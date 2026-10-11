@@ -58,7 +58,8 @@ impl Tally {
     }
 }
 
-/// The option matrix plus the buffer API and reparse deferral variants.
+/// The option matrix plus the buffer API, reparse deferral and namespace
+/// triplet variants.
 fn extended_options() -> Vec<ParseOptions> {
     let mut v = option_matrix();
     v.push(ParseOptions {
@@ -76,6 +77,12 @@ fn extended_options() -> Vec<ParseOptions> {
         chunk_size: 2,
         buffer_api: true,
         encoding: Some("UTF-16LE".into()),
+        ..ParseOptions::default()
+    });
+    v.push(ParseOptions {
+        chunk_size: 5,
+        ns_separator: Some(b'|'),
+        ns_triplets: true,
         ..ParseOptions::default()
     });
     v
@@ -126,6 +133,7 @@ fn random_options(r: &mut Rng) -> ParseOptions {
         chunk_size: *r.pick(&[0, 0, 1, 2, 3, 5, 7, 64, 1000, 1500]),
         buffer_api: r.one_in(3),
         no_reparse_deferral: r.one_in(4),
+        ns_triplets: r.one_in(3),
         ..ParseOptions::default()
     }
 }
@@ -143,6 +151,41 @@ fn generated_documents_match_c() {
     }
     tally.assert_clean("generated");
     assert!(tally.compared > 5000, "generator lost coverage");
+}
+
+/// Namespace triplets (`XML_SetReturnNSTriplet`): element and attribute
+/// names with prefixes, the default namespace, and the duplicate-attribute
+/// check for two prefixes bound to one URI, whose C comparison (the stored
+/// name, which carries the triplet suffix, starts with the new one) only
+/// differs from plain equality when triplets are on.
+#[test]
+fn namespace_triplets_match_c() {
+    let docs: &[&[u8]] = &[
+        b"<a:e xmlns:a='u' a:x='1' y='2'><a:f/></a:e>",
+        b"<e xmlns='d' xmlns:p='u'><p:f p:x='1'/><g/></e>",
+        b"<e xmlns:a='u' xmlns:b='u' a:x='1' b:x='2'/>",
+        b"<e xmlns:a='u' xmlns:b='u' a:x='1' b:xy='2'/>",
+        b"<e xmlns:a='u' xmlns:b='v' a:x='1' b:x='2'/>",
+        b"<e xmlns:a='u' a:x='1' a:x='2'/>",
+        b"<e xmlns:a='' a:x='1'/>",
+    ];
+    let mut tally = Tally::default();
+    for (i, doc) in docs.iter().enumerate() {
+        for sep in *b"|\n:" {
+            for chunk in [0, 1, 4] {
+                for triplets in [false, true] {
+                    let o = ParseOptions {
+                        ns_separator: Some(sep),
+                        chunk_size: chunk,
+                        ns_triplets: triplets,
+                        ..ParseOptions::default()
+                    };
+                    assert!(tally.check(&format!("triplets #{i}"), doc, &o));
+                }
+            }
+        }
+    }
+    tally.assert_clean("triplets");
 }
 
 /// Q-1 and Q-2 (docs/DIVERGENCES.md): the position after CR LF / CR at the

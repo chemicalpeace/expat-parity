@@ -109,8 +109,9 @@ pub const SEED: u64 = 0x7365_6564_732d_3130;
 /// Selector pairs every upstream vector is paired with in the
 /// `parse_trace` seeds: default, 1-byte chunks, 3-byte chunks with `|`
 /// namespaces, UTF-16 override, ISO-8859-1 override with 2-byte chunks,
-/// buffer API without reparse deferral, parameter entity parsing always.
-const VECTOR_SELECTORS: [[u8; 2]; 7] = [
+/// buffer API without reparse deferral, parameter entity parsing always,
+/// namespaces with triplets.
+const VECTOR_SELECTORS: [[u8; 2]; 8] = [
     [0x00, 0x00],
     [0x01, 0x00],
     [0x06, 0x00],
@@ -118,6 +119,7 @@ const VECTOR_SELECTORS: [[u8; 2]; 7] = [
     [0x2B, 0x00],
     [0x01, 0x03],
     [0x80, 0x00],
+    [0x04, 0x40],
 ];
 
 /// The seed inputs of a fuzz target (`parse_trace` or `buffer_diff`), in a

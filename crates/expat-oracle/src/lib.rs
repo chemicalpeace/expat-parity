@@ -223,6 +223,9 @@ pub struct ParseOptions {
     pub buffer_api: bool,
     /// `XML_SetReparseDeferralEnabled(parser, XML_FALSE)`.
     pub no_reparse_deferral: bool,
+    /// `XML_SetReturnNSTriplet(parser, XML_TRUE)` (only has an effect with
+    /// namespaces).
+    pub ns_triplets: bool,
 }
 
 /// Errors of the oracle wrapper itself (never of the parse being traced).
@@ -269,6 +272,7 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
         },
         buffer_api: c_int::from(opts.buffer_api),
         no_reparse_deferral: c_int::from(opts.no_reparse_deferral),
+        ns_triplets: c_int::from(opts.ns_triplets),
     };
     let mut out: *mut u8 = std::ptr::null_mut();
     let mut out_len: usize = 0;

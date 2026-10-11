@@ -136,6 +136,9 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
     if opts.no_reparse_deferral {
         p.set_reparse_deferral_enabled(false);
     }
+    if opts.ns_triplets {
+        p.set_return_ns_triplet(true);
+    }
     let mut st = parse::Status::Ok;
     if opts.chunk_size == 0 || opts.chunk_size >= doc.len() {
         st = feed(&mut p, &mut t, doc, true, opts.buffer_api);

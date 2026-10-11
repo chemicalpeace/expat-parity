@@ -17,7 +17,11 @@ built-in encoding and for application-defined encodings, the converters to
 UTF-8/UTF-16, encoding detection and the XML declaration), i.e. all of
 `xmltok.c`, `xmltok_impl.c` and `xmltok_ns.c`; module 8 is `xmlrole.c` (the
 prolog/DTD state machine); module 9 is the string pool and hash table of
-`xmlparse.c` with C's allocation behaviour. No public parser API exists yet.
+`xmlparse.c` with C's allocation behaviour; module 10 is the parser core of
+`xmlparse.c` for documents without a document type declaration (buffer,
+prolog, content, attributes, namespaces, CDATA, epilog, positions). No
+public parser API exists yet (module 12); the DTD, entities and the
+amplification limits are module 11.
 
 ## Verification infrastructure
 
@@ -25,7 +29,8 @@ prolog/DTD state machine); module 9 is the string pool and hash table of
   (`scripts/verify-vendor.sh`, 39 files).
 - Trace format = definition of "equal" (`docs/ARCHITECTURE.md`).
 - 540 upstream-derived vectors (`tests/vectors/`), golden traces, 7 upstream
-  error expectations asserted, 7 option sets in the differential matrix.
+  error expectations asserted, 7 option sets in the differential matrix
+  (10 for whole parses since module 10).
 
 ### Harness self-test
 
@@ -118,17 +123,141 @@ for fuzz and Miri.
   | `role_diff` | module 8: role + full state after every token, documents and synthetic sequences, document/external entity | 631 s | 5,158,518 |
   | `core_diff` | module 9: pool and hash table programs with allocation refusals, white-box state after every operation | 665 s (7 runs of 95 s) | 143,161 |
 
+  | `parse_trace` | module 10: whole parses, port vs C by trace (documents with a DTD skipped), options from two selector bytes | 672 s (7 slices of 96 s) | 3,486,658 |
+  | `buffer_diff` | module 10: `XML_Parse`/`XML_GetBuffer`/`XML_ParseBuffer` programs, buffer state after every operation, white-box | 672 s (7 slices of 96 s) | 5,605,579 |
+
+  Module 10 figures are the sums of `stat::number_of_executed_units` in the
+  libFuzzer logs kept in `docs/fuzz-logs/module-10/` (one file per slice;
+  `-max_len=65536 -rss_limit_mb=2048`, ASan). `parse_trace`: edge coverage
+  (`cov:`) 9,282 at the start of the first slice to 9,390 at the end of the
+  fifth (features 37,102 to 38,633); slices 6 and 7 restarted from the
+  minimised corpus because a sandbox reset deleted the working corpus
+  (9,282 to 9,324). `buffer_diff`: 5,746 to 6,358 edges (features 19,535 to
+  23,376), still growing slowly. The instrumented binaries contain 54,668
+  counters each, including the C oracle and the harness, so the edge counts
+  are not a coverage percentage of the port. Findings: none in these runs.
+  Earlier module 10 runs found the `errorProcessor` bug (D-023, fixed in
+  89c7e9e). Figures reported before for module 10 (`parse_trace` 665 s /
+  5,223,814, `buffer_diff` 790 s / 6,563,968) came from a summary file of
+  one line per slice, without the raw logs; two `buffer_diff` lines were
+  recorded from the console because their slices ran concurrently with
+  `parse_trace` and lost their log lines, and two of those were entered
+  twice. They are not used; the runs above replace them.
+
+  Seeding `buffer_diff` with the upstream vectors for the corpus merge
+  showed a gap in the target: it compared documents with a DTD although
+  the port stops at them (136 inputs failed, every one with the port's
+  `Stop::DtdNotPorted` code). The fuzzer had never produced such an input.
+  The target now skips them as `parse_trace` does
+  (`expat_difftest::fuzzcase::buffer_diff_case`); module 11 removes both
+  skips.
+
   Corpora were minimised with `cargo fuzz cmin` and committed
   (`fuzz/corpus/`). `core_diff` was run in 95-second slices because a
   command may run at most two minutes in the current sandbox; two earlier
   slices (216 s, 65,802 executions, no finding) are not counted because a
   deliberate-bug experiment edited the source while they were being built.
+  Since module 10 the corpora, the seed generator and the merge command are
+  documented in `docs/FUZZING.md`; `tests/tests/fuzz_corpus.rs` replays the
+  `parse_trace` (8,495 files) and `buffer_diff` (6,787 files) corpora on
+  every CI platform.
+
+### Module 10 (PR #5): the parser core versus C
+
+**What "equal" means.** Each parse produces a canonical trace
+(`docs/ARCHITECTURE.md`, "Trace format"): one line per callback (XML
+declaration, start tag with its specified-attribute count and every
+attribute in libexpat's order, end tag, character data coalesced into one
+line between other events, PIs, comments, CDATA start/end, namespace
+start/end, skipped entities, and the DTD events once ported), ending with
+`result <ok|error> <error_code> <line> <column> <byte_index>` taken from
+`XML_GetErrorCode` and the position getters after the last call. C's trace
+comes from the vendored libexpat 2.9.0 through `shim/oracle_trace.c`; the
+port's from `tests/src/port.rs`. Two traces must be byte-identical; the only
+normalisation is the coalescing of character data (libexpat splits it at
+buffer boundaries, which applications cannot rely on).
+
+**The 398 upstream vectors under 10 option sets.**
+`tests/tests/parse_diff.rs::upstream_vectors_match_c` parses each of the
+540 documents extracted from libexpat's test suite (`tests/vectors/`) with
+both parsers under each of these option sets:
+
+| # | Option set |
+|---|---|
+| 1 | defaults: no namespaces, no encoding override, whole document in one `XML_Parse` call |
+| 2 | 1-byte chunks (`XML_Parse` per byte, last call final) |
+| 3 | 7-byte chunks |
+| 4 | namespaces, separator `\|` |
+| 5 | encoding override `ISO-8859-1` |
+| 6 | encoding override `UTF-16` |
+| 7 | parameter entity parsing `ALWAYS`, namespaces with separator `\n`, 3-byte chunks |
+| 8 | 3-byte chunks through `XML_GetBuffer` + `XML_ParseBuffer` |
+| 9 | 1-byte chunks, reparse deferral off, namespaces with separator `:` |
+| 10 | 2-byte chunks through the buffer API, encoding override `UTF-16LE` |
+
+Chunking means the document is fed in pieces of that many bytes, each a
+separate `XML_Parse` (or `XML_GetBuffer` with a request of `2n + 3` bytes
+then `XML_ParseBuffer(n)`), with `isFinal` on the last; this exercises
+partial tokens, the reparse-deferral heuristic and buffer growth. 398 of
+the 540 vectors are compared under all 10 option sets (3,980 trace pairs)
+and every pair is equal. The other 142 contain a document type declaration;
+the port stops at it with `Stop::DtdNotPorted` and those pairs are counted,
+not compared (module 11). The test asserts the count (`fully == 398`), so a
+change in scope is visible. Generated documents add a second population:
+`generated_documents_match_c` parses 2,500 seeded documents
+(`expat_difftest::docgen`: XML declarations, nesting, attributes with and
+without namespaces, references, CDATA, PIs, comments, encoded as UTF-8,
+UTF-16LE/BE with and without BOM or Latin-1, a third of them damaged by
+truncation or byte edits) under 3 random option sets each (14 encoding
+overrides including an unknown one, 6 separators, 10 chunk sizes, buffer
+API, reparse deferral) and requires over 5,000 compared pairs. The buffer
+itself is compared white-box (`tests/tests/buffer_diff.rs`: buffer
+offsets, limit, `m_lastBufferRequestSize`, parse-end and event pointers
+after every operation).
+
+Local run (2026-10-11, aarch64 Linux):
+`cargo test -p expat-difftest --test parse_diff -- --nocapture` →
+`upstream: 398 of 540 vectors compared under every option set`, 4 tests
+passed.
+
+**Injected bugs** (module 10, recorded in the PR #5 commits): the
+`errorProcessor` reset found by `buffer_diff` was a real port bug, fixed in
+89c7e9e with a unit test.
+
+**Coverage** of `crates/expat` (the port), measured with
+`cargo-llvm-cov 0.8` (`cargo llvm-cov --no-report` per test target, then
+`cargo llvm-cov report --ignore-filename-regex
+'(tests/|crates/expat-oracle|benches/|fuzz/|vendor)'`), toolchain 1.99.0,
+commit 6504844 (the module 10 code):
+
+| Metric | Covered | Total | % |
+|---|---|---|---|
+| Regions | 7,910 | 8,418 | 93.97 |
+| Functions | 395 | 428 | 92.29 |
+| Lines | 4,397 | 4,749 | 92.59 |
+
+Per module (lines): `parse/content.rs` 82.18 %, `parse/mod.rs` 82.78 %,
+`parse/prolog.rs` 90.54 %, `parse/dtd.rs` 95.76 %, `role` 99.44 %,
+`tok/scan.rs` 97.64 %, `pool` 97.55 %, `hash` 96.02 %, `chartab` 48.57 %
+(the runtime table accessors; the tables are checked byte for byte against
+C, mostly by generated-table checks). Included: the unit tests of every
+crate and the integration tests `parse_diff`, `buffer_diff`,
+`upstream_vectors`, `trace_format`, `harness_selftest`, `module_diff`,
+`core_diff`, `role_diff`, `init_diff` and 11 of the 12 `tok_diff` tests.
+Not included: doctests (need nightly `--doctests`), and
+`tok_diff::upstream_vectors_every_offset`, which does not finish within the
+sandbox's two-minute command limit in an unoptimised instrumented build
+(it exercises only the tokenizer, already at 97-100 % lines). Fuzzing
+coverage is not included. Uncovered parser code is mostly the
+suspend/resume and handler-status branches that only the public API
+(module 12) can reach (D-023) and allocation-failure paths.
 
 ## Divergences
 
 `docs/DIVERGENCES.md`. No divergences yet. Three C quirks found by the
 harness, all chunking-related: Q-3 resolved as "replicate" (module 7; the
-input violates XML 1.0 §4.3.3), Q-1 and Q-2 pending (module 10).
+input violates XML 1.0 §4.3.3), Q-1 and Q-2 resolved as "replicate"
+(module 10, D-024).
 Platform-dependent C behaviour fixed to one choice: D-016 (counter width),
 D-017 (sign of stray bytes in `utf8_toUtf16`).
 
@@ -139,7 +268,24 @@ comparisons start when the parser exists.
 
 ## Limitations
 
-- No parser API yet (Phase 3 in progress).
+- No public parser API yet (module 12): no default handler,
+  `XML_StopParser`/`XML_ResumeParser`, external entity parsers,
+  unknown-encoding handler or `XML_GetInputContext`.
+- Module 10 stops at any document type declaration or declared entity with
+  `Stop::DtdNotPorted` (D-023), never with a guessed error; 142 of the 540
+  upstream vectors (and every DTD input of the fuzz targets) are therefore
+  not compared yet. Module 11 removes the variant.
+- The allocation tracker's byte counts (`XML_SetAllocTrackerMaximumAmplification`)
+  are replicated for the hash tables only; whether every parser structure is
+  replicated is decided in module 11 (D-021, D-023). Without a failing
+  allocator or a tracker limit nothing observable depends on it.
+- D-017: on targets where C `char` is unsigned (aarch64 Linux) C's
+  `utf8_toUtf16` zero-extends stray bytes that the port sign-extends; the
+  parser never passes such bytes to the converter, and the tokenizer
+  harness accepts exactly those units there. Every CI target has a signed
+  `char`.
+- Q-1/Q-2 (DIVERGENCES.md): positions after a CR at the end of the input
+  depend on chunking in C; the port replicates it.
 - `XML_UNICODE` builds are out of scope (D-002).
 
 ## Reproduce
@@ -148,4 +294,5 @@ comparisons start when the parser exists.
 cargo test --workspace --all-features
 scripts/ci-local.sh
 cargo run -p expat-difftest --bin oracle_trace -- some.xml
+cargo run -p expat-difftest --bin fuzz_seeds -- /tmp/seeds   # docs/FUZZING.md
 ```

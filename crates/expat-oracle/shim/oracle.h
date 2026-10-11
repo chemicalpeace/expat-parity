@@ -39,6 +39,7 @@ struct oracle_options {
   int param_entity_parsing; /* XML_ParamEntityParsing value */
   int buffer_api; /* 1: XML_GetBuffer(2n+3) + XML_ParseBuffer(n) per chunk */
   int no_reparse_deferral; /* 1: XML_SetReparseDeferralEnabled(p, 0) */
+  int ns_triplets; /* 1: XML_SetReturnNSTriplet(p, 1) */
 };
 
 int oracle_type_table(int id, unsigned char out[256]);

@@ -11,6 +11,7 @@ pub(crate) struct OracleOptions {
     pub(crate) param_entity_parsing: c_int,
     pub(crate) buffer_api: c_int,
     pub(crate) no_reparse_deferral: c_int,
+    pub(crate) ns_triplets: c_int,
 }
 
 /// Mirror of `struct oracle_role_state`.

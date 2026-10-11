@@ -406,6 +406,8 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   XML_SetSkippedEntityHandler(p, on_skipped);
   if (opts->no_reparse_deferral)
     XML_SetReparseDeferralEnabled(p, XML_FALSE);
+  if (opts->ns_triplets)
+    XML_SetReturnNSTriplet(p, XML_TRUE);
 
   if (opts->chunk_size == 0 || opts->chunk_size >= len) {
     st = feed(p, doc, len, 1, opts->buffer_api);

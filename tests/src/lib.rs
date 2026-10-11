@@ -68,7 +68,8 @@ pub fn options_from_selector(sel: u8) -> ParseOptions {
 /// whole-parser target: bit 0 feeds through `XML_GetBuffer` +
 /// `XML_ParseBuffer`, bit 1 disables reparse deferral, bits 2-3 pick the
 /// namespace separator used when namespaces are on (`|`, `\n`, `:`, `#`),
-/// bits 4-5 replace the chunk size of 64 by 2, 7, 1024 or keep it.
+/// bits 4-5 replace the chunk size of 64 by 2, 7, 1024 or keep it, bit 6
+/// turns on `XML_SetReturnNSTriplet` (namespace triplets).
 pub fn options_from_selectors(sel: u8, sel2: u8) -> ParseOptions {
     let mut o = options_from_selector(sel);
     o.buffer_api = sel2 & 1 != 0;
@@ -76,6 +77,7 @@ pub fn options_from_selectors(sel: u8, sel2: u8) -> ParseOptions {
     if o.ns_separator.is_some() {
         o.ns_separator = Some(b"|\n:#"[usize::from((sel2 >> 2) & 3)]);
     }
+    o.ns_triplets = sel2 & 0x40 != 0;
     if o.chunk_size == 64 {
         o.chunk_size = [2, 7, 1024, 64][usize::from((sel2 >> 4) & 3)];
     }
