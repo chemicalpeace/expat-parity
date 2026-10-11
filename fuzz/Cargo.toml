@@ -45,3 +45,10 @@ path = "fuzz_targets/role_diff.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "core_diff"
+path = "fuzz_targets/core_diff.rs"
+test = false
+doc = false
+bench = false
