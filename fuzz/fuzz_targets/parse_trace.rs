@@ -1,6 +1,8 @@
-//! Whole-document differential target. The first input byte selects the
-//! parse options (namespaces, chunk size, encoding override, parameter
-//! entity parsing); the rest is the document.
+//! Whole-document differential target. The first two input bytes select
+//! the parse options (namespaces and separator, chunk size, encoding
+//! override, parameter entity parsing, `XML_Parse` or the buffer API,
+//! reparse deferral; `expat_difftest::options_from_selectors`); the rest is
+//! the document.
 //!
 //! The port's parser and the C oracle parse the document and their
 //! canonical traces must be equal. Documents with a document type
@@ -13,10 +15,10 @@ use expat_difftest::trace::{first_difference, is_well_formed_trace};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    let Some((&sel, doc)) = data.split_first() else {
+    let [sel, sel2, doc @ ..] = data else {
         return;
     };
-    let opts = expat_difftest::options_from_selector(sel);
+    let opts = expat_difftest::options_from_selectors(*sel, *sel2);
     let c = expat_oracle::parse_trace(doc, &opts).expect("oracle shim allocation");
     assert!(is_well_formed_trace(&c), "malformed trace");
     if let PortTrace::Trace(rust) = port_trace(doc, &opts) {

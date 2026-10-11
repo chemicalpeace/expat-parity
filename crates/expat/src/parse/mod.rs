@@ -767,7 +767,13 @@ impl Parser {
             Processor::Content => self.content_processor(h, buf, start, end_ptr),
             Processor::CdataSection => self.cdata_section_processor(h, buf, start, end_ptr),
             Processor::Epilog => self.epilog_processor(h, buf, start, end_ptr),
-            Processor::Error => Err(self.error_code),
+            // `errorProcessor` returns `m_errorCode`, which a later call
+            // that the reparse-deferral heuristic skipped may have reset to
+            // XML_ERROR_NONE; then it succeeds, like C.
+            Processor::Error => match self.error_code {
+                Stop::Error(XmlError::None) => Ok(()),
+                e => Err(e),
+            },
         }
     }
 }

@@ -19,7 +19,7 @@ fn check(doc: &[u8], ops: &[BufferOp], ns: bool, deferral: bool) {
     assert_eq!(
         r,
         c,
-        "ops {ops:?} ns {ns} deferral {deferral}\ndoc {:?}",
+        "left: port, right: C; ops {ops:?} ns {ns} deferral {deferral}\ndoc {:?}",
         String::from_utf8_lossy(doc)
     );
 }
@@ -111,7 +111,17 @@ fn buffer_edge_cases_match_c() {
             },
         ],
         // len larger than the free space of the buffer: XML_ERROR_INVALID_ARGUMENT.
-        vec![BufferOp::Buffer { req: 5, n: 5000, is_final: false }, BufferOp::Parse { n: 40, is_final: true }],
+        vec![
+            BufferOp::Buffer {
+                req: 5,
+                n: 5000,
+                is_final: false,
+            },
+            BufferOp::Parse {
+                n: 40,
+                is_final: true,
+            },
+        ],
         // Empty requests and parses.
         vec![
             BufferOp::Buffer {

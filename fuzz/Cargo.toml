@@ -52,3 +52,10 @@ path = "fuzz_targets/core_diff.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "buffer_diff"
+path = "fuzz_targets/buffer_diff.rs"
+test = false
+doc = false
+bench = false
