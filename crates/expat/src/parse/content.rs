@@ -9,6 +9,7 @@ use core::ffi::c_ulong;
 use super::accounting::Account;
 use super::dtd::{Binding, BindingId, EntityRef, PrefixId};
 use super::error::{Stop, XmlError};
+use super::entity::EntityType;
 use super::prolog::{to_utf8, with_known};
 use super::{Enc, Handler, INIT_ATTS_SIZE, INIT_DATA_BUF_SIZE, Parser, Parsing, Processor, Tag};
 use crate::encode::utf8_encode;
@@ -246,10 +247,11 @@ impl Parser {
         loop {
             let r = enc.to_utf8(bytes(buf, s, next), &mut data);
             s += r.read;
-            self.event_end_ptr = Some(match from {
+            let end_at = match from {
                 DataIn::Content => s,
                 DataIn::Cdata => next,
-            });
+            };
+            self.ev_end(enc, Some(end_at));
             h.character_data(data.get(..r.written).unwrap_or_default());
             if matches!(
                 r.result,
@@ -257,13 +259,13 @@ impl Parser {
             ) {
                 return;
             }
-            self.event_ptr = Some(s);
+            self.ev(enc, Some(s));
         }
     }
 
     /// `doContent` (document entity: `startTagLevel` 0).
     #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of doContent.
-    fn do_content<E: Encoding, H: Handler>(
+    pub(crate) fn do_content<E: Encoding, H: Handler>(
         &mut self,
         h: &mut H,
         enc: &E,
@@ -277,7 +279,7 @@ impl Parser {
         let end = buf.len();
         let m = E::MINBPC;
         let mut s = s;
-        self.event_ptr = Some(s);
+        self.ev(enc, Some(s));
         loop {
             let r = content_tok(enc, buf, s);
             let tok = r.scan;
@@ -299,14 +301,14 @@ impl Parser {
             {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
-            self.event_end_ptr = Some(next);
+            self.ev_end(enc, Some(next));
             match tok {
                 Scan::TrailingCr => {
                     if have_more {
                         *next_ptr = s;
                         return Ok(());
                     }
-                    self.event_end_ptr = Some(end);
+                    self.ev_end(enc, Some(end));
                     if self.handlers.character_data {
                         h.character_data(b"\n");
                     }
@@ -334,7 +336,7 @@ impl Parser {
                     return Err(XmlError::NoElements.into());
                 }
                 Scan::Invalid => {
-                    self.event_ptr = Some(next);
+                    self.ev(enc, Some(next));
                     return Err(XmlError::InvalidToken.into());
                 }
                 Scan::Partial => {
@@ -449,7 +451,7 @@ impl Parser {
                     }
                     if self.handlers.end_element {
                         if self.handlers.start_element {
-                            self.event_ptr = self.event_end_ptr;
+                            self.ev(enc, self.ev_end_get(enc));
                         }
                         h.end_element(&name);
                     }
@@ -467,7 +469,7 @@ impl Parser {
                     let raw = bytes(buf, raw_start, raw_start + len);
                     let matches = self.tag_stack.last().is_some_and(|t| t.raw_name == raw);
                     if !matches {
-                        self.event_ptr = Some(raw_start);
+                        self.ev(enc, Some(raw_start));
                         return Err(XmlError::TagMismatch.into());
                     }
                     let Some(tag) = self.tag_stack.pop() else {
@@ -529,11 +531,11 @@ impl Parser {
                         }
                     }
                     if start_tag_level == 0 {
-                        self.event_ptr = Some(end);
+                        self.ev(enc, Some(end));
                         return Err(XmlError::NoElements.into());
                     }
                     if self.tag_level != start_tag_level {
-                        self.event_ptr = Some(end);
+                        self.ev(enc, Some(end));
                         return Err(XmlError::AsyncEntity.into());
                     }
                     *next_ptr = end;
@@ -551,12 +553,12 @@ impl Parser {
             }
             match self.parsing {
                 Parsing::Suspended => {
-                    self.event_ptr = Some(next);
+                    self.ev(enc, Some(next));
                     *next_ptr = next;
                     return Ok(());
                 }
                 Parsing::Finished => {
-                    self.event_ptr = Some(next);
+                    self.ev(enc, Some(next));
                     return Err(XmlError::Aborted.into());
                 }
                 Parsing::Parsing if self.reenter => {
@@ -565,7 +567,7 @@ impl Parser {
                 }
                 Parsing::Parsing | Parsing::Initialized => {
                     s = next;
-                    self.event_ptr = Some(s);
+                    self.ev(enc, Some(s));
                 }
             }
         }
@@ -620,7 +622,7 @@ impl Parser {
         let Some(mut s) = start.take() else {
             return Err(XmlError::UnexpectedState.into());
         };
-        self.event_ptr = Some(s);
+        self.ev(enc, Some(s));
         loop {
             let r = cdata_section_tok(enc, buf, s);
             // In case of XML_TOK_NONE or XML_TOK_PARTIAL.
@@ -631,7 +633,7 @@ impl Parser {
             {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
-            self.event_end_ptr = Some(next);
+            self.ev_end(enc, Some(next));
             match r.scan {
                 Scan::Token(Tok::CdataSectClose) => {
                     if self.handlers.end_cdata_section {
@@ -653,7 +655,7 @@ impl Parser {
                     self.report_chars(h, enc, buf, s, next, DataIn::Cdata);
                 }
                 Scan::Invalid => {
-                    self.event_ptr = Some(next);
+                    self.ev(enc, Some(next));
                     return Err(XmlError::InvalidToken.into());
                 }
                 Scan::PartialChar => {
@@ -671,24 +673,24 @@ impl Parser {
                     return Err(XmlError::UnclosedCdataSection.into());
                 }
                 _ => {
-                    self.event_ptr = Some(next);
+                    self.ev(enc, Some(next));
                     return Err(XmlError::UnexpectedState.into());
                 }
             }
             match self.parsing {
                 Parsing::Suspended => {
-                    self.event_ptr = Some(next);
+                    self.ev(enc, Some(next));
                     *next_ptr = next;
                     return Ok(());
                 }
                 Parsing::Finished => {
-                    self.event_ptr = Some(next);
+                    self.ev(enc, Some(next));
                     return Err(XmlError::Aborted.into());
                 }
                 Parsing::Parsing if self.reenter => return Err(XmlError::UnexpectedState.into()),
                 Parsing::Parsing | Parsing::Initialized => {
                     s = next;
-                    self.event_ptr = Some(s);
+                    self.ev(enc, Some(s));
                 }
             }
         }
@@ -798,7 +800,7 @@ impl Parser {
             // prefixes for the same namespace are used. For this case we
             // have a check further down.
             if self.dtd.att_flag(id) != 0 {
-                self.event_ptr = Some(att.name);
+                self.ev_doc(enc, Some(att.name));
                 return Err(XmlError::DuplicateAttribute.into());
             }
             self.dtd.set_att_flag(id, 1);
@@ -1096,34 +1098,12 @@ impl Parser {
         }
     }
 
-    /// `storeAttributeValue`: the normalised value of `buf[ptr..end]`.
-    /// `in_prolog` says whether C would store into `dtd->pool` (a default
-    /// value in an attribute-list declaration) rather than the temporary
-    /// pool (a start tag), which decides how undeclared entities are
-    /// checked.
-    #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of storeAttributeValue.
-    pub(crate) fn store_attribute_value<E: Encoding>(
-        &mut self,
-        enc: &E,
-        buf: &[u8],
-        is_cdata: bool,
-        ptr: usize,
-        end: usize,
-        account: Account,
-        in_prolog: bool,
-    ) -> Result<Vec<u8>, Stop> {
-        let mut out = Vec::new();
-        self.append_attribute_value(enc, bytes(buf, 0, end), is_cdata, ptr, &mut out, account, in_prolog)?;
-        if !is_cdata && out.last() == Some(&0x20) {
-            out.pop();
-        }
-        Ok(out)
-    }
-
     /// `appendAttributeValue` on `buf[ptr..]` (the slice ends at the end of
     /// the value), appending to `out` (the current string of the pool).
+    /// Returns at the end of the value or after opening an entity
+    /// (`*next_ptr` is then where to continue).
     #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of appendAttributeValue.
-    fn append_attribute_value<E: Encoding>(
+    pub(crate) fn append_attribute_value<E: Encoding>(
         &mut self,
         enc: &E,
         buf: &[u8],
@@ -1132,6 +1112,7 @@ impl Parser {
         out: &mut Vec<u8>,
         account: Account,
         in_prolog: bool,
+        next_ptr: &mut usize,
     ) -> Result<(), Stop> {
         let m = E::MINBPC;
         let mut ptr = ptr;
@@ -1145,19 +1126,22 @@ impl Parser {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
             match r.scan {
-                Scan::None => return Ok(()),
+                Scan::None => {
+                    *next_ptr = next;
+                    return Ok(());
+                }
                 Scan::Invalid => {
-                    self.event_ptr = Some(next);
+                    self.ev_doc(enc, Some(next));
                     return Err(XmlError::InvalidToken.into());
                 }
                 Scan::Partial => {
-                    self.event_ptr = Some(ptr);
+                    self.ev_doc(enc, Some(ptr));
                     return Err(XmlError::InvalidToken.into());
                 }
                 Scan::Token(Tok::CharRef) => {
                     let n = char_ref_number(enc, buf, ptr);
                     let Ok(c) = u32::try_from(n) else {
-                        self.event_ptr = Some(ptr);
+                        self.ev_doc(enc, Some(ptr));
                         return Err(XmlError::BadCharRef.into());
                     };
                     if !(!is_cdata && c == 0x20 && (out.is_empty() || out.last() == Some(&0x20))) {
@@ -1221,22 +1205,24 @@ impl Parser {
                             return Err(XmlError::EntityDeclaredInPe.into());
                         }
                         if open {
-                            self.event_ptr = Some(ptr);
+                            self.ev_doc(enc, Some(ptr));
                             return Err(XmlError::RecursiveEntityRef.into());
                         }
                         if notation {
-                            self.event_ptr = Some(ptr);
+                            self.ev_doc(enc, Some(ptr));
                             return Err(XmlError::BinaryEntityRef.into());
                         }
                         if !text {
-                            self.event_ptr = Some(ptr);
+                            self.ev_doc(enc, Some(ptr));
                             return Err(XmlError::AttributeExternalEntityRef.into());
                         }
-                        return self.expand_attribute_entity(r);
+                        self.process_entity(r, false, EntityType::Attribute)?;
+                        *next_ptr = next;
+                        return Ok(());
                     }
                 }
                 _ => {
-                    self.event_ptr = Some(ptr);
+                    self.ev_doc(enc, Some(ptr));
                     return Err(XmlError::UnexpectedState.into());
                 }
             }

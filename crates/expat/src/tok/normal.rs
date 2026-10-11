@@ -121,6 +121,10 @@ impl Encoding for Normal {
         !matches!(self, Normal::Latin1 | Normal::Latin1Ns)
     }
 
+    fn is_internal(&self) -> bool {
+        matches!(self, Normal::InternalUtf8 | Normal::InternalUtf8Ns)
+    }
+
     fn to_utf8(&self, from: &[u8], to: &mut [u8]) -> Converted {
         match self {
             Normal::Latin1 | Normal::Latin1Ns => convert::latin1_to_utf8(from, to),

@@ -105,7 +105,7 @@ fn upstream_vectors_match_c() {
     tally.assert_clean("upstream");
     // Every vector without a document type declaration is compared under
     // every option set; the count changes only with the ported scope.
-    assert_eq!(fully, 494);
+    assert_eq!(fully, 540);
 }
 
 /// Random option set for generated documents.

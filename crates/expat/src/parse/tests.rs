@@ -184,16 +184,22 @@ fn error_positions() {
 }
 
 #[test]
-fn declarations_are_ported_expansion_is_next() {
-    // Module 11a: declarations parse; expanding a declared internal entity
-    // is module 11b and still stops the parser.
-    let (st, _, _) = parse(b"<!DOCTYPE d [<!ELEMENT d ANY><!ENTITY e 'x'>]><d/>", None);
-    assert_eq!(st, Status::Ok);
+fn internal_entities_expand_without_recursion() {
+    // Module 11b: content, attribute values and nested references.
     let mut p = Parser::new(None, None, [0; 16]);
     p.set_handlers(all());
-    let doc = b"<!DOCTYPE d [<!ENTITY e 'x'>]><d>&e;</d>";
+    let mut ev = Events::default();
+    let doc = b"<!DOCTYPE d [<!ENTITY e 'x&f;y'><!ENTITY f '<i a=\"&g;\"/>'><!ENTITY g 'v'>]><d>&e;</d>";
+    assert_eq!(p.parse(&mut ev, doc, true), Status::Ok);
+    let want: [&[u8]; 7] = [b"start d 0", b"text x", b"start i 2", b"attr a v", b"end i", b"text y", b"end d"];
+    let got: Vec<&[u8]> = ev.0.iter().map(Vec::as_slice).filter(|e| !e.starts_with(b"entity")).collect();
+    assert!(got.ends_with(&want), "{got:?}");
+    // A cycle a -> b -> a is an error at the reference that closes it.
+    let mut p = Parser::new(None, None, [0; 16]);
+    p.set_handlers(all());
+    let doc = b"<!DOCTYPE d [<!ENTITY a '&b;'><!ENTITY b '&a;'>]><d>&a;</d>";
     assert_eq!(p.parse(&mut Events::default(), doc, true), Status::Error);
-    assert_eq!(p.error_code(), Stop::DtdNotPorted);
+    assert_eq!(p.error_code(), Stop::Error(XmlError::RecursiveEntityRef));
 }
 
 #[test]

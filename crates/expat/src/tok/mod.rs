@@ -97,6 +97,16 @@ pub trait Encoding {
     /// conversion (true for UTF-8 and US-ASCII).
     fn is_utf8(&self) -> bool;
 
+    /// Whether this is one of the internal encodings of
+    /// `XmlGetUtf8InternalEncoding(NS)`, the encoding of replacement text.
+    /// The parser's own encoding (`m_encoding`) never is one, so this is
+    /// `xmlparse.c`'s `enc != parser->m_encoding` test: it decides whether
+    /// `doContent`/`doProlog` update the document's event pointers or
+    /// those of the innermost open internal entity.
+    fn is_internal(&self) -> bool {
+        false
+    }
+
     /// `XmlUtf8Convert`: converts from the start of `from` into `to`.
     fn to_utf8(&self, from: &[u8], to: &mut [u8]) -> Converted;
 
