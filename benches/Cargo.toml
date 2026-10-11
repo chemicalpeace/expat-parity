@@ -1,0 +1,23 @@
+[package]
+name = "expat-bench"
+description = "Criterion benchmarks: safe port versus libexpat C"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints.rust]
+missing_docs = "deny"
+
+[dependencies]
+expat = { path = "../crates/expat", features = ["internal-api"] }
+expat-oracle = { path = "../crates/expat-oracle" }
+
+[dev-dependencies]
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "oracle_parse"
+harness = false

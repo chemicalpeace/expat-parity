@@ -1,0 +1,22 @@
+[package]
+name = "expat"
+description = "Memory-safe Rust port of the libexpat XML parser, verified against the C reference"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[features]
+default = ["std"]
+## Implements std::error::Error and other std-only conveniences.
+std = []
+## Exposes internal modules for the differential test crate. Not a stable API.
+internal-api = []
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+proptest = "1"

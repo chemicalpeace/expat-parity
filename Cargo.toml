@@ -1,0 +1,31 @@
+[workspace]
+resolver = "3"
+members = ["crates/expat", "crates/expat-oracle", "tests", "benches"]
+default-members = ["crates/expat", "crates/expat-oracle", "tests", "benches"]
+exclude = ["fuzz"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT"
+repository = "https://github.com/chemicalpeace/expat-rs"
+publish = false
+
+[workspace.lints.rust]
+missing_docs = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+indexing_slicing = "warn"
+arithmetic_side_effects = "warn"
+
+[profile.release]
+debug = 1

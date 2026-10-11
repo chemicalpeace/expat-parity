@@ -1,0 +1,21 @@
+[package]
+name = "expat-oracle"
+description = "Test-only FFI to the vendored libexpat C reference (the oracle). Not for production use."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+links = "expat_oracle"
+build = "build.rs"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+
+[build-dependencies]
+cc = "1"
