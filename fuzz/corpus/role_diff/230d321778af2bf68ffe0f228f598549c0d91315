@@ -1,0 +1,4 @@
+<!DOCTYPE d [<?xTITY % pe "x"> <!EN"1.0"?>
+<!ENTITY % pe "x"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n1 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIE x?><d/>

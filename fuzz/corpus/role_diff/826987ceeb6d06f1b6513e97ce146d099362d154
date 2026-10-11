@@ -1,0 +1,2 @@
+<?x ANY> <!ELEM(c?,d*)+)?> <!ELEMENT f (a|b)+> <!ELEMENT g (a)*>
+<!ELEMENT h  (b)+> [ I

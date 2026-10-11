@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n>
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d  IDREF 'v' g IDREFS #IMPLIED h ENT[ITLIED j NMTOKEN #MP?> <!-- c -->

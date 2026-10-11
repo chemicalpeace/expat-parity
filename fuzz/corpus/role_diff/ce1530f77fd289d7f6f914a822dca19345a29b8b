@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a">
+<!ELEMENT a EMPTY> <!ELEMENT b ANY> <!ELEMENT c (#PCDATA)> <!ELEMENT d (#PCDATA|9|b)*>
+<!ELEMENT ed (x|y) "x" e NOTATION (n|n2) h EMPTY> <>

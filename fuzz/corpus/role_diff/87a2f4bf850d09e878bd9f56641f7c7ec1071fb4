@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!NOTATION n2 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n|n2) #FIXED "n"
+  f IDREF 'v' g IDREFI,b)|(c?к⌡уж+)?> <!ELEMEN; <?piLIED i ENTc -->

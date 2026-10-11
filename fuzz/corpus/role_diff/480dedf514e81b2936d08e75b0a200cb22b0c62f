@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!YSTEM "a" NDAT pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!b ANY> <!ELEMENT c (#PCDATA)> l ge SYSTEM  (#PCDATA)> <!ELEMENT d (#PCDATA|a[|b)*>
+<!ELHMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!b ANY> <!ELEMEFT c (#PCDATA)> <!ELEMENT d SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NT c (#PCDMENT d (#PCDATA|a[|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!b T c (#PCDATA)> <!EMELENT d (#PCDATA|a[|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!b AY ge SYS:EM "a" NDATA n>  x<!ENTITY ?e2> 

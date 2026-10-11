@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x">XED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIED i ENTITIES #IMPLIED j NMTOKEN #IMPLIED k NMTOKENS #IMPLIED>
+<!ELEMENT a EMPTY> <!ELEMENT b ANY> <!ELEMENT c (#PCDATA)> <!ELEMENT d (#PCDATA|a|b e ((a,b)|(c?,d*)+)?> <!ELEMENT f?>
+<!ENTITY % pe "x">XED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIED i ENTITIES #IMPLIED j NMTOKEN #I)> <!MENT d (#PCDATA|a|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT fx|y) "x" e NOTATION (n|n4) #FCXED "n"
+  f IDREF 'v' g IDREFS #IMh e ((a,x|y) "x" e NOTATION (n|n4) #FCXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIEa|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!ELEMENT g (a-*>
+<![INCLUDE[ <!ELEMENT h E4PTY> <![ IGNORE f (a|b)+> <!ELEMENT g (a-*>
+<![INCLUDE[ <!ELEMENT h EMPTY> <![ IGNORE [ junk ]]> ]]> %pe; <?pi x?> <!-- c -s‘˜

@@ -1,0 +1,2 @@
+<?xml ?> <!ELEMENT f (a|b)+> <!ELEMENT g (a)*>
+<![INCL <!EL

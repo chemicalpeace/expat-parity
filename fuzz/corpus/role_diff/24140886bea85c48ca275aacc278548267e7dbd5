@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIPUBLIC "p" "s">
+<!NOTATION n SYSTe; <?pi x?> <!-- c -->

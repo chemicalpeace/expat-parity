@@ -1,0 +1,2 @@
+<!ENTITY % pe33 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #nnnnnnnnnnnIMPED c ID #->

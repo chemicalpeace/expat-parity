@@ -6,8 +6,10 @@
 //!   option matrix.
 //! - [`vectors`]: test documents extracted from libexpat's test suite.
 //! - [`tok`]: differential checks of the tokenizer port.
+//! - [`role`]: differential checks of the prolog state machine.
 
 pub mod diff;
+pub mod role;
 pub mod tok;
 pub mod trace;
 pub mod vectors;

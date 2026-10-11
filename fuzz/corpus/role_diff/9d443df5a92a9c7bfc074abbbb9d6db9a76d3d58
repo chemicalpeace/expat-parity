@@ -1,0 +1,4 @@
+<?xml ver0"?>
+<!ENTITY % pepe2 SYSTEM "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n1 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATT EMPTY> <!ELEMENT b ANY[ junk ]]> ]]> %pe; <?pi x?> <!-- c -->

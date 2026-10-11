@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!ENTITY % SYSTEM "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a d (x|y) "x" e NOTATION (n|n2) #FIXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIED i ENTITIES #IMPLIED j NMTsKDATA,> <!EM "a" NDATA n> <!ENTITY e2 PUBLIC "p" "s">
+?pi x?> <!-- c -->

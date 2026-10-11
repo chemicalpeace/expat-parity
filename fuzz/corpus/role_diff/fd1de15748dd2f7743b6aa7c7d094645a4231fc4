@@ -1,0 +1,3 @@
+<?xml vers> <!ELEM()+)?> <!ELEMENT f (a|b)+> <!ELEMENT g (a)*>
+<!ELEMENT h  (a|b
+)!

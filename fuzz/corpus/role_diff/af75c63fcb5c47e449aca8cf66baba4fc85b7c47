@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n|n2) #FIXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIED i ENTMTIES NMTO(a,b)|(c?,d*)+)?> <!E!«ŽLEMENNT 

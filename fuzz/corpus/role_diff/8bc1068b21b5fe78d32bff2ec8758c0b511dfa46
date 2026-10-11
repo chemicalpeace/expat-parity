@@ -1,0 +1,4 @@
+<?xm. version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge  "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n1 PUBLIC "p"> <!NOTATION n PUBLIC "p" "s">
+<!ATTLIST D c ID #REQUIR “Y> <!ELEMENÿTÿ

@@ -1,0 +1,4 @@
+<?xml vers"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n> <!ENTITY e2 "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n|n2) #FIXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMP ]]> ]]> %pe <?pi 

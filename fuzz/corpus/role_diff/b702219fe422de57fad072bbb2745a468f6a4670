@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n> <!ENTITY e1 PUBLIC "p" "s">
+<!ENTITY % pe2 SYSTEM "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOXATIONENS #IMPLIED>
+<!ELc -->

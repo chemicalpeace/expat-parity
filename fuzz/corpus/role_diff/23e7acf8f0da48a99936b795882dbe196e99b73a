@@ -1,0 +1,3 @@
+<?xmlrve "1.0"?>
+<!ENTITY % BLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b C. x?> <!-- c -->

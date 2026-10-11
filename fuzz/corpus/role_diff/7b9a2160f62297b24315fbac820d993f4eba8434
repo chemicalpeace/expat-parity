@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n> <!ENTITY e2  "s"> <!NOTATION n2 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n|n2) #FIXED "n"
+  f IDREFS #IMPLIED h ENTITY #IMPLIED i ENTITIES #IMPLIED j NMg (a)*>
+<![INCLUDE[ <!ELEMENT h EMPTY> <![ IGNORE [ junk ]]> ]]> %pe; <?pi x?> <!-- c -->

@@ -21,6 +21,7 @@ fn main() {
         "shim/oracle.h",
         "shim/oracle_trace.c",
         "shim/oracle_internals.c",
+        "shim/oracle_role.c",
     ] {
         println!("cargo:rerun-if-changed={f}");
     }
@@ -42,6 +43,7 @@ fn main() {
         })
         .file("shim/oracle_trace.c")
         .file("shim/oracle_internals.c")
+        .file("shim/oracle_role.c")
         .define("XML_STATIC", None)
         .warnings(false);
     // Under `cargo fuzz` (which sets `--cfg fuzzing`), instrument the C code

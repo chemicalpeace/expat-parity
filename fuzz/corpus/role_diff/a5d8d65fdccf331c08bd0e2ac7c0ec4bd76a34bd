@@ -1,0 +1,13 @@
+<?xml version="0.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n> NTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n1 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMTATION (nqn2) #FIXED "n"
+  f IDREF 'v' g IDREFS #IMPIED j NMTOKEN #IMPLIED k NMTOKENS #IMPLIED>
+<!ELEMENTC "w" "s">
+<!ENTITY % pe0 SYSTEM "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n2 PUBL> <!ELEMENITY % pe+> <!b ANY>ITY ge SYSTEM "a" NDATA n> <!ENTITY e2 PUBLIC "w" "s">
+<!ENTITY % pe2 SYSTEM "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATIOPIED j NMTOKEN #IMPLIED k NMTOKENS #IMPLIED>
+<!ELEMENTC "w" "s">
+<!ENTITY % pe0 SYSTEM "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> < x?> <!-- c -->

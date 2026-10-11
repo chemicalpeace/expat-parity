@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge "s"> <!NOTATION n2 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n|n2) #FIXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIED i ENTITIES #IMPLIED j NMTOKEN #IMPLIED k NMTOKENS #IMPLIED>
+<!ELEMENT a EMPTY> <!ELEMENT b ANY> <!ELEMENT c (#PCDATA)> <!ELEMENT d (#PCDATA|a|b)*> <!ELEMENT c (#PCDATA)> <!ELEMENT d (#PCDATA|a|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b+) $<!ELEME-->

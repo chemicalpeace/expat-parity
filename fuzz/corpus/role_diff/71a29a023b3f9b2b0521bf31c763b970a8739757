@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!IC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NT c (#PCDATA)> <!ELEMENT d (#PCDATA|a[|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT ATA|a[|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!b ANY> <!ELEMENT c (#PCDATA)> <!ELEMENT d SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NV c (#PCDATA)> <!ELEMENT d (#PCDATA|a[|b)*>
+<!ELEMENT e ( <!ELEMENT d (#PCDATA|a[|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT ATA|a[|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!b ANY> <!ELEMENT c (#PCDATA)> <!ELEMENT d SYSTEM "s"> <!NOTATION n4 PUBLIC "p"> <!NT c (#PCDATA)> <!ELEMENT d (#PCDATA|a[|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!b T c (LENT d (#PCDATA|a[|bf (a|b)+> <!b ANY> <!ELEMENT c (#PCDATA)> <!ELEMENT d SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NT c (#PCDATA)> <!ELEMENT d (#PCDATA|a[|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!b T c (#PCDATA)> <!EMELENT d (#PCDATA|a[|b)*>
+<!ELEMENT e ((e,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!b ANY> <!ELEMENT DATA)> <!EMEL n2 pe "x"> <!ENTITY ge SYS:EM "a" NDATA n>  x<!ENTITY ?e2> 
