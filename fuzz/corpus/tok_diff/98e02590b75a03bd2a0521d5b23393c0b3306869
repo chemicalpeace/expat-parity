@@ -1,0 +1,8 @@
+<!DOCTYPE doc [
+<!Af2'>
+<!ATTLIST doc zc CDATA 'def3'>
+]>
+<doc a='1'     b='2'     c='3'     d='4'   zc CDATA 'def3'>
+]>
+<doc a='1'     b='2'     c='3'     d='4'     e='5'     f='6'     g='7'  >
+<!ATTLIST doc zc CDATA 'd<doc a='1'     b='2'     c='3'     d='4'     e='5'     f='6'     g=' p='07'     q='16'     r='17m='13' =   n '14'     p='15'     q='16ÿ     r='07'     s='½18'></doc>

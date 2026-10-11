@@ -24,3 +24,17 @@ path = "fuzz_targets/parse_trace.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "leaf_diff"
+path = "fuzz_targets/leaf_diff.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tok_diff"
+path = "fuzz_targets/tok_diff.rs"
+test = false
+doc = false
+bench = false

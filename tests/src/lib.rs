@@ -5,8 +5,10 @@
 //! - [`diff`]: comparison of two [`diff::TraceSource`]s over documents and an
 //!   option matrix.
 //! - [`vectors`]: test documents extracted from libexpat's test suite.
+//! - [`tok`]: differential checks of the tokenizer port.
 
 pub mod diff;
+pub mod tok;
 pub mod trace;
 pub mod vectors;
 

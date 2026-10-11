@@ -26,13 +26,34 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | `asciitab.h`, `iasciitab.h`, `latin1tab.h`, `utf8tab.h`, `xmltok_impl.h` (BT_*) | `expat::chartab` | see STATE.md |
 | `nametab.h`, `UCS2_GET_NAMING`, `UTF8_GET_NAMING2/3`, `UTF8_INVALID2/3/4` (`xmltok.c`) | `expat::naming` | see STATE.md |
 | `XmlUtf8Encode`, `XmlUtf16Encode` (`xmltok.c`) | `expat::encode` | see STATE.md |
-| `siphash.h` | `expat::siphash` | planned |
-| `xmltok_impl.c`, `xmltok.c`, `xmltok_ns.c` | `expat::tok` | planned |
+| `siphash.h` | `expat::siphash` | see STATE.md |
+| `xmltok_impl.c` (scanner template); normal encodings of `xmltok.c` | `expat::tok` (`scan`, `normal`) | see STATE.md |
+| UTF-16 / unknown encodings, `initScan`, XML declaration (`xmltok.c`, `xmltok_ns.c`) | `expat::tok` | planned |
 | `xmlrole.c` | `expat::role` | planned |
 | `xmlparse.c` | `expat::parse` (+ submodules) | planned |
 
 Internal modules are reachable from tests only through the `internal-api`
 feature (`expat::internal`), see DECISIONS D-006.
+
+## Tokenizer
+
+`expat::tok::scan` ports `xmltok_impl.c` function by function, generic over
+`expat::tok::Encoding` (the template's macros: `MINBPC`, `BYTE_TYPE`,
+`BYTE_TO_ASCII`, `CHAR_MATCHES`, `IS_NAME_CHAR`, ...). `expat::tok::Normal`
+implements it for the eight single-byte `normal_encoding`s of `xmltok.c`.
+Representation choices (offsets, `Scanned::next`, typed `Scan`) and the
+bounded variants of the precondition-trusting helpers are recorded in
+DECISIONS D-014. The C case macros become helper methods returning a `Step`
+(advance or return), so each Rust `match` lists the same cases as the C
+`switch`.
+
+Verification (`tests/tests/tok_diff.rs`, `expat_difftest::tok`, fuzz target
+`tok_diff`): every scanner is compared with C on token *and* `next` (including
+whether C writes it) for all strings of up to 3 bytes over a 56-byte alphabet
+that covers every byte type, at every offset of the upstream vectors, on
+token-by-token walks of every vector, and on random XML-ish fragments. For
+each accepted token the helpers whose precondition it establishes are
+compared too; the total helpers are compared at every offset.
 
 ## Verification layers
 

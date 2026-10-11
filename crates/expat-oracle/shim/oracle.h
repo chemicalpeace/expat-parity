@@ -41,6 +41,34 @@ int oracle_ucs2_naming(int which, unsigned int hi, unsigned int lo);
 int oracle_utf8_predicate(int pred, const unsigned char *p, size_t len);
 int oracle_utf8_encode(int c, unsigned char out[4]);
 int oracle_utf16_encode(int c, unsigned short out[2]);
+/* SipHash-2-4 from siphash.h; data is fed to sip24_update in pieces of
+ * `split` bytes (0 = one call). */
+unsigned long long oracle_siphash24(const unsigned char key[16],
+                                    const unsigned char *data, size_t len,
+                                    size_t split);
+int oracle_sip24_valid(void);
+
+/* xmltok_impl.c through the ENCODING vtable of table `table` (an
+ * ORACLE_TABLE_* id). `which`: 0 prolog, 1 content, 2 CDATA section,
+ * 3 ignore section, 4 attribute value, 5 entity value. Offsets are relative
+ * to `buf`; -1 means the C function did not write the pointer. Functions
+ * without a `len` read until a terminator, like the C ones: only call them on
+ * input that satisfies their precondition. */
+int oracle_tok_scan(int table, int which, const char *buf, size_t len,
+                    size_t ptr, long long *next);
+int oracle_tok_is_public_id(int table, const char *buf, size_t len, size_t ptr,
+                            long long *bad);
+int oracle_tok_get_atts(int table, const char *buf, size_t ptr, int atts_max,
+                        long long *out);
+int oracle_tok_char_ref_number(int table, const char *buf, size_t ptr);
+int oracle_tok_predefined_entity_name(int table, const char *buf, size_t len,
+                                      size_t ptr);
+int oracle_tok_name_matches_ascii(int table, const char *buf, size_t len,
+                                  size_t ptr, const char *ascii);
+long long oracle_tok_name_length(int table, const char *buf, size_t ptr);
+long long oracle_tok_skip_s(int table, const char *buf, size_t ptr);
+void oracle_tok_update_position(int table, const char *buf, size_t len,
+                                size_t ptr, unsigned long long pos[2]);
 
 /* Runs the full parser and writes a canonical event trace (see
  * docs/ARCHITECTURE.md, "Trace format") into a malloc'd buffer.

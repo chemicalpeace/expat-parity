@@ -1,0 +1,5 @@
+<!DOCTYPE doc [
+<!ATTLIST doc za CDATA 'default'>
+<!ATTLIST doc zb CDATA 'def2'>
+<!ATTLIST doc zc CDATA 'def3'>]>
+<doc a='1'     b='2'     c='3'    d='4'     e='1'     f='6'     g='7'     h='18'></doc>

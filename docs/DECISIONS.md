@@ -135,3 +135,53 @@ Until the remote exists (D-003) every CI job is executed locally with the same
 commands as `.github/workflows/ci.yml` (`scripts/ci-local.sh`), and results are
 recorded in `docs/STATE.md`. "CI green" in reports means *local* until the
 first GitHub Actions run is visible.
+
+## D-013 Remote exists; CI is GitHub Actions (supersedes the blocker in D-003 and D-012)
+
+The owner created the public repository `chemicalpeace/expat-rs` and granted
+the integration access. `main` was pushed and the first Actions run
+(run 38147233705, commit `ebc8e89`) was green on every job: check, test on
+`ubuntu-latest` and `macos-latest`, Miri, fuzz smoke. From now on "CI green"
+means GitHub Actions. `scripts/ci-local.sh` stays as the local equivalent.
+
+Workflow from here: every change goes to a short-lived branch, a pull request
+is opened, and it is merged into `main` only after CI on the PR is green.
+History is never rewritten (no force-push, no rebase of pushed commits).
+
+## D-014 Tokenizer representation (module 5)
+
+`xmltok_impl.c` is a macro template instantiated per encoding family. The
+port is one set of generic functions (`expat::tok::scan`) over a trait
+(`expat::tok::Encoding`) whose methods are the template's macros. Decisions:
+
+- **Offsets, not pointers.** A scanner gets a slice and a start offset; the
+  end of the slice is the C `end`.
+- **`nextTokPtr` is `Scanned::next: Option<usize>`**, `None` exactly when C
+  leaves `*nextTokPtr` untouched. This is stricter than the parser needs, so
+  the differential tests also pin when C writes the pointer.
+- **Typed results.** `Scan::{Token, PartialToken, Invalid, Partial, ...}`
+  instead of a signed `int`; `Scan::to_c` restores the C value and every
+  differential check compares through it.
+- **Arithmetic lint.** `scan.rs` allows `clippy::arithmetic_side_effects`
+  module-wide, with the bound written down: offsets never exceed
+  `buf.len() + 4` and slices are at most `isize::MAX` long. Indexing is still
+  denied (`get` only), so no lookup can panic.
+- **Functions that trust their input** (`nameLength`, `skipS`, `getAtts`,
+  `charRefNumber`) read in C until a terminator, out of bounds on input that
+  breaks their precondition. The port additionally stops at the end of the
+  slice. Equality is required, and tested, only on input that meets the C
+  precondition (the token the scanner accepted). This is not a divergence of
+  observable parser behaviour: the parser only calls them on such tokens.
+- **Latin-1/ASCII name predicates.** C stores `NULL` for them because their
+  tables contain no lead-byte types; the port uses the UTF-8 predicates for
+  every single-byte encoding, which are equally never reached.
+
+## D-015 Oracle access to the C tokenizer
+
+`shim/oracle_internals.c` exposes the scanners and helpers through each
+encoding's `ENCODING` vtable (`oracle_tok_*`), so the same entry points serve
+the UTF-16 encodings of module 6. The Rust wrappers (`expat_oracle::tok`)
+call the C functions that rely on a terminator on a copy of the buffer
+followed by a padding that ends every one of them (four NUL characters, then
+`>">'>` for `getAtts` or `;` for `charRefNumber`), so the wrappers are safe
+to call on arbitrary input and AddressSanitizer stays meaningful under fuzz.

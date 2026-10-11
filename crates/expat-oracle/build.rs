@@ -36,5 +36,15 @@ fn main() {
         .file("shim/oracle_internals.c")
         .define("XML_STATIC", None)
         .warnings(false);
+    // Under `cargo fuzz` (which sets `--cfg fuzzing`), instrument the C code
+    // too, so libFuzzer is guided by coverage of the oracle and not only of
+    // the Rust side, and AddressSanitizer covers the C heap.
+    println!("cargo:rerun-if-env-changed=CARGO_CFG_FUZZING");
+    if std::env::var_os("CARGO_CFG_FUZZING").is_some() {
+        build
+            .compiler("clang")
+            .flag("-fsanitize=fuzzer-no-link")
+            .flag("-fsanitize=address");
+    }
     build.compile("expat_oracle");
 }

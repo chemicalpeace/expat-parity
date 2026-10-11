@@ -1,0 +1,6 @@
+<?xml versio<!ELEMENT doc (#PCDATA)>
+<!ATTLIST doc a CDATA #IMPLIED>
+<?pi in dtd?>
+<!--comment in dtd-->
+]>n='1.0' e
+<doc><![CDATncodAin[text in docg=']]></dutf-oc>8'?>

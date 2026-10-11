@@ -1,0 +1,6 @@
+<?xml version='1.0' standalone='no'?>
+<!DOCTYPE animal SYSTEM 'test.dtd'>
+<animal>This is a 
+    <a/>  
+
+yellow tiger</animal>

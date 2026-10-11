@@ -1,0 +1,2 @@
+<!DOCTYPE doc [<!ENTITY foo 'bar'>]>
+<doc>&foo;</doc>
