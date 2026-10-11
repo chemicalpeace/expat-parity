@@ -50,15 +50,22 @@
 
 mod accounting;
 mod content;
+mod decl;
 mod dtd;
+mod entity;
 mod error;
+mod model;
 mod prolog;
 
 #[cfg(test)]
 mod tests;
 
 pub use accounting::{Account, Accounting};
-pub use dtd::{AttributeId, Binding, BindingId, DefaultAttribute, Dtd, ElementType, Prefix, PrefixId};
+pub use dtd::{
+    AttributeId, Binding, BindingId, DefaultAttribute, Dtd, ElementType, Entity, EntityRef, Prefix,
+    PrefixId,
+};
+pub use model::{ContentModel, ContentNode, ContentQuant, ContentType, Scaffold};
 pub use error::{Stop, XmlError};
 
 use alloc::vec;
@@ -138,6 +145,18 @@ pub struct HandlerSet {
     pub skipped_entity: bool,
     /// `XML_SetStartDoctypeDeclHandler`
     pub start_doctype_decl: bool,
+    /// `XML_SetEndDoctypeDeclHandler`
+    pub end_doctype_decl: bool,
+    /// `XML_SetEntityDeclHandler`
+    pub entity_decl: bool,
+    /// `XML_SetUnparsedEntityDeclHandler`
+    pub unparsed_entity_decl: bool,
+    /// `XML_SetNotationDeclHandler`
+    pub notation_decl: bool,
+    /// `XML_SetElementDeclHandler`
+    pub element_decl: bool,
+    /// `XML_SetAttlistDeclHandler`
+    pub attlist_decl: bool,
 }
 
 /// Receives the parser's events. Only the methods whose [`HandlerSet`]
@@ -168,6 +187,63 @@ pub trait Handler {
     fn end_namespace_decl(&mut self, _prefix: Option<&[u8]>) {}
     /// `XML_SkippedEntityHandler`.
     fn skipped_entity(&mut self, _name: &[u8], _is_param: bool) {}
+    /// `XML_StartDoctypeDeclHandler`.
+    fn start_doctype_decl(
+        &mut self,
+        _name: &[u8],
+        _sysid: Option<&[u8]>,
+        _pubid: Option<&[u8]>,
+        _has_internal_subset: bool,
+    ) {
+    }
+    /// `XML_EndDoctypeDeclHandler`.
+    fn end_doctype_decl(&mut self) {}
+    /// `XML_EntityDeclHandler`: `value` is the replacement text of an
+    /// internal entity (`None` for an external one).
+    #[allow(clippy::too_many_arguments)] // reason: mirrors XML_EntityDeclHandler.
+    fn entity_decl(
+        &mut self,
+        _name: &[u8],
+        _is_param: bool,
+        _value: Option<&[u8]>,
+        _base: Option<&[u8]>,
+        _sysid: Option<&[u8]>,
+        _pubid: Option<&[u8]>,
+        _notation: Option<&[u8]>,
+    ) {
+    }
+    /// `XML_UnparsedEntityDeclHandler`.
+    fn unparsed_entity_decl(
+        &mut self,
+        _name: &[u8],
+        _base: Option<&[u8]>,
+        _sysid: Option<&[u8]>,
+        _pubid: Option<&[u8]>,
+        _notation: &[u8],
+    ) {
+    }
+    /// `XML_NotationDeclHandler`.
+    fn notation_decl(
+        &mut self,
+        _name: &[u8],
+        _base: Option<&[u8]>,
+        _sysid: Option<&[u8]>,
+        _pubid: Option<&[u8]>,
+    ) {
+    }
+    /// `XML_ElementDeclHandler`.
+    fn element_decl(&mut self, _name: &[u8], _model: &ContentModel) {}
+    /// `XML_AttlistDeclHandler`: `dflt` is `None` for `#IMPLIED` and
+    /// `#REQUIRED`; `is_required` is true for `#REQUIRED` and `#FIXED`.
+    fn attlist_decl(
+        &mut self,
+        _elname: &[u8],
+        _attname: &[u8],
+        _att_type: &[u8],
+        _dflt: Option<&[u8]>,
+        _is_required: bool,
+    ) {
+    }
 }
 
 /// White-box view of the input buffer (offsets from `m_buffer`, -1 for a
@@ -307,6 +383,39 @@ pub struct Parser {
     pub(crate) dtd: Dtd,
     /// `m_accounting`
     pub(crate) accounting: Accounting,
+
+    // Declarations (module 11).
+    /// `m_curBase` (`XML_SetBase`, public API).
+    pub(crate) cur_base: Option<Vec<u8>>,
+    /// `m_doctypeName`
+    pub(crate) doctype_name: Option<Vec<u8>>,
+    /// `m_doctypeSysid` (`"#"` when no start handler is set).
+    pub(crate) doctype_sysid: Option<Vec<u8>>,
+    /// `m_doctypePubid`
+    pub(crate) doctype_pubid: Option<Vec<u8>>,
+    /// `m_useForeignDTD` (`XML_UseForeignDTD`, public API).
+    pub(crate) use_foreign_dtd: bool,
+    /// `m_isParamEntity`: this parser reads an external parameter entity
+    /// (external entity parsers, public API).
+    pub(crate) is_param_entity: bool,
+    /// `m_declEntity`
+    pub(crate) decl_entity: Option<EntityRef>,
+    /// `m_declNotationName`
+    pub(crate) decl_notation_name: Option<Vec<u8>>,
+    /// `m_declNotationPublicId`
+    pub(crate) decl_notation_public_id: Option<Vec<u8>>,
+    /// `m_declElementType`
+    pub(crate) decl_element_type: Option<crate::hash::EntryId>,
+    /// `m_declAttributeId`
+    pub(crate) decl_attribute_id: Option<crate::hash::EntryId>,
+    /// `m_declAttributeType`
+    pub(crate) decl_attribute_type: Option<Vec<u8>>,
+    /// `m_declAttributeIsCdata`
+    pub(crate) decl_attribute_is_cdata: bool,
+    /// `m_declAttributeIsId`
+    pub(crate) decl_attribute_is_id: bool,
+    /// `m_groupConnector[0..m_groupSize]`
+    pub(crate) group_connector: Vec<u8>,
 }
 
 impl Parser {
@@ -359,6 +468,21 @@ impl Parser {
             app_atts: Vec::new(),
             dtd: Dtd::new(),
             accounting: Accounting::default(),
+            cur_base: None,
+            doctype_name: None,
+            doctype_sysid: None,
+            doctype_pubid: None,
+            use_foreign_dtd: false,
+            is_param_entity: false,
+            decl_entity: None,
+            decl_notation_name: None,
+            decl_notation_public_id: None,
+            decl_element_type: None,
+            decl_attribute_id: None,
+            decl_attribute_type: None,
+            decl_attribute_is_cdata: false,
+            decl_attribute_is_id: false,
+            group_connector: Vec::new(),
         }
     }
 

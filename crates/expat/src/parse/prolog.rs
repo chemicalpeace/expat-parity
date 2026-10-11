@@ -231,9 +231,8 @@ impl Parser {
                     }
                     .into());
                 }
-                // Every other role belongs to a document type declaration
-                // (module 11).
-                _ => return Err(Stop::DtdNotPorted),
+                // Every other role belongs to a document type declaration.
+                _ => self.dtd_role(h, enc, buf, role, t, s, next, true)?,
             }
             match self.parsing {
                 Parsing::Suspended => {

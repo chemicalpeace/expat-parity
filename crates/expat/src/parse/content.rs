@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use core::ffi::c_ulong;
 
 use super::accounting::Account;
-use super::dtd::{Binding, BindingId, PrefixId};
+use super::dtd::{Binding, BindingId, EntityRef, PrefixId};
 use super::error::{Stop, XmlError};
 use super::prolog::{to_utf8, with_known};
 use super::{Enc, Handler, INIT_ATTS_SIZE, INIT_DATA_BUF_SIZE, Parser, Parsing, Processor, Tag};
@@ -366,18 +366,44 @@ impl Parser {
                     } else {
                         let name = to_utf8(enc, bytes(buf, s + m, next - m));
                         let entity = self.dtd.general_entities.find(&self.salt, &name);
-                        if !self.dtd.has_param_entity_refs || self.dtd.standalone {
-                            if entity.is_none() {
-                                return Err(XmlError::UndefinedEntity.into());
+                        // First, determine if a check for an existing
+                        // declaration is needed; if yes, check that the
+                        // entity exists, and that it is internal,
+                        // otherwise call the skipped entity handler.
+                        let check = !self.dtd.has_param_entity_refs || self.dtd.standalone;
+                        match entity {
+                            None if check => return Err(XmlError::UndefinedEntity.into()),
+                            None => {
+                                if self.handlers.skipped_entity {
+                                    h.skipped_entity(&name, false);
+                                }
                             }
-                            // Declared entities exist only with a DTD.
-                            return Err(Stop::DtdNotPorted);
-                        } else if entity.is_none() {
-                            if self.handlers.skipped_entity {
-                                h.skipped_entity(&name, false);
+                            Some(id) => {
+                                let r = EntityRef::General(id);
+                                let (is_internal, open, notation, text) = match self.dtd.entity(r) {
+                                    Some(e) => (e.is_internal, e.open, e.notation.is_some(), e.text.is_some()),
+                                    None => (true, false, false, false),
+                                };
+                                if check && !is_internal {
+                                    return Err(XmlError::EntityDeclaredInPe.into());
+                                }
+                                if open {
+                                    return Err(XmlError::RecursiveEntityRef.into());
+                                }
+                                if notation {
+                                    return Err(XmlError::BinaryEntityRef.into());
+                                }
+                                if text {
+                                    // m_defaultExpandInternalEntities is
+                                    // true without a default handler
+                                    // (public API, module 12).
+                                    self.open_content_entity(r)?;
+                                }
+                                // An external entity: without an external
+                                // entity reference handler or a default
+                                // handler (public API, module 12) nothing
+                                // happens.
                             }
-                        } else {
-                            return Err(Stop::DtdNotPorted);
                         }
                     }
                 }
@@ -785,7 +811,15 @@ impl Parser {
                 } else {
                     true
                 };
-                self.store_attribute_value(enc, buf, is_cdata, att.value_ptr, att.value_end, account)?
+                self.store_attribute_value(
+                    enc,
+                    buf,
+                    is_cdata,
+                    att.value_ptr,
+                    att.value_end,
+                    account,
+                    false,
+                )?
             };
             match a.prefix {
                 Some(prefix) if a.xmlns => {
@@ -1056,9 +1090,13 @@ impl Parser {
         }
     }
 
-    /// `storeAttributeValue` without open attribute entities (which need
-    /// entity declarations, module 11): the normalised value.
-    fn store_attribute_value<E: Encoding>(
+    /// `storeAttributeValue`: the normalised value of `buf[ptr..end]`.
+    /// `in_prolog` says whether C would store into `dtd->pool` (a default
+    /// value in an attribute-list declaration) rather than the temporary
+    /// pool (a start tag), which decides how undeclared entities are
+    /// checked.
+    #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of storeAttributeValue.
+    pub(crate) fn store_attribute_value<E: Encoding>(
         &mut self,
         enc: &E,
         buf: &[u8],
@@ -1066,9 +1104,10 @@ impl Parser {
         ptr: usize,
         end: usize,
         account: Account,
+        in_prolog: bool,
     ) -> Result<Vec<u8>, Stop> {
         let mut out = Vec::new();
-        self.append_attribute_value(enc, bytes(buf, 0, end), is_cdata, ptr, &mut out, account)?;
+        self.append_attribute_value(enc, bytes(buf, 0, end), is_cdata, ptr, &mut out, account, in_prolog)?;
         if !is_cdata && out.last() == Some(&0x20) {
             out.pop();
         }
@@ -1077,6 +1116,7 @@ impl Parser {
 
     /// `appendAttributeValue` on `buf[ptr..]` (the slice ends at the end of
     /// the value), appending to `out` (the current string of the pool).
+    #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of appendAttributeValue.
     fn append_attribute_value<E: Encoding>(
         &mut self,
         enc: &E,
@@ -1085,6 +1125,7 @@ impl Parser {
         ptr: usize,
         out: &mut Vec<u8>,
         account: Account,
+        in_prolog: bool,
     ) -> Result<(), Stop> {
         let m = E::MINBPC;
         let mut ptr = ptr;
@@ -1143,16 +1184,49 @@ impl Parser {
                     } else {
                         let name = to_utf8(enc, bytes(buf, ptr + m, next - m));
                         let entity = self.dtd.general_entities.find(&self.salt, &name);
-                        // Called from content (the temporary pool).
-                        let check = !self.dtd.has_param_entity_refs || self.dtd.standalone;
-                        match (check, entity) {
-                            (true, None) => return Err(XmlError::UndefinedEntity.into()),
-                            // An undeclared entity in a document with
-                            // parameter entity references is skipped.
-                            (false, None) => {}
-                            // Declared entities exist only with a DTD.
-                            (_, Some(_)) => return Err(Stop::DtdNotPorted),
+                        // First, determine if a check for an existing
+                        // declaration is needed; if yes, check that the
+                        // entity exists, and that it is internal.
+                        let check = if in_prolog {
+                            self.prolog_state.document_entity
+                                && if self.dtd.standalone {
+                                    !self.in_internal_entity()
+                                } else {
+                                    !self.dtd.has_param_entity_refs
+                                }
+                        } else {
+                            !self.dtd.has_param_entity_refs || self.dtd.standalone
+                        };
+                        let Some(id) = entity else {
+                            if check {
+                                return Err(XmlError::UndefinedEntity.into());
+                            }
+                            // An undeclared entity is skipped (C cannot
+                            // report it here).
+                            ptr = next;
+                            continue;
+                        };
+                        let r = EntityRef::General(id);
+                        let (is_internal, open, notation, text) = match self.dtd.entity(r) {
+                            Some(e) => (e.is_internal, e.open, e.notation.is_some(), e.text.is_some()),
+                            None => (true, false, false, false),
+                        };
+                        if check && !is_internal {
+                            return Err(XmlError::EntityDeclaredInPe.into());
                         }
+                        if open {
+                            self.event_ptr = Some(ptr);
+                            return Err(XmlError::RecursiveEntityRef.into());
+                        }
+                        if notation {
+                            self.event_ptr = Some(ptr);
+                            return Err(XmlError::BinaryEntityRef.into());
+                        }
+                        if !text {
+                            self.event_ptr = Some(ptr);
+                            return Err(XmlError::AttributeExternalEntityRef.into());
+                        }
+                        return self.expand_attribute_entity(r);
                     }
                 }
                 _ => {
