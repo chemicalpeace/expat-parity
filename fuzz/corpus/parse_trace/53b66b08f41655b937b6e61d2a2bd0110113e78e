@@ -1,0 +1,7 @@
+<!DOCTYPE r [
+<!ENTITY % draft 'INCLUDE'>
+<!ENTITY % final 'IGNORE'>
+<!ENTITY % iY % final 'IGN"first.ent">
+%ort;
+]>
+<r/>

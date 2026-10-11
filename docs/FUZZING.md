@@ -25,7 +25,7 @@ generated-document tests.
 
 ```sh
 cargo run -p expat-difftest --bin fuzz_seeds -- /tmp/seeds
-# parse_trace: 5780 seeds   (540 upstream vectors x 7 selector pairs + 2,000 generated documents)
+# parse_trace: 6320 seeds   (540 upstream vectors x 8 selector pairs + 2,000 generated documents)
 # buffer_diff: 2540 seeds   (540 upstream vectors + 2,000 generated documents, each with an operation header)
 ```
 
@@ -51,13 +51,17 @@ same build, the merge is deterministic; what a fuzzing run discovers is not
 (libFuzzer picks a random `-seed` per run, recorded in each log), which is
 why the merged result is committed rather than regenerated in CI.
 
-Module 10 merge (2026-10-11): `parse_trace` 17,419 inputs (previous
+Module 10 merges (2026-10-11). First: `parse_trace` 17,419 inputs (previous
 committed corpus 1,080, minimised corpus of the earlier module 10 runs (7,719)
 plus the units found by the last two logged slices, 5,780 seeds; the
 working corpus of the first five logged slices was lost with a sandbox
 reset) to 8,495 files;
 `buffer_diff` 21,226 inputs (earlier and logged runs' corpus, 2,540 seeds) to
-6,787 files.
+6,787 files. After the namespace-triplet option was added to the harness:
+`parse_trace` committed corpus + 6,320 seeds to 8,444 files, then, after the
+final 673-second run, committed corpus + that run's working corpus + seeds
+(29,223 inputs) to 9,238 files (1,800,939 bytes, 10,658 edges in the
+merge). `buffer_diff` is unchanged (its seeds did not change).
 
 ## Run logs
 

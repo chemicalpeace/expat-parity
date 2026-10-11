@@ -1,3 +1,0 @@
-<!DOCTYPE doc SYSTEM 'foo' [
-  <!ENTITY en SYSTEM 'bar'>
-]>

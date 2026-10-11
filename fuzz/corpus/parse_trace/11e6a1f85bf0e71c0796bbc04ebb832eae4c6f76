@@ -1,0 +1,1 @@
+<!DOCTYPE t1[<!ENTITY e1 'angle<'><!ENTITY e1 '&e1;'>]><t1>&g2;

@@ -125,6 +125,7 @@ for fuzz and Miri.
 
   | `parse_trace` | module 10: whole parses, port vs C by trace (documents with a DTD skipped), options from two selector bytes | 672 s (7 slices of 96 s) | 3,486,658 |
   | `buffer_diff` | module 10: `XML_Parse`/`XML_GetBuffer`/`XML_ParseBuffer` programs, buffer state after every operation, white-box | 672 s (7 slices of 96 s) | 5,605,579 |
+  | `parse_trace` | module 10, final target (namespace-triplet selector bit, triplet seeds), started from the re-merged corpus | 673 s (7 slices of 96-97 s) | 2,444,032 |
 
   Module 10 figures are the sums of `stat::number_of_executed_units` in the
   libFuzzer logs kept in `docs/fuzz-logs/module-10/` (one file per slice;
@@ -135,7 +136,10 @@ for fuzz and Miri.
   (9,282 to 9,324). `buffer_diff`: 5,746 to 6,358 edges (features 19,535 to
   23,376), still growing slowly. The instrumented binaries contain 54,668
   counters each, including the C oracle and the harness, so the edge counts
-  are not a coverage percentage of the port. Findings: none in these runs.
+  are not a coverage percentage of the port. The final `parse_trace` run
+  (logs `parse_trace-*-f1800cad.log` and `-072e1bb8.log`; the port's code is
+  the same in both commits) went from 10,277 to 10,647 edges (features
+  40,969 to 43,939). Findings: none in these runs.
   Earlier module 10 runs found the `errorProcessor` bug (D-023, fixed in
   89c7e9e). Figures reported before for module 10 (`parse_trace` 665 s /
   5,223,814, `buffer_diff` 790 s / 6,563,968) came from a summary file of
@@ -159,7 +163,7 @@ for fuzz and Miri.
   deliberate-bug experiment edited the source while they were being built.
   Since module 10 the corpora, the seed generator and the merge command are
   documented in `docs/FUZZING.md`; `tests/tests/fuzz_corpus.rs` replays the
-  `parse_trace` (8,495 files) and `buffer_diff` (6,787 files) corpora on
+  `parse_trace` (9,238 files) and `buffer_diff` (6,787 files) corpora on
   every CI platform.
 
 ### Module 10 (PR #5): the parser core versus C
@@ -254,7 +258,8 @@ The earlier fuzzing found one real port bug: the `errorProcessor` reset
 `cargo-llvm-cov 0.8` (`cargo llvm-cov --no-report` per test target, then
 `cargo llvm-cov report --ignore-filename-regex
 '(tests/|crates/expat-oracle|benches/|fuzz/|vendor)'`), toolchain 1.99.0,
-commit 6504844 (the module 10 code):
+commit 6504844 (the module 10 code; the later commits of PR #5 add
+the namespace-triplet tests and change no port code):
 
 | Metric | Covered | Total | % |
 |---|---|---|---|

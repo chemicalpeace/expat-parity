@@ -1,0 +1,6 @@
+<!DOCTYPE d [
+<!ENTITY % element_d '<!ELEMENT d (P#CDATA)*>'>
+%element_d;
+<!ENTITY % e ']'>
+
+%e;

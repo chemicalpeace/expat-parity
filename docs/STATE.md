@@ -66,14 +66,17 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 7 | `tok` XML decl + encoding detection (`initScan`, Q-3) | `xmltok.c`, `xmltok_ns.c` | **done** — `tok::init`, `tok::xmldecl`; D-019; Q-3 resolved (replicate) |
 | 8 | `role` prolog state machine | `xmlrole.c` | **done** — `role::PrologState`, all 51 handlers; D-020 |
 | 9 | `pool` / `hash` / `heap`: string pool, hash table, allocation accounting | `xmlparse.c` | **done** — `StringPool`, `HashTable`, `Heap`; white-box vs C (block lists, slot layout, every allocation request, failure of each attempt); D-021 |
-| 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors, generated documents, fuzzing), buffer state white-box; D-023; Q-1/Q-2 resolved (replicate, D-024). DTD roles stop with `Stop::DtdNotPorted` |
+| 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors under 11 option sets incl. namespace triplets, generated documents, fuzzing), buffer state white-box; D-023, D-025; Q-1/Q-2 resolved (replicate, D-024). DTD roles stop with `Stop::DtdNotPorted` |
 | 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | not started |
 | 12 | public API `expat::Parser` (default handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers, unknown-encoding handler, `XML_GetInputContext`, entropy for the salt) | — | not started (the trace adapter and differential `parse_trace` already exist, module 10) |
 | 13 | `expat-capi` (optional) | `expat.h` | not started |
 
 Fuzz targets: `parse_trace` (differential since module 10: port vs C by
 trace, documents with a DTD are skipped until module 11), `buffer_diff`
-(module 10: buffer state after every input call, white-box), `leaf_diff`
+(module 10: buffer state after every input call, white-box; DTD documents
+skipped until module 11). Every target's corpus is committed and versioned
+(`docs/FUZZING.md`, D-025); `tests/tests/fuzz_corpus.rs` replays the
+`parse_trace` and `buffer_diff` corpora on every CI platform. Older targets: `leaf_diff`
 (modules 1-4), `tok_diff` (modules 5-7: all 12 built-in encodings and
 seeded unknown encodings; scanners, helpers, converters, `initScan`,
 `XmlParseXmlDecl`), `role_diff` (module 8: documents tokenized in the

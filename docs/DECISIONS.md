@@ -456,3 +456,24 @@ Regression tests: `tests/tests/parse_diff.rs::q1_q2_epilog_line_breaks_replicate
 (the reproducers whole and in 1-byte chunks, compared with C and pinned to
 C's values), `crates/expat/src/parse/tests.rs::epilog_cr_lf_split_counts_two_lines_like_c`,
 and the chunk-dependence pin of the upstream vectors.
+
+## D-025 Versioned fuzz corpora and a corpus replay test (module 10)
+
+The committed corpus of every fuzz target is test data with a documented
+origin (`docs/FUZZING.md`): a libFuzzer merge of the previous corpus, the
+working corpus of the logged runs and deterministic seeds
+(`expat_difftest::fuzzcase::seeds`, constant seed, `fuzz_seeds` binary).
+What a fuzzing run discovers is not reproducible bit for bit (libFuzzer
+draws a random seed per run), so the merged result is committed instead of
+being regenerated in CI. The checks of the whole-parser targets live in
+`expat_difftest::fuzzcase`, so the fuzz targets and
+`tests/tests/fuzz_corpus.rs` run the same code; the replay test makes the
+corpora part of the ordinary suite on Linux, macOS and Windows.
+`scripts/fuzz-smoke.sh` fails for a target without a committed corpus
+instead of creating an empty one. The raw libFuzzer logs of the runs
+reported in REPORT.md are kept, trimmed, in `docs/fuzz-logs/`.
+
+The harness gained `ParseOptions::ns_triplets` (`XML_SetReturnNSTriplet`)
+after an injected bug in the triplet-dependent duplicate-attribute check
+went undetected (REPORT.md, module 10).
+
