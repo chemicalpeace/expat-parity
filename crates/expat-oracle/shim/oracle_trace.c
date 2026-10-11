@@ -14,8 +14,10 @@
 #include "expat.h"
 #include "oracle.h"
 
-/* Fixed hash salt so libexpat never draws entropy. The salt only seeds
-   internal SipHash tables and never changes observable output. */
+/* Fixed hash salt so libexpat never draws entropy. The salt seeds the
+   internal SipHash tables; their slot order shows only in the context string
+   of external entity references (getContext), which the trace does not
+   record (D-021). */
 static const uint8_t ORACLE_HASH_SALT[16]
     = {0x65, 0x78, 0x70, 0x61, 0x74, 0x2d, 0x72, 0x73,
        0x2d, 0x6f, 0x72, 0x61, 0x63, 0x6c, 0x65, 0x21};

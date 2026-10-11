@@ -143,6 +143,23 @@ int oracle_parse_trace(const unsigned char *doc, size_t len,
                        size_t *out_len);
 void oracle_free(void *p);
 
+/* xmlparse.c string pool and hash table (shim/oracle_core.c). Runs a
+ * program of pool or hash table operations (format: tests/src/core.rs) and
+ * writes the text trace into a malloc'd buffer. Not thread-safe: callers
+ * serialise runs. Returns -1 for a malformed header or a shim allocation
+ * failure. */
+#define ORACLE_CORE_HEAP_CAP ((size_t)32 << 20)
+int oracle_core_run(const unsigned char *prog, size_t len, unsigned char **out,
+                    size_t *out_len);
+/* poolBytesToAllocateFor and offsetof(BLOCK, s). */
+size_t oracle_pool_bytes_to_allocate_for(int block_size);
+size_t oracle_block_header_size(void);
+/* hash() of xmlparse.c for a parser with this 16-byte salt; *ulong_bits is
+ * the width of the C `unsigned long` result. */
+unsigned long long oracle_parser_hash(const unsigned char salt[16],
+                                      const char *key, size_t len,
+                                      int *ulong_bits);
+
 const char *oracle_expat_version(void);
 
 #endif

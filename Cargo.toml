@@ -29,3 +29,16 @@ arithmetic_side_effects = "warn"
 
 [profile.release]
 debug = 1
+
+# The differential tests run the port, the harness and the C oracle millions
+# of times; optimising these three crates in dev/test builds keeps the suite
+# fast without changing what is checked (debug assertions and overflow checks
+# stay on, D-022).
+[profile.dev.package.expat]
+opt-level = 2
+
+[profile.dev.package.expat-difftest]
+opt-level = 2
+
+[profile.dev.package.expat-oracle]
+opt-level = 2

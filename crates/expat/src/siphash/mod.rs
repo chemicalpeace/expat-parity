@@ -1,8 +1,10 @@
 //! SipHash-2-4, the keyed hash of libexpat's internal hash tables.
 //!
 //! Port of `siphash.h` (`R_2_9_0`; originally by William Ahern, MIT). libexpat
-//! seeds it with a per-parser salt to resist hash-flooding; the hash value
-//! itself is never observable through the parser API.
+//! seeds it with a per-parser salt to resist hash-flooding. The hash value
+//! is not reported by the parser API, but it fixes the slot order of the
+//! parser's hash tables, which shows in the context string of external
+//! entity references (see `expat::hash`, D-021).
 //!
 //! Differences from the C interface, all for safety:
 //! - [`SipHasher24::finish`] consumes the hasher (C's `sip24_final` mutates

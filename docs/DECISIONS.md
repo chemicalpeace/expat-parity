@@ -299,3 +299,66 @@ comparison is exact.
   handler pointer to its index in declaration order; `oracle_role_run` can
   start from any state, which lets the tests check every handler with every
   token kind and keyword in one step.
+
+## D-021 String pool, hash table and allocation accounting (module 9)
+
+- **Same structure as C.** `pool::StringPool` keeps `STRING_POOL`'s two block
+  lists (as vectors, C list head last), the `int` block sizes, and the three
+  growth strategies of `poolGrow` (reuse a free block, enlarge the newest
+  block in place when the current string starts it, or allocate a new block
+  of `max(1024, 2 x (end - start))`), plus `poolClear`'s list order. The
+  hash table keeps `HASH_TABLE`'s slot layout. This is not cosmetic: the
+  slot order is observable (the parser iterates `dtd->prefixes` and the
+  general entities to build the context string of an external entity
+  reference, `getContext`), and the exact allocation sizes are what the
+  allocation tracker (`XML_SetAllocTrackerMaximumAmplification`) and a
+  failing allocator see. Whether module 11 replicates the tracker's byte
+  counts for all parser structures is decided there; the pool and table
+  already report C's sizes.
+- **Handles instead of pointers.** Pool strings are `PoolStr { block,
+  start, len }` (block numbered from the oldest in use, which is stable
+  because only the newest block changes), read with `StringPool::get`.
+  Table entries live in an arena and are named by `EntryId` (insertion
+  index, valid until `clear`); slots hold ids. Each entry owns its key (C
+  points at a pool string that outlives the entry). A stale handle is a
+  logic error but memory-safe.
+- **Allocation accounting.** `heap::Heap` receives every `MALLOC`,
+  `REALLOC` and `FREE` the C code would make, with C's size
+  (`offsetof(BLOCK, s) + size` for blocks, `sizeof(NAMED *) x size` for
+  slot arrays, the caller's `createSize` for entries); `false` makes the
+  operation fail exactly where C's would, leaving C's state (for example a
+  failed first table allocation sets `power` without slots; an insertion
+  that fails after doubling keeps the doubled table). Sizes use the target's
+  pointer width, so they equal C's on every platform. The port allocates
+  with Rust's allocator; `heap::Unlimited` never refuses.
+- **Hash width.** C truncates the 64-bit SipHash value to `unsigned long`
+  (32 bits on Windows); the port uses `core::ffi::c_ulong`, so its slot
+  layout equals C's on each platform. Unlike D-016 (counters), this is a
+  free choice with no correctness cost, and it keeps `getContext` output
+  identical to C everywhere.
+- **Preconditions.** Keys and the strings given to `poolCopyString`,
+  `poolCopyStringNoFinish` and `poolAppendString` are C strings (no NUL);
+  C would stop at a NUL (and its `keyeq` can then read out of bounds). The
+  port asserts this in debug builds; the parser only passes names.
+- **C quirk kept:** `poolAppendString` of an empty string to a pool without
+  blocks returns `NULL` (nothing was allocated, so `start` is `NULL`), which
+  callers report as out of memory; the port returns `Err(NoMemory)`. The
+  parser only appends non-empty constants, so this is not observable through
+  the API. Found by the random differential programs.
+- **Oracle access.** `shim/oracle_core.c` textually includes the unmodified
+  `xmlparse.c`, every exported symbol renamed with `oracle_p_` (D-009), and
+  interprets operation programs on a parser created with
+  `XML_ParserCreate_MM` whose allocation hooks record and refuse requests
+  (the allocation tracker is disabled). Runs are serialised by a lock in
+  `expat-oracle` because the hooks use global state.
+
+## D-022 Optimised dev/test builds of the port, harness and oracle
+
+`Cargo.toml` sets `opt-level = 2` in the `dev` profile (which `cargo test`
+uses) for `expat`, `expat-difftest` and `expat-oracle` (the C oracle is then
+built with `-O2` too, as it already is for fuzzing). Debug assertions and
+overflow checks are profile settings that stay on, so nothing that is checked
+changes; the differential suites just run 10-20 times faster (whole
+workspace 208 s -> 57 s including the build on the 2-core sandbox,
+`tok_diff.rs` 163 s -> 8 s). Miri ignores `opt-level`. Taken in module 9
+because each module adds heavy differential tests.

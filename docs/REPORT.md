@@ -16,7 +16,8 @@ See the module table in `docs/STATE.md`. Ported and verified: modules 1-7
 built-in encoding and for application-defined encodings, the converters to
 UTF-8/UTF-16, encoding detection and the XML declaration), i.e. all of
 `xmltok.c`, `xmltok_impl.c` and `xmltok_ns.c`; module 8 is `xmlrole.c` (the
-prolog/DTD state machine). No public parser API exists yet.
+prolog/DTD state machine); module 9 is the string pool and hash table of
+`xmlparse.c` with C's allocation behaviour. No public parser API exists yet.
 
 ## Verification infrastructure
 
@@ -49,6 +50,13 @@ prolog/DTD state machine). No public parser API exists yet.
 - Deliberate bug in ported code (module 8, 2026-10-11, reverted): `#FIXED`
   moving to `attlist1` instead of `attlist9` (`role/mod.rs`) failed
   `every_handler_token_and_keyword` and `dtd_constructs`.
+- Deliberate bugs in ported code (module 9, 2026-10-11, each reverted):
+  `poolClear` moving the blocks to a non-empty free list oldest first
+  instead of newest first (`pool/mod.rs`) failed
+  `pool_random_programs_match_c`; saturating instead of truncating
+  `PROBE_STEP` to 8 bits (`hash/mod.rs`) failed `hash_large_tables_match_c`
+  and `hash_random_programs_match_c`. (A first attempt at the second
+  mutation was a no-op because `| 1` masked it; it was replaced.)
 
 ## Test and fuzz statistics
 
@@ -81,6 +89,23 @@ for fuzz and Miri.
   `tok_diff.rs` 163 s, `init_diff.rs` 24 s, `role_diff.rs` 17 s).
 - `cargo +nightly miri test -p expat --all-features`
   (`-Zmiri-strict-provenance`): 20 unit tests + 5 doctests pass (97 s).
+- Module 9 (PR #4): `tests/tests/core_diff.rs` has 9 tests (C's
+  `poolBytesToAllocateFor` and `offsetof(BLOCK, s)` at every boundary;
+  `hash()` for 2,000 keys/salts and the width of `unsigned long`; a pool
+  scenario covering every function and growth strategy, run as is, with
+  each of its first 40 allocation attempts refused, and with two refusals
+  in a row before each operation (40 + 39 programs); growth up to the
+  harness heap cap; 1,500 random pool programs; tables of up to 2^14 slots
+  (6,000 keys, 3 salts); each of the first 80 allocation attempts of a
+  70-key program refused, and refusals at the doubling; 1,500 random hash
+  table programs), plus 7 unit tests (`pool`, `hash`).
+- Whole workspace after module 9, with D-022: `cargo test --workspace
+  --all-features` runs 99 test functions (86 tests + 13 doctests), all
+  passing, in 57 s including the build (`core_diff.rs` 6.0 s,
+  `tok_diff.rs` 8.3 s, `init_diff.rs` 4.4 s).
+  `cargo +nightly miri test -p expat --all-features --lib -- pool hash`:
+  the 10 pool/hash unit tests pass under Miri (21 s); the full Miri run is
+  in CI.
 - Fuzzing (`cargo +nightly fuzz run <target> -- -max_total_time=...`,
   AddressSanitizer on Rust and on the C oracle), no findings:
 
@@ -91,9 +116,13 @@ for fuzz and Miri.
   | `tok_diff` | modules 5-6: + UTF-16, seeded unknown encodings, converters | 661 s | 262,991 |
   | `tok_diff` | modules 5-7: + `initScan` (11 names x 2 states x 2 NS modes per input), `XmlParseXmlDecl` on every declaration token | 661 s | 233,945 |
   | `role_diff` | module 8: role + full state after every token, documents and synthetic sequences, document/external entity | 631 s | 5,158,518 |
+  | `core_diff` | module 9: pool and hash table programs with allocation refusals, white-box state after every operation | 665 s (7 runs of 95 s) | 143,161 |
 
   Corpora were minimised with `cargo fuzz cmin` and committed
-  (`fuzz/corpus/`).
+  (`fuzz/corpus/`). `core_diff` was run in 95-second slices because a
+  command may run at most two minutes in the current sandbox; two earlier
+  slices (216 s, 65,802 executions, no finding) are not counted because a
+  deliberate-bug experiment edited the source while they were being built.
 
 ## Divergences
 

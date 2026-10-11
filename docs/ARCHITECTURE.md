@@ -31,7 +31,10 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | UTF-16 and unknown encodings, `utf8Convert`/`utf16Convert` converters (`xmltok.c`) | `expat::tok` (`utf16`, `unknown`, `convert`) | see STATE.md |
 | `XmlInitEncoding(NS)`, `initScan`, `XmlParseXmlDecl(NS)`, encoding tables (`xmltok.c`, `xmltok_ns.c`) | `expat::tok` (`init`, `xmldecl`) | see STATE.md |
 | `xmlrole.c` | `expat::role` | see STATE.md |
-| `xmlparse.c` | `expat::parse` (+ submodules) | planned |
+| `STRING_POOL`, `pool*` (`xmlparse.c`) | `expat::pool` | see STATE.md |
+| `HASH_TABLE`, `lookup`, `hashTable*`, `hash.h`/`hash_table.h` (`xmlparse.c`) | `expat::hash` | see STATE.md |
+| `MALLOC`/`REALLOC`/`FREE` accounting (`expat_malloc` & co., `xmlparse.c`) | `expat::heap` | see STATE.md |
+| rest of `xmlparse.c` | `expat::parse` (+ submodules) | planned |
 
 Internal modules are reachable from tests only through the `internal-api`
 feature (`expat::internal`), see DECISIONS D-006.
@@ -96,6 +99,24 @@ declaration form and conditional sections, tokenized with the prolog
 scanner, as a document entity and as an external entity, in all 12 built-in
 encodings, and (c) random synthetic token sequences (also in seeded unknown
 encodings).
+
+## Parser core data structures
+
+`expat::pool` (`STRING_POOL`) and `expat::hash` (`HASH_TABLE`) keep the C
+structure exactly (D-021): the pool's block lists, block sizes and growth
+choices, and the hash table's slot layout (SipHash with the root parser's
+salt, double hashing with the 8-bit `PROBE_STEP`, doubling at half full).
+Allocations the C code would make are announced, with C's sizes, to an
+`expat::heap::Heap`, which may refuse them like a failing `MALLOC`. Strings
+are `PoolStr` handles and table entries `EntryId`s instead of pointers.
+Verification (`tests/tests/core_diff.rs`, `expat_difftest::core`, fuzz target
+`core_diff`): programs of pool / hash table operations run on the real C
+structures (`shim/oracle_core.c`, which includes `xmlparse.c`) and on the
+port; after every operation the result, every allocation request and the
+complete white-box state are compared (block lists, `start`/`ptr`, the
+current string, all finished strings; `power`/`size`/`used`, entry ids and
+slots, iteration order, the final slot layout), including a refusal of
+every single allocation attempt.
 
 ## Verification layers
 

@@ -282,6 +282,69 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
     Ok(trace)
 }
 
+/// `ORACLE_CORE_HEAP_CAP`: the harness heap of [`core_run`] refuses any
+/// request that would take its total above this many bytes.
+pub const CORE_HEAP_CAP: usize = 32 << 20;
+
+/// Serialises [`core_run`]: the shim's allocation hooks use global state.
+static CORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Runs a program of string pool or hash table operations against
+/// `xmlparse.c` (`shim/oracle_core.c`; program and trace formats in the test
+/// crate's `core` module) and returns the text trace, or `None` if the
+/// program header is malformed.
+pub fn core_run(prog: &[u8]) -> Option<String> {
+    let _guard = CORE_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut out: *mut u8 = std::ptr::null_mut();
+    let mut out_len: usize = 0;
+    // SAFETY: `prog` is a live slice, `out`/`out_len` are valid out-pointers,
+    // and the lock above serialises access to the shim's global state.
+    let rc = unsafe { ffi::oracle_core_run(prog.as_ptr(), prog.len(), &mut out, &mut out_len) };
+    if rc != 0 {
+        return None;
+    }
+    let bytes = if out.is_null() {
+        Vec::new()
+    } else {
+        // SAFETY: on success a non-null `out` is a malloc'd buffer of exactly
+        // `out_len` initialised bytes that we own until `oracle_free`.
+        let v = unsafe { std::slice::from_raw_parts(out, out_len) }.to_vec();
+        // SAFETY: `out` came from the shim's allocator and is freed once.
+        unsafe { ffi::oracle_free(out.cast()) };
+        v
+    };
+    Some(String::from_utf8(bytes).expect("the trace is ASCII"))
+}
+
+/// `poolBytesToAllocateFor(block_size)` of `xmlparse.c`.
+pub fn pool_bytes_to_allocate_for(block_size: i32) -> usize {
+    // SAFETY: pure function of an integer.
+    unsafe { ffi::oracle_pool_bytes_to_allocate_for(block_size) }
+}
+
+/// `offsetof(BLOCK, s)` in `xmlparse.c`.
+pub fn block_header_size() -> usize {
+    // SAFETY: returns a constant.
+    unsafe { ffi::oracle_block_header_size() }
+}
+
+/// `hash(parser, key, len)` of `xmlparse.c` for a parser whose salt was set
+/// with `XML_SetHashSalt16Bytes(salt)`, and the bit width of C's `unsigned
+/// long` (the type of the result). `key` must not contain NUL.
+pub fn parser_hash(salt: &[u8; 16], key: &[u8]) -> (u64, u32) {
+    let c = CString::new(key).expect("key without NUL");
+    let _guard = CORE_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut bits: c_int = 0;
+    // SAFETY: `salt` has 16 bytes, `c` holds `key.len()` bytes plus NUL,
+    // `bits` is a valid out-pointer.
+    let h = unsafe { ffi::oracle_parser_hash(salt.as_ptr(), c.as_ptr(), key.len(), &mut bits) };
+    (h, u32::try_from(bits).expect("positive width"))
+}
+
 /// The version string reported by the vendored libexpat (`XML_ExpatVersion`).
 pub fn expat_version() -> String {
     // SAFETY: XML_ExpatVersion returns a pointer to a static NUL-terminated

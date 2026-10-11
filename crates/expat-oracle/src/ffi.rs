@@ -153,5 +153,19 @@ unsafe extern "C" {
         out_len: *mut usize,
     ) -> c_int;
     pub(crate) fn oracle_free(p: *mut c_void);
+    pub(crate) fn oracle_core_run(
+        prog: *const u8,
+        len: usize,
+        out: *mut *mut u8,
+        out_len: *mut usize,
+    ) -> c_int;
+    pub(crate) fn oracle_pool_bytes_to_allocate_for(block_size: c_int) -> usize;
+    pub(crate) fn oracle_block_header_size() -> usize;
+    pub(crate) fn oracle_parser_hash(
+        salt: *const u8,
+        key: *const c_char,
+        len: usize,
+        ulong_bits: *mut c_int,
+    ) -> c_ulonglong;
     pub(crate) fn oracle_expat_version() -> *const c_char;
 }
