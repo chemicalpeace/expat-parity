@@ -10,6 +10,10 @@ XML 1.0 specifications or to libexpat's own documentation.
 
 _No divergences yet._
 
+Platform-dependent C behaviour that the port fixes to one choice, without an
+observable effect on parsing, is recorded in DECISIONS (D-016 counter width,
+D-017 sign of stray bytes in `utf8_toUtf16`).
+
 ## Observed C quirks (candidates; decision due when the module is ported)
 
 These are behaviours of libexpat 2.9.0 found by the harness that look like bugs

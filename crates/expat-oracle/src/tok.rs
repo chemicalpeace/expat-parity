@@ -471,3 +471,145 @@ pub fn trim_utf8(from: &[u8]) -> usize {
     // SAFETY: reads only inside `from`.
     unsafe { ffi::oracle_trim_utf8(from.as_ptr(), from.len()) }
 }
+
+impl Builtin {
+    fn from_id(id: c_int) -> Option<Builtin> {
+        Builtin::ALL.into_iter().find(|b| b.id() == id)
+    }
+}
+
+/// `initScan` after `XmlInitEncoding(NS)` with `name`: `None` if C rejects
+/// the name, else the token, `next`, and the builtin encoding that `*encPtr`
+/// points to afterwards (`None`: still the initial encoding). `content`
+/// selects `XML_CONTENT_STATE`.
+pub fn init_scan(
+    name: Option<&[u8]>,
+    ns: bool,
+    content: bool,
+    buf: &[u8],
+    ptr: usize,
+) -> Option<(i32, Option<usize>, Option<Builtin>)> {
+    assert!(ptr <= buf.len());
+    let name = name.map(|n| CString::new(n).expect("name without NUL"));
+    let mut next: c_longlong = -1;
+    let mut selected: c_int = -1;
+    // SAFETY: `name` is null or NUL-terminated; initScan reads at most 3
+    // bytes and the scanner only `[buf + ptr, buf + len)`; the out-pointers
+    // are valid.
+    let tok = unsafe {
+        ffi::oracle_init_scan(
+            name.as_ref().map_or(std::ptr::null(), |n| n.as_ptr()),
+            c_int::from(ns),
+            c_int::from(content),
+            buf.as_ptr(),
+            buf.len(),
+            ptr,
+            &mut next,
+            &mut selected,
+        )
+    };
+    if tok == -100 {
+        return None;
+    }
+    let sel = (selected != -1).then(|| Builtin::from_id(selected).expect("builtin id"));
+    Some((tok, opt(next), sel))
+}
+
+/// `XmlUpdatePosition` of the initial encoding (`initUpdatePosition`).
+pub fn init_update_position(buf: &[u8], ptr: usize, pos: (u64, u64)) -> (u64, u64) {
+    assert!(ptr <= buf.len());
+    let mut p: [c_ulonglong; 2] = [pos.0, pos.1];
+    // SAFETY: reads only inside `[buf + ptr, buf + len)`; `p` holds 2 values.
+    unsafe { ffi::oracle_init_update_position(buf.as_ptr(), buf.len(), ptr, p.as_mut_ptr()) };
+    (p[0], p[1])
+}
+
+/// What `findEncoding` returned through `XmlParseXmlDecl`'s `*encoding`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FoundEncoding {
+    /// Not written.
+    Untouched,
+    /// `NULL`: unrecognised name.
+    Null,
+    /// The input encoding, which is not a builtin.
+    Same,
+    /// A builtin encoding (possibly the input encoding itself).
+    Builtin(Builtin),
+}
+
+/// `XmlParseXmlDecl(NS)` results; offsets are `None` when not written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XmlDecl {
+    /// Return value.
+    pub ok: bool,
+    /// `*badPtr`
+    pub bad: Option<usize>,
+    /// `*versionPtr`
+    pub version: Option<usize>,
+    /// `*versionEndPtr`
+    pub version_end: Option<usize>,
+    /// `*encodingName`
+    pub encoding_name: Option<usize>,
+    /// `*encoding`
+    pub encoding: FoundEncoding,
+    /// `*standalone`, `None` when not written.
+    pub standalone: Option<bool>,
+}
+
+/// `XmlParseXmlDecl(NS)` on the declaration `buf[ptr..end]`.
+///
+/// Requires `end <= buf.len()`, at least 7 characters (`<?xml?>`) and a
+/// whole number of characters between `ptr` and `end`; then the C function
+/// never moves past `end`. The call runs on a copy of `buf` followed by 8
+/// bytes of `>`, because an unknown encoding's converter may read the bytes
+/// of a multi-byte sequence that starts just before `end`.
+pub fn parse_xml_decl(
+    ns: bool,
+    is_general_text_entity: bool,
+    enc: Enc<'_>,
+    buf: &[u8],
+    ptr: usize,
+    end: usize,
+) -> XmlDecl {
+    let m = enc.minbpc();
+    assert!(end <= buf.len() && ptr + 7 * m <= end && (end - ptr).is_multiple_of(m));
+    let mut v = buf.to_vec();
+    v.extend([b'>'; 8]);
+    let mut out: [c_longlong; 5] = [-1; 5];
+    let mut sa: c_int = -7;
+    // SAFETY: by the precondition checked above every position the C code
+    // reads is below `end`, except converter reads of at most 3 bytes past
+    // it, which the padding covers; the out-pointers are valid.
+    let ok = unsafe {
+        ffi::oracle_parse_xml_decl(
+            c_int::from(ns),
+            c_int::from(is_general_text_entity),
+            enc.ptr(),
+            v.as_ptr(),
+            ptr,
+            end,
+            out.as_mut_ptr(),
+            &mut sa,
+        )
+    };
+    let encoding = match out[4] {
+        -7 => FoundEncoding::Untouched,
+        -2 => FoundEncoding::Null,
+        -3 => FoundEncoding::Same,
+        id => FoundEncoding::Builtin(
+            Builtin::from_id(c_int::try_from(id).expect("small")).expect("builtin id"),
+        ),
+    };
+    XmlDecl {
+        ok: ok == 1,
+        bad: opt(out[0]),
+        version: opt(out[1]),
+        version_end: opt(out[2]),
+        encoding_name: opt(out[3]),
+        encoding,
+        standalone: match sa {
+            -7 => None,
+            s => Some(s == 1),
+        },
+    }
+}

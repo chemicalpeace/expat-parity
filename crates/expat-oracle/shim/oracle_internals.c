@@ -350,3 +350,75 @@ const void *
 oracle_unknown_enc(const void *h) {
   return ((const struct oracle_unknown *)h)->enc;
 }
+
+/* ---- encoding detection and the XML declaration (module 7) -------------- */
+
+/* Builtin id of `enc`, or -1 if it is none of them. */
+static int
+builtin_id(const ENCODING *enc) {
+  int i;
+  for (i = 0; i <= ORACLE_TABLE_BIG2_NS; i++)
+    if (enc == &table_by_id(i)->enc)
+      return i;
+  return -1;
+}
+
+int
+oracle_init_scan(const char *name, int ns, int state, const char *buf,
+                 size_t len, size_t ptr, long long *next, int *selected) {
+  INIT_ENCODING ie;
+  const ENCODING *enc = NULL;
+  const char *nextp = NULL;
+  int tok;
+  memset(&ie, 0, sizeof ie);
+  if (! (ns ? oracle_i_XmlInitEncodingNS : oracle_i_XmlInitEncoding)(&ie, &enc,
+                                                                    name))
+    return ORACLE_INIT_FAILED;
+  tok = XmlTok(enc, state, buf + ptr, buf + len, &nextp);
+  *next = offset_or_none(nextp, buf);
+  *selected = enc == &ie.initEnc ? -1 : builtin_id(enc);
+  return tok;
+}
+
+void
+oracle_init_update_position(const char *buf, size_t len, size_t ptr,
+                            unsigned long long pos[2]) {
+  INIT_ENCODING ie;
+  const ENCODING *enc = NULL;
+  POSITION p;
+  memset(&ie, 0, sizeof ie);
+  oracle_i_XmlInitEncoding(&ie, &enc, NULL);
+  p.lineNumber = (XML_Size)pos[0];
+  p.columnNumber = (XML_Size)pos[1];
+  XmlUpdatePosition(enc, buf + ptr, buf + len, &p);
+  pos[0] = p.lineNumber;
+  pos[1] = p.columnNumber;
+}
+
+int
+oracle_parse_xml_decl(int ns, int is_general_text_entity, const void *encv,
+                      const char *buf, size_t ptr, size_t end,
+                      long long out[5], int *standalone) {
+  static const char sentinel = 0;
+  const ENCODING *enc = (const ENCODING *)encv;
+  const char *bad = NULL, *version = NULL, *version_end = NULL, *name = NULL;
+  const ENCODING *found = (const ENCODING *)&sentinel;
+  int sa = ORACLE_UNTOUCHED;
+  int ok = (ns ? oracle_i_XmlParseXmlDeclNS : oracle_i_XmlParseXmlDecl)(
+      is_general_text_entity, enc, buf + ptr, buf + end, &bad, &version,
+      &version_end, &name, &found, &sa);
+  out[0] = offset_or_none(bad, buf);
+  out[1] = offset_or_none(version, buf);
+  out[2] = offset_or_none(version_end, buf);
+  out[3] = offset_or_none(name, buf);
+  if (found == (const ENCODING *)&sentinel)
+    out[4] = ORACLE_UNTOUCHED;
+  else if (found == NULL)
+    out[4] = ORACLE_NULL;
+  else if (builtin_id(found) >= 0)
+    out[4] = builtin_id(found);
+  else
+    out[4] = found == enc ? ORACLE_SAME : ORACLE_NULL - 100;
+  *standalone = sa;
+  return ok;
+}

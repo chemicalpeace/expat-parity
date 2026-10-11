@@ -82,7 +82,14 @@ fn utf16_all_strings_up_to_three_units() {
 fn utf8_converters_all_strings_up_to_three_bytes() {
     for_all_strings(ALPHABET, 3, |buf| {
         check_trim(buf);
-        for enc in Normal::ALL {
+        // One encoding per converter pair and byte-type table (the NS
+        // variants share converters and lead-byte types).
+        for enc in [
+            Normal::Utf8,
+            Normal::InternalUtf8Ns,
+            Normal::Latin1,
+            Normal::Ascii,
+        ] {
             check_convert(&enc, buf, true);
         }
     });

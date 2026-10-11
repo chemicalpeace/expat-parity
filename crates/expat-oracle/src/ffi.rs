@@ -96,6 +96,32 @@ unsafe extern "C" {
     ) -> *mut c_void;
     pub(crate) fn oracle_unknown_enc(h: *const c_void) -> *const c_void;
     pub(crate) fn oracle_unknown_free(h: *mut c_void);
+    pub(crate) fn oracle_init_scan(
+        name: *const c_char,
+        ns: c_int,
+        state: c_int,
+        buf: *const u8,
+        len: usize,
+        ptr: usize,
+        next: *mut c_longlong,
+        selected: *mut c_int,
+    ) -> c_int;
+    pub(crate) fn oracle_init_update_position(
+        buf: *const u8,
+        len: usize,
+        ptr: usize,
+        pos: *mut c_ulonglong,
+    );
+    pub(crate) fn oracle_parse_xml_decl(
+        ns: c_int,
+        is_general_text_entity: c_int,
+        enc: *const c_void,
+        buf: *const u8,
+        ptr: usize,
+        end: usize,
+        out: *mut c_longlong,
+        standalone: *mut c_int,
+    ) -> c_int;
     pub(crate) fn oracle_parse_trace(
         doc: *const u8,
         len: usize,

@@ -93,6 +93,30 @@ void *oracle_unknown_new(const int map[256], const int *tab, int ns);
 const void *oracle_unknown_enc(const void *h);
 void oracle_unknown_free(void *h);
 
+/* initScan: XmlInitEncoding(NS) with `name` (NULL: none), then XmlTok in
+ * `state` (0 prolog, 1 content) on buf[ptr..len]. *selected is the builtin
+ * id that *encPtr points to afterwards, or -1 if it still points to the
+ * initial encoding. Returns ORACLE_INIT_FAILED if the name is rejected. */
+enum {
+  ORACLE_INIT_FAILED = -100,
+  ORACLE_UNTOUCHED = -7,
+  ORACLE_NULL = -2,
+  ORACLE_SAME = -3
+};
+int oracle_init_scan(const char *name, int ns, int state, const char *buf,
+                     size_t len, size_t ptr, long long *next, int *selected);
+/* XmlUpdatePosition of a fresh INIT_ENCODING (initUpdatePosition). */
+void oracle_init_update_position(const char *buf, size_t len, size_t ptr,
+                                 unsigned long long pos[2]);
+/* XmlParseXmlDecl(NS) on buf[ptr..end]. out: bad, version, version_end,
+ * encoding name offsets (-1 = not written), then the found encoding:
+ * ORACLE_UNTOUCHED, ORACLE_NULL, ORACLE_SAME (the input encoding, when it is
+ * not a builtin) or a builtin id. *standalone is ORACLE_UNTOUCHED, 0 or 1.
+ * The caller pads the buffer (unknown converters read past `end`). */
+int oracle_parse_xml_decl(int ns, int is_general_text_entity, const void *enc,
+                          const char *buf, size_t ptr, size_t end,
+                          long long out[5], int *standalone);
+
 /* Runs the full parser and writes a canonical event trace (see
  * docs/ARCHITECTURE.md, "Trace format") into a malloc'd buffer.
  * Returns 0 on success (the parse itself may have failed; that is part of

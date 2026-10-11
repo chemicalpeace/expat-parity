@@ -33,12 +33,18 @@
 //! ```
 
 mod convert;
+mod init;
 mod normal;
 pub mod scan;
 mod unknown;
 mod utf16;
+mod xmldecl;
 
 pub use convert::{ConvertResult, Converted, trim_to_complete_utf8_characters};
+pub use init::{
+    EncodingIndex, InitEncoding, InitScan, Known, State, get_encoding_index, init_scan,
+    internal_encoding, tok,
+};
 pub use normal::Normal;
 pub use scan::{
     Attribute, Position, attribute_value_tok, cdata_section_tok, char_ref_number, content_tok,
@@ -47,6 +53,7 @@ pub use scan::{
 };
 pub use unknown::{Converter, InvalidMap, Unknown};
 pub use utf16::Utf16;
+pub use xmldecl::{FoundEncoding, XmlDecl, parse_xml_decl, to_ascii};
 
 use crate::chartab::ByteType;
 

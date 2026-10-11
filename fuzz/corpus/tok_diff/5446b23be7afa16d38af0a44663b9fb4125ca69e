@@ -1,0 +1,19 @@
+<ef0'>
+<!ATTLIST doc zc CDAT!ATTL   a3  NMTOKE­N   #IMTOKENS  #IM.9ÅÑRÏLIED
+    a6  IDREF     #IMPLIE  a6  IDR   #IMTOKENS  #IMPLIED
+    a5  ID        #IMPLIED
+    a6 NMTOKE­N   #IMTOKENS  #IMPLIED
+    a0  ID        #IMPLIED
+    26  IDREF     #IMPLIE  a6  ID        #IMP<v-->12-*<9ÅÑRÏLIED
+    a6  IDREF     #IMPLIE  a6  IDR   #IMTOKENS  #IMPLIED
+    a5  ID        #IMPLIED
+    a6  IDREF     #IMPLIE  a6  ID        #IMPLIED
+    a6 !DOCTYPE r [
+<!ENTITY % draft 'INC final 'IGNORE'>
+<!ENTITY % import SYSTE IDREF     #IMPLIE  a6  ID        #IMPLIED
+    a6 !DOCTYPE r [
+<!ENTITY % draft 'INC final 'IGNORE'>
+<!ENTITY % import SYSTEM "first.ent">
+%import;
+]>
+<r/>

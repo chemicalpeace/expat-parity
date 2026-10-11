@@ -200,3 +200,49 @@ LP64 targets and does not replicate the 32-bit wrap-around of the Windows
 build. The difference is only observable after 2^32 lines or columns. The
 differential tests compare the wrap-around near `u64::MAX` on LP64 targets
 and use small start values on Windows.
+
+## D-017 Sign of stray bytes in `utf8_toUtf16`
+
+`utf8_toUtf16` copies a byte that does not start a multi-byte sequence with
+`*to++ = *from++`, i.e. through C `char`. For bytes `>= 0x80` (continuation
+or malformed bytes) the result is `0xFF80..=0xFFFF` where `char` is signed
+(x86-64 Linux, macOS on arm64, Windows: every CI target) and `0x0080..=0x00FF`
+where it is unsigned (aarch64 Linux). The port sign-extends on every
+platform, matching C on all CI targets. Such bytes never reach the converter
+from the parser (the tokenizer rejects them first), so no parse result
+depends on it. On targets with unsigned `char` the differential harness
+accepts the zero-extended C value for exactly these units of the UTF-8
+encodings (`expat_difftest::tok::utf16_units_equal`); everywhere else the
+comparison is exact.
+
+## D-018 UTF-16 and unknown encodings (module 6)
+
+- **One trait for the whole `ENCODING`.** `Encoding` gains `is_utf8`,
+  `to_utf8` and `to_utf16`. The converters take an input and an output slice
+  and return `Converted { result, read, written }`: `read`/`written` are how
+  far C moves `*fromP`/`*toP`.
+- **UTF-16** is `tok::Utf16 { Little, LittleNs, Big, BigNs }`. A code unit that
+  is not complete in the buffer classifies as `BT_NONXML` (C would read past
+  the end). `isUtf16` (a host byte-order optimisation for `XML_UNICODE`
+  builds) and the internal UTF-16 encodings are not ported (D-002).
+- **Unknown encodings** are `tok::Unknown<C: Converter>`, built by
+  `Unknown::new(map, Option<C>, ns)`, which fails (`InvalidMap`) exactly when
+  `XmlInitUnknownEncoding` returns `NULL`. C passes the converter a pointer
+  and the converter decides how far to read; the port passes the slice of
+  the sequence, whose length the map defines. A multi-byte sequence that is
+  not complete in the input makes `to_utf8`/`to_utf16` stop with
+  `InputIncomplete` (for `to_utf16`, a full output is reported first, like
+  C's loop condition); C reads past the end there. The tokenizer only
+  accepts complete sequences, so the parser never gives a converter such
+  input. The differential tests compare with C only on input that ends on a
+  sequence boundary and pin the port's behaviour on the rest separately.
+- **Oracle access.** The oracle's tokenizer entry points take an `ENCODING *`
+  (`oracle_encoding(id)` for the built-ins, now including `big2_`;
+  `oracle_unknown_new` for unknown encodings, with a table-driven converter
+  that the Rust harness mirrors). The 256-entry byte maps and 65,536-entry
+  converter tables are generated from a 64-bit seed, so the fuzz target
+  explores maps and converters together with documents.
+- **Padding for unknown encodings.** The oracle wrappers of the helpers that
+  read until a terminator (D-015) pad with `>` instead of NUL for unknown
+  encodings, because the map may make NUL a lead byte but must map `>` to
+  itself.

@@ -24,6 +24,7 @@ use std::rc::Rc;
 use expat::internal::chartab::{ByteType, Table};
 use expat::internal::tok::{self as rs, Converter, Encoding, Normal, Scan, Tok, Unknown, Utf16};
 use expat_oracle::tok::{self as c, Builtin, CONVERTER_TABLE_LEN, Enc, Scanner, UnknownEncoding};
+use rs::{FoundEncoding, InitEncoding, Known, State};
 
 /// A Rust encoding and its C counterpart.
 pub trait Subject: fmt::Debug {
@@ -353,6 +354,13 @@ fn check_token_helpers<S: Subject>(s: &S, buf: &[u8], ptr: usize, tok: Tok, next
             let r = rs::is_public_id(enc, lit, 0).map_err(Some);
             assert_eq!(r, c::is_public_id(t, lit, 0), "{s:?} isPublicId {lit:?}");
         }
+        Tok::XmlDecl => {
+            for ns in [false, true] {
+                for gte in [false, true] {
+                    check_xml_decl(s, ns, gte, buf, ptr, next);
+                }
+            }
+        }
         Tok::Name | Tok::PrefixedName | Tok::Nmtoken => {
             let name = buf.get(ptr..next).expect("token inside buffer");
             for a in ASCII_NAMES {
@@ -575,4 +583,102 @@ pub fn check_token_walk<S: Subject>(s: &S, buf: &[u8]) {
             }
         }
     }
+}
+
+/// The C encoding of a Rust built-in encoding.
+pub fn builtin_of_known(k: Known) -> Builtin {
+    match k {
+        Known::Normal(e) => builtin_of_normal(e),
+        Known::Utf16(e) => builtin_of_utf16(e),
+    }
+}
+
+/// Compares `XmlParseXmlDecl(NS)` on the declaration token `buf[ptr..end]`.
+pub fn check_xml_decl<S: Subject>(s: &S, ns: bool, gte: bool, buf: &[u8], ptr: usize, end: usize) {
+    let r = rs::parse_xml_decl(gte, s.rs(), ns, buf, ptr, end);
+    let cd = c::parse_xml_decl(ns, gte, s.c(), buf, ptr, end);
+    let encoding = match r.encoding {
+        None => c::FoundEncoding::Untouched,
+        Some(FoundEncoding::Unrecognized) => c::FoundEncoding::Null,
+        Some(FoundEncoding::Known(k)) => c::FoundEncoding::Builtin(builtin_of_known(k)),
+        Some(FoundEncoding::Input) => match s.c() {
+            Enc::Builtin(b) => c::FoundEncoding::Builtin(b),
+            Enc::Unknown(_) => c::FoundEncoding::Same,
+        },
+    };
+    let rd = c::XmlDecl {
+        ok: r.ok,
+        bad: r.bad,
+        version: r.version,
+        version_end: r.version_end,
+        encoding_name: r.encoding_name,
+        encoding,
+        standalone: r.standalone,
+    };
+    assert_eq!(
+        rd,
+        cd,
+        "{s:?} XmlParseXmlDecl(ns {ns}, text decl {gte}) of {:?}",
+        &buf[ptr..end]
+    );
+}
+
+/// Encoding names given to `XmlInitEncoding`: none, each built-in name in
+/// two spellings, and unknown names.
+pub const INIT_NAMES: [Option<&[u8]>; 11] = [
+    None,
+    Some(b"ISO-8859-1"),
+    Some(b"us-ascii"),
+    Some(b"UTF-8"),
+    Some(b"utf-16"),
+    Some(b"UTF-16BE"),
+    Some(b"Utf-16le"),
+    Some(b"UTF-16XX"),
+    Some(b"latin1"),
+    Some(b""),
+    Some(b"UTF-8 "),
+];
+
+/// Compares `XmlInitEncoding(NS)` + `initScan` from `buf[ptr]` for every
+/// name in [`INIT_NAMES`], both states and both namespace settings, and
+/// `initUpdatePosition`.
+pub fn check_init(buf: &[u8], ptr: usize) {
+    for name in INIT_NAMES {
+        for ns in [false, true] {
+            let r = InitEncoding::new(name, ns);
+            for content in [false, true] {
+                let cr = c::init_scan(name, ns, content, buf, ptr);
+                let rr = r.map(|init| {
+                    let state = if content {
+                        State::Content
+                    } else {
+                        State::Prolog
+                    };
+                    let x = rs::init_scan(&init, state, buf, ptr);
+                    (
+                        x.scanned.scan.to_c(),
+                        x.scanned.next,
+                        x.encoding.map(builtin_of_known),
+                    )
+                });
+                assert_eq!(
+                    rr, cr,
+                    "initScan(name {name:?}, ns {ns}, content {content}) at {ptr} of {buf:?}"
+                );
+            }
+        }
+    }
+    let column = if cfg!(windows) { 3 } else { u64::MAX - 2 };
+    let mut pos = rs::Position {
+        line_number: 7,
+        column_number: column,
+    };
+    if let Some(init) = InitEncoding::new(None, false) {
+        init.update_position(buf, ptr, &mut pos);
+    }
+    assert_eq!(
+        (pos.line_number, pos.column_number),
+        c::init_update_position(buf, ptr, (7, column)),
+        "initUpdatePosition at {ptr} of {buf:?}"
+    );
 }
