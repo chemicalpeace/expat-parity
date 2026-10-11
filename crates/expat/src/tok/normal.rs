@@ -3,6 +3,7 @@
 //! UTF-8 encoding used for parser-generated text.
 
 use super::Encoding;
+use super::convert::{self, Converted};
 use crate::chartab::{ByteType, Table};
 use crate::naming;
 
@@ -113,6 +114,27 @@ impl Encoding for Normal {
             3 => bytes(buf, p).is_none_or(naming::utf8_is_invalid3),
             4 => bytes(buf, p).is_none_or(naming::utf8_is_invalid4),
             _ => true,
+        }
+    }
+
+    fn is_utf8(&self) -> bool {
+        !matches!(self, Normal::Latin1 | Normal::Latin1Ns)
+    }
+
+    fn to_utf8(&self, from: &[u8], to: &mut [u8]) -> Converted {
+        match self {
+            Normal::Latin1 | Normal::Latin1Ns => convert::latin1_to_utf8(from, to),
+            Normal::Ascii | Normal::AsciiNs => convert::ascii_to_utf8(from, to),
+            _ => convert::utf8_to_utf8(from, to),
+        }
+    }
+
+    fn to_utf16(&self, from: &[u8], to: &mut [u16]) -> Converted {
+        match self {
+            Normal::Latin1 | Normal::Latin1Ns | Normal::Ascii | Normal::AsciiNs => {
+                convert::latin1_to_utf16(from, to)
+            }
+            _ => convert::utf8_to_utf16(self.table(), from, to),
         }
     }
 }

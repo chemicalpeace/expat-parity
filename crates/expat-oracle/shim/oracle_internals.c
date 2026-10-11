@@ -53,6 +53,10 @@ table_by_id(int id) {
     return &little2_encoding;
   case ORACLE_TABLE_LITTLE2_NS:
     return &little2_encoding_ns;
+  case ORACLE_TABLE_BIG2:
+    return &big2_encoding;
+  case ORACLE_TABLE_BIG2_NS:
+    return &big2_encoding_ns;
   default:
     return NULL;
   }
@@ -139,7 +143,14 @@ oracle_sip24_valid(void) {
 }
 
 /* ---- xmltok_impl.c scanners through the ENCODING vtable ------------------
+ * `encv` is an `ENCODING *` from oracle_encoding() or oracle_unknown_enc().
  * Offsets are relative to `buf`; -1 means "pointer not written by C". */
+
+const void *
+oracle_encoding(int id) {
+  const struct normal_encoding *e = table_by_id(id);
+  return e ? &e->enc : NULL;
+}
 
 static long long
 offset_or_none(const char *p, const char *buf) {
@@ -147,9 +158,9 @@ offset_or_none(const char *p, const char *buf) {
 }
 
 int
-oracle_tok_scan(int table, int which, const char *buf, size_t len, size_t ptr,
+oracle_tok_scan(const void *encv, int which, const char *buf, size_t len, size_t ptr,
                 long long *next) {
-  const ENCODING *enc = &table_by_id(table)->enc;
+  const ENCODING *enc = (const ENCODING *)encv;
   const char *nextp = NULL;
   int tok;
   if (which < XML_N_STATES)
@@ -162,9 +173,9 @@ oracle_tok_scan(int table, int which, const char *buf, size_t len, size_t ptr,
 }
 
 int
-oracle_tok_is_public_id(int table, const char *buf, size_t len, size_t ptr,
+oracle_tok_is_public_id(const void *encv, const char *buf, size_t len, size_t ptr,
                         long long *bad) {
-  const ENCODING *enc = &table_by_id(table)->enc;
+  const ENCODING *enc = (const ENCODING *)encv;
   const char *badp = NULL;
   int ok = enc->isPublicId(enc, buf + ptr, buf + len, &badp);
   *bad = offset_or_none(badp, buf);
@@ -172,9 +183,9 @@ oracle_tok_is_public_id(int table, const char *buf, size_t len, size_t ptr,
 }
 
 int
-oracle_tok_get_atts(int table, const char *buf, size_t ptr, int atts_max,
+oracle_tok_get_atts(const void *encv, const char *buf, size_t ptr, int atts_max,
                     long long *out) {
-  const ENCODING *enc = &table_by_id(table)->enc;
+  const ENCODING *enc = (const ENCODING *)encv;
   ATTRIBUTE atts[64];
   int n, i;
   if (atts_max < 0 || atts_max > 64)
@@ -196,45 +207,218 @@ oracle_tok_get_atts(int table, const char *buf, size_t ptr, int atts_max,
 }
 
 int
-oracle_tok_char_ref_number(int table, const char *buf, size_t ptr) {
-  const ENCODING *enc = &table_by_id(table)->enc;
+oracle_tok_char_ref_number(const void *encv, const char *buf, size_t ptr) {
+  const ENCODING *enc = (const ENCODING *)encv;
   return enc->charRefNumber(enc, buf + ptr);
 }
 
 int
-oracle_tok_predefined_entity_name(int table, const char *buf, size_t len,
+oracle_tok_predefined_entity_name(const void *encv, const char *buf, size_t len,
                                   size_t ptr) {
-  const ENCODING *enc = &table_by_id(table)->enc;
+  const ENCODING *enc = (const ENCODING *)encv;
   return enc->predefinedEntityName(enc, buf + ptr, buf + len);
 }
 
 int
-oracle_tok_name_matches_ascii(int table, const char *buf, size_t len,
+oracle_tok_name_matches_ascii(const void *encv, const char *buf, size_t len,
                               size_t ptr, const char *ascii) {
-  const ENCODING *enc = &table_by_id(table)->enc;
+  const ENCODING *enc = (const ENCODING *)encv;
   return enc->nameMatchesAscii(enc, buf + ptr, buf + len, ascii);
 }
 
 long long
-oracle_tok_name_length(int table, const char *buf, size_t ptr) {
-  const ENCODING *enc = &table_by_id(table)->enc;
+oracle_tok_name_length(const void *encv, const char *buf, size_t ptr) {
+  const ENCODING *enc = (const ENCODING *)encv;
   return enc->nameLength(enc, buf + ptr);
 }
 
 long long
-oracle_tok_skip_s(int table, const char *buf, size_t ptr) {
-  const ENCODING *enc = &table_by_id(table)->enc;
+oracle_tok_skip_s(const void *encv, const char *buf, size_t ptr) {
+  const ENCODING *enc = (const ENCODING *)encv;
   return enc->skipS(enc, buf + ptr) - buf;
 }
 
 void
-oracle_tok_update_position(int table, const char *buf, size_t len, size_t ptr,
+oracle_tok_update_position(const void *encv, const char *buf, size_t len, size_t ptr,
                            unsigned long long pos[2]) {
-  const ENCODING *enc = &table_by_id(table)->enc;
+  const ENCODING *enc = (const ENCODING *)encv;
   POSITION p;
   p.lineNumber = (XML_Size)pos[0];
   p.columnNumber = (XML_Size)pos[1];
   enc->updatePosition(enc, buf + ptr, buf + len, &p);
   pos[0] = p.lineNumber;
   pos[1] = p.columnNumber;
+}
+
+/* ---- converters (utf8Convert / utf16Convert) ----------------------------- */
+
+int
+oracle_convert(const void *encv, int to_utf16, const char *from,
+               size_t from_len, void *to, size_t to_len, size_t *read,
+               size_t *written) {
+  const ENCODING *enc = (const ENCODING *)encv;
+  const char *f = from;
+  int res;
+  if (to_utf16) {
+    unsigned short *t0 = (unsigned short *)to;
+    unsigned short *t = t0;
+    res = XmlUtf16Convert(enc, &f, from + from_len, &t, t0 + to_len);
+    *written = (size_t)(t - t0);
+  } else {
+    char *t0 = (char *)to;
+    char *t = t0;
+    res = XmlUtf8Convert(enc, &f, from + from_len, &t, t0 + to_len);
+    *written = (size_t)(t - t0);
+  }
+  *read = (size_t)(f - from);
+  return res;
+}
+
+size_t
+oracle_trim_utf8(const char *from, size_t len) {
+  const char *lim = from + len;
+  oracle_i_trim_to_complete_utf8_characters(from, &lim);
+  return (size_t)(lim - from);
+}
+
+/* ---- unknown encodings (XmlInitUnknownEncoding) ------------------------- */
+
+/* The converter used by the differential tests: the code point of a
+   sequence is tab[(first byte << 8) | (xor of the other bytes)], where the
+   sequence length comes from the map. Mirrored by expat_difftest. */
+struct oracle_conv {
+  int map[256];
+  int tab[65536];
+};
+
+struct oracle_unknown {
+  struct oracle_conv *conv;
+  void *mem;
+  ENCODING *enc;
+};
+
+static int XMLCALL
+oracle_table_convert(void *data, const char *s) {
+  const struct oracle_conv *c = (const struct oracle_conv *)data;
+  unsigned char b0 = (unsigned char)s[0];
+  int n = -c->map[b0];
+  unsigned x = 0;
+  int i;
+  for (i = 1; i < n; i++)
+    x ^= (unsigned char)s[i];
+  return c->tab[(b0 << 8) | x];
+}
+
+void
+oracle_unknown_free(void *h) {
+  struct oracle_unknown *u = (struct oracle_unknown *)h;
+  if (u == NULL)
+    return;
+  free(u->conv);
+  free(u->mem);
+  free(u);
+}
+
+void *
+oracle_unknown_new(const int map[256], const int *tab, int ns) {
+  struct oracle_unknown *u = calloc(1, sizeof *u);
+  if (u == NULL)
+    return NULL;
+  u->conv = malloc(sizeof *u->conv);
+  u->mem = malloc((size_t)oracle_i_XmlSizeOfUnknownEncoding());
+  if (u->conv == NULL || u->mem == NULL) {
+    oracle_unknown_free(u);
+    return NULL;
+  }
+  memcpy(u->conv->map, map, sizeof u->conv->map);
+  if (tab)
+    memcpy(u->conv->tab, tab, sizeof u->conv->tab);
+  if (ns)
+    u->enc = oracle_i_XmlInitUnknownEncodingNS(
+        u->mem, map, tab ? oracle_table_convert : NULL, u->conv);
+  else
+    u->enc = oracle_i_XmlInitUnknownEncoding(
+        u->mem, map, tab ? oracle_table_convert : NULL, u->conv);
+  if (u->enc == NULL) {
+    oracle_unknown_free(u);
+    return NULL;
+  }
+  return u;
+}
+
+const void *
+oracle_unknown_enc(const void *h) {
+  return ((const struct oracle_unknown *)h)->enc;
+}
+
+/* ---- encoding detection and the XML declaration (module 7) -------------- */
+
+/* Builtin id of `enc`, or -1 if it is none of them. */
+static int
+builtin_id(const ENCODING *enc) {
+  int i;
+  for (i = 0; i <= ORACLE_TABLE_BIG2_NS; i++)
+    if (enc == &table_by_id(i)->enc)
+      return i;
+  return -1;
+}
+
+int
+oracle_init_scan(const char *name, int ns, int state, const char *buf,
+                 size_t len, size_t ptr, long long *next, int *selected) {
+  INIT_ENCODING ie;
+  const ENCODING *enc = NULL;
+  const char *nextp = NULL;
+  int tok;
+  memset(&ie, 0, sizeof ie);
+  if (! (ns ? oracle_i_XmlInitEncodingNS : oracle_i_XmlInitEncoding)(&ie, &enc,
+                                                                    name))
+    return ORACLE_INIT_FAILED;
+  tok = XmlTok(enc, state, buf + ptr, buf + len, &nextp);
+  *next = offset_or_none(nextp, buf);
+  *selected = enc == &ie.initEnc ? -1 : builtin_id(enc);
+  return tok;
+}
+
+void
+oracle_init_update_position(const char *buf, size_t len, size_t ptr,
+                            unsigned long long pos[2]) {
+  INIT_ENCODING ie;
+  const ENCODING *enc = NULL;
+  POSITION p;
+  memset(&ie, 0, sizeof ie);
+  oracle_i_XmlInitEncoding(&ie, &enc, NULL);
+  p.lineNumber = (XML_Size)pos[0];
+  p.columnNumber = (XML_Size)pos[1];
+  XmlUpdatePosition(enc, buf + ptr, buf + len, &p);
+  pos[0] = p.lineNumber;
+  pos[1] = p.columnNumber;
+}
+
+int
+oracle_parse_xml_decl(int ns, int is_general_text_entity, const void *encv,
+                      const char *buf, size_t ptr, size_t end,
+                      long long out[5], int *standalone) {
+  static const char sentinel = 0;
+  const ENCODING *enc = (const ENCODING *)encv;
+  const char *bad = NULL, *version = NULL, *version_end = NULL, *name = NULL;
+  const ENCODING *found = (const ENCODING *)&sentinel;
+  int sa = ORACLE_UNTOUCHED;
+  int ok = (ns ? oracle_i_XmlParseXmlDeclNS : oracle_i_XmlParseXmlDecl)(
+      is_general_text_entity, enc, buf + ptr, buf + end, &bad, &version,
+      &version_end, &name, &found, &sa);
+  out[0] = offset_or_none(bad, buf);
+  out[1] = offset_or_none(version, buf);
+  out[2] = offset_or_none(version_end, buf);
+  out[3] = offset_or_none(name, buf);
+  if (found == (const ENCODING *)&sentinel)
+    out[4] = ORACLE_UNTOUCHED;
+  else if (found == NULL)
+    out[4] = ORACLE_NULL;
+  else if (builtin_id(found) >= 0)
+    out[4] = builtin_id(found);
+  else
+    out[4] = found == enc ? ORACLE_SAME : ORACLE_NULL - 100;
+  *standalone = sa;
+  return ok;
 }

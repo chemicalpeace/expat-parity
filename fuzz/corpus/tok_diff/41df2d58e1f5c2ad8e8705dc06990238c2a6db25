@@ -1,0 +1,5 @@
+<!ELEMENT doc (#PPLIED>
+<?pi in dtd?>
+<!--iomment in dtd-->
+]>
+<doc><![CDATA[text in doc]]></doc>

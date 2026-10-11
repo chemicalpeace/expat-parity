@@ -1,0 +1,11 @@
+<!DOCTYPE doc [
+  <!ATTLIST. doc
+ NMTOKEN   #IMPLIED
+    a4  NMTOKENS  #IMPLIED
+    a5  ID        #IMPLIED
+    a6  IDREF     #IMPLIED
+    a7  IDREFS    #IMPLIEDTY    #IMPLIED
+    a9  ENTITIES  #IMPLIED
+    a10 CDATA     #IMPLIED
+  >]>
+<doc>wombat</doc>

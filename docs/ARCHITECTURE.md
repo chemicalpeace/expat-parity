@@ -28,7 +28,8 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | `XmlUtf8Encode`, `XmlUtf16Encode` (`xmltok.c`) | `expat::encode` | see STATE.md |
 | `siphash.h` | `expat::siphash` | see STATE.md |
 | `xmltok_impl.c` (scanner template); normal encodings of `xmltok.c` | `expat::tok` (`scan`, `normal`) | see STATE.md |
-| UTF-16 / unknown encodings, `initScan`, XML declaration (`xmltok.c`, `xmltok_ns.c`) | `expat::tok` | planned |
+| UTF-16 and unknown encodings, `utf8Convert`/`utf16Convert` converters (`xmltok.c`) | `expat::tok` (`utf16`, `unknown`, `convert`) | see STATE.md |
+| `XmlInitEncoding(NS)`, `initScan`, `XmlParseXmlDecl(NS)`, encoding tables (`xmltok.c`, `xmltok_ns.c`) | `expat::tok` (`init`, `xmldecl`) | see STATE.md |
 | `xmlrole.c` | `expat::role` | planned |
 | `xmlparse.c` | `expat::parse` (+ submodules) | planned |
 
@@ -47,13 +48,40 @@ DECISIONS D-014. The C case macros become helper methods returning a `Step`
 (advance or return), so each Rust `match` lists the same cases as the C
 `switch`.
 
+`expat::tok::Utf16` implements it for the four UTF-16 encodings
+(`little2_`/`big2_`, `MINBPC` 2) and `expat::tok::Unknown<C>` for encodings
+built from an application map (`XmlInitUnknownEncoding(NS)`), where `C` is a
+`Converter` that receives exactly the bytes of one multi-byte sequence. The
+same trait carries the converters (`to_utf8`/`to_utf16`, the C
+`utf8Convert`/`utf16Convert`), which return a `Converted { result, read,
+written }` instead of moving two pointers (`expat::tok::convert`). See
+DECISIONS D-017 and D-018.
+
+Encoding detection (`expat::tok::init`: `InitEncoding`, `init_scan`, `Known`)
+and the XML/text declaration (`expat::tok::xmldecl::parse_xml_decl`) complete
+the port of `xmltok.c`/`xmltok_ns.c` (D-019). `tests/tests/init_diff.rs`
+compares `initScan` for all strings of up to 4 bytes over the bytes it
+dispatches on, for 11 encoding names x both states x both namespace modes,
+and every declaration token that any scanner accepts is parsed by both
+implementations with every out-parameter compared (generated declarations in
+all 12 built-in encodings and in seeded unknown encodings; upstream vectors;
+fuzzing).
+
 Verification (`tests/tests/tok_diff.rs`, `expat_difftest::tok`, fuzz target
 `tok_diff`): every scanner is compared with C on token *and* `next` (including
 whether C writes it) for all strings of up to 3 bytes over a 56-byte alphabet
-that covers every byte type, at every offset of the upstream vectors, on
-token-by-token walks of every vector, and on random XML-ish fragments. For
+that covers every byte type (single-byte encodings) and of up to 3 code units
+over a 41-unit alphabet (UTF-16, also with a dangling byte and from an odd
+offset), at every offset of the upstream vectors (also transcoded to UTF-16),
+on token-by-token walks of every vector, and on random XML-ish fragments.
+Unknown encodings are generated from a seed (map and converter table, the
+same on both sides; the oracle's table converter is mirrored by
+`expat_difftest::tok::TableConverter`), including maps that C rejects. For
 each accepted token the helpers whose precondition it establishes are
-compared too; the total helpers are compared at every offset.
+compared too; the total helpers are compared at every offset. The converters
+are compared exhaustively on short inputs with every output size from 0 to 9
+plus partial and ample sizes, on whole documents and on every content token
+of a walk.
 
 ## Verification layers
 

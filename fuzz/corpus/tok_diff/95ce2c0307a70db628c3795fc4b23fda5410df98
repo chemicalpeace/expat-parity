@@ -1,0 +1,3 @@
+<!ENTITY % e1TY % comment "<!--18;comment;">
+ PUBLIC 'foo' 'sec §<!--22-->%e1;<!-22-->'>
+%e2;

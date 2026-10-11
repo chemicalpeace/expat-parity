@@ -1,0 +1,4 @@
+<?xml version='1.0' encoding='iso-88<?xml version='1.0' encoding='u59-1'?><
+doc>&#xE9;&#xE8;&#xE0;&#xE7;&#xEA;&cnsupported-›Šcoding'?>
+<!DOCTYPE test [<!ENTITY foo 'bar'>>]>
+<test a='9&foo;'/>

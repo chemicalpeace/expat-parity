@@ -32,22 +32,36 @@
 //! # }
 //! ```
 
+mod convert;
+mod init;
 mod normal;
 pub mod scan;
+mod unknown;
+mod utf16;
+mod xmldecl;
 
+pub use convert::{ConvertResult, Converted, trim_to_complete_utf8_characters};
+pub use init::{
+    EncodingIndex, InitEncoding, InitScan, Known, State, get_encoding_index, init_scan,
+    internal_encoding, tok,
+};
 pub use normal::Normal;
 pub use scan::{
     Attribute, Position, attribute_value_tok, cdata_section_tok, char_ref_number, content_tok,
     entity_value_tok, get_atts, ignore_section_tok, is_public_id, name_length,
     name_matches_ascii, predefined_entity_name, prolog_tok, skip_s, update_position,
 };
+pub use unknown::{Converter, InvalidMap, Unknown};
+pub use utf16::Utf16;
+pub use xmldecl::{FoundEncoding, XmlDecl, parse_xml_decl, to_ascii};
 
 use crate::chartab::ByteType;
 
-/// The encoding-specific primitives of the scanner template.
+/// One encoding of `xmltok.c` (C: `ENCODING`): the primitives of the scanner
+/// template and the converters to UTF-8 and UTF-16.
 ///
-/// These are the macros that `xmltok.c` defines before each inclusion of
-/// `xmltok_impl.c`. Positions are offsets into `buf`. Callers guarantee that
+/// The scanner primitives are the macros that `xmltok.c` defines before each
+/// inclusion of `xmltok_impl.c`. Positions are offsets into `buf`. Callers guarantee that
 /// `p + Self::MINBPC <= buf.len()` (respectively `p + n`) for every call the
 /// C code would make; implementations must still be total and return a
 /// fixed value for positions outside `buf`.
@@ -78,6 +92,16 @@ pub trait Encoding {
 
     /// `IS_INVALID_CHAR(enc, p, n)`.
     fn is_invalid_char(&self, buf: &[u8], p: usize, n: usize) -> bool;
+
+    /// `isUtf8`: input in this encoding is already UTF-8 and needs no
+    /// conversion (true for UTF-8 and US-ASCII).
+    fn is_utf8(&self) -> bool;
+
+    /// `XmlUtf8Convert`: converts from the start of `from` into `to`.
+    fn to_utf8(&self, from: &[u8], to: &mut [u8]) -> Converted;
+
+    /// `XmlUtf16Convert`: converts from the start of `from` into `to`.
+    fn to_utf16(&self, from: &[u8], to: &mut [u16]) -> Converted;
 }
 
 /// A positive `XML_TOK_*` token (`xmltok.h`). `Tok as i32` is the C value.

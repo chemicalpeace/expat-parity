@@ -1,0 +1,10 @@
+ÈÄó"êóP„Ö<!DOCTYPE doc [
+<!ATTLIST doc za CDATA 'default'>
+<!ATTLIST doc zb CDATA 'def2'>
+<!ATTLIST doc zc CDATA 'def3'>
+]>
+<doc a='1'     b='2'     c='3'    d='4'     e='5'     f='6'     g='7'     ÂØÇ'     i='9'     PE '15'     q='16'     r='17'  !ATTLIST doc zc CDATA 'def3'>
+]>
+<doc a='1'     b='1'   d='4'     e='5'     f='6'     g='7'     ÂØÇ<!ENTITY % com%five;][%five;]\]]">ment 1'     a='12'     m='13'     n<='14'     p=!DOGTYPE P [PE '15'     q='16'     r='17'  !ATTLIST doc zc CDATA 'def3'>
+]>
+<doc a='1'     b='2'     c='3'    d='4'     e='5'     f='6'     g='7'     ÂØÇ!T<NETIY % com%five;][%five;]\]]">ment '<!--ÿÿÿnt2 !--     s='18'></doc>

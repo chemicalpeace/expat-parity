@@ -6,14 +6,14 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 ## Snapshot
 
 - **Target:** libexpat 2.9.0 (`R_2_9_0`, `a76b1174c1ea52abb639a4c69d52b630a8a106a2`) — frozen (D-001).
-- **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-5 done.
+- **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-7 done.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
   tables, doc, deny), test on ubuntu-latest / macos-latest / windows-latest,
-  Miri, fuzz smoke (60 s per target). Green on PR #1 (modules 1-5) before
-  merge; see the PR for the run. Windows needed two fixes (D-016,
-  `.gitattributes`).
+  Miri, fuzz smoke (60 s per target). Green on PR #1 (modules 1-5) and PR #2
+  (modules 6-7) before merge; see the PRs for the runs. Windows needed two
+  fixes in PR #1 (D-016, `.gitattributes`).
 
 ## Blockers
 
@@ -58,8 +58,8 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 3 | `encode` UTF-8/UTF-16 encoders | `xmltok.c` `XmlUtf8Encode` `XmlUtf16Encode` | **done** — every value 0..=0x110010 and i32 max vs C |
 | 4 | `siphash` | `siphash.h` | **done** — C self-test, all lengths 0..=80 x update splits 0..=17, 20k random cases vs C |
 | 5 | `tok` scanner template, single-byte encodings | `xmltok_impl.c`; normal encodings of `xmltok.c` | **done** — see ARCHITECTURE "Tokenizer"; D-014, D-015 |
-| 6 | `tok` UTF-16LE/BE + unknown encodings, conversions (`toUtf8`/`toUtf16`) | `xmltok.c` | not started |
-| 7 | `tok` XML decl + encoding detection (`initScan`, Q-3) | `xmltok.c`, `xmltok_ns.c` | not started |
+| 6 | `tok` UTF-16LE/BE + unknown encodings, conversions (`toUtf8`/`toUtf16`) | `xmltok.c` | **done** — `Utf16`, `Unknown<C>`, `tok::convert`; D-017, D-018 |
+| 7 | `tok` XML decl + encoding detection (`initScan`, Q-3) | `xmltok.c`, `xmltok_ns.c` | **done** — `tok::init`, `tok::xmldecl`; D-019; Q-3 resolved (replicate) |
 | 8 | `role` prolog state machine | `xmlrole.c` | not started |
 | 9 | `parse` pools/hash tables | `xmlparse.c` | not started |
 | 10 | `parse` content, attributes, namespaces, epilog (Q-1, Q-2) | `xmlparse.c` | not started |
@@ -68,13 +68,14 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 13 | `expat-capi` (optional) | `expat.h` | not started |
 
 Fuzz targets: `parse_trace` (oracle only until module 12), `leaf_diff`
-(modules 1-4), `tok_diff` (module 5; module 6 extends it to UTF-16).
+(modules 1-4), `tok_diff` (modules 5-7: all 12 built-in encodings and
+seeded unknown encodings; scanners, helpers, converters, `initScan`,
+`XmlParseXmlDecl`).
 
 ## Next steps
 
-1. Module 6: implement `Encoding` for UTF-16LE/BE (`little2_`/`big2_`,
-   MINBPC 2) and unknown encodings (`XmlInitUnknownEncoding`), port the
-   `toUtf8`/`toUtf16` converters; extend `expat_difftest::tok` and `tok_diff`
-   to them (the oracle already exposes Little2 tables; add Big2 + unknown).
-2. Module 7: `initScan`, `XmlParseXmlDecl`, `xmltok_ns.c`; decide Q-3.
-3. Module 8: `xmlrole.c`.
+1. Module 8: `xmlrole.c` (prolog state machine) as `expat::role`, with a
+   white-box oracle shim (`shim/oracle_role.c`) and a `role_diff` fuzz target.
+2. Module 9: `xmlparse.c` pools and hash tables (SipHash-keyed, fixed salt in
+   tests).
+3. Module 10: content, attributes, namespaces, epilog; decide Q-1/Q-2.
