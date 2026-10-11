@@ -164,6 +164,92 @@ impl TraceWriter {
         self.line("skipped", &[Some(name)], &[i64::from(is_param)]);
     }
 
+    /// `XML_EntityDeclHandler` (`is_param` comes second, like the shim).
+    #[allow(clippy::too_many_arguments)]
+    pub fn entity(
+        &mut self,
+        name: &[u8],
+        is_param: bool,
+        value: Option<&[u8]>,
+        base: Option<&[u8]>,
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+        notation: Option<&[u8]>,
+    ) {
+        self.flush_text();
+        self.out.push_str("entity");
+        push_field(&mut self.out, Some(name));
+        let _ = write!(self.out, " {}", i32::from(is_param));
+        for f in [value, base, sysid, pubid, notation] {
+            push_field(&mut self.out, f);
+        }
+        self.out.push('\n');
+    }
+
+    /// `XML_NotationDeclHandler`.
+    pub fn notation(
+        &mut self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+    ) {
+        self.line("notation", &[Some(name), base, sysid, pubid], &[]);
+    }
+
+    /// `XML_AttlistDeclHandler`.
+    pub fn attlist(
+        &mut self,
+        elname: &[u8],
+        attname: &[u8],
+        att_type: Option<&[u8]>,
+        dflt: Option<&[u8]>,
+        is_required: bool,
+    ) {
+        self.line(
+            "attlist",
+            &[Some(elname), Some(attname), att_type, dflt],
+            &[i64::from(is_required)],
+        );
+    }
+
+    /// `XML_ElementDeclHandler`: the name, then the model as
+    /// `<type><quant> <name>(<child>,<child>...)`. Written without
+    /// recursion, so any nesting depth is fine.
+    pub fn element(&mut self, name: &[u8], model: &expat::internal::parse::ContentModel) {
+        enum Item {
+            Node(usize),
+            Text(&'static str),
+        }
+        self.flush_text();
+        self.out.push_str("element");
+        push_field(&mut self.out, Some(name));
+        self.out.push(' ');
+        let mut stack = vec![Item::Node(0)];
+        while let Some(item) = stack.pop() {
+            match item {
+                Item::Text(t) => self.out.push_str(t),
+                Item::Node(i) => {
+                    let Some(n) = model.nodes.get(i) else {
+                        continue;
+                    };
+                    let _ = write!(self.out, "{}{}", n.kind as i32, n.quant as i32);
+                    push_field(&mut self.out, n.name.as_deref());
+                    self.out.push('(');
+                    stack.push(Item::Text(")"));
+                    let children: Vec<usize> = n.children.clone().collect();
+                    for (k, c) in children.iter().enumerate().rev() {
+                        stack.push(Item::Node(*c));
+                        if k > 0 {
+                            stack.push(Item::Text(","));
+                        }
+                    }
+                }
+            }
+        }
+        self.out.push('\n');
+    }
+
     /// `XML_StartNamespaceDeclHandler`.
     pub fn ns_start(&mut self, prefix: Option<&[u8]>, uri: Option<&[u8]>) {
         self.line("nsstart", &[prefix, uri], &[]);

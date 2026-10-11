@@ -10,7 +10,7 @@
 use crate::diff::TraceSource;
 use crate::trace::{Status, TraceWriter};
 use expat::internal::parse::{
-    self, Handler, HandlerSet, ParamEntityParsing as PortPep, Parser, Stop,
+    self, ContentModel, Handler, HandlerSet, ParamEntityParsing as PortPep, Parser, Stop,
 };
 use expat_oracle::{BufferOp, ParamEntityParsing, ParseOptions};
 
@@ -66,6 +66,54 @@ impl Handler for Tracer {
     fn skipped_entity(&mut self, name: &[u8], is_param: bool) {
         self.w.skipped(name, is_param);
     }
+    fn start_doctype_decl(
+        &mut self,
+        name: &[u8],
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+        has_internal_subset: bool,
+    ) {
+        self.w.doctype(name, sysid, pubid, has_internal_subset);
+    }
+    fn end_doctype_decl(&mut self) {
+        self.w.end_doctype();
+    }
+    fn entity_decl(
+        &mut self,
+        name: &[u8],
+        is_param: bool,
+        value: Option<&[u8]>,
+        base: Option<&[u8]>,
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+        notation: Option<&[u8]>,
+    ) {
+        self.w
+            .entity(name, is_param, value, base, sysid, pubid, notation);
+    }
+    fn notation_decl(
+        &mut self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+    ) {
+        self.w.notation(name, base, sysid, pubid);
+    }
+    fn element_decl(&mut self, name: &[u8], model: &ContentModel) {
+        self.w.element(name, model);
+    }
+    fn attlist_decl(
+        &mut self,
+        elname: &[u8],
+        attname: &[u8],
+        att_type: &[u8],
+        dflt: Option<&[u8]>,
+        is_required: bool,
+    ) {
+        self.w
+            .attlist(elname, attname, Some(att_type), dflt, is_required);
+    }
 }
 
 /// The handlers `oracle_parse_trace` sets, as far as the port has them.
@@ -83,6 +131,14 @@ fn traced_handlers() -> HandlerSet {
         end_namespace_decl: true,
         skipped_entity: true,
         start_doctype_decl: true,
+        end_doctype_decl: true,
+        entity_decl: true,
+        // The shim sets no unparsed-entity handler, so unparsed entities
+        // reach the entity declaration handler.
+        unparsed_entity_decl: false,
+        notation_decl: true,
+        element_decl: true,
+        attlist_decl: true,
     }
 }
 

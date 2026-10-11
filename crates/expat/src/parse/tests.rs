@@ -73,6 +73,12 @@ fn all() -> HandlerSet {
         end_namespace_decl: true,
         skipped_entity: true,
         start_doctype_decl: true,
+        end_doctype_decl: true,
+        entity_decl: true,
+        unparsed_entity_decl: false,
+        notation_decl: true,
+        element_decl: true,
+        attlist_decl: true,
     }
 }
 
@@ -178,12 +184,63 @@ fn error_positions() {
 }
 
 #[test]
-fn doctype_is_outside_the_ported_scope() {
-    let (st, _, _) = parse(b"<!DOCTYPE d><d/>", None);
+fn declarations_are_ported_expansion_is_next() {
+    // Module 11a: declarations parse; expanding a declared internal entity
+    // is module 11b and still stops the parser.
+    let (st, _, _) = parse(b"<!DOCTYPE d [<!ELEMENT d ANY><!ENTITY e 'x'>]><d/>", None);
+    assert_eq!(st, Status::Ok);
     let mut p = Parser::new(None, None, [0; 16]);
-    assert_eq!(p.parse(&mut Events::default(), b"<!DOCTYPE d><d/>", true), Status::Error);
-    assert_eq!(st, Status::Error);
+    p.set_handlers(all());
+    let doc = b"<!DOCTYPE d [<!ENTITY e 'x'>]><d>&e;</d>";
+    assert_eq!(p.parse(&mut Events::default(), doc, true), Status::Error);
     assert_eq!(p.error_code(), Stop::DtdNotPorted);
+}
+
+#[test]
+fn public_ids_are_normalized_like_c() {
+    use super::decl::normalize_public_id;
+    assert_eq!(normalize_public_id(b"  a \r\n b  "), b"a b");
+    assert_eq!(normalize_public_id(b""), b"");
+    assert_eq!(normalize_public_id(b"   "), b"");
+    assert_eq!(normalize_public_id(b"x\t y"), b"x\t y");
+}
+
+#[test]
+fn content_models_keep_c_node_order() {
+    // C's build_model puts the children of a node next to each other,
+    // after all nodes of the previous level: (a,(b|c),d) gives
+    // [root, a, group, d, b, c].
+    #[derive(Default)]
+    struct Models(Vec<ContentModel>);
+    impl Handler for Models {
+        fn element_decl(&mut self, _name: &[u8], model: &ContentModel) {
+            self.0.push(model.clone());
+        }
+    }
+    let mut p = Parser::new(None, None, [0; 16]);
+    p.set_handlers(all());
+    let mut m = Models::default();
+    let doc = b"<!DOCTYPE r [<!ELEMENT r (a,(b|c)*,d+)?>]><r/>";
+    assert_eq!(p.parse(&mut m, doc, true), Status::Ok);
+    assert_eq!(m.0.len(), 1);
+    let model = m.0.first().cloned().unwrap_or(ContentModel { nodes: Vec::new() });
+    let kinds: Vec<(ContentType, ContentQuant, Option<&[u8]>)> = model
+        .nodes
+        .iter()
+        .map(|n| (n.kind, n.quant, n.name.as_deref()))
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            (ContentType::Seq, ContentQuant::Opt, None),
+            (ContentType::Name, ContentQuant::None, Some(&b"a"[..])),
+            (ContentType::Choice, ContentQuant::Rep, None),
+            (ContentType::Name, ContentQuant::Plus, Some(&b"d"[..])),
+            (ContentType::Name, ContentQuant::None, Some(&b"b"[..])),
+            (ContentType::Name, ContentQuant::None, Some(&b"c"[..])),
+        ]
+    );
+    assert_eq!(model.root().map(|r| model.children(r).len()), Some(3));
 }
 
 #[test]

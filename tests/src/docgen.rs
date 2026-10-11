@@ -274,3 +274,344 @@ pub fn document(r: &mut Rng) -> Vec<u8> {
     }
     doc
 }
+
+// ---------------------------------------------------------------------
+// Documents with a document type declaration (module 11).
+// ---------------------------------------------------------------------
+
+const ENTITY_NAMES: &[&str] = &["e1", "e2", "e3", "ext", "unp", "lt", "amp", "p:x", "é"];
+const PE_NAMES: &[&str] = &["pe1", "pe2", "pe3", "extpe"];
+const ENTITY_VALUES: &[&str] = &[
+    "",
+    "text",
+    "a&amp;b",
+    "&#60;b/&#62;",
+    "&#x3C;b>x&#x3C;/b>",
+    "<b>in</b>",
+    "&e1;",
+    "&e2;&e2;",
+    "&e3;",
+    "&ext;",
+    "&undeclared;",
+    "&#37;pe1;",
+    "line\nbreak\r\nand\rcr",
+    "&#38;#38;",
+    "]]>",
+    "<a/>",
+    "<!ELEMENT q ANY>",
+    "<!ENTITY e9 'nine'>",
+    "&#x10000;☃",
+];
+/// Entity values that are errors (used rarely).
+const BAD_ENTITY_VALUES: &[&str] = &["%pe1;", "&#0;", "&#xD800;", "&", "&#x110000;", "%"];
+const PUBLIC_IDS: &[&str] = &[
+    "-//X//DTD x//EN",
+    "  spaced \r\n  id  ",
+    "",
+    "bad{char}",
+    "a'b",
+];
+
+/// A random content model (`depth` levels of nested groups).
+fn content_model(r: &mut Rng, out: &mut String, depth: usize) {
+    out.push('(');
+    let n = 1 + r.below(4);
+    let sep = *r.pick(&[",", "|", " , ", "|"]);
+    for i in 0..n {
+        if i > 0 {
+            out.push_str(sep);
+        }
+        if depth > 0 && r.one_in(3) {
+            content_model(r, out, depth - 1);
+        } else {
+            out.push_str(r.pick(NAMES));
+            out.push_str(r.pick(&["", "", "?", "*", "+"]));
+        }
+    }
+    if r.one_in(40) {
+        // Mixed connectors: a syntax error.
+        out.push_str(",x|y");
+    }
+    out.push(')');
+    out.push_str(r.pick(&["", "", "?", "*", "+"]));
+}
+
+fn quoted(r: &mut Rng, out: &mut String, value: &str) {
+    let q = if value.contains('"') {
+        '\''
+    } else if value.contains('\'') {
+        '"'
+    } else {
+        *r.pick(&['"', '\''])
+    };
+    out.push(q);
+    out.push_str(value);
+    out.push(q);
+}
+
+/// One markup declaration (or a PE reference, comment, PI or white space
+/// between declarations).
+fn declaration(r: &mut Rng, out: &mut String) {
+    match r.below(14) {
+        0 | 1 => {
+            out.push_str("<!ELEMENT ");
+            out.push_str(r.pick(NAMES));
+            out.push(' ');
+            match r.below(6) {
+                0 => out.push_str("EMPTY"),
+                1 => out.push_str("ANY"),
+                2 => out.push_str("(#PCDATA)"),
+                3 => {
+                    out.push_str("(#PCDATA");
+                    for _ in 0..r.below(4) {
+                        out.push('|');
+                        out.push_str(r.pick(NAMES));
+                    }
+                    out.push_str(")*");
+                }
+                _ => {
+                    let depth = r.below(4);
+                    content_model(r, out, depth);
+                }
+            }
+            out.push('>');
+        }
+        2..=4 => {
+            out.push_str("<!ATTLIST ");
+            out.push_str(r.pick(NAMES));
+            for _ in 0..1 + r.below(3) {
+                out.push(' ');
+                out.push_str(r.pick(ATT_NAMES));
+                out.push(' ');
+                out.push_str(r.pick(&[
+                    "CDATA",
+                    "ID",
+                    "IDREF",
+                    "IDREFS",
+                    "ENTITY",
+                    "ENTITIES",
+                    "NMTOKEN",
+                    "NMTOKENS",
+                    "(x|y|z)",
+                    "( x | y )",
+                    "NOTATION (n1|n2)",
+                    "CDATA",
+                ]));
+                out.push(' ');
+                match r.below(5) {
+                    0 => out.push_str("#IMPLIED"),
+                    1 => out.push_str("#REQUIRED"),
+                    2 => {
+                        out.push_str("#FIXED ");
+                        let v = *r.pick(ATT_VALUES);
+                        quoted(r, out, v);
+                    }
+                    _ => {
+                        let v = if r.one_in(3) {
+                            *r.pick(&["&e1;", "x&e2;y", "&ext;", "&unp;", "&undeclared;", "&lt;"])
+                        } else {
+                            *r.pick(ATT_VALUES)
+                        };
+                        quoted(r, out, v);
+                    }
+                }
+            }
+            out.push('>');
+        }
+        5..=7 => {
+            out.push_str("<!ENTITY ");
+            let is_pe = r.one_in(3);
+            if is_pe {
+                out.push_str("% ");
+                out.push_str(r.pick(PE_NAMES));
+            } else {
+                out.push_str(r.pick(ENTITY_NAMES));
+            }
+            out.push(' ');
+            match r.below(6) {
+                0 => {
+                    out.push_str("SYSTEM ");
+                    quoted(r, out, "sys.ent");
+                }
+                1 => {
+                    out.push_str("PUBLIC ");
+                    let p = *r.pick(PUBLIC_IDS);
+                    quoted(r, out, p);
+                    out.push(' ');
+                    quoted(r, out, "sys2.ent");
+                }
+                2 if !is_pe => {
+                    out.push_str("SYSTEM 'u.gif' NDATA ");
+                    out.push_str(r.pick(&["n1", "n2", "undeclared"]));
+                }
+                _ => {
+                    let v = if r.one_in(15) {
+                        *r.pick(BAD_ENTITY_VALUES)
+                    } else if is_pe && r.one_in(2) {
+                        *r.pick(&[
+                            "<!ENTITY e3 'from pe'>",
+                            "<!ELEMENT z ANY>",
+                            "<!ATTLIST doc pa CDATA 'pe default'>",
+                            "%pe2;",
+                            "&#37;pe1;",
+                            "<!ENTITY e1 '&#37;pe1;'>",
+                            "",
+                            "  ",
+                        ])
+                    } else {
+                        *r.pick(ENTITY_VALUES)
+                    };
+                    quoted(r, out, v);
+                }
+            }
+            out.push_str(r.pick(&[">", " >"]));
+        }
+        8 => {
+            out.push_str("<!NOTATION ");
+            out.push_str(r.pick(&["n1", "n2"]));
+            match r.below(3) {
+                0 => out.push_str(" SYSTEM 'viewer'"),
+                1 => {
+                    out.push_str(" PUBLIC ");
+                    let p = *r.pick(PUBLIC_IDS);
+                    quoted(r, out, p);
+                }
+                _ => out.push_str(" PUBLIC 'p' 'viewer'"),
+            }
+            out.push('>');
+        }
+        9 => {
+            out.push_str(r.pick(&["%pe1;", "%pe2;", "%extpe;", "%undeclared;", " %pe1; "]));
+        }
+        10 => out.push_str(r.pick(&["<!--dtd comment-->", "<?dtdpi x?>", "<!---->"])),
+        11 => out.push_str(r.pick(&["\n", " ", "\r\n", "\t"])),
+        12 => {
+            // Rare malformed declarations.
+            if r.one_in(3) {
+                out.push_str(r.pick(&[
+                    "<!ELEMENT>",
+                    "<!ATTLIST a b>",
+                    "<!ENTITY a>",
+                    "<!ENTITY % a 'x' NDATA n>",
+                    "<!NOTATION n>",
+                    "<!ELEMENT a (b,c|d)>",
+                    "<!ELEMENT a (#PCDATA|b)>",
+                    "<!ELEMENT a (#PCDATA)+>",
+                    "<!ATTLIST a b CDATA '<'>",
+                    "<!ATTLIST a b ID #FIXED 'x'>",
+                    "<!ENTITY a 'x' 'y'>",
+                    "<![INCLUDE[ ]]>",
+                    "<!DOCTYPE x>",
+                    "<?xml version='1.0'?>",
+                    "<!ELEMENT a %pe1;>",
+                    "<!ENTITY a PUBLIC 'x'>",
+                    "]",
+                ]));
+            }
+        }
+        _ => {
+            // Many attributes with defaults for one element type.
+            out.push_str("<!ATTLIST doc");
+            for i in 0..r.below(20) {
+                out.push_str(&format!(" d{i} CDATA 'v{i}'"));
+            }
+            out.push('>');
+        }
+    }
+}
+
+/// Content that uses the declarations: entity references in text and in
+/// attribute values, and elements whose types have attribute defaults.
+fn dtd_content(r: &mut Rng, out: &mut String, depth: usize) {
+    let name = *r.pick(&["doc", "a", "b", "doc"]);
+    out.push('<');
+    out.push_str(name);
+    for _ in 0..r.below(3) {
+        out.push(' ');
+        out.push_str(r.pick(&["a", "id", "c", "p:a", "xmlns:p"]));
+        out.push('=');
+        let v = *r.pick(&[
+            "'1'",
+            "'&e1;'",
+            "' x &e2; '",
+            "'&ext;'",
+            "'&lt;'",
+            "'&undeclared;'",
+            "'urn:p'",
+        ]);
+        out.push_str(v);
+    }
+    out.push('>');
+    for _ in 0..r.below(5) {
+        match r.below(6) {
+            0 | 1 => out.push_str(r.pick(&[
+                "&e1;",
+                "&e2;",
+                "&e3;",
+                "&ext;",
+                "&unp;",
+                "&undeclared;",
+                "&e9;",
+                "&lt;",
+            ])),
+            2 => out.push_str(r.pick(TEXTS)),
+            3 if depth > 0 => dtd_content(r, out, depth - 1),
+            4 => out.push_str(r.pick(&["<a/>", "<b x='y'/>", "<doc/>", "<![CDATA[&e1;]]>"])),
+            _ => out.push_str(r.pick(&["<!--c-->", "<?pi?>"])),
+        }
+    }
+    out.push_str("</");
+    out.push_str(name);
+    out.push('>');
+}
+
+/// A random document with a document type declaration, as text.
+pub fn dtd_document_text(r: &mut Rng) -> String {
+    let mut out = String::new();
+    if r.one_in(2) {
+        out.push_str(r.pick(&[
+            "<?xml version='1.0'?>",
+            "<?xml version='1.0' standalone='yes'?>",
+            "<?xml version='1.0' standalone='no'?>",
+            "<?xml version='1.0' encoding='UTF-8'?>",
+        ]));
+    }
+    out.push_str(r.pick(&["", "\n", "<!--before-->"]));
+    out.push_str("<!DOCTYPE ");
+    out.push_str(r.pick(&["doc", "doc", "a", "p:e"]));
+    match r.below(4) {
+        0 => out.push_str(" SYSTEM 'doc.dtd'"),
+        1 => {
+            out.push_str(" PUBLIC ");
+            let p = *r.pick(PUBLIC_IDS);
+            quoted(r, &mut out, p);
+            out.push_str(" 'doc.dtd'");
+        }
+        _ => {}
+    }
+    if !r.one_in(5) {
+        out.push_str(" [");
+        for _ in 0..r.below(14) {
+            declaration(r, &mut out);
+            if r.one_in(2) {
+                out.push('\n');
+            }
+        }
+        out.push(']');
+    }
+    out.push_str(r.pick(&[">", " >", ">\n"]));
+    let depth = r.below(3);
+    dtd_content(r, &mut out, depth);
+    out
+}
+
+/// A random document with a document type declaration: generated,
+/// encoded, and damaged with probability 1/4.
+pub fn dtd_document(r: &mut Rng) -> Vec<u8> {
+    let text = dtd_document_text(r);
+    let mut doc = encode(r, &text);
+    if r.one_in(4) {
+        mutate(r, &mut doc);
+    }
+    doc
+}

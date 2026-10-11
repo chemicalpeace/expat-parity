@@ -756,9 +756,14 @@ impl Parser {
             .dtd
             .element_type_for_content(&salt, self.ns, tag_name)
             .map_err(no_mem)?;
-        let (et_prefix, et_id_att, defaults) = match self.dtd.element_types.value(et_id) {
-            Some(et) => (et.prefix, et.id_att, et.default_atts.clone()),
-            None => (None, None, Vec::new()),
+        let (et_prefix, et_id_att, defaults, att_index) = match self.dtd.element_types.value(et_id) {
+            Some(et) => (
+                et.prefix,
+                et.id_att,
+                et.default_atts.clone(),
+                et.default_att_for_name.clone(),
+            ),
+            None => (None, None, Vec::new(), alloc::collections::BTreeMap::new()),
         };
         let n_default = defaults.len();
 
@@ -804,9 +809,10 @@ impl Parser {
             } else {
                 // Figure out whether declared as other than CDATA.
                 let is_cdata = if a.maybe_tokenized {
-                    defaults
-                        .iter()
-                        .find(|d| d.id == id)
+                    // `defaultAttForName` names the first definition.
+                    att_index
+                        .get(&id)
+                        .and_then(|&i| defaults.get(i))
                         .is_none_or(|d| d.is_cdata)
                 } else {
                     true
