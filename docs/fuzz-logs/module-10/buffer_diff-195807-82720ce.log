@@ -1,0 +1,69 @@
+# libFuzzer log, trimmed: 955 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.08s
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.06s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 511279446
+INFO: Loaded 1 modules   (54697 inline 8-bit counters): 54697 [0xaaaad19b2180, 0xaaaad19bf729), 
+INFO: Loaded 1 PC tables (54697 PCs): 54697 [0xaaaad19bf730,0xaaaad1a951c0), 
+INFO:    15590 files found in <corpus>
+INFO: seed corpus: files: 15590 min: 1b max: 10293b total: 2030007b rss: 42Mb
+#15591	INITED cov: 6223 ft: 21667 corp: 5630/682Kb exec/s: 3897 rss: 488Mb
+#16384	pulse  cov: 6223 ft: 21667 corp: 5630/682Kb lim: 10306 exec/s: 4096 rss: 488Mb
+#32768	pulse  cov: 6226 ft: 21678 corp: 5635/682Kb lim: 10397 exec/s: 5461 rss: 512Mb
+#65536	pulse  cov: 6229 ft: 21686 corp: 5639/686Kb lim: 10553 exec/s: 7281 rss: 512Mb
+#131072	pulse  cov: 6230 ft: 21726 corp: 5660/703Kb lim: 10800 exec/s: 7710 rss: 512Mb
+#262144	pulse  cov: 6236 ft: 21767 corp: 5687/706Kb lim: 11333 exec/s: 8456 rss: 512Mb
+	NEW_FUNC[1/2]: 0xaaaad1501330  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x2a1330) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+	NEW_FUNC[2/2]: 0xaaaad1777de4  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x517de4) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+#524288	pulse  cov: 6257 ft: 21872 corp: 5736/726Kb lim: 12373 exec/s: 8886 rss: 512Mb
+#835256	DONE   cov: 6267 ft: 22235 corp: 5812/775Kb lim: 13816 exec/s: 8700 rss: 512Mb
+###### Recommended dictionary. ######
+"\012\000" # Uses: 6318
+"\340\250\206" # Uses: 5091
+"\000\000\000\000\000\000\000\002" # Uses: 4740
+"vwvvvvvvv" # Uses: 4628
+"\000'" # Uses: 4578
+"Zvvvvvvv" # Uses: 4257
+"\000t]\027E\321t]" # Uses: 3665
+"\001\000\000\000\000\000\000\001" # Uses: 3582
+"\377\377\377\377\377\377\377\377" # Uses: 2789
+"vwvvv" # Uses: 2972
+"vvvZv" # Uses: 2564
+"Zv\352\260\264\352\260\264\350\200\230" # Uses: 2435
+"\010\000\000\000\000\000\000\000" # Uses: 2165
+"\377\016" # Uses: 2124
+"\000\000" # Uses: 2012
+"\377\377\377\377\377\377\377\021" # Uses: 1962
+"\004\000\000\000\000\000\000\000" # Uses: 1922
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\216\203\350\216\203\350\216\203\350\216\203\350\216\203v\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\200\200" # Uses: 1132
+"\001\000\000\000\000\000\000\000" # Uses: 1647
+"\003\000" # Uses: 1401
+"\011H" # Uses: 1313
+"Zvvvvvvvvv" # Uses: 1226
+"\376\377\377\375" # Uses: 1130
+"\000\377" # Uses: 1134
+"vvvvZvvvvvvvv" # Uses: 1031
+"\001\000" # Uses: 824
+"\000\000\000\000\000\000\000b" # Uses: 732
+"\003\377\377\377\377\377\377\377" # Uses: 687
+"Wvvvvvv\345\234\250" # Uses: 584
+"\377\377\377\377" # Uses: 421
+"\001\000\000\377" # Uses: 407
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\345\251\266\347\231\266\347\230\266\347\231\266\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 178
+"ARZ" # Uses: 244
+"5\000\000\000\000\000\000\000" # Uses: 228
+")\000" # Uses: 148
+"Zvvvvvvvvvvvvvv" # Uses: 112
+"\377." # Uses: 117
+"Zv\352\260\264\352\260\264\350\200\230\304\200\315\200\345\222\227\350\212\217\303\277vv" # Uses: 7
+"ZZvvvvvvv" # Uses: 2
+###### End of recommended dictionary. ######
+Done 835256 runs in 96 second(s)
+stat::number_of_executed_units: 835256
+stat::average_exec_per_sec:     8700
+stat::new_units_added:          955
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              512

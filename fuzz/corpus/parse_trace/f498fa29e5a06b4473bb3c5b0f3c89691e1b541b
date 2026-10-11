@@ -1,0 +1,5 @@
+@<!DOCTYPE r [
+<!ENTITY % draft 'INCLUDE'>
+<!ENTITY % final 'IGNORE'>
+<!ENTITY % fina5lt SYSTEM "first.ent">
+%im

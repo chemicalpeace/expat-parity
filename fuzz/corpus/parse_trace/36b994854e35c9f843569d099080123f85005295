@@ -1,0 +1,9 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc
+    a1  (a|b|c)   'a'
+    a2  (foo|bar) #IMPLIED
+    a3  NMTOKEN   #IMPLIED
+    a5  NMTOKENS  #IMPLIED
+    a5  CDATA     #IMPLIED
+  >]>
+<doc>wombat</doc>

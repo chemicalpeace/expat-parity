@@ -1,5 +1,0 @@
-<!DOCTYPE doc [
-<!NOTATION note PUBLIC 'foo'>
-<!ELEMENT doc EMPTY>
-]>
-<doc/>

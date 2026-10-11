@@ -1,0 +1,72 @@
+# libFuzzer log, trimmed: 1176 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.07s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.04s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 675610469
+INFO: Loaded 1 modules   (54697 inline 8-bit counters): 54697 [0xaaaaac7b2180, 0xaaaaac7bf729), 
+INFO: Loaded 1 PC tables (54697 PCs): 54697 [0xaaaaac7bf730,0xaaaaac8951c0), 
+INFO:    13464 files found in <corpus>
+INFO: seed corpus: files: 13464 min: 1b max: 8525b total: 1412713b rss: 41Mb
+#8192	pulse  cov: 5751 ft: 14959 corp: 3907/73Kb exec/s: 4096 rss: 392Mb
+#13465	INITED cov: 6004 ft: 20374 corp: 5235/507Kb exec/s: 2693 rss: 471Mb
+#16384	pulse  cov: 6004 ft: 20374 corp: 5235/507Kb lim: 8551 exec/s: 3276 rss: 471Mb
+#32768	pulse  cov: 6007 ft: 20390 corp: 5241/510Kb lim: 8577 exec/s: 4681 rss: 479Mb
+#65536	pulse  cov: 6021 ft: 20415 corp: 5254/521Kb lim: 8694 exec/s: 5461 rss: 485Mb
+#131072	pulse  cov: 6030 ft: 20458 corp: 5272/523Kb lim: 8850 exec/s: 6898 rss: 485Mb
+#262144	pulse  cov: 6048 ft: 20569 corp: 5321/540Kb lim: 9214 exec/s: 7489 rss: 485Mb
+#524288	pulse  cov: 6074 ft: 20781 corp: 5418/598Kb lim: 10124 exec/s: 8192 rss: 485Mb
+#807273	DONE   cov: 6116 ft: 21089 corp: 5514/623Kb lim: 11138 exec/s: 8409 rss: 485Mb
+###### Recommended dictionary. ######
+"vZvvvvvwvvvvvvvv" # Uses: 6114
+"\000\000\000\000\000\000\000\000" # Uses: 3499
+"\340\000" # Uses: 3406
+"\377\377\377\377\377\377\377\377" # Uses: 3159
+"\010\377\377\377\377\377\377\377" # Uses: 3047
+"ZvvvvZvvvvvvvt" # Uses: 2673
+"\000\000\000\000" # Uses: 2984
+"Zvvvvvvv" # Uses: 2728
+"vwvvvvvvv" # Uses: 2661
+"\177\000" # Uses: 2467
+"\001t]\027E\321t]" # Uses: 2359
+"vwvvvvvv" # Uses: 1990
+"\000\001\000\000\000\000\000\000" # Uses: 2077
+"vvZvvvvvv" # Uses: 1912
+"\001\000\000\000\000\000\000t" # Uses: 1999
+"\001\000\000\000\000\000\0004" # Uses: 1952
+"\002\000\000\000" # Uses: 1889
+"\001\000\000\000\000\000\000\000" # Uses: 1881
+".\000\000\000" # Uses: 1814
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\345\251\266\347\231\266\347\230\266\347\231\266\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 1077
+"\340\250\206" # Uses: 1605
+"\034\000\000\000" # Uses: 1354
+"Wvvvvvvvvv" # Uses: 1242
+"\377\377" # Uses: 1156
+"\003\000\000\000" # Uses: 1024
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\200\260\347\201\260\347" # Uses: 608
+"Zv:vvv6vvZvvv" # Uses: 934
+"\213\373" # Uses: 802
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\200\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 463
+"\005\000\000\000" # Uses: 751
+"\001-" # Uses: 725
+"\000\000" # Uses: 692
+"\377\377\377\034" # Uses: 616
+"\001\000\000\000\000\000\000^" # Uses: 607
+"\001\000" # Uses: 651
+"\252\252\252\252\252\252\252\012" # Uses: 572
+"\345\234\250" # Uses: 658
+"Wvv" # Uses: 594
+"\001\001" # Uses: 529
+"\020\000" # Uses: 476
+"vvvvyyyyyyyyyy" # Uses: 419
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\214\246\350\216\203\347\266\203\350\216\203\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\202\220\350\276\217\350\261\260\347" # Uses: 169
+"\012\000" # Uses: 252
+"\006\000" # Uses: 165
+"\200\000" # Uses: 22
+###### End of recommended dictionary. ######
+Done 807273 runs in 96 second(s)
+stat::number_of_executed_units: 807273
+stat::average_exec_per_sec:     8409
+stat::new_units_added:          1176
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              485

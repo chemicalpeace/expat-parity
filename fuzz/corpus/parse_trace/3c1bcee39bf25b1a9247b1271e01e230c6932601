@@ -1,0 +1,4 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc identifier ID #REQUIRED identifier CDATA 'unexpected'>
+]>
+<doc/>

@@ -1,3 +1,0 @@
-<!DOCTYPE foo [
-<!ENTITY e1 "test">
-]> <foo>&e1;

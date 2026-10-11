@@ -1,0 +1,98 @@
+# libFuzzer log, trimmed: 1672 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.09s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.05s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3816891429
+INFO: Loaded 1 modules   (54668 inline 8-bit counters): 54668 [0xaaaabac225e0, 0xaaaabac2fb6c), 
+INFO: Loaded 1 PC tables (54668 PCs): 54668 [0xaaaabac2fb70,0xaaaabad05430), 
+INFO:     7718 files found in <corpus>
+INFO: seed corpus: files: 7718 min: 1b max: 3719b total: 902454b rss: 37Mb
+#7719	INITED cov: 9282 ft: 37102 corp: 7627/878Kb exec/s: 2573 rss: 307Mb
+#8192	pulse  cov: 9282 ft: 37102 corp: 7627/878Kb lim: 3730 exec/s: 2730 rss: 318Mb
+#16384	pulse  cov: 9282 ft: 37102 corp: 7627/878Kb lim: 3741 exec/s: 4096 rss: 439Mb
+#32768	pulse  cov: 9283 ft: 37107 corp: 7631/877Kb lim: 3785 exec/s: 5461 rss: 515Mb
+#65536	pulse  cov: 9283 ft: 37149 corp: 7645/885Kb lim: 3840 exec/s: 6553 rss: 515Mb
+#131072	pulse  cov: 9285 ft: 37187 corp: 7660/890Kb lim: 3939 exec/s: 6898 rss: 515Mb
+#262144	pulse  cov: 9289 ft: 37300 corp: 7703/914Kb lim: 4140 exec/s: 7084 rss: 515Mb
+#524288	pulse  cov: 9296 ft: 37495 corp: 7793/984Kb lim: 4476 exec/s: 6808 rss: 515Mb
+#652659	DONE   cov: 9300 ft: 37566 corp: 7828/1005Kb lim: 4704 exec/s: 6798 rss: 515Mb
+###### Recommended dictionary. ######
+"do_\303\276" # Uses: 3503
+"text" # Uses: 3286
+"\016\000" # Uses: 2838
+"skipped" # Uses: 2742
+"e2" # Uses: 2414
+"\000\001" # Uses: 2205
+"\001\000\000\000" # Uses: 1978
+"\001\001" # Uses: 2007
+"nsstart" # Uses: 1728
+"\002\350\272.\213\242\350\272" # Uses: 1644
+"doX" # Uses: 1497
+"\001\026" # Uses: 1465
+"\000\000" # Uses: 1258
+"od\343" # Uses: 1190
+"\030\000" # Uses: 1054
+"\000\000\000\000\000\000\000\010" # Uses: 1055
+"d\346\275\237\354\216\277\351\246\231\351\246\231\351\244\201\351" # Uses: 984
+"\004\000\000\000" # Uses: 1053
+".\000\000\000" # Uses: 1051
+"e3" # Uses: 1098
+"do_\303\277" # Uses: 993
+"\377\377Pt\352\227\225R" # Uses: 906
+"\377\377\377/" # Uses: 835
+"do2_" # Uses: 875
+"\000\005" # Uses: 825
+"\034\000" # Uses: 843
+"\376\377\377\377\377\377\377\377" # Uses: 776
+"\023\000\000\000\000\000\000\000" # Uses: 774
+"\001\000\000\000\000\000\000\004" # Uses: 724
+"\003\000" # Uses: 698
+"attlist" # Uses: 672
+"do\303\201\303\201\303\201\303\201\303\201\303\201\303\201\303\201\303\201\303\201\303\201\303\260\303\260\303\260\303\260\303\260\303\260\303\260\303\260\303\260\303" # Uses: 415
+"\257\022\203\352\204Q\000\000" # Uses: 562
+"\000\000\000\005" # Uses: 567
+"\002\000\000\000" # Uses: 554
+"ing" # Uses: 567
+"doctype" # Uses: 489
+"\373\377\377\377" # Uses: 522
+"doc" # Uses: 519
+"\001\010\000\000" # Uses: 478
+"\035\000" # Uses: 471
+"\000\000\001R" # Uses: 459
+"do_\303\276\303\277" # Uses: 402
+"UR\347\273\244\356\223\244\356\223\244\356\223\244\356\220\251\342\270\200\346\225\255\346\225\256\347\220\273" # Uses: 364
+"end" # Uses: 439
+"mm??mmmmmmmmmmmmmmmmmmmmmmmmmmmmmsm:" # Uses: 290
+"\011\000" # Uses: 348
+"\000-" # Uses: 373
+"\000\000\000\000" # Uses: 316
+"\000\000\000\000\000\000\000\000" # Uses: 315
+"\001\000\000\000\000\000\004\313" # Uses: 318
+"\354\215\203pre" # Uses: 291
+"xmlnsj" # Uses: 316
+"}\000" # Uses: 289
+"e1" # Uses: 310
+"\357\000\000\000" # Uses: 262
+"nss" # Uses: 247
+"\024\000\000\000\000\000\000\000" # Uses: 224
+"xmlns:" # Uses: 209
+"fons3333333333333330000000003333333333333333333333333300000006p3" # Uses: 147
+"\000\000\000\362" # Uses: 214
+"p\000\000\000" # Uses: 191
+"\377\001" # Uses: 158
+"\010\000" # Uses: 158
+"*\000\000\000" # Uses: 155
+"\005\000\000\000\000\000\000\000" # Uses: 97
+"\000\000\000\000\000\000\000\004" # Uses: 104
+"comment" # Uses: 60
+"\006\000\000\000" # Uses: 44
+"\000\000\000\000\000\000\000!" # Uses: 28
+"ending" # Uses: 1
+###### End of recommended dictionary. ######
+Done 652659 runs in 96 second(s)
+stat::number_of_executed_units: 652659
+stat::average_exec_per_sec:     6798
+stat::new_units_added:          1672
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              515

@@ -1,6 +1,0 @@
-<!ELEMENT doc (#PCDATA)>
-<!ATTLIST doc a CDATA #IMPLIED>
-<?pi in dtd?>
-<!--comment in dtd-->
-]>
-<doc><![CDATA[text in doc]]></doc>

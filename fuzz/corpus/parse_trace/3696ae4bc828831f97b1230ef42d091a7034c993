@@ -1,4 +1,0 @@
-<!DOCTYPE r [
-  <!ENTITY ext SYSTEM 'ext.ent'>
-]>
-<r>&ext;</r>

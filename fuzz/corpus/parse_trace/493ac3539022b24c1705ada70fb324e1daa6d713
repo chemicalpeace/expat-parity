@@ -1,3 +1,0 @@
-<!ELEMENT root (#PCDATA|a)* >
-]>
-<root></root>

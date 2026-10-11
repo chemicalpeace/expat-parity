@@ -1,5 +1,0 @@
-<!DOCTYPE r [
-<!ENTITY % ninedef "&#60;!ENTITY nine &#34;123456789&#34;&#62;">
-%ninedef;
-]>
-<r>&nine;</r>

@@ -1,4 +1,0 @@
-<!DOCTYPE doc [
-  <!ATTLIST doc identifier CDATA 'expected' identifier ID #REQUIRED>
-]>
-<doc/>

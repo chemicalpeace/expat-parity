@@ -1,8 +1,0 @@
-<!DOCTYPE doc [
-<!ENTITY % element_doc '<!ELEMENT doc (#PCDATA)*>'>
-%element_doc;
-<!ENTITY % foo ']>
-<doc>Hell<oc (#PCDATA)*>'>
-%foo;
-]>
-<doc>Hello, world</dVc>

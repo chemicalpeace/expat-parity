@@ -1,2 +1,0 @@
-<!ELEMENT doc EMPTY>
-<!ENTITY % e2 '%e1;'>

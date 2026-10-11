@@ -1,5 +1,0 @@
-<!DOCTYPE t0 [
-  <!ENTITY g0 ''>
-  <!ENTITY g1 '<t1>&g0;'>
-]>
-<t0>&g1;</t1></t0>

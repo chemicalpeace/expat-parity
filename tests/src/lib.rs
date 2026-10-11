@@ -7,11 +7,18 @@
 //! - [`vectors`]: test documents extracted from libexpat's test suite.
 //! - [`tok`]: differential checks of the tokenizer port.
 //! - [`role`]: differential checks of the prolog state machine.
+//! - [`docgen`]: random XML-ish documents for whole-parser tests.
+//! - [`port`]: the trace adapter of the port's parser.
+//! - [`fuzzcase`]: the checks of the whole-parser fuzz targets and their
+//!   deterministic seed generator.
 //! - [`core`]: white-box differential checks of the string pool and hash
 //!   table of the parser core.
 
 pub mod core;
 pub mod diff;
+pub mod docgen;
+pub mod fuzzcase;
+pub mod port;
 pub mod role;
 pub mod tok;
 pub mod trace;
@@ -53,5 +60,26 @@ pub fn options_from_selector(sel: u8) -> ParseOptions {
         ns_separator,
         chunk_size,
         param_entity_parsing,
+        ..ParseOptions::default()
     }
+}
+
+/// [`options_from_selector`] extended by a second selector byte for the
+/// whole-parser target: bit 0 feeds through `XML_GetBuffer` +
+/// `XML_ParseBuffer`, bit 1 disables reparse deferral, bits 2-3 pick the
+/// namespace separator used when namespaces are on (`|`, `\n`, `:`, `#`),
+/// bits 4-5 replace the chunk size of 64 by 2, 7, 1024 or keep it, bit 6
+/// turns on `XML_SetReturnNSTriplet` (namespace triplets).
+pub fn options_from_selectors(sel: u8, sel2: u8) -> ParseOptions {
+    let mut o = options_from_selector(sel);
+    o.buffer_api = sel2 & 1 != 0;
+    o.no_reparse_deferral = sel2 & 2 != 0;
+    if o.ns_separator.is_some() {
+        o.ns_separator = Some(b"|\n:#"[usize::from((sel2 >> 2) & 3)]);
+    }
+    o.ns_triplets = sel2 & 0x40 != 0;
+    if o.chunk_size == 64 {
+        o.chunk_size = [2, 7, 1024, 64][usize::from((sel2 >> 4) & 3)];
+    }
+    o
 }

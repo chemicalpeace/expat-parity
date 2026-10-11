@@ -1,4 +1,0 @@
-<!DOCTYPE doc [
-<!ELEMENT doc (tag)>
-<!ATTLIST doc id ID #REQUIRED>
-]><doc a='1' id='one' b='2'><tag c='3'/></doc>

@@ -34,7 +34,8 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | `STRING_POOL`, `pool*` (`xmlparse.c`) | `expat::pool` | see STATE.md |
 | `HASH_TABLE`, `lookup`, `hashTable*`, `hash.h`/`hash_table.h` (`xmlparse.c`) | `expat::hash` | see STATE.md |
 | `MALLOC`/`REALLOC`/`FREE` accounting (`expat_malloc` & co., `xmlparse.c`) | `expat::heap` | see STATE.md |
-| rest of `xmlparse.c` | `expat::parse` (+ submodules) | planned |
+| `XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, `callProcessor`, prolog without DTD, `processXmlDecl`, content, `storeAtts`, namespaces, CDATA, epilog, position getters, accounting (`xmlparse.c`) | `expat::parse` (`mod`, `prolog`, `content`, `dtd`, `accounting`, `error`) | see STATE.md |
+| DTD, entities, external subset (rest of `xmlparse.c`) | `expat::parse` | planned (module 11) |
 
 Internal modules are reachable from tests only through the `internal-api`
 feature (`expat::internal`), see DECISIONS D-006.
@@ -118,6 +119,26 @@ current string, all finished strings; `power`/`size`/`used`, entry ids and
 slots, iteration order, the final slot layout), including a refusal of
 every single allocation attempt.
 
+## Parser core (module 10)
+
+`expat::parse::Parser` holds the parser state of `xmlparse.c` and runs its
+processors (D-023): the input buffer is managed exactly like C's (sizes,
+context bytes, reparse deferral), C pointers are offsets, the processors are
+generic over the encoding and instantiated per family, events go to a
+`Handler` and which handlers are set is configuration (`HandlerSet`).
+Element types, attribute ids and prefixes use the module 9 hash tables;
+bindings are an arena. A document type declaration stops the parser with
+`Stop::DtdNotPorted` until module 11.
+
+Verification: the trace adapter (`tests/src/port.rs`) drives the port with
+the handlers of the C shim and writes the canonical trace, so whole parses
+are compared with C (`tests/tests/parse_diff.rs`: the 540 upstream vectors
+under 10 option sets, 2,500 generated documents x 3 random option sets,
+the Q-1/Q-2 reproducers); `tests/tests/buffer_diff.rs` compares the buffer
+state after every `XML_Parse` / `XML_GetBuffer` / `XML_ParseBuffer` call
+white-box (`oracle_buffer_run`); fuzz targets `parse_trace` (differential)
+and `buffer_diff`.
+
 ## Verification layers
 
 1. **White-box module diffs.** Each leaf module is compared exhaustively (where
@@ -142,7 +163,9 @@ Two parses are equal iff their **canonical traces** are byte-identical.
 The trace is produced for a given *(document bytes, options)* pair. Options:
 encoding override (or autodetect), namespace separator (or none), chunk size
 (0 = one `XML_Parse` call; otherwise the document is fed in chunks of that
-size, followed by an empty final call), parameter-entity-parsing mode. The C
+size, followed by an empty final call), parameter-entity-parsing mode,
+whether each piece goes through `XML_Parse` or through `XML_GetBuffer(2n + 3)`
++ `XML_ParseBuffer(n)`, and whether reparse deferral is disabled. The C
 side always uses a fixed hash salt.
 
 ### Trace format

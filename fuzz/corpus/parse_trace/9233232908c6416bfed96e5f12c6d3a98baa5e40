@@ -1,7 +1,0 @@
-<!DOCTYPE t0 [
-   <!ENTITY a '<t1></t1>'>
-   <!ENTITY b '<t2>two</t2>'>
-   <!ENTITY c '<t3>three<t4>four</t4>three</t3>'>
-   <!ENTITY d '<t5>&b;</t5>'>
-]>
-<t0>&a;&b;&c;&d;</t0>

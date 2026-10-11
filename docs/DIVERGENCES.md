@@ -19,24 +19,33 @@ D-017 sign of stray bytes in `utf8_toUtf16`).
 These are behaviours of libexpat 2.9.0 found by the harness that look like bugs
 relative to the specification. The port is currently compared to C under the
 same chunking, so they do not mask anything; each is resolved (replicate or
-diverge with a regression test) when the owning module is ported. Q-1 and Q-2
-are open (module 10); Q-3 is resolved.
+diverge with a regression test) when the owning module is ported. All three
+are resolved as "replicate" (Q-1/Q-2: D-024, module 10; Q-3: D-019, module 7).
 
-### Q-1 Epilog CR LF split across `XML_Parse` calls counts two lines
+### Q-1 Epilog CR LF split across `XML_Parse` calls counts two lines — resolved: replicate
 
 - Reproducer: `<a/>\r\n` fed in 1-byte chunks → `result ok 0 3 0 6`; fed whole
   → `result ok 0 2 0 6`. Same for upstream vectors
   `expat/tests/basic_tests.c:4615` (test_abort_epilog) and
   `basic_tests.c:456` (UTF-16LE, test_utf16_le_epilog_newline).
 - Spec: XML 1.0 §2.11 — `#xD #xA` is one line break regardless of buffering.
-- Owning module: `xmlparse.c` `epilogProcessor` / `XmlUpdatePosition` with
-  `XML_TOK_TRAILING_CR`. Not yet ported.
+- Cause: `epilogProcessor` consumes a CR at the end of the available input
+  (a partial `XML_TOK_PROLOG_S`), so `XML_ParseBuffer` counts its line break;
+  the LF in the next chunk is then a line break of its own.
+- Decision (module 10, D-024): **replicate**. §2.11 is about the characters
+  passed to the application, and none are passed for epilog white space
+  either way; XML 1.0 does not specify reported positions. Only the position
+  after the root element differs, never an event or an error.
+- Regression tests: `tests/tests/parse_diff.rs::q1_q2_epilog_line_breaks_replicate_c`,
+  `crates/expat/src/parse/tests.rs::epilog_cr_lf_split_counts_two_lines_like_c`.
 
-### Q-2 Trailing CR at end of document: position depends on chunking
+### Q-2 Trailing CR at end of document: position depends on chunking — resolved: replicate
 
 - Reproducer: `<a/>\r` whole → `result ok 0 1 4 4` (the CR is not consumed);
   chunked → `result ok 0 2 0 5`.
-- Owning module: same as Q-1.
+- Cause and decision: as Q-1 (D-024); the final call has no data, so the CR
+  consumed by the previous chunk stays counted.
+- Regression test: `tests/tests/parse_diff.rs::q1_q2_epilog_line_breaks_replicate_c`.
 
 ### Q-3 BOM-less UTF-16 detection with a 1-byte first chunk — resolved: replicate
 

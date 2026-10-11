@@ -1,0 +1,55 @@
+# libFuzzer log, trimmed: 808 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.08s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.06s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 4064523514
+INFO: Loaded 1 modules   (54668 inline 8-bit counters): 54668 [0xaaaaba6425e0, 0xaaaaba64fb6c), 
+INFO: Loaded 1 PC tables (54668 PCs): 54668 [0xaaaaba64fb70,0xaaaaba725430), 
+INFO:    11983 files found in <corpus>
+INFO: seed corpus: files: 11983 min: 1b max: 6338b total: 2180220b rss: 40Mb
+#11984	INITED cov: 9380 ft: 38482 corp: 8002/1216Kb exec/s: 1997 rss: 432Mb
+#16384	pulse  cov: 9380 ft: 38482 corp: 8002/1216Kb lim: 6362 exec/s: 2340 rss: 440Mb
+#32768	pulse  cov: 9382 ft: 38486 corp: 8006/1216Kb lim: 6410 exec/s: 3276 rss: 550Mb
+#65536	pulse  cov: 9382 ft: 38493 corp: 8011/1221Kb lim: 6506 exec/s: 3855 rss: 557Mb
+#131072	pulse  cov: 9382 ft: 38531 corp: 8028/1230Kb lim: 6650 exec/s: 4228 rss: 557Mb
+#262144	pulse  cov: 9385 ft: 38579 corp: 8059/1262Kb lim: 6890 exec/s: 4096 rss: 557Mb
+#393878	DONE   cov: 9390 ft: 38633 corp: 8083/1293Kb lim: 7166 exec/s: 4102 rss: 557Mb
+###### Recommended dictionary. ######
+"\001\005" # Uses: 3663
+"\001\004" # Uses: 3293
+"comment" # Uses: 2503
+"e2" # Uses: 1724
+"\376\377\377\355" # Uses: 1604
+"\000\035" # Uses: 1574
+"doctype" # Uses: 1458
+"do_\303\277" # Uses: 1373
+"\000\000\000\000\000\000\000\001" # Uses: 1103
+"\000\000\000\000" # Uses: 1096
+"\377\007" # Uses: 1152
+"\000\000" # Uses: 1070
+"\001\000\000\000\000\000\000\000" # Uses: 1088
+"do_" # Uses: 1103
+"\377\377\377\374" # Uses: 973
+"\377\377\377\377" # Uses: 932
+"\377\377\377\377\377\377\377\377" # Uses: 872
+"\001\001" # Uses: 937
+"\001\000\000\000" # Uses: 848
+"xmlns" # Uses: 781
+"\376\377\377\377" # Uses: 746
+"fons3333333333333330000000003333333333333333333333333300000006p3" # Uses: 313
+"\377\377\377\377\377\377\377\000" # Uses: 366
+"do_\303\276" # Uses: 400
+"fons6p33333333333330000000000" # Uses: 289
+"\014\000" # Uses: 329
+"\373\377\377\377" # Uses: 217
+"\377\377\377\377\377\377\377\011" # Uses: 209
+"eN" # Uses: 132
+"d\303\260o" # Uses: 93
+###### End of recommended dictionary. ######
+Done 393878 runs in 96 second(s)
+stat::number_of_executed_units: 393878
+stat::average_exec_per_sec:     4102
+stat::new_units_added:          808
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              557

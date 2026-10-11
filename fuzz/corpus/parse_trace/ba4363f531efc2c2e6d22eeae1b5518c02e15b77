@@ -1,4 +1,0 @@
-<!ELEMENT doc EMPTY>
-<!ENTITY % e1 SYSTEM 'second.ent'>
-<!ENTITY % e2 '%e1;'>
-%e1;

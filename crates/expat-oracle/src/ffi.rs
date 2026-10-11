@@ -9,6 +9,9 @@ pub(crate) struct OracleOptions {
     pub(crate) ns_separator: c_int,
     pub(crate) chunk_size: usize,
     pub(crate) param_entity_parsing: c_int,
+    pub(crate) buffer_api: c_int,
+    pub(crate) no_reparse_deferral: c_int,
+    pub(crate) ns_triplets: c_int,
 }
 
 /// Mirror of `struct oracle_role_state`.
@@ -160,6 +163,16 @@ unsafe extern "C" {
         out_len: *mut usize,
     ) -> c_int;
     pub(crate) fn oracle_pool_bytes_to_allocate_for(block_size: c_int) -> usize;
+    pub(crate) fn oracle_buffer_run(
+        doc: *const u8,
+        len: usize,
+        ops: *const c_int,
+        nops: usize,
+        ns: c_int,
+        deferral: c_int,
+        out: *mut *mut u8,
+        out_len: *mut usize,
+    ) -> c_int;
     pub(crate) fn oracle_block_header_size() -> usize;
     pub(crate) fn oracle_parser_hash(
         salt: *const u8,

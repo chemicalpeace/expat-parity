@@ -1,8 +1,0 @@
-<!DOCTYPE doc [
-  <!ENTITY e SYSTEM 'entity.ent'>
-  <!ELEMENT doc ANY>
-  <!ELEMENT tag EMPTY>
-  <!ATTLIST tag first CDATA #IMPLIED>
-  <!ATTLIST tag second NMTOKENS #IMPLIED>
-]>
-<doc>&e;</doc>
