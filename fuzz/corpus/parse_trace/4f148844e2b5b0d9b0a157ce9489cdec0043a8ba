@@ -1,0 +1,5 @@
+Æ<!--before--><!DOCTYPE a [<!ENTITY % pe2 "  " >
+<!ELEMENT b (b+ , a , p:e? , b)+>
+<!ENTITY e1 SYSTEM "sys.ent" >
+%pe1;
+<!ATTLIST q:e xmlns NOTATI q:e (q:e+ , n-1? , (a[<!ENTITY % peoc>

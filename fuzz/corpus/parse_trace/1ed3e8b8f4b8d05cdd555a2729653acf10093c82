@@ -1,0 +1,7 @@
+�k﻿<!DOCTYPE p:e SYSTEM 'doc.dtd' [<!ENTITY e1 PUBLIC "a'b" 'sys2.ent'>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13' d14 CDATA 'v14' d15 CDATA 'v15' d16 CDATA 'v16' d17 CDATA 'v17' d18 CDATA 'v18'><!ENTITY % pe3 "<!ENTITY e3 'from pe'>"><!--dtd comment-->
+<!NOTATION n1 PUBLIC 'p' 'viewer'><!ATTLIST n-1 xmlns:q ID #REQUIRED xmlns:p CDATA #REQUIRED><!ELEMENT é (a*,b,(doc+),doc?)*>
+<!NOTATION n2 PUBLIC "">
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13'>
+<!ELEMENT q:e (#PCDATA|b)*>
+]><b c='&undeclared;'>&e9;<b id='urn:p'><b p:a='1' p:a='&lt;'><!--c-->&unp;&e1;&undeclared;</b></b>&e9;<doc/></b>

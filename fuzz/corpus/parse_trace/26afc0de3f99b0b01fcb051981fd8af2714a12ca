@@ -1,0 +1,2 @@
+i¶<?xml version='1.0' encoding='ISO-8859-1'?><!--before--><!DOCTYPE a PUBLIC '' 'doc.dtd' [<!ATTLIST p:e xmlns CDATA "&#x10000;"><!ATTLIST n-1 xmlns IDREF #REQUIRED xmlns:p NMTOattlistEQUIRED xÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿml:lang ENTITY #FIXED "urn:q"><!ELEMENT b (a+,b,(doc*|(a|n-2|p:e)?|a+|p:e)?)>%undecl2) #IMPLIED><!ENTITY exmldecl1 '<!ELEMENT q ANY>' >
+]><b p:=a' x &e2; ' id='urn:p'><!--c--><?pi>?</b>

@@ -1,0 +1,10 @@
+ù“<?xml version='1.0'?>
+<!DOCTYPE a PUBLIC "a'b" 'doc.dtd' [<!---->
+<!NOTATION n1 SYSTEM 'viewer'>
+<?dtdpi x?>
+<!ATTLIST b p:a CDATA #IMPLIED>
+<!ATTLIST a id ENTITY #FIXED "hmtp://www.w3.org/XML/1998/namespace" xmlns:p (x|y|z) 'urn:q' a NOTATION (n1|n2) #FIXED "">
+<!ATTLIST q:e xmlns ( x | y ) 'http://www.w398/namespace' q:a NMTOKEN #REQUIRED p:a NOTATION (n1|n2) #IMPLIED>
+
+
+]>

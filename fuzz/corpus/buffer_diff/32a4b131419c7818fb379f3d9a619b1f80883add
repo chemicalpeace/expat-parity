@@ -1,0 +1,5 @@
+<?xml version='1.0' standalone='no'?><!--before--><!DOCTYPE p:e PUBLIC '' 'doc.dtd' [<!ATTLIST b xml:lang NOTATION (n1|n2) "1" xmlns:q IDREFS '&e1;' id CDATA #FIXED 'urn:p'>
+ 
+<!NOTATION n1 SYSTEM 'viewer'>
+<!ENTITY e1 "]]>" >]>
+<doc c='&lt;' id='urn:p'>text&e3;&e9;</doc>

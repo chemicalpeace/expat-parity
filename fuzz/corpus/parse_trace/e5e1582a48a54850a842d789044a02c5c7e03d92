@@ -1,0 +1,9 @@
+@<!DOCTYPE doc [
+<!ELEMENT doc (a|b|c)+>
+<!ELEMENT a EMPTY>
+<!ELEMENT b (#PCDATA)>
+<!ELEMENT oc>
+<a/>
+<b attr='foo'>This is a foo</b>
+<c></c>
+</doc>

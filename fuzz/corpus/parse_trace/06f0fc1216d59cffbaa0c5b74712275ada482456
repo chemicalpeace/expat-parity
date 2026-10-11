@@ -1,0 +1,3 @@
+Aé
+<!DOCTYPE a [<!ENTITY % pe PUBLIC 'bad{char}' 'sys2.ent' >
+]>&lt;&e9;</doc>

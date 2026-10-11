@@ -1,0 +1,6 @@
+¸§
+<!DOCTYPE doc [<!ATTLIST a xmlns NOTATION (n1|n2) " x  y ">
+<!ATTLIST doc d0 CDATA 'v0'>
+<!ENTITY % pe2 "<!ELEMENT q ANY>" ><!ENTITY % pe3 '&#38;#38;'><!ENTITY amp SYSTEM 'sys.ent'>%pe1;
+<!ENTITY lt SYSTEM 'u.gif' NDATA n2>
+	='&lt;'> <a/></b>

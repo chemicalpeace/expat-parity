@@ -1,4 +1,0 @@
-<!DOCTYPE doc SYSTEM 'foo' [
-  <!ATTLIST doc baz ID #REQUIRED>
-  <!ENTITY en SYSTEM 'bar'>
-]>

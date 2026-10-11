@@ -1,0 +1,2 @@
+i¶<?xml version='1.0' encoding='ISO-8859-1'?><!--before--><!DOCTYPE a PUBLIC '' 'doc.dtd' [<!ATTLIST p:e xmlns CDATA "&#x10000;"><!ATTLIST n-1 xmlns IDREF #REQUIRED xmlns:p NMTOKENS #REQUIRED xml:lang ENTITY #FIXED "urn:q"><!ELEMENT b (a+,b,(doc*|(a|n-1|p:e)?|a+|p:e)?)>%undeclared;
+<!ATTLIST é a NO xml:lang ENTITY #FIXED "urn:q"><!ELEMENT b (a+,b,(doc*|(a|n-1|p:e)?|a+|p:e)?)>='urn:p'><!--c--><?pi?></b>

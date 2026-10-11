@@ -1,0 +1,7 @@
+<!DOCTYPE doc [
+  <!ENTITY % p1 '&#37;p2;'>
+  <!ENTITY % p2 '&#37;p1;'>
+  <!ENTITY % define_g "<!ENTITY g '&#37;p2;'>">
+  %define_g;
+]>
+ x?><a xmlns=' x /<doc/>

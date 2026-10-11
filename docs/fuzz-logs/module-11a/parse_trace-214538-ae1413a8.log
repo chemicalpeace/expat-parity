@@ -1,0 +1,47 @@
+# libFuzzer log, trimmed: 684 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=97 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 401117179
+INFO: Loaded 1 modules   (62913 inline 8-bit counters): 62913 [0xaaaaae9467c0, 0xaaaaae955d81), 
+INFO: Loaded 1 PC tables (62913 PCs): 62913 [0xaaaaae955d88,0xaaaaaea4b998), 
+INFO:    21893 files found in <corpus>
+INFO: seed corpus: files: 21893 min: 1b max: 11360b total: 6437413b rss: 46Mb
+#16384	pulse  cov: 12750 ft: 44579 corp: 8414/382Kb exec/s: 5461 rss: 421Mb
+#21894	INITED cov: 13669 ft: 55802 corp: 10470/2376Kb exec/s: 1684 rss: 481Mb
+#32768	pulse  cov: 13669 ft: 55814 corp: 10471/2376Kb lim: 11386 exec/s: 2340 rss: 510Mb
+#65536	pulse  cov: 13674 ft: 55849 corp: 10483/2388Kb lim: 11425 exec/s: 2978 rss: 574Mb
+#131072	pulse  cov: 13679 ft: 55893 corp: 10504/2398Kb lim: 11529 exec/s: 3196 rss: 574Mb
+#262144	pulse  cov: 13689 ft: 55998 corp: 10544/2446Kb lim: 11672 exec/s: 3084 rss: 574Mb
+#313907	DONE   cov: 13695 ft: 56023 corp: 10558/2449Kb lim: 11737 exec/s: 3203 rss: 574Mb
+###### Recommended dictionary. ######
+"e06" # Uses: 4650
+"e4" # Uses: 4037
+"element" # Uses: 2960
+"xmlnu:p" # Uses: 1404
+"\000\000\000\000\000\000\000\000" # Uses: 1313
+"xmlns:p" # Uses: 1254
+"\000\000\000\000" # Uses: 1204
+"NO" # Uses: 1232
+"\027\000\000\000\000\000\000\000" # Uses: 1082
+"doctype" # Uses: 903
+"a2" # Uses: 785
+"\011\000\000\000\000\000\000\000" # Uses: 802
+"*\000\000\000" # Uses: 509
+"attlist" # Uses: 414
+"\001\000\000\000" # Uses: 372
+"\007\000\000\000\000\000\000\000" # Uses: 287
+"\016\000\000\000\000\000\000\000" # Uses: 293
+"\377\377\377\377\377\377\377\377" # Uses: 217
+"\376\377\377\377\377\377\377\377" # Uses: 120
+"\001\000\000\000\000\000\000>" # Uses: 96
+"UR\347\273\244\356\223\244\356\223\244\356\223\244\356\220\251\342\270\200\346\225\255\346\225\256\347\220\273" # Uses: 28
+"\013\000" # Uses: 16
+###### End of recommended dictionary. ######
+Done 313907 runs in 98 second(s)
+stat::number_of_executed_units: 313907
+stat::average_exec_per_sec:     3203
+stat::new_units_added:          684
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              574

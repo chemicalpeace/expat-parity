@@ -1,0 +1,4 @@
+�<!DOCTYPE a PUBLIC "a'b" 'doc.dtd' [<!ATTLIST b a ENTITIES #FIXED 'urn:q' q:a (x|y|z) "1">
+<!ENTITY % extpe '&#37;pe1;'><!ENTITY % pe3 'line
+break
+andcr'>] ><a p:a='&lt;'<?pi?>café ☃ 𝄞	</a>

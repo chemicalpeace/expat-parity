@@ -1,0 +1,5 @@
+p²<?xml version='1.0'?><!DOCTYPE doc PUBLIC "" 'doc.dtd' [<!ATTLIST b xmlns:q ID #REQUIRED xmlns:p (x|y|z) #IMPLIED xmlns:p (x|y|z) #FIXED " x  y "><!ATTLIST a xmlns:q (x|y|z) '&e1;'>
+<!----><!NOTATION n1 SYSTEM 'viewer'>
+<!ATTLIST b c ENTITY #FIXED 'http://www.w3.org/2000/xmlns/' id IDREFS '&#65;&#x42;&#32;' xmlns:p ENTITIES #REQUIRED>
+<!ENTITY p:x SYSTEM 'sys.ent' >
+<!ENTITY % extpe SYSTEM 'sys.ent'><!ENTITY % pe3 SYSTEM 'sys.ent' ><!ELEMENT q:e (#PCDAT'><doc/>&ext;&#13;</doc>

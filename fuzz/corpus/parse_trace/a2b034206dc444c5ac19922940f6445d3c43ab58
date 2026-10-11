@@ -1,0 +1,6 @@
+='<!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ENTITY e3 SYSTEM "sys.ent" >
+<!ELEMENT a (#PCDATA|a|a)*><!NOTATION n1 PUBLIC "a'b">
+<!ENTITY % pe2 "line
+break
+andcr" >
+<!ATTLIT _) "&ext;" xmlns:q NOTATION (n1|n2) #REQUIRED xmlns:p NM?pi?></doc>

@@ -1,0 +1,7 @@
+8Ÿ<?xml version='1.0'?><!--before--><!DOCTYPE p:e [<!ENTITY % extpe '<!ELEMENT z ANY>'><!ELEMENT p:e (#PCDATA|b|p:e)*>
+<!ELEMENT q:e (#PCDATA)*>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9'>
+<!ELEMENT _u (_u?|a+)*>
+<!ATTLIST doc d0 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13' d14 CDATA 'v14' d15 CDATA 'v15'><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13' d14 CDATA 'v14' d15 CDATA 'v15'>
+<!ATTLIST b xmlns:p ENTITY "&lt;" xmlns:q NOTATION (n1|n2) #IMPLIED q:a ENTITIES #FIXED "a|b"><!ATTLIST _u xmlns (x|y|z) "x&e2;y" xmlns:p ENTITIES #IMPLIED>
+<!ENTITY lt "&e3;" ><!ATTLIST Ã© xml:lang ID "http://www.w3.org/2000/xmlns/" b NMTOKEN "&#65;&#x42;&#32;" p:a ENTITY "http://www.w3.org/2000/xmlns/">] ><b xmlns:p='&undeclared;'></b>

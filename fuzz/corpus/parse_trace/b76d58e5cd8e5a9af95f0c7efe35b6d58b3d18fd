@@ -1,0 +1,9 @@
+�<?xml version='1.0' standalone='no'?><!DOCTYPE doc [<!ATTLIST _u id ENTITIES 'a b' xmlns:p IDREFS #IMPLIED xmlns:q CDATA #IMPLIED><!ENTITY p:x SYSTEM 'u.gif' NDATA n1 >
+
+
+	
+<!ENTITY % pe2 "">
+<!ATTLIST q:e q:a:q ENTITY 'urn:q'>
+<!ATTLIST é q:a NOTATION (n1|n2) #FIXED "line
+break
+andcr	tab" xmlns:p ENTITIES #FIXED ' x  y ' xmlns:q EnTITY #FIXED "&lt;&gt;&quot;&apo?pi?>&e0;<?pi?></a>

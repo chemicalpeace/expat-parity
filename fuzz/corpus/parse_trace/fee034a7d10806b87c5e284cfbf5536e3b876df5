@@ -1,0 +1,6 @@
+}x<?xml version='1.0' standalone='no'?><!--before--><!DOCTYPE a [<!NOTATION n1 SYSTEM 'viewer'><!ATTLIST _u q:a ENTITY #FIXED "line
+break
+andcr	tab" c NMTOKENS #IMPLIED xmlns:p NMTOKENS "&lt;&gt;&quot;&apos;">
+
+<!ELEMENT b (#PCDATA)><!ELEMENT p:e (é*|a+|_u|a)>
+<!ATTLIST _u xmlns:p ENTITY #REQUIRED p:a c ENTITIE/doc>

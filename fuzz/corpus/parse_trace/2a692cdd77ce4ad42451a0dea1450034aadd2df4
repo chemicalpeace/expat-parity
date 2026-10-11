@@ -1,0 +1,9 @@
+CÛ<?xml version='1.0' encoding='UTF-8'?><!DOCTYPE p:e PUBLIC '  spaced 
+  id  ' 'doc.dtd' [<!ATTLIST n-1 id ID #REQUIRED><!ATTLIST Ã© xmlns:p NMTOKENS #REQUIRED p:a IDREF #IMPLIED id (x|y|z) #IMPLIED>
+%extpe;
+<!ENTITY lt '<a/>'>
+<!ATTLIST b id IDREF #IMPLIED q:a NMTOKEN '&e1;'>
+	
+<!---->
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10'>
+]><b c='&ext;' p:a='urn:p'></b>

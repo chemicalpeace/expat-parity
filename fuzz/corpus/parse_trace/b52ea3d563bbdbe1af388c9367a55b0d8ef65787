@@ -1,0 +1,4 @@
+Gh<!--before--><!DOCTYPE doc [<!ENTITY unp SYSTEM "sys.ent">
+<!ELEMENT a ANY>
+<!ATTLIST q:e b NOTATION (n1|n2) #FIXED '&#x10000;' c IDREFS '&#65;&#x42;&#32;'>
+<!ATTLIST b xmlns ENTITY 'a&amp;b' q:a IDREFS #IMPLIE4333333TY é PUBLIC '  sp/doc>

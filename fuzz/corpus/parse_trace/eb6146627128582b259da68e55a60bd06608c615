@@ -1,0 +1,6 @@
+€/<!--before--><!DOCTYPE doc [%extpe;
+<!ENTITY p:x PUBLIC "a'b" 'sys2.ent' >%extpe;
+<!ATTLIST _u xml:lang ENTITIES "a&amp;b" xmlns:q NOTATION (n1|n2) #FIXED 'http://www.w3.org/2000/xmlns/'><!ENTITY e2 SYSTEM "sys.ent">
+ 
+]><doc xmlns:p='&e1;'><doc a='&e1;'>&unp;
+<a/></doc>&ext;<?pi?></doc>

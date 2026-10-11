@@ -1,0 +1,84 @@
+# libFuzzer log, trimmed: 1330 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=93 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3299650924
+INFO: Loaded 1 modules   (62913 inline 8-bit counters): 62913 [0xaaaace4367c0, 0xaaaace445d81), 
+INFO: Loaded 1 PC tables (62913 PCs): 62913 [0xaaaace445d88,0xaaaace53b998), 
+INFO:    16981 files found in <corpus>
+INFO: seed corpus: files: 16981 min: 1b max: 17298b total: 5605914b rss: 44Mb
+#8192	pulse  cov: 8963 ft: 25635 corp: 6096/177Kb exec/s: 2730 rss: 420Mb
+#16384	pulse  cov: 12058 ft: 41485 corp: 8886/1059Kb exec/s: 3276 rss: 470Mb
+#16982	INITED cov: 12067 ft: 42210 corp: 9024/1693Kb exec/s: 2830 rss: 470Mb
+#32768	pulse  cov: 12067 ft: 42229 corp: 9032/1696Kb lim: 17340 exec/s: 4096 rss: 582Mb
+#65536	pulse  cov: 12072 ft: 42255 corp: 9042/1697Kb lim: 17410 exec/s: 5461 rss: 606Mb
+#131072	pulse  cov: 12079 ft: 42329 corp: 9064/1702Kb lim: 17508 exec/s: 6553 rss: 606Mb
+#262144	pulse  cov: 12088 ft: 42409 corp: 9106/1703Kb lim: 17788 exec/s: 7084 rss: 606Mb
+#524288	pulse  cov: 12102 ft: 42591 corp: 9188/1753Kb lim: 18362 exec/s: 7384 rss: 606Mb
+#715873	DONE   cov: 12115 ft: 42749 corp: 9240/1766Kb lim: 18726 exec/s: 7615 rss: 606Mb
+###### Recommended dictionary. ######
+"\000\000\000\000\000\000\000\000" # Uses: 4302
+"\001\000\000\000\000\000\001\010" # Uses: 3155
+"\001\000\000\013" # Uses: 3197
+"\000\001" # Uses: 3115
+"a4" # Uses: 2977
+"d3" # Uses: 2708
+"\000\000\000\000\000\000\000\001" # Uses: 2617
+"\015\000" # Uses: 2736
+"b6" # Uses: 2597
+"\000\000\000\000\000\000\002\036" # Uses: 2233
+"d5" # Uses: 1943
+"\001\000\000\000\000\000\0000" # Uses: 1717
+"ZvvvvvvvvV" # Uses: 1494
+"\021\000\000\000\000\000\000\000" # Uses: 1589
+"a6" # Uses: 1545
+"Zvvvvvvv" # Uses: 1495
+"\017\000\000\000\000\000\000\000" # Uses: 1379
+"vwvvvvvv" # Uses: 1148
+"d16" # Uses: 1148
+"\010\000\000\000\000\000\000\000" # Uses: 1134
+"\001\000\000\035" # Uses: 1168
+"d9" # Uses: 1147
+"\376\377\377\377" # Uses: 1112
+"vvZvvvvvvvv" # Uses: 993
+"\001\000\000\000\000\000\000\000" # Uses: 1033
+"vvvZvvvv" # Uses: 1012
+"\001\000\000\000\000\000\002\"" # Uses: 909
+".\000\000\000\000\000\000\000" # Uses: 830
+"\001\000\000\000\000\000\000\020" # Uses: 865
+"\004\000\000\000" # Uses: 793
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 564
+"\000\000\000\005" # Uses: 795
+"\024UUUUUUU" # Uses: 602
+"\345\234\250\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\202\203\350\216\203\350\216\203\350" # Uses: 453
+"\303\277ml:l" # Uses: 531
+"b2" # Uses: 512
+"\001\022" # Uses: 584
+"\001\000\000\000" # Uses: 498
+"4\000\000\000\000\000\000\000" # Uses: 422
+"\001\000\000\000\000\000\000\004" # Uses: 383
+"d0" # Uses: 372
+"\001\000\000\000\000\000\000'" # Uses: 382
+"\033\000\000\000\000\000\000\000" # Uses: 354
+"\017\000" # Uses: 263
+"\376\000\000\000" # Uses: 201
+"\377\377\377\377\377\377\377." # Uses: 210
+"\000\000\000\000" # Uses: 172
+"\303\303\000\000" # Uses: 149
+"\001\000\000\000\000\000\000 " # Uses: 153
+"xml" # Uses: 126
+"id" # Uses: 130
+"\000\000\000\000\000\000\000\002" # Uses: 94
+"\000\000\000\001" # Uses: 86
+"\000\000\000\000\000\000\000\004" # Uses: 68
+"p\000:\000e\000" # Uses: 23
+"\377\377\377\377" # Uses: 13
+"\001\000\005w" # Uses: 6
+###### End of recommended dictionary. ######
+Done 715873 runs in 94 second(s)
+stat::number_of_executed_units: 715873
+stat::average_exec_per_sec:     7615
+stat::new_units_added:          1330
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              606

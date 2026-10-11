@@ -1,0 +1,3 @@
+nÂ<!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ATTLIST p:e id IDREFS #FIXED ' x  y ' c EKTITY #FIXED 'line
+break>
+]><doc c='1'></doc>

@@ -1,0 +1,1 @@
+½É<?xml version='1.0' encoding='ISO-8859-1'?><!--before--><!DOCTYPE p:e SYSTEM 'doc.dtd' [<!ATTLIST doc b ( x | y ) #IMPLIED a ENTITY #IMPLIED><!ELEMENT a (n-1?,é+,_u+<?pi?></doc>

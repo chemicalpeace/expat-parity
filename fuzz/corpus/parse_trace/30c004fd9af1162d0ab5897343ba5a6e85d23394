@@ -1,0 +1,6 @@
+æ<!--before--><!DOCTYPE doc [<!ENTITY unp "text">
+<!ENTITY % pe1 PUBLIC "  spaced 
+  id  " "sys2.ent" >
+<!ELEMENT b (n-1|n-1|b|Ã©+)+>
+<!ATTLIST p:e xmlns:p (x|y|z) "&lt;&gt;&quot;&apos;" id ENTITY " x  y "><!--dtd comment--><!ATTLIST q:e p:a ENTITIES #REQUIRED c IDREFS #REQUIRED>
+]><doc a='&undecla>ed;' a='&exT;'>&undeclared;</doc>

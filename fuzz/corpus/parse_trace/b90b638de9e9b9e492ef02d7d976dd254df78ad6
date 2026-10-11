@@ -1,0 +1,4 @@
+<!DOCTYPE r [
+<!ENTITY e1 'v1'>
+<!ENTITY e2 SYSNOTEM 'v2'>
+]¹õ<r a1='[&e1;]'>[&e2;][&;&apos;&gt;&lt;&quot;]</r>

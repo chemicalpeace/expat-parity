@@ -1,0 +1,7 @@
+ˆÒ<?xml version='1.0' encoding='ISO-8859-1'?>
+<!DOCTYPE doc PUBLIC "" 'doc.dtd' [<!ATTLIST a xmlns:q CDATA '&lt;&gt;&quot;&apos;'>
+<!ATTLIST b p:a NOTATION (n1|n2) "line
+break
+andcr	tab" xmlns (x|y|z) #IMPLIED><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5'>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3'>
+] ><doc><b x='y'/><a p:a='&ext;'>a&amp;b<![CDATA[&e1;]]><doc></doc>&e9;</a>&e2;&e2;</doc>

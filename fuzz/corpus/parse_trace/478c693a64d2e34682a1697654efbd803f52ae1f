@@ -1,0 +1,5 @@
+® <?xml version='1.0' standalone='yes'?><!DOCTYPE doc PUBLIC '' 'doc.dtd' [<!ELEMENT a (#PCDATA|b|q:e)*><!ELEMENT b ANY><!---->
+<!ELEMENT b (#PCDATA)>
+<!ELEMENT p:e (a|doc?)>
+]>
+<doc id=' x &e2; '>&unp;</doc>

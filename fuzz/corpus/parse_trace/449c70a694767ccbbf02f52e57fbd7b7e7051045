@@ -1,0 +1,6 @@
+C­ï»¿<!DOCTYPE p:e [ %pe1; %extpe;
+<!ATTLIST a qa ENTITIES '&ext;' xmlns NOTATION (n1|n2) #IMPLIED><!ENTITY lt '<b>in</b>'>
+%undeclared;
+
+
+<!ELEMENT a (#<a/></doc>

@@ -1,0 +1,10 @@
+¶Ñ<?xml version='1.0' encoding='ISO-8859-1'?>
+<!DOCTYPE doc [<!ENTITY unp "<!ELEMENT q ANY>" >
+<!ELEMENT p:e (b*,doc)+>
+<!ATTLIST q:e xml:lang IDREF "&lt;&gt;&quot;&apos;">
+<!ATTLIST p:e b (x|y|z) #IMPLIED>
+<!ENTITY e1 SYSTEM 'u.gif' NDATA undeclared><!ENTITY % pe3 '&#37;pe1;' > %pe1; 
+<!ENTITY ext SYSTEM 'u.gif' NDATA n2>
+<!ENTITY % pe3 PUBLIC '-//X//DTD x//EN' 'sys1.ent' ><!ATTLIST q:e c ENTITY #REQUIRED>
+<!ELEMENT p:e EMPTY>
+<!ATTLIST b xmlns CDATA #IMPLIED xmlns:p ENT,ITIES #REQUIRED xmlns IDREFS '&lt;'><!ATTLIST _u xmlns:p ENTIDITY #FIXED ' x  y '>]><a a='&undeclared;'>&undeclared;<![CDATA[&e1;]]></a>

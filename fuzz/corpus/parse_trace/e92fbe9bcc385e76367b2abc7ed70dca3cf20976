@@ -1,0 +1,2 @@
+ñbï»¿<!--before--><!DOCTYPE a [<!ELEMENT n-1 (_u , (p:e , (n-1,a*,p:e))+ , (a+|p:e?))><!ELEMENT b (#PCDATA|b)*>
+%undeclared;<!A a='&e1;'> <a/><b>

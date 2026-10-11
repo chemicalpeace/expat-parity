@@ -1,8 +1,0 @@
-<!DOCTYPE doc [
-  <!ATTLIST doc
-            attr NMTOKENS #REQUIRED
-            ents ENTITIES #REQUIRED
-            refs IDREFS   #REQUIRED>
-]>
-<doc attr='    a  b cnt-0   	
-do_   >

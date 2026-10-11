@@ -1,0 +1,3 @@
+´d
+<!DOCTYPE a [<!ATTLIST b b ENTITIES #REQUIRED q:a ENTITY #REQUIRED xmlns CDATA '&lt;'>] ><a>&e1;<a/>&undeclared;
+</a>

@@ -1,0 +1,3 @@
+mÄ<!DOCTYPE a [<!---->
+%pe2;
+<!ATTLIST _u xmlns:q ( x | y ) #IMPLIED xmlns (x|y|z) #REQUIRED xmlns:p ENTITY #REQUIRED>%p='&undeclared;'><?pi?><doc/><b x='y'/></b>
