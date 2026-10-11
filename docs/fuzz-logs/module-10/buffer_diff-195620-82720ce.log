@@ -1,0 +1,92 @@
+# libFuzzer log, trimmed: 1138 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.06s
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on shared package cache
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.06s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 914476834
+INFO: Loaded 1 modules   (54697 inline 8-bit counters): 54697 [0xaaaae2162180, 0xaaaae216f729), 
+INFO: Loaded 1 PC tables (54697 PCs): 54697 [0xaaaae216f730,0xaaaae22451c0), 
+INFO:    14529 files found in <corpus>
+INFO: seed corpus: files: 14529 min: 1b max: 9491b total: 1695361b rss: 41Mb
+#14530	INITED cov: 6116 ft: 21089 corp: 5457/595Kb exec/s: 3632 rss: 482Mb
+#16384	pulse  cov: 6116 ft: 21090 corp: 5458/595Kb lim: 9504 exec/s: 4096 rss: 482Mb
+#32768	pulse  cov: 6116 ft: 21095 corp: 5463/595Kb lim: 9569 exec/s: 6553 rss: 516Mb
+#65536	pulse  cov: 6117 ft: 21127 corp: 5475/603Kb lim: 9647 exec/s: 7281 rss: 516Mb
+	NEW_FUNC[1/1]: 0xaaaae1d07e54  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x2f7e54) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+#131072	pulse  cov: 6135 ft: 21173 corp: 5495/615Kb lim: 9946 exec/s: 8192 rss: 516Mb
+#262144	pulse  cov: 6158 ft: 21283 corp: 5537/639Kb lim: 10492 exec/s: 8192 rss: 516Mb
+#524288	pulse  cov: 6194 ft: 21475 corp: 5615/665Kb lim: 11415 exec/s: 8594 rss: 516Mb
+#832684	DONE   cov: 6223 ft: 21667 corp: 5709/713Kb lim: 12546 exec/s: 8673 rss: 516Mb
+###### Recommended dictionary. ######
+"\000\000\000\377" # Uses: 4804
+"vwvvvvvvvvyyyyyyyyyyyyyyyy" # Uses: 3880
+"Zvvvvvvvvv" # Uses: 3921
+"vwv" # Uses: 3618
+"!\000\000\000\000\000\000\000" # Uses: 3436
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 1821
+"\036\000" # Uses: 2840
+"\000\000\000\242" # Uses: 2763
+"\"\000" # Uses: 2646
+"vZvvvvvvvv" # Uses: 2382
+"\000\000\000\000\000\000\000\003" # Uses: 2237
+"\376\377\377\377" # Uses: 2111
+"\345\234\250" # Uses: 1994
+"\017/" # Uses: 1841
+"\377\377\377\377\377\377\377\002" # Uses: 1757
+"\000\000\000\000\000\000\000\000" # Uses: 1675
+"VUUUUUU\025" # Uses: 1560
+"\004\000" # Uses: 1481
+"vvvvZvvvvvvvv" # Uses: 1337
+"-\000" # Uses: 1459
+"\003\014" # Uses: 1397
+"\033\000\000\000" # Uses: 1215
+"vwVvvvvvv" # Uses: 1132
+"\377\377\372\377\235\000\367\000" # Uses: 1053
+"\025\000\000\000\000\000\000\000" # Uses: 934
+"vvv" # Uses: 978
+"\001\000" # Uses: 909
+"vwvvvvvvvvyyyyy" # Uses: 761
+"\001\000\000\014" # Uses: 868
+"Zv:vvv6vvZvvv" # Uses: 712
+"(<" # Uses: 787
+"\000\000\000\000" # Uses: 806
+"vwvvvvvv" # Uses: 675
+"vwvvv" # Uses: 779
+"*\000\000\000" # Uses: 652
+"\001U\004\235\377\373\000\000" # Uses: 659
+"\001\000\000\000\000\000\000\000" # Uses: 566
+")$" # Uses: 554
+"\314\001\000\000\000\000\000\000" # Uses: 582
+"\000\000\000\000\000\000\000e" # Uses: 547
+"\377," # Uses: 542
+"\000\000Q\264\274^_\304" # Uses: 496
+"\001\000\000\004" # Uses: 488
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\201\260" # Uses: 321
+"\320\303c.@\003\000\000" # Uses: 481
+"Zvxxxxvw" # Uses: 438
+"Zvv" # Uses: 417
+"\027\305\000\000" # Uses: 350
+"vwvvvvvvv" # Uses: 359
+"\374\377\377\377" # Uses: 348
+"\015\000\000\000\000\000\000\000" # Uses: 328
+"vvZvvvvvvvv" # Uses: 237
+"fvv" # Uses: 208
+"vvZvvv" # Uses: 125
+"\000," # Uses: 126
+"\377\377\377\000" # Uses: 124
+"\001\222" # Uses: 107
+"ZvvvvZvvvvvvvt" # Uses: 87
+"Zv\352\260\264\352\260\264\350\200\230" # Uses: 32
+"\001\256" # Uses: 6
+"vvZvvwvvvvvvvvyyyyyvvvvvvv" # Uses: 3
+###### End of recommended dictionary. ######
+Done 832684 runs in 96 second(s)
+stat::number_of_executed_units: 832684
+stat::average_exec_per_sec:     8673
+stat::new_units_added:          1138
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              516

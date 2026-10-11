@@ -1,0 +1,104 @@
+# libFuzzer log, trimmed: 1345 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.14s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.10s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1130343830
+INFO: Loaded 1 modules   (54697 inline 8-bit counters): 54697 [0xaaaac3ea2180, 0xaaaac3eaf729), 
+INFO: Loaded 1 PC tables (54697 PCs): 54697 [0xaaaac3eaf730,0xaaaac3f851c0), 
+INFO:    12215 files found in <corpus>
+INFO: seed corpus: files: 12215 min: 1b max: 6760b total: 1117644b rss: 40Mb
+#8192	pulse  cov: 5545 ft: 15082 corp: 3963/80Kb exec/s: 4096 rss: 395Mb
+#12216	INITED cov: 5746 ft: 19535 corp: 5000/444Kb exec/s: 3054 rss: 464Mb
+#16384	pulse  cov: 5748 ft: 19537 corp: 5002/444Kb lim: 6772 exec/s: 4096 rss: 518Mb
+#22059	RELOAD cov: 5748 ft: 19539 corp: 5004/444Kb lim: 6820 exec/s: 4411 rss: 520Mb
+#32768	pulse  cov: 5752 ft: 19551 corp: 5011/445Kb lim: 6844 exec/s: 5461 rss: 520Mb
+	NEW_FUNC[1/4]: 0xaaaac38f72c8  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x1a72c8) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+	NEW_FUNC[2/4]: 0xaaaac3b70494  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x420494) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+#65536	pulse  cov: 5838 ft: 19688 corp: 5026/445Kb lim: 6964 exec/s: 5957 rss: 520Mb
+#131072	pulse  cov: 5841 ft: 19740 corp: 5055/454Kb lim: 7144 exec/s: 6898 rss: 520Mb
+	NEW_FUNC[1/4]: 0xaaaac3a10ea4  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x2c0ea4) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+	NEW_FUNC[2/4]: 0xaaaac3c63a24  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x513a24) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+#262144	pulse  cov: 5890 ft: 19843 corp: 5091/466Kb lim: 7672 exec/s: 7489 rss: 520Mb
+	NEW_FUNC[1/1]: 0xaaaac3a1339c  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x2c339c) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+#524288	pulse  cov: 5948 ft: 20068 corp: 5183/500Kb lim: 8525 exec/s: 8594 rss: 520Mb
+	NEW_FUNC[1/2]: 0xaaaac3a72e84  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x322e84) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+	NEW_FUNC[2/2]: 0xaaaac3cfefd4  (<fuzz>/target/aarch64-unknown-linux-gnu/release/buffer_diff+0x5aefd4) (BuildId: 051396d1660dc7913b6380013d2f1eaa4042843f)
+#852689	DONE   cov: 6004 ft: 20374 corp: 5296/546Kb lim: 9474 exec/s: 8882 rss: 520Mb
+###### Recommended dictionary. ######
+"7\000\000\000\000\000\000\000" # Uses: 3314
+"\000\002" # Uses: 3278
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\200\260\347\201\260\347" # Uses: 2133
+"\203\000\000\000\000\000\000\000" # Uses: 3249
+"\003\000\000\000" # Uses: 3099
+"\001\000\000\000" # Uses: 2980
+"\000+" # Uses: 3033
+"\006\000\000\000" # Uses: 2859
+"\000\001" # Uses: 2716
+"\377\377\377\377" # Uses: 2425
+"\001\000\000\000\000\000\001M" # Uses: 2311
+"\377\377\377\377\377\377\377\000" # Uses: 2116
+".v" # Uses: 2180
+"\340\250\206" # Uses: 1755
+"\377\377\377\005" # Uses: 1800
+"\345\234\250\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 1100
+"(\000" # Uses: 1665
+"Wvvvvvvvvv" # Uses: 1481
+"vwvvvvvv" # Uses: 1534
+"\000\372\253\270\377\373\000\000" # Uses: 1521
+"Zvvvvvvv" # Uses: 1442
+"\377\377\377\001" # Uses: 1319
+"\000\000Q\264\366\024\336d" # Uses: 1138
+"vwvvvvvv." # Uses: 1228
+"ZvvZvvvvvvvvv" # Uses: 1109
+"vwvvvvvvvvyyyyyyyyyyyyyyyy" # Uses: 943
+"Zvv\340\250\206vvv" # Uses: 1097
+"\000\377" # Uses: 1080
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 670
+"\377\377\377\377\377\377\377\377" # Uses: 952
+"\345\234\250" # Uses: 1027
+"\376;\000\000" # Uses: 1014
+"\377\377\377\377\377\377\377\\" # Uses: 952
+"\211\000\000\000\000\000\000\000" # Uses: 932
+"\002\000\000\000\000\000\000\000" # Uses: 1000
+"\010\000\000\000\000\000\000\000" # Uses: 851
+"\000\000\000\000\000\000\000\000" # Uses: 779
+"\007\377\377\377\377\377\377\377" # Uses: 787
+"\003\000" # Uses: 776
+"Zvvvyyyyyyyyyyy" # Uses: 679
+"?\000\000\000\000\000\000\000" # Uses: 709
+"\000\000\000\000\000\000\000\001" # Uses: 568
+"\313\177" # Uses: 576
+"\323\000\000\000\000\000\000\000" # Uses: 581
+"\001\000\000\006" # Uses: 547
+"\377\377\377\377\377\377\377\027" # Uses: 356
+"\0128" # Uses: 334
+"vvZvvvvvvvv" # Uses: 313
+"vvvtvvvv" # Uses: 251
+"\000\000\000\004" # Uses: 263
+"\377\377\377\377\377\377\377y" # Uses: 248
+"\000\000" # Uses: 213
+"Zvvvvvvvv" # Uses: 210
+"\377\377\377\377\377\377\377\003" # Uses: 212
+"\377\377\377\377\377\377\377I" # Uses: 198
+"vvvvZvvvvvvvv" # Uses: 180
+"\000\013" # Uses: 153
+"\000\003" # Uses: 105
+"vwvvvvvvv" # Uses: 113
+"Zv:vvv6vvZvvv" # Uses: 73
+"\000\000\000\000" # Uses: 92
+"vwvvvvvvvvvvv" # Uses: 52
+"\000\000\200\307" # Uses: 73
+"\001\013" # Uses: 39
+"1\000\000\000\000\000\000\000" # Uses: 30
+"Zvvvv88888888888" # Uses: 24
+"\376\000" # Uses: 10
+"\345\234\210" # Uses: 6
+"Z.vvvvv" # Uses: 6
+###### End of recommended dictionary. ######
+Done 852689 runs in 96 second(s)
+stat::number_of_executed_units: 852689
+stat::average_exec_per_sec:     8882
+stat::new_units_added:          1345
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              520
