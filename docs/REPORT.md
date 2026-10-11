@@ -177,7 +177,7 @@ port's from `tests/src/port.rs`. Two traces must be byte-identical; the only
 normalisation is the coalescing of character data (libexpat splits it at
 buffer boundaries, which applications cannot rely on).
 
-**The 398 upstream vectors under 10 option sets.**
+**The 398 upstream vectors under 11 option sets.**
 `tests/tests/parse_diff.rs::upstream_vectors_match_c` parses each of the
 540 documents extracted from libexpat's test suite (`tests/vectors/`) with
 both parsers under each of these option sets:
@@ -194,13 +194,16 @@ both parsers under each of these option sets:
 | 8 | 3-byte chunks through `XML_GetBuffer` + `XML_ParseBuffer` |
 | 9 | 1-byte chunks, reparse deferral off, namespaces with separator `:` |
 | 10 | 2-byte chunks through the buffer API, encoding override `UTF-16LE` |
+| 11 | namespaces with separator `\|` and `XML_SetReturnNSTriplet`, 5-byte chunks |
 
 Chunking means the document is fed in pieces of that many bytes, each a
 separate `XML_Parse` (or `XML_GetBuffer` with a request of `2n + 3` bytes
 then `XML_ParseBuffer(n)`), with `isFinal` on the last; this exercises
 partial tokens, the reparse-deferral heuristic and buffer growth. 398 of
-the 540 vectors are compared under all 10 option sets (3,980 trace pairs)
-and every pair is equal. The other 142 contain a document type declaration;
+the 540 vectors are compared under all 11 option sets (4,378 trace pairs)
+and every pair is equal; with the pairs of DTD vectors whose parse ends
+before the DTD the test compares 4,670 pairs and counts 1,270 stopped
+ones. The other 142 contain a document type declaration;
 the port stops at it with `Stop::DtdNotPorted` and those pairs are counted,
 not compared (module 11). The test asserts the count (`fully == 398`), so a
 change in scope is visible. Generated documents add a second population:
@@ -210,19 +213,42 @@ without namespaces, references, CDATA, PIs, comments, encoded as UTF-8,
 UTF-16LE/BE with and without BOM or Latin-1, a third of them damaged by
 truncation or byte edits) under 3 random option sets each (14 encoding
 overrides including an unknown one, 6 separators, 10 chunk sizes, buffer
-API, reparse deferral) and requires over 5,000 compared pairs. The buffer
+API, reparse deferral, namespace triplets): 7,500 pairs, all equal.
+`namespace_triplets_match_c` adds 7 hand-written namespace documents x 3
+separators x 3 chunkings x triplets on/off. The buffer
 itself is compared white-box (`tests/tests/buffer_diff.rs`: buffer
 offsets, limit, `m_lastBufferRequestSize`, parse-end and event pointers
 after every operation).
 
 Local run (2026-10-11, aarch64 Linux):
 `cargo test -p expat-difftest --test parse_diff -- --nocapture` →
-`upstream: 398 of 540 vectors compared under every option set`, 4 tests
-passed.
+`upstream: 398 of 540 vectors compared under every option set`,
+`upstream: 4670 pairs equal to C, 1270 stopped at a DTD (module 11)`,
+`generated: 7500 pairs equal to C`, 5 tests passed.
 
-**Injected bugs** (module 10, recorded in the PR #5 commits): the
-`errorProcessor` reset found by `buffer_diff` was a real port bug, fixed in
-89c7e9e with a unit test.
+**Injected bugs** (module 10, 2026-10-11, each reverted after the run):
+
+- `XML_CONTEXT_BYTES` 1023 instead of 1024 (`parse/mod.rs`):
+  `buffer_diff::buffer_management_matches_c_on_generated_sequences` and
+  `large_documents_cross_buffer_boundaries_like_c` failed.
+- Not setting the error position before `XML_ERROR_DUPLICATE_ATTRIBUTE`
+  (`parse/content.rs`): `parse_diff::generated_documents_match_c` (271
+  mismatches), `buffer_diff::buffer_management_matches_c_on_generated_sequences`,
+  and the corpus replays (`parse_trace` 23, `buffer_diff` 17 failing inputs)
+  failed; `upstream_vectors_match_c` did not.
+- Plain equality instead of C's prefix comparison in the duplicate check
+  for prefixed attributes (`parse/content.rs`): **not detected** by any
+  test at first. Root cause: the harness never enabled
+  `XML_SetReturnNSTriplet`, and the two comparisons only differ when the
+  stored name carries the triplet suffix. Fixed by adding the
+  `ns_triplets` option to the oracle and the port adapter (option set 11,
+  generated documents, the `parse_trace` selector, seeds) and
+  `namespace_triplets_match_c`, which then failed on the mutation
+  (`C nsend b`, port `start e 4` for
+  `<e xmlns:a='u' xmlns:b='u' a:x='1' b:x='2'/>`).
+
+The earlier fuzzing found one real port bug: the `errorProcessor` reset
+(D-023), fixed in 89c7e9e with a unit test.
 
 **Coverage** of `crates/expat` (the port), measured with
 `cargo-llvm-cov 0.8` (`cargo llvm-cov --no-report` per test target, then
