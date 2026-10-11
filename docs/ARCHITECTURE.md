@@ -35,7 +35,8 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | `HASH_TABLE`, `lookup`, `hashTable*`, `hash.h`/`hash_table.h` (`xmlparse.c`) | `expat::hash` | see STATE.md |
 | `MALLOC`/`REALLOC`/`FREE` accounting (`expat_malloc` & co., `xmlparse.c`) | `expat::heap` | see STATE.md |
 | `XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, `callProcessor`, prolog without DTD, `processXmlDecl`, content, `storeAtts`, namespaces, CDATA, epilog, position getters, accounting (`xmlparse.c`) | `expat::parse` (`mod`, `prolog`, `content`, `dtd`, `accounting`, `error`) | see STATE.md |
-| DTD, entities, external subset (rest of `xmlparse.c`) | `expat::parse` | planned (module 11) |
+| `doProlog` DTD roles, `storeEntityValue`, `defineAttribute`, `getElementType`, `nextScaffoldPart`, `build_model`, `normalizePublicId` (`xmlparse.c`) | `expat::parse` (`decl`, `model`, `dtd`) | module 11a |
+| `processEntity`, `internalEntityProcessor`, entity expansion, external subset (rest of `xmlparse.c`) | `expat::parse` (`entity`) | module 11b / 12 |
 
 Internal modules are reachable from tests only through the `internal-api`
 feature (`expat::internal`), see DECISIONS D-006.

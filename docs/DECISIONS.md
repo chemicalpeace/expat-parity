@@ -498,3 +498,33 @@ justify it. Callers can already tighten the amplification limits through
 the same setters as in C (opt-in). No security check may be relaxed to
 make a differential test pass; a mismatch is fixed at its root cause or
 recorded in DIVERGENCES.md.
+
+## D-027 Declarations: data structures (module 11a)
+
+- **Entities.** `ENTITY` is `dtd::Entity` in the module 9 hash tables
+  `general_entities` and `param_entities` (slot order is C's; it becomes
+  observable through `getContext`). The replacement text is an
+  `Arc<[u8]>` so the expansion (11b) can scan it while the parser state
+  changes; `Arc` rather than `Rc` keeps the parser `Send`.
+  "Created by this lookup" is C's `entity->name == name` test.
+- **Content models.** The scaffold mirrors `CONTENT_SCAFFOLD` (reused
+  between declarations like C's array) and `build_model` produces a flat
+  node array in C's order (children contiguous), so neither building,
+  printing nor dropping a model recurses; models nested 20,000 deep are
+  compared with C.
+- **`defaultAttForName`** is a `BTreeMap` from attribute id to the index
+  of the first definition: C's table is private and its slot order is
+  never observable; lookups are the same. `storeAtts` uses it exactly where
+  C does (found by an injected bug, REPORT.md).
+- **Temporary pool contents** (`m_doctypeName`, `m_declAttributeType`,
+  notation names) are owned `Vec`s. C's `poolClear` leaves dangling but
+  non-`NULL` pointers that are only tested, never read (for example
+  `m_doctypeSysid` after the internal subset starts); the port keeps the
+  `Option` set in those places so the same tests give the same result.
+- **Scope boundary (11a).** Expanding a declared internal entity
+  (content, attribute value, parameter entity in the prolog) and the roles
+  that only external parameter entities produce (text declaration,
+  conditional sections, inner PE references) still return
+  `Stop::DtdNotPorted`; the not-standalone and external-entity-reference
+  handlers belong to the public API (module 12) and behave as unset, like
+  C without them.
