@@ -169,6 +169,14 @@ impl InitEncoding {
         get_encoding_index(name).map(|index| InitEncoding { index, ns })
     }
 
+    /// `XmlInitEncoding(NS)` with no name (C passes `NULL`): autodetection.
+    pub fn unnamed(ns: bool) -> Self {
+        InitEncoding {
+            index: EncodingIndex::NoEnc,
+            ns,
+        }
+    }
+
     /// The index of the named encoding (`INIT_ENC_INDEX`).
     pub fn index(self) -> EncodingIndex {
         self.index

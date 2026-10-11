@@ -68,4 +68,7 @@ internal_modules! {
     // reason: as above.
     #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
     hash,
+    // reason: consumed by the public API (docs/STATE.md module 12).
+    #[cfg_attr(not(feature = "internal-api"), allow(dead_code, unused_imports))]
+    parse,
 }

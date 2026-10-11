@@ -7,11 +7,13 @@
 //! - [`vectors`]: test documents extracted from libexpat's test suite.
 //! - [`tok`]: differential checks of the tokenizer port.
 //! - [`role`]: differential checks of the prolog state machine.
+//! - [`port`]: the trace adapter of the port's parser.
 //! - [`core`]: white-box differential checks of the string pool and hash
 //!   table of the parser core.
 
 pub mod core;
 pub mod diff;
+pub mod port;
 pub mod role;
 pub mod tok;
 pub mod trace;
