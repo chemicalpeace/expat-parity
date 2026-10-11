@@ -13,6 +13,7 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
+extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
@@ -58,4 +59,13 @@ internal_modules! {
     // reason: consumed by the parser core (docs/STATE.md modules 9-11).
     #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
     role,
+    // reason: consumed by the parser core (docs/STATE.md modules 10-11).
+    #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
+    heap,
+    // reason: as above.
+    #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
+    pool,
+    // reason: as above.
+    #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
+    hash,
 }
