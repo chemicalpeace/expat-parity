@@ -223,7 +223,7 @@ impl Parser {
                 }
                 if self.doctype_sysid.is_some() || self.use_foreign_dtd {
                     // Reading the external subset needs an external
-                    // entity reference handler (public API, module 12);
+                    // entity reference handler (public API, module 12),
                     // without one C only records the reference.
                     self.dtd.has_param_entity_refs = true;
                     self.use_foreign_dtd = false;
