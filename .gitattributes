@@ -1,0 +1,5 @@
+# Test inputs are byte-exact: never convert line endings (a CRLF checkout on
+# Windows would change offsets and byte counts in the golden traces).
+tests/vectors/** -text
+fuzz/corpus/** -text
+crates/expat-oracle/vendor/** -text

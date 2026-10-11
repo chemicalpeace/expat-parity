@@ -1,0 +1,6 @@
+<!DOCTYPE r [
+  <!ENTITY % five "12345">
+  <!ENTITY % five2def "&#60;!ENTITY five2 &#34;[&#37;five;][&#37;five;]]]]&#34;&#62;">
+  %five2def;
+]>
+<r>&five2;</r>

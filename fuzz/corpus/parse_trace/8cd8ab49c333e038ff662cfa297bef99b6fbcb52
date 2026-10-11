@@ -1,0 +1,6 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc attribute CDATA 'expected_doc'>
+  <!ATTLIST tag attribute CDATA 'expected_tag'>
+  <!ATTLIST doc second_attribute CDATA 'second_expected_doc' attribute CDATA 'ignored_doc'>
+]>
+<doc><tag></tag></doc>

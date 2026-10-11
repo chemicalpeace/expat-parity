@@ -1,0 +1,4 @@
+<!ENTITY % e1TY % comment "<!--37;comment;">
+ PUBLIC 'foo' 'second.ent'>
+<!ENTITY % e2 §<!--22-->%e1;<!-22-->'>
+%e2;

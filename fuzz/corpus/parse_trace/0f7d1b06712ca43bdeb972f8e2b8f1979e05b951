@@ -1,0 +1,5 @@
+<!DOCTYPE doc [
+<!ENTITY % foo '<!ELEMENT doc (#PCDATA)*>'>
+%foo;
+]>
+<doc>Hello, world</doc>

@@ -1,0 +1,4 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc attr CDATA #!IMPLIED>
+]>
+<doc />

@@ -1,0 +1,7 @@
+<!ELEMENTÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿUÿÿ animaUÿÿ animal (#PCDATA|a)*>
+<!ELEMENT a EMPTY>
+<!ATTLIST anim@l xml:space (default|prel (#PCDATA|a)*>
+<!ELEMENT a ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿUÿÿ animaUÿÿ animal (#PCDATA|a)*>
+<!ELEMENT a EMPTY>
+<!ATTLIST anim@l xml:space (default|prel ( a`EMPTY>
+<!ATTLIST anim@l xml:space (default|preserve) 'preserve'>

@@ -1,0 +1,6 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc identifier ID #REQUIRED>
+  <!ATTLIST tag identifier CDATA 'identifier_tag'>
+  <!ATTLIST doc identifier CDATA 'ignored'>
+]>
+<doc identifier='doc_identity'><tag></tag></doc>

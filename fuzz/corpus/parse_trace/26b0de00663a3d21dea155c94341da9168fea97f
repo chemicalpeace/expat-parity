@@ -1,0 +1,5 @@
+<!DOCTYPE doc [
+<!ENTITY wombat 'wom'>
+<!ENTITY entity 'hi &wom; there'>
+]>
+<doc>&entity;</doc>

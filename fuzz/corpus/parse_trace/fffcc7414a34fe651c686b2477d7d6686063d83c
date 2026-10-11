@@ -1,0 +1,5 @@
+<!DOCTYPE root [
+<!ENTITY nine "123456789">
+<!ENTITY nine2 "&nine;&nine;">
+]>
+<root>&nine2;&nine2;&nine2;</root>

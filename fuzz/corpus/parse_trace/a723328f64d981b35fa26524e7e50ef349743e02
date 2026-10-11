@@ -1,0 +1,3 @@
+<!ENTITY % comment '<!--1-->'>
+<!ENTITY % comment2 '<!--22-->%comment;<!--22-->%comment;<!--22-->'>
+%comment2;

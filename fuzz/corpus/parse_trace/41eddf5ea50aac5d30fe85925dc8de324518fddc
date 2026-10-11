@@ -1,0 +1,5 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc attribute CDATA 'expected'>
+  <!ATTLIST doc attribute CDATA 'ignored'>
+]>
+<doc/>

@@ -1,0 +1,4 @@
+  <!ENTITY %% define_g "<!ENTITY g '&#37;s%lu;'>">
+  %%define_g;
+]>
+<foo/>

@@ -14,6 +14,7 @@
 use std::ffi::{CStr, CString, c_char, c_int, c_uint, c_ushort};
 
 mod ffi;
+pub mod tok;
 
 /// Upstream release tag of the vendored sources.
 pub const UPSTREAM_TAG: &str = "R_2_9_0";
@@ -178,6 +179,20 @@ pub fn utf16_encode(c: i32) -> Vec<u16> {
     out.get(..usize::try_from(n).unwrap_or(0))
         .unwrap_or(&[])
         .to_vec()
+}
+
+/// SipHash-2-4 of `data` under `key` as computed by `siphash.h`, feeding
+/// `sip24_update` in pieces of `split` bytes (`0` = a single call).
+pub fn siphash24(key: &[u8; 16], data: &[u8], split: usize) -> u64 {
+    // SAFETY: `key` points to 16 readable bytes; `data` is a live slice and
+    // the shim reads exactly `data.len()` bytes from it.
+    unsafe { ffi::oracle_siphash24(key.as_ptr(), data.as_ptr(), data.len(), split) }
+}
+
+/// `sip24_valid()`: libexpat's own self-test against the reference vectors.
+pub fn sip24_valid() -> bool {
+    // SAFETY: no arguments; the function only reads static data.
+    unsafe { ffi::oracle_sip24_valid() == 1 }
 }
 
 /// `XML_ParamEntityParsing`.

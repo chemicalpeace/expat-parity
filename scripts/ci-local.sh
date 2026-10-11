@@ -8,6 +8,7 @@ step cargo fmt --all --check
 step cargo clippy --workspace --all-targets --all-features -- -D warnings
 step scripts/debt-check.sh
 step scripts/verify-vendor.sh
+step python3 scripts/gen_tables.py --check
 step cargo doc --workspace --no-deps --all-features
 step cargo deny check
 step cargo test --workspace --all-features

@@ -1,0 +1,3 @@
+<?xml version='1.0' encoding='unsupported-›Šcoding'?>
+<!DOCTYPE test [<!ENTITY foo 'bar'>]>
+<test a='9&foo;'/>

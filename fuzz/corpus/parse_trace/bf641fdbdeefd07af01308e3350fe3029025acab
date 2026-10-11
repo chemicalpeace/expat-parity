@@ -1,0 +1,4 @@
+<!DOCTYPE doc PUBLIC 'pubname' 'test.dtd' [
+  <!ENTITY foo 'bar'>
+]>
+<doc>&foo;</doc>

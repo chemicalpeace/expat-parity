@@ -1,0 +1,7 @@
+<!DOCTYPE r [
+<!ENTITY % draft 'INCLUDE'>
+<!ENTITY % final 'IGNORE'>
+<!ENTITY % import SYSTEM "first.ent">
+%import;
+]>
+<r/>

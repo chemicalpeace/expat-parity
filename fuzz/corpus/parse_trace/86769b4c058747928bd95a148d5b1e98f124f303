@@ -1,0 +1,4 @@
+<!DOCTYPE pfx:element SYSTEM 'foo' [
+  <!ATTLIST pfx:element baz ID #REQUIRED>
+  <!ENTITY en SYSTEM 'bar'>
+]>

@@ -1,0 +1,5 @@
+<!DOCTYPE r [
+<!ENTITY % comment "<!---->">
+%comment;
+]>
+<r/>

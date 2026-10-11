@@ -1,0 +1,23 @@
+<doc>
+<a1/><a2/><a3/><a4/><a5/><a6/><a7/><a8/>
+<b1Á</b1><b2 attr='foo'>This is a foo</b2><b3></b3><b4></b4>
+<b5></<b8></b8>
+<c1/><c2/><c3/><c4/><c5b5><b6>><a6/><a7/><a8/>
+<b1Á</b1><b2 attr='foo'>This is a foo</b4><b3></b3><b4></b4>
+<b5></b5><b6></b6><b7></b7><b8></b8>
+<c1/><c2/><c3/><c4/><c5/><c6/><c7/><c8/>
+<d1/><d2/><d3/><d4/><d5/><d6/><d7/>
+<d8>This triggers the table growth and collides </b6><b7></b7><b8></b8>
+<c1/><c2/><c3/><c4/><c5/><c6/><c7/><c8/>
+<d1/><d2/><d3/><d4/><d5/><d6/><d7/>
+<d8>Thisa4'>This is a foo</b4><b3></b3><b4></b4/><a5/><a6/><a7/><a8/>
+<b1Á</b1><b2 attr='foo'>This is a foo</b2><b3></b3><b4></b4>
+<b5></b5><b6>><a6/><a7/><a8/>
+<b1Á</b1><b2 attr='foo'>This is a foo</b4><b3></b3><b4></b4>
+<b5></b5><b6></b6><b7></b7><b8></b8>
+<c1/><c2/><c3/><c4/><c5/><c6/><c7/><c8/>
+<d1/><d2/><d3/><d4/><d5/><d6/><d7/>
+<d8>This triggers the table growth and collides </b6><b7></b7><b8></b8>
+<c1/><c2/><c3/><c4/><c5/><c6/><c7/><c8/>
+<d1/><d2111<![CDÿÿ/><d3/>>3<34d3/><d5/><d6/><d7/>
+<d8>This triggers the table growth and collides with b2</

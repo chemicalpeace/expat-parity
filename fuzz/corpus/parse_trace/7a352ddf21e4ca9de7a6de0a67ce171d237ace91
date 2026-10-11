@@ -1,0 +1,5 @@
+<!ELEMENT doc EMPTY>
+<!ATTLIST doc a CDATA #IMPLIED>
+<?pi in dtd?>
+<!--comment in dtd-->
+]><doc/>

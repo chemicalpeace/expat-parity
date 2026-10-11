@@ -36,7 +36,7 @@ check '^\s*//[^/!].*(;\s*$|\{\s*$|^\s*//\s*(let|fn|use|pub|impl|match|struct|enu
 # Every #[allow(..)] / #![allow(..)] needs a `// reason:` on the same or previous line.
 for f in "${RS[@]}"; do
   awk -v f="$f" '
-    /#!?\[allow\(/ { if ($0 !~ /reason:/ && prev !~ /reason:/) { print "    " f ":" NR ": " $0; bad=1 } }
+    /#!?\[(allow|cfg_attr\(.*allow)\(/ { if ($0 !~ /reason:/ && prev !~ /reason:/) { print "    " f ":" NR ": " $0; bad=1 } }
     { prev=$0 }
     END { exit bad }' "$f" || report "#[allow] without '// reason:' justification"
 done
