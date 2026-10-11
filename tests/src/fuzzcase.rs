@@ -8,7 +8,7 @@
 //! [`seeds`] produces the seed inputs the corpora are regenerated from
 //! (`docs/FUZZING.md`); it is a pure function of a fixed seed.
 
-use crate::docgen::{Rng, document, dtd_document};
+use crate::docgen::{Rng, document, dtd_document, entity_document};
 use crate::port::{PortTrace, port_trace};
 use crate::trace::{first_difference, is_well_formed_trace};
 use crate::vectors::upstream;
@@ -128,8 +128,10 @@ const VECTOR_SELECTORS: [[u8; 2]; 8] = [
 /// `parse_trace`: every upstream vector under each of
 /// `VECTOR_SELECTORS`, then 2,000 generated documents ([`document`]) with
 /// random selector pairs, then 2,000 documents with a document type
-/// declaration ([`dtd_document`]). `buffer_diff`: every upstream vector,
-/// 2,000 generated documents and 1,000 documents with a DTD, each with a
+/// declaration ([`dtd_document`]), then 1,500 entity documents
+/// ([`entity_document`]). `buffer_diff`: every upstream vector, 2,000
+/// generated documents, 1,000 documents with a DTD and 500 entity
+/// documents, each with a
 /// random operation header of 1-16 operations whose sizes cover the
 /// document.
 pub fn seeds(target: &str) -> Option<Vec<Vec<u8>>> {
@@ -158,6 +160,13 @@ pub fn seeds(target: &str) -> Option<Vec<Vec<u8>>> {
                 input.extend_from_slice(&doc);
                 out.push(input);
             }
+            // Module 11b: documents built around internal entities.
+            for _ in 0..1500 {
+                let doc = entity_document(&mut r);
+                let mut input = vec![r.next_u64() as u8, r.next_u64() as u8];
+                input.extend_from_slice(&doc);
+                out.push(input);
+            }
             Some(out)
         }
         "buffer_diff" => {
@@ -169,6 +178,11 @@ pub fn seeds(target: &str) -> Option<Vec<Vec<u8>>> {
             // Module 11: documents with a document type declaration.
             for _ in 0..1000 {
                 let doc = dtd_document(&mut r);
+                out.push(buffer_seed(&mut r, &doc));
+            }
+            // Module 11b: documents built around internal entities.
+            for _ in 0..500 {
+                let doc = entity_document(&mut r);
                 out.push(buffer_seed(&mut r, &doc));
             }
             Some(out)
