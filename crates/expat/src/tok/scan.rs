@@ -2,9 +2,9 @@
 //! (`R_2_9_0`), generic over [`Encoding`].
 //!
 //! Each function names its C counterpart. The C file's macros map to:
-//! `HAS_CHARS`/`REQUIRE_CHARS` → [`S::has`]/`req!`, `INVALID_CASES` →
-//! [`S::invalid_cases`], `CHECK_NAME_CASES` → [`S::check_name`],
-//! `CHECK_NMSTRT_CASES` → [`S::check_nmstrt`]. A C `switch` that lists one of
+//! `HAS_CHARS`/`REQUIRE_CHARS` → `S::has`/`req!`, `INVALID_CASES` →
+//! `S::invalid_cases`, `CHECK_NAME_CASES` → `S::check_name`,
+//! `CHECK_NMSTRT_CASES` → `S::check_nmstrt`. A C `switch` that lists one of
 //! those macros next to explicit cases becomes a call to the helper (which
 //! handles exactly the macro's byte types) followed by a `match` on the
 //! remaining ones; the sets are disjoint, as they are in C.
@@ -17,9 +17,9 @@
 //! such a position counts as "no characters left", like the signed C
 //! pointer difference.
 
-// reason: position arithmetic is bounded as explained in the module docs
-// (offsets never exceed `buf.len() + 4 <= isize::MAX`), and the counters
-// `level` and the attribute count are bounded by the input length.
+// Offsets never exceed `buf.len() + 4 <= isize::MAX` (module docs), and the
+// counters `level` and the attribute count are bounded by the input length.
+// reason: all arithmetic in this module is bounded as stated above.
 #![allow(clippy::arithmetic_side_effects)]
 
 use super::{Encoding, Scan, Scanned, Tok};
@@ -1226,11 +1226,7 @@ impl<E: Encoding> S<'_, E> {
                             a.normalized = false;
                         }
                     }
-                    Bt::Gt | Bt::Sol => {
-                        if state != State::InValue {
-                            return n_atts;
-                        }
-                    }
+                    Bt::Gt | Bt::Sol if state != State::InValue => return n_atts,
                     _ => {}
                 }
             }

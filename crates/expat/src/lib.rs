@@ -51,7 +51,8 @@ internal_modules! {
     // reason: as above (consumed by the hash tables of the parser core).
     #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
     siphash,
+    // The module's re-exports are its API for the parser core.
     // reason: consumed by the parser core (docs/STATE.md modules 9-11).
-    #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
+    #[cfg_attr(not(feature = "internal-api"), allow(dead_code, unused_imports))]
     tok,
 }

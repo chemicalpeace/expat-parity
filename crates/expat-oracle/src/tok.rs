@@ -87,9 +87,9 @@ fn padded(table: TypeTable, buf: &[u8], tail: &[u8]) -> Vec<u8> {
 pub fn scan(table: TypeTable, which: Scanner, buf: &[u8], ptr: usize) -> (i32, Option<usize>) {
     assert!(ptr <= buf.len(), "ptr within buffer");
     let mut next: c_longlong = -1;
-    // SAFETY: `buf` is a live slice of `buf.len()` bytes and `ptr <= len`;
-    // the scanners read only inside `[buf + ptr, buf + len)`. `next` is a
-    // valid out-pointer.
+    // SAFETY: `buf` is a live slice of `buf.len()` bytes and `ptr <= len`,
+    // the scanners read only inside `[buf + ptr, buf + len)`, and `next` is
+    // a valid out-pointer.
     let tok = unsafe {
         ffi::oracle_tok_scan(
             table.id(),

@@ -197,7 +197,8 @@ impl Scan {
     pub fn to_c(self) -> i32 {
         match self {
             Scan::Token(t) => t as i32,
-            Scan::PartialToken(t) => -(t as i32),
+            // Token values are 1..=42, so the negation cannot wrap.
+            Scan::PartialToken(t) => (t as i32).wrapping_neg(),
             Scan::Invalid => 0,
             Scan::Partial => -1,
             Scan::PartialChar => -2,
