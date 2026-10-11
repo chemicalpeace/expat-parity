@@ -107,10 +107,7 @@ pub fn check_document<S: Subject>(s: &S, buf: &[u8]) {
 
 /// Every `Scan` value the handlers can be given.
 pub fn all_scans() -> Vec<Scan> {
-    let mut v: Vec<Scan> = (1..=42)
-        .filter_map(tok_from_c)
-        .map(Scan::Token)
-        .collect();
+    let mut v: Vec<Scan> = (1..=42).filter_map(tok_from_c).map(Scan::Token).collect();
     v.extend([
         Scan::Invalid,
         Scan::Partial,
@@ -222,7 +219,10 @@ pub fn encode_ascii<S: Subject>(s: &S, text: &str) -> Vec<u8> {
 
 /// Builds a synthetic token sequence: `(scan index, text index)` pairs into
 /// [`all_scans`] and [`TEXTS`], laid out one after another in a buffer.
-pub fn synthetic<S: Subject>(s: &S, picks: &[(usize, usize)]) -> (Vec<u8>, Vec<(Scan, usize, usize)>) {
+pub fn synthetic<S: Subject>(
+    s: &S,
+    picks: &[(usize, usize)],
+) -> (Vec<u8>, Vec<(Scan, usize, usize)>) {
     let scans = all_scans();
     let mut buf = Vec::new();
     let mut toks = Vec::new();
