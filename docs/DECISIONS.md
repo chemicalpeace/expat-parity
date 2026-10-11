@@ -477,3 +477,24 @@ The harness gained `ParseOptions::ns_triplets` (`XML_SetReturnNSTriplet`)
 after an injected bug in the triplet-dependent duplicate-attribute check
 went undetected (REPORT.md, module 10).
 
+
+## D-026 Security defaults of the DTD port: identical to C (module 11)
+
+Specification: `docs/DTD-SECURITY.md` (written before the port, with
+`xmlparse.c` line references). The port keeps every default and every
+check of libexpat 2.9.0: parameter entity parsing `Never`, internal
+entities expanded, billion-laughs protection with maximum amplification
+100.0 and activation threshold 8 MiB, the same recursion, standalone and
+`is_internal` checks at the same places, and the same error codes and
+positions. The core crate has no I/O; external entities are read only by
+a caller's handler (module 12), so the library itself never fetches a
+resource, like C.
+
+Stricter defaults were evaluated (no internal entity expansion, a lower
+amplification limit, a cap on entity nesting or replacement text size)
+and rejected as defaults: each changes the result for documents C
+accepts, which would be a divergence without a specification bug to
+justify it. Callers can already tighten the amplification limits through
+the same setters as in C (opt-in). No security check may be relaxed to
+make a differential test pass; a mismatch is fixed at its root cause or
+recorded in DIVERGENCES.md.
