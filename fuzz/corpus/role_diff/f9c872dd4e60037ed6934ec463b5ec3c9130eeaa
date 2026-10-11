@@ -1,0 +1,3 @@
+<!NOTATION n1 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "7" e NO ENTITY D "n"
+: f IDREF 

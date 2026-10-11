@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n|n0) #FIXED "n"
+  f ID,EF 'v' g IDREFS #IMP-- c -->

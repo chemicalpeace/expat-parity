@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x">
+<!ENTITY n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED%c  NFS #IMPL>

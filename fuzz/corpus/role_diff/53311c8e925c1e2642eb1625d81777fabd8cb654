@@ -1,0 +1,3 @@
+<?xml version="1.0""1.0"?>
+<!ENTITY % pe "x"> <!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n|n2) #FIXED "n"
+  f IDREF 'v' g IDREFS #I  f ITIORE [ junk ]]> ]]>

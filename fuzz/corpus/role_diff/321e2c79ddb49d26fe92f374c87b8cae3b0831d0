@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!NOTATION n SYSTEM "s"> <!NOTATION n1 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!AT  <>

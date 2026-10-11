@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" Y NTIATION n SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NT c (#PCDATA)> <!ELEMENT d (#PCDATA|a[|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!EL ANY> <!ELEMENT c (#PCDATA)> <!ELEMENT d SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NT c (#PCDATA)> <!ELEMENT d (#PCDATA|a[|b)*>
+<!ELMMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a| c (#PCDATA)> <!ELEMENT d (#PCDATA|aGNORE [ junk ]]> ]]> %pe; <?pi<?xml version="1.0"?> % ITY ge SYS:EM "a" NDATA n>  x<!ENTITY ?e2> 

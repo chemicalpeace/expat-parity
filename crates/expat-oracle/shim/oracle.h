@@ -117,6 +117,23 @@ int oracle_parse_xml_decl(int ns, int is_general_text_entity, const void *enc,
                           const char *buf, size_t ptr, size_t end,
                           long long out[5], int *standalone);
 
+/* xmlrole.c (shim/oracle_role.c): the prolog state after a token. */
+struct oracle_role_state {
+  int handler; /* index into the handler table, -1 if unknown */
+  unsigned level;
+  int role_none;
+  unsigned include_level;
+  int document_entity;
+};
+/* Runs the n tokens (toks[i], buf[ptrs[i]..ends[i]]) through a fresh
+ * PROLOG_STATE (XmlPrologStateInit, then XmlPrologStateInitExternalEntity
+ * if `external`, then overwritten by `init` unless it is NULL), writing the
+ * role and the state after each token. Returns -1 for a bad handler index. */
+int oracle_role_run(int external, const struct oracle_role_state *init,
+                    const void *enc, const char *buf, size_t n, const int *toks,
+                    const size_t *ptrs, const size_t *ends, int *roles,
+                    struct oracle_role_state *states);
+
 /* Runs the full parser and writes a canonical event trace (see
  * docs/ARCHITECTURE.md, "Trace format") into a malloc'd buffer.
  * Returns 0 on success (the parse itself may have failed; that is part of

@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!ENTITY PUBLIC "p"> <!NOTATION n6 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED h ENTITY #IMPLIED i ENTITIENOTATION n0 U&a "s">
+-- c -->

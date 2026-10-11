@@ -30,7 +30,7 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | `xmltok_impl.c` (scanner template); normal encodings of `xmltok.c` | `expat::tok` (`scan`, `normal`) | see STATE.md |
 | UTF-16 and unknown encodings, `utf8Convert`/`utf16Convert` converters (`xmltok.c`) | `expat::tok` (`utf16`, `unknown`, `convert`) | see STATE.md |
 | `XmlInitEncoding(NS)`, `initScan`, `XmlParseXmlDecl(NS)`, encoding tables (`xmltok.c`, `xmltok_ns.c`) | `expat::tok` (`init`, `xmldecl`) | see STATE.md |
-| `xmlrole.c` | `expat::role` | planned |
+| `xmlrole.c` | `expat::role` | see STATE.md |
 | `xmlparse.c` | `expat::parse` (+ submodules) | planned |
 
 Internal modules are reachable from tests only through the `internal-api`
@@ -82,6 +82,20 @@ compared too; the total helpers are compared at every offset. The converters
 are compared exhaustively on short inputs with every output size from 0 to 9
 plus partial and ample sizes, on whole documents and on every content token
 of a walk.
+
+## Prolog state machine
+
+`expat::role` ports `xmlrole.c`: `PrologState::token_role` gives each prolog
+or DTD token its `Role` and moves to the next `Handler` (D-020).
+Verification (`tests/tests/role_diff.rs`, `expat_difftest::role`, fuzz target
+`role_diff`): the role and the complete state are compared with C after every
+token, for (a) every handler x every token kind x 30 keyword texts from every
+combination of the counters, flags and `role_none` (one step each, in UTF-8
+and UTF-16BE), (b) the upstream vectors and a DTD that uses every
+declaration form and conditional sections, tokenized with the prolog
+scanner, as a document entity and as an external entity, in all 12 built-in
+encodings, and (c) random synthetic token sequences (also in seeded unknown
+encodings).
 
 ## Verification layers
 

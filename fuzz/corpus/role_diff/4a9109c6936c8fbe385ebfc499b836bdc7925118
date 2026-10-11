@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n> <!ENTITY e1 PUBLIC "p" "s">
+<!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n|n2) #FIXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIED i ENTITIES #IMPLIED j NMTOKEN #IMPLIED k NMTOKeNS #IMPLIED>
+<!ELEMENT a> <!-- c -->

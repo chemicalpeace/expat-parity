@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n> <!ENTITY e1 PUBLIC "p" "s">
+<!ENTITY % pe2 SYSTEM "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n0 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIMD c-->

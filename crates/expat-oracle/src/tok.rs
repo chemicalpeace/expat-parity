@@ -613,3 +613,95 @@ pub fn parse_xml_decl(
         },
     }
 }
+
+/// The prolog state after a token (`PROLOG_STATE`), from the C role machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RoleState {
+    /// Index of the handler in declaration order (`expat::role::Handler::ALL`).
+    pub handler: usize,
+    /// `level`
+    pub level: u32,
+    /// `role_none`
+    pub role_none: i32,
+    /// `includeLevel`
+    pub include_level: u32,
+    /// `documentEntity`
+    pub document_entity: bool,
+}
+
+/// One token for [`role_run`]: the C token value and its span in the buffer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RoleToken {
+    /// The `XML_TOK_*` value (any `int`).
+    pub tok: i32,
+    /// Start of the token.
+    pub ptr: usize,
+    /// End of the token.
+    pub end: usize,
+}
+
+/// Feeds `toks` to a fresh C `PROLOG_STATE` (`external`: initialised for an
+/// external entity; `init`: then set to this state) and returns the role and
+/// the state after each token.
+pub fn role_run(
+    external: bool,
+    init: Option<RoleState>,
+    enc: Enc<'_>,
+    buf: &[u8],
+    toks: &[RoleToken],
+) -> Vec<(i32, RoleState)> {
+    for t in toks {
+        assert!(t.ptr <= t.end && t.end <= buf.len(), "token inside buffer");
+    }
+    // The handlers compare keywords at `ptr + 2 * MINBPC` without first
+    // checking that the token is that long (the read itself is bounded by
+    // `end`); the padding keeps even that pointer inside the allocation.
+    let mut v = buf.to_vec();
+    v.extend([0u8; 8]);
+    let n = toks.len();
+    let codes: Vec<c_int> = toks.iter().map(|t| t.tok).collect();
+    let ptrs: Vec<usize> = toks.iter().map(|t| t.ptr).collect();
+    let ends: Vec<usize> = toks.iter().map(|t| t.end).collect();
+    let mut roles = vec![0 as c_int; n];
+    let mut states = vec![ffi::OracleRoleState::default(); n];
+    let init = init.map(|s| ffi::OracleRoleState {
+        handler: c_int::try_from(s.handler).expect("small index"),
+        level: s.level,
+        role_none: s.role_none,
+        include_level: s.include_level,
+        document_entity: c_int::from(s.document_entity),
+    });
+    // SAFETY: all arrays have `n` elements; `init` is null or valid; every
+    // token lies inside `v` and the handlers read only inside `[ptr, end)`.
+    let rc = unsafe {
+        ffi::oracle_role_run(
+            c_int::from(external),
+            init.as_ref().map_or(std::ptr::null(), |i| i),
+            enc.ptr(),
+            v.as_ptr(),
+            n,
+            codes.as_ptr(),
+            ptrs.as_ptr(),
+            ends.as_ptr(),
+            roles.as_mut_ptr(),
+            states.as_mut_ptr(),
+        )
+    };
+    assert_eq!(rc, 0, "handler index in range");
+    roles
+        .into_iter()
+        .zip(states)
+        .map(|(r, s)| {
+            (
+                r,
+                RoleState {
+                    handler: usize::try_from(s.handler).expect("known handler"),
+                    level: s.level,
+                    role_none: s.role_none,
+                    include_level: s.include_level,
+                    document_entity: s.document_entity != 0,
+                },
+            )
+        })
+        .collect()
+}

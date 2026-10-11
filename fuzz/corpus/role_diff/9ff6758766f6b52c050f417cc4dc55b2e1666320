@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x">  <!NOTATION n2 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION ( ge SYTY #IMPLIED i E•NTITIESE <!-- c -->

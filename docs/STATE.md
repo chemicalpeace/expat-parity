@@ -6,13 +6,13 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 ## Snapshot
 
 - **Target:** libexpat 2.9.0 (`R_2_9_0`, `a76b1174c1ea52abb639a4c69d52b630a8a106a2`) — frozen (D-001).
-- **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-7 done.
+- **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-8 done.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
   tables, doc, deny), test on ubuntu-latest / macos-latest / windows-latest,
-  Miri, fuzz smoke (60 s per target). Green on PR #1 (modules 1-5) and PR #2
-  (modules 6-7) before merge; see the PRs for the runs. Windows needed two
+  Miri, fuzz smoke (60 s per target). Green on PR #1 (modules 1-5), PR #2
+  (modules 6-7) and PR #3 (module 8) before merge; see the PRs for the runs. Windows needed two
   fixes in PR #1 (D-016, `.gitattributes`).
 
 ## Blockers
@@ -60,7 +60,7 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 5 | `tok` scanner template, single-byte encodings | `xmltok_impl.c`; normal encodings of `xmltok.c` | **done** — see ARCHITECTURE "Tokenizer"; D-014, D-015 |
 | 6 | `tok` UTF-16LE/BE + unknown encodings, conversions (`toUtf8`/`toUtf16`) | `xmltok.c` | **done** — `Utf16`, `Unknown<C>`, `tok::convert`; D-017, D-018 |
 | 7 | `tok` XML decl + encoding detection (`initScan`, Q-3) | `xmltok.c`, `xmltok_ns.c` | **done** — `tok::init`, `tok::xmldecl`; D-019; Q-3 resolved (replicate) |
-| 8 | `role` prolog state machine | `xmlrole.c` | not started |
+| 8 | `role` prolog state machine | `xmlrole.c` | **done** — `role::PrologState`, all 51 handlers; D-020 |
 | 9 | `parse` pools/hash tables | `xmlparse.c` | not started |
 | 10 | `parse` content, attributes, namespaces, epilog (Q-1, Q-2) | `xmlparse.c` | not started |
 | 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | not started |
@@ -70,12 +70,17 @@ A Phase 3 module is done when all of these hold, in the same PR:
 Fuzz targets: `parse_trace` (oracle only until module 12), `leaf_diff`
 (modules 1-4), `tok_diff` (modules 5-7: all 12 built-in encodings and
 seeded unknown encodings; scanners, helpers, converters, `initScan`,
-`XmlParseXmlDecl`).
+`XmlParseXmlDecl`), `role_diff` (module 8: documents tokenized in the
+prolog state and synthetic token sequences, as document and external
+entity).
 
 ## Next steps
 
-1. Module 8: `xmlrole.c` (prolog state machine) as `expat::role`, with a
-   white-box oracle shim (`shim/oracle_role.c`) and a `role_diff` fuzz target.
-2. Module 9: `xmlparse.c` pools and hash tables (SipHash-keyed, fixed salt in
-   tests).
-3. Module 10: content, attributes, namespaces, epilog; decide Q-1/Q-2.
+1. Module 9: `xmlparse.c` pools (`STRING_POOL`) and hash tables (`HASH_TABLE`,
+   SipHash-keyed with the oracle's fixed salt), white-box against C.
+2. Module 10: content, attributes, namespaces, epilog; decide Q-1/Q-2. This
+   is where `InitEncoding`/`Known`/`Unknown` and `PrologState` get their
+   consumer (the processors of `xmlparse.c`).
+3. Module 11: DTD, entities, amplification limits; then module 12 (public
+   `expat::Parser` + trace adapter), which turns `parse_trace` into a true
+   differential fuzz target.

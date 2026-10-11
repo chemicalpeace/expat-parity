@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ELEMENT d (#PCDATA|a|b)*>
+<!ELEMENT ed (x|y) "x" e NOTENspi x?> c -->

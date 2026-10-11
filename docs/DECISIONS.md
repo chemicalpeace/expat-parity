@@ -273,3 +273,29 @@ comparison is exact.
   pads the buffer; the harness calls it on every declaration token a scanner
   accepts.
 - **Q-3** is resolved as "replicate" (DIVERGENCES.md).
+
+## D-020 Prolog state machine (module 8)
+
+- **State as an enum.** C keeps `PROLOG_STATE::handler` as a pointer to one
+  of 51 static handler functions; the port stores `role::Handler` and
+  `PrologState::token_role` dispatches on it to one method per C handler.
+  The other fields (`level`, `role_none`, `include_level`,
+  `document_entity`, `in_entity_value`) are public, like the C struct the
+  parser reads and writes.
+- **Tokens.** The handlers take the scanner's `Scan`. Only complete tokens
+  and `XML_TOK_NONE` are listed in any handler; every other value takes the
+  default branch, exactly like the negative C values.
+- **Uninitialised fields.** `XmlPrologStateInit` does not set `level` or
+  `role_none`; the port sets them to 0 and `Role::None`. Both are always
+  written before they are read (`element1` sets `level`, every transition to
+  `declClose` sets `role_none`), so this is not observable; the oracle shim
+  zeroes its state too, and the differential tests compare the complete
+  state after every token.
+- **Counters** `level` and `include_level` are `u32` with wrapping
+  arithmetic, like C's `unsigned`; they are bounded by the number of `(` and
+  `<![INCLUDE[` tokens.
+- **Oracle access.** `shim/oracle_role.c` includes the unmodified
+  `xmlrole.c` (its two exported functions renamed, D-009) and maps the
+  handler pointer to its index in declaration order; `oracle_role_run` can
+  start from any state, which lets the tests check every handler with every
+  token kind and keyword in one step.

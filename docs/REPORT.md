@@ -15,8 +15,8 @@ See the module table in `docs/STATE.md`. Ported and verified: modules 1-7
 (byte tables, name predicates, encoders, SipHash, the tokenizer for every
 built-in encoding and for application-defined encodings, the converters to
 UTF-8/UTF-16, encoding detection and the XML declaration), i.e. all of
-`xmltok.c`, `xmltok_impl.c` and `xmltok_ns.c`. No public parser API exists
-yet.
+`xmltok.c`, `xmltok_impl.c` and `xmltok_ns.c`; module 8 is `xmlrole.c` (the
+prolog/DTD state machine). No public parser API exists yet.
 
 ## Verification infrastructure
 
@@ -46,6 +46,9 @@ yet.
   declaration (`xmldecl.rs`) failed `xml_decl_in_every_builtin_encoding`;
   testing UTF-16BE instead of UTF-16LE in the `00 xx` detection rule
   (`init.rs`) failed `init_scan_all_strings_up_to_four_bytes`.
+- Deliberate bug in ported code (module 8, 2026-10-11, reverted): `#FIXED`
+  moving to `attlist1` instead of `attlist9` (`role/mod.rs`) failed
+  `every_handler_token_and_keyword` and `dtd_constructs`.
 
 ## Test and fuzz statistics
 
@@ -66,6 +69,16 @@ for fuzz and Miri.
   4,000 generated declarations in all 12 built-in encodings plus seeded
   unknown encodings). Debug-build time of `tok_diff.rs` ~100 s on the
   2-core sandbox.
+- Module 8 (PR #3): `tests/tests/role_diff.rs` has 4 tests (51 handlers x 49
+  token kinds x 30 keyword texts x 16 state variants, single steps, in UTF-8
+  and UTF-16BE: 2,399,040 comparisons; upstream vectors as document and
+  external entity in 6 encodings; a DTD using every declaration form and
+  conditional sections in all 12 built-in encodings; 2,000 random synthetic
+  sequences, each also in a seeded unknown encoding), plus 2 unit tests.
+- Whole workspace after module 8: `cargo test --workspace --all-features`
+  runs 80 test functions (70 tests + 10 doctests), all passing, in 208 s
+  (debug build, 2-core sandbox, with a fuzzer running on the other core;
+  `tok_diff.rs` 163 s, `init_diff.rs` 24 s, `role_diff.rs` 17 s).
 - `cargo +nightly miri test -p expat --all-features`
   (`-Zmiri-strict-provenance`): 20 unit tests + 5 doctests pass (97 s).
 - Fuzzing (`cargo +nightly fuzz run <target> -- -max_total_time=...`,
@@ -77,6 +90,7 @@ for fuzz and Miri.
   | `tok_diff` | module 5: all 6 scanners + 8 helpers vs C | 661 s | 527,795 |
   | `tok_diff` | modules 5-6: + UTF-16, seeded unknown encodings, converters | 661 s | 262,991 |
   | `tok_diff` | modules 5-7: + `initScan` (11 names x 2 states x 2 NS modes per input), `XmlParseXmlDecl` on every declaration token | 661 s | 233,945 |
+  | `role_diff` | module 8: role + full state after every token, documents and synthetic sequences, document/external entity | 631 s | 5,158,518 |
 
   Corpora were minimised with `cargo fuzz cmin` and committed
   (`fuzz/corpus/`).

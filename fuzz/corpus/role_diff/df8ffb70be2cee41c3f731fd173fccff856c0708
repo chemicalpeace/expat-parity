@@ -1,0 +1,4 @@
+<?xml versio.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n>
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n|n2) #FIXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTIT.Y #iþÿÿUDE[ <!E->

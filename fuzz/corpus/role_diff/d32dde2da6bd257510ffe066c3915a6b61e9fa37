@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n> <!ENTITY UBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDATA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (n) #FIXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED i ENTITY #IMPLIED i ENTITIES #IMPLIED j NMTOKEN #IMPLIED k NM O<>![TELEMEN->

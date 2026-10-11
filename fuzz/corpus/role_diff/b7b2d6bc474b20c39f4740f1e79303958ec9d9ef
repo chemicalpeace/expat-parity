@@ -1,0 +1,4 @@
+<?xml version="2.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n> <!ENTITY e2 PUBLIC "p" "s">
+<!ENTITY % pe2 SYSTEM "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NOTATION n3 PU c ID #REQUnk ]]> ]]> %pe; <?pi x?> <!-- c -->

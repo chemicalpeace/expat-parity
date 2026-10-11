@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x"> <!ENTITY ge SYSTEM "a" NDATA n> <!ENTITY e2 PUBLIC "p" "s">
+<!ENTITY % pe2 SYSTEM "s"> <!ENTITY % pe3 PUBLIC "p" "s">
+<!NOTATION n SYSTEM "s"> <!NOTATION n2 PUBLIC "p"> <!NOTATION n3 PUBLIC "p" "s">
+<!ATTLIST a b CDAoA #IMPLIED c ID #REQUIRED d (x|y) "x" e NOTATION (nn2) #FIXED "n"
+  f IDREF %pe; <?pi x?> <!-- c -->

@@ -38,3 +38,10 @@ path = "fuzz_targets/tok_diff.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "role_diff"
+path = "fuzz_targets/role_diff.rs"
+test = false
+doc = false
+bench = false

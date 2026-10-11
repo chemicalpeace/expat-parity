@@ -55,4 +55,7 @@ internal_modules! {
     // reason: consumed by the parser core (docs/STATE.md modules 9-11).
     #[cfg_attr(not(feature = "internal-api"), allow(dead_code, unused_imports))]
     tok,
+    // reason: consumed by the parser core (docs/STATE.md modules 9-11).
+    #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
+    role,
 }

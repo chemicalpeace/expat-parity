@@ -1,0 +1,2 @@
+<?xml version="1.0"?> a b CDATA #IMPLIEbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbD c ID #REQUIRED d (x|y) "x" e NOTATIO j NMTOKEN #IMPLIED k NMTOKENS (#PCDATA)> <!ELEMENT d (#PCDATAa||b)*>
+<!ELEMENT e pi !-- c -->

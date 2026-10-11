@@ -11,6 +11,17 @@ pub(crate) struct OracleOptions {
     pub(crate) param_entity_parsing: c_int,
 }
 
+/// Mirror of `struct oracle_role_state`.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct OracleRoleState {
+    pub(crate) handler: c_int,
+    pub(crate) level: c_uint,
+    pub(crate) role_none: c_int,
+    pub(crate) include_level: c_uint,
+    pub(crate) document_entity: c_int,
+}
+
 unsafe extern "C" {
     pub(crate) fn oracle_type_table(id: c_int, out: *mut u8) -> c_int;
     pub(crate) fn oracle_ucs2_naming(which: c_int, hi: c_uint, lo: c_uint) -> c_int;
@@ -121,6 +132,18 @@ unsafe extern "C" {
         end: usize,
         out: *mut c_longlong,
         standalone: *mut c_int,
+    ) -> c_int;
+    pub(crate) fn oracle_role_run(
+        external: c_int,
+        init: *const OracleRoleState,
+        enc: *const c_void,
+        buf: *const u8,
+        n: usize,
+        toks: *const c_int,
+        ptrs: *const usize,
+        ends: *const usize,
+        roles: *mut c_int,
+        states: *mut OracleRoleState,
     ) -> c_int;
     pub(crate) fn oracle_parse_trace(
         doc: *const u8,

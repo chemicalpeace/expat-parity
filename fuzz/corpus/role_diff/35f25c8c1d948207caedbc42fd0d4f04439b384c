@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!ENTITY % pe "x">XED f IDREF 'v' g IDREFS #IMPLIED h ENTI[Y #IMPLIED i ENTITIES #IMPLIENT a EMPTY> <!ELEMENT b ANY> <!ELEMENT c (#PCDATA)> <!ELEMENT d (#PCDATA|a|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT fx|y) "x" e NOTATION (n|n4D h ENTITY #IMPLIEa|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!ELEMENT g (a-*>
+<![INCLUDE[ <!ELEMENT h E4ENT c (#PCDATA)> <!ELEMENT d (ENT a EMPTY> <!ELEMENT b ANY> <!ELEMENT c (#PCDATA)> <!ELEMENT d (#PCDATA|a|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f?>
+<!ENTITY % pe "x">XED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIED i ENTIPCDATA|a|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT fx|y) "x" e NOTATION (n|n4D h ENTITY #IMPLIEa|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!ELEMENT g (a-*>
+<![INCLUDE[ <!ELEMENT h E4ENT c (#PCDATA)> <!ELEMENT d (#PCDATA|a|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT fx|y) "x" e NOTATION (n|n4) #FCXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIEa|b)*>
+<!ELEMENT e ((a,x|y) "x" e NOTATION (n|n8) #FCXED "n"
+  f IDREF 'v' g IDREFS #IMPLIED h ENTITY #IMPLIEa|b)*>
+<!ELEMENT e ((a,b)|(c?,d*)+)?> <!ELEMENT f (a|b)+> <!ELEMENT g (a-*>
+<![INCLUDE[ <!ELEMENT h E4PTY> <![ IGNORE f (a|b)+> <!ELEMENT g (a-*>
+<![INClUDE[ <!ELEMENT h EMPTY> <![ IGNORE [ junk ]]>]]]ENT h EMPTY> <![ IGNORE [ junk ]]>]]]> %pe; <?pi x?> <!-- c+-s‘˜
