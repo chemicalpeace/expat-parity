@@ -299,8 +299,8 @@ pub fn core_run(prog: &[u8]) -> Option<String> {
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut out: *mut u8 = std::ptr::null_mut();
     let mut out_len: usize = 0;
-    // SAFETY: `prog` is a live slice; `out`/`out_len` are valid out-pointers;
-    // the lock above serialises access to the shim's global state.
+    // SAFETY: `prog` is a live slice, `out`/`out_len` are valid out-pointers,
+    // and the lock above serialises access to the shim's global state.
     let rc = unsafe { ffi::oracle_core_run(prog.as_ptr(), prog.len(), &mut out, &mut out_len) };
     if rc != 0 {
         return None;

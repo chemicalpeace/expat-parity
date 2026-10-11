@@ -115,7 +115,7 @@ pub fn bytes_to_allocate_for(block_size: i32) -> usize {
     if block_size <= 0 {
         return 0;
     }
-    // `sizeof(XML_Char)` is 1, so `blockSize * stretch` cannot overflow;
+    // `sizeof(XML_Char)` is 1, so `blockSize * stretch` cannot overflow.
     // C adds the header in `size_t` and converts the sum to `int`.
     let Ok(size) = usize::try_from(block_size) else {
         return 0;

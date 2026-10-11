@@ -84,7 +84,7 @@ fn growth_strategies() -> Result<(), NoMemory> {
     assert!(pool.layout().free_blocks.is_empty());
     assert_eq!(pool.current().len(), 1101);
     assert_eq!(heap.log.len(), 3);
-    // Clearing into an empty free list keeps the order (newest on top);
+    // Clearing into an empty free list keeps the order (newest on top),
     // clearing into a non-empty one pushes the blocks newest first.
     pool.clear();
     assert_eq!(pool.layout().free_blocks, [1024, 2048]);
