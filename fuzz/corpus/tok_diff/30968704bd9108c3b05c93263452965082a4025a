@@ -1,3 +1,0 @@
-<?xml version=d-encoding'?>
-<!DOCTYPE test [<!ENTITY foo 'bar'>]>
-<tesL a='&fìo;'/>

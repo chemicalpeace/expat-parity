@@ -1,6 +1,8 @@
-//! Differential target for the tokenizer (modules 5 and 6): every scanner,
-//! tokenizer helper and converter of the port against `xmltok.c` /
-//! `xmltok_impl.c`, through `expat_difftest::tok`.
+//! Differential target for the tokenizer (modules 5-7): every scanner,
+//! tokenizer helper and converter, encoding detection (`initScan`) and the
+//! XML declaration (`XmlParseXmlDecl`, on every declaration token a scanner
+//! accepts) of the port against `xmltok.c` / `xmltok_impl.c`, through
+//! `expat_difftest::tok`.
 //!
 //! The first byte selects the encoding: the 8 single-byte encodings, the 4
 //! UTF-16 encodings, or (for the remaining values) an unknown encoding whose
@@ -12,7 +14,7 @@
 
 use expat::internal::tok::{Normal, Utf16};
 use expat_difftest::tok::{
-    Subject, check_buffer, check_convert, check_token_walk, unknown_from_seed,
+    Subject, check_buffer, check_convert, check_init, check_token_walk, unknown_from_seed,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -26,6 +28,8 @@ fuzz_target!(|data: &[u8]| {
     let Some((&sel, buf)) = data.split_first() else {
         return;
     };
+    // Encoding detection sees the raw input, selector byte included.
+    check_init(data, 0);
     let sel = usize::from(sel);
     if let Some(&enc) = Normal::ALL.get(sel) {
         run(&enc, buf);

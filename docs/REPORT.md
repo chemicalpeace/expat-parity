@@ -11,9 +11,12 @@ expat-compatible memory-safe implementation exists.
 
 ## Ported / unported
 
-See the module table in `docs/STATE.md`. Ported and verified: modules 1-5
-(byte tables, name predicates, encoders, SipHash, the tokenizer for the
-single-byte encodings). No public parser API exists yet.
+See the module table in `docs/STATE.md`. Ported and verified: modules 1-7
+(byte tables, name predicates, encoders, SipHash, the tokenizer for every
+built-in encoding and for application-defined encodings, the converters to
+UTF-8/UTF-16, encoding detection and the XML declaration), i.e. all of
+`xmltok.c`, `xmltok_impl.c` and `xmltok_ns.c`. No public parser API exists
+yet.
 
 ## Verification infrastructure
 
@@ -33,17 +36,36 @@ single-byte encodings). No public parser API exists yet.
   made `tests/tests/tok_diff.rs::random_fragments_every_offset` fail on the
   first run (token/next mismatch reported with encoding, scanner, offset and
   input). The change was reverted.
+- Deliberate bugs in ported code (modules 6-7, 2026-10-11), each reverted
+  after the run: requiring a high instead of a low surrogate after a UTF-16
+  lead (`utf16.rs`) failed `utf16_all_strings_up_to_three_units`; plane `+2`
+  instead of `+1` in UTF-16→UTF-8 (`convert.rs`) failed
+  `utf16_converters_all_strings_up_to_three_units`; name-start instead of
+  name-char test in `unknown_isName` (`unknown.rs`) failed
+  `unknown_encodings_seeded`; matching `yez` instead of `yes` in the XML
+  declaration (`xmldecl.rs`) failed `xml_decl_in_every_builtin_encoding`;
+  testing UTF-16BE instead of UTF-16LE in the `00 xx` detection rule
+  (`init.rs`) failed `init_scan_all_strings_up_to_four_bytes`.
 
 ## Test and fuzz statistics
 
 Measured 2026-10-11 on aarch64 Linux (2 cores), toolchain 1.99.0 / nightly
 for fuzz and Miri.
 
-- `cargo test --workspace --all-features`: 50 test functions + 5 doctests,
-  all passing. `tok_diff.rs` alone runs ~34 s (all 1 + 56 + 56² + 56³ strings
-  over the byte-type alphabet x 8 encodings x 6 scanners; token walks and
-  every-offset checks of the 540 upstream vectors; 3,000 random fragment
-  documents).
+- Modules 1-5 (PR #1): `cargo test --workspace --all-features`: 50 test
+  functions + 5 doctests, all passing; `tok_diff.rs` ~34 s.
+- Modules 6-7 (PR #2): `tests/tests/tok_diff.rs` has 12 tests (exhaustive
+  strings over the byte-type and UTF-16 code-unit alphabets, converters with
+  every output size 0-9 plus partial/ample on all strings of up to 3
+  units/bytes, all byte pairs for the UTF-8 trimming, 300 seeded unknown
+  encodings, the C rejection rules of `XmlInitUnknownEncoding`, upstream
+  vectors natively and transcoded to UTF-16, 3,000 + 3,000 + 300 random
+  documents); `tests/tests/init_diff.rs` has 4 (initScan on all 16,105
+  strings of up to 4 bytes over the 11 bytes it dispatches on, at offsets 0
+  and 1, for 11 names x 2 states x 2 NS modes; the upstream vectors; Q-3;
+  4,000 generated declarations in all 12 built-in encodings plus seeded
+  unknown encodings). Debug-build time of `tok_diff.rs` ~100 s on the
+  2-core sandbox.
 - `cargo +nightly miri test -p expat --all-features`
   (`-Zmiri-strict-provenance`): 20 unit tests + 5 doctests pass (97 s).
 - Fuzzing (`cargo +nightly fuzz run <target> -- -max_total_time=...`,
@@ -53,14 +75,19 @@ for fuzz and Miri.
   |---|---|---|---|
   | `leaf_diff` | modules 1-4 vs C | 601 s | 6,876,903 |
   | `tok_diff` | module 5: all 6 scanners + 8 helpers vs C | 661 s | 527,795 |
+  | `tok_diff` | modules 5-6: + UTF-16, seeded unknown encodings, converters | 661 s | 262,991 |
+  | `tok_diff` | modules 5-7: + `initScan` (11 names x 2 states x 2 NS modes per input), `XmlParseXmlDecl` on every declaration token | 661 s | 233,945 |
 
   Corpora were minimised with `cargo fuzz cmin` and committed
   (`fuzz/corpus/`).
 
 ## Divergences
 
-`docs/DIVERGENCES.md`. No divergences yet; three C quirks (Q-1..Q-3) found by
-the harness, all chunking-related, pending decision.
+`docs/DIVERGENCES.md`. No divergences yet. Three C quirks found by the
+harness, all chunking-related: Q-3 resolved as "replicate" (module 7; the
+input violates XML 1.0 §4.3.3), Q-1 and Q-2 pending (module 10).
+Platform-dependent C behaviour fixed to one choice: D-016 (counter width),
+D-017 (sign of stray bytes in `utf8_toUtf16`).
 
 ## Benchmarks
 
@@ -70,8 +97,6 @@ comparisons start when the parser exists.
 ## Limitations
 
 - No parser API yet (Phase 3 in progress).
-- The tokenizer covers the single-byte encodings only; UTF-16 and unknown
-  encodings are module 6.
 - `XML_UNICODE` builds are out of scope (D-002).
 
 ## Reproduce

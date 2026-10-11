@@ -18,8 +18,9 @@ D-017 sign of stray bytes in `utf8_toUtf16`).
 
 These are behaviours of libexpat 2.9.0 found by the harness that look like bugs
 relative to the specification. The port is currently compared to C under the
-same chunking, so they do not mask anything; each will be resolved (replicate
-or diverge with a regression test) when the owning module is ported.
+same chunking, so they do not mask anything; each is resolved (replicate or
+diverge with a regression test) when the owning module is ported. Q-1 and Q-2
+are open (module 10); Q-3 is resolved.
 
 ### Q-1 Epilog CR LF split across `XML_Parse` calls counts two lines
 
@@ -37,14 +38,25 @@ or diverge with a regression test) when the owning module is ported.
   chunked → `result ok 0 2 0 5`.
 - Owning module: same as Q-1.
 
-### Q-3 BOM-less UTF-16 detection with a 1-byte first chunk
+### Q-3 BOM-less UTF-16 detection with a 1-byte first chunk — resolved: replicate
 
 - Reproducer: `basic_tests.c:188` (`" \0<\0e\0/\0>\0"`) whole → parses as
   UTF-16LE; 1-byte chunks → `result error 4 1 1 1` (invalid token), also
   `misc_tests.c:967`.
-- Spec: XML 1.0 Appendix F (autodetection needs the first bytes; a streaming
-  parser should defer the decision rather than guess). Owning module:
-  `xmltok.c` `initScan`. Not yet ported.
+- Cause: `initScan` (`xmltok.c`) decides the encoding from a single byte when
+  only one is available. A byte other than `00`, `3C`, `EF`, `FE`, `FF` selects
+  the default encoding (UTF-8), so the following `00` is invalid; with two
+  bytes, `20 00` selects UTF-16LE. libexpat documents this choice in the
+  source ("we couldn't reliably determine whether we needed further bytes").
+- Decision (module 7, 2026-10-11): **replicate**. XML 1.0 §4.3.3 requires an
+  entity in UTF-16 to begin with a byte order mark; the reproducer has none
+  and no external encoding, so it is not well-formed and rejecting it is
+  correct. Appendix F (autodetection) is non-normative. Accepting it when it
+  arrives in one piece is C's leniency, which the port keeps too, so the port
+  equals C under every chunking. No divergence.
+- Regression tests: `tests/tests/init_diff.rs::q3_single_byte_detection_matches_c`
+  (detection on 1 byte, 2 bytes and the whole document, against C) and the
+  chunk-dependence pin below.
 
 The exact set of chunk-dependent upstream vectors is pinned by
 `tests/tests/upstream_vectors.rs::oracle_chunk_dependence_is_exactly_the_known_set`.

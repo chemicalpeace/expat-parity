@@ -29,7 +29,7 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | `siphash.h` | `expat::siphash` | see STATE.md |
 | `xmltok_impl.c` (scanner template); normal encodings of `xmltok.c` | `expat::tok` (`scan`, `normal`) | see STATE.md |
 | UTF-16 and unknown encodings, `utf8Convert`/`utf16Convert` converters (`xmltok.c`) | `expat::tok` (`utf16`, `unknown`, `convert`) | see STATE.md |
-| `initScan`, XML declaration (`xmltok.c`, `xmltok_ns.c`) | `expat::tok` | planned |
+| `XmlInitEncoding(NS)`, `initScan`, `XmlParseXmlDecl(NS)`, encoding tables (`xmltok.c`, `xmltok_ns.c`) | `expat::tok` (`init`, `xmldecl`) | see STATE.md |
 | `xmlrole.c` | `expat::role` | planned |
 | `xmlparse.c` | `expat::parse` (+ submodules) | planned |
 
@@ -56,6 +56,16 @@ same trait carries the converters (`to_utf8`/`to_utf16`, the C
 `utf8Convert`/`utf16Convert`), which return a `Converted { result, read,
 written }` instead of moving two pointers (`expat::tok::convert`). See
 DECISIONS D-017 and D-018.
+
+Encoding detection (`expat::tok::init`: `InitEncoding`, `init_scan`, `Known`)
+and the XML/text declaration (`expat::tok::xmldecl::parse_xml_decl`) complete
+the port of `xmltok.c`/`xmltok_ns.c` (D-019). `tests/tests/init_diff.rs`
+compares `initScan` for all strings of up to 4 bytes over the bytes it
+dispatches on, for 11 encoding names x both states x both namespace modes,
+and every declaration token that any scanner accepts is parsed by both
+implementations with every out-parameter compared (generated declarations in
+all 12 built-in encodings and in seeded unknown encodings; upstream vectors;
+fuzzing).
 
 Verification (`tests/tests/tok_diff.rs`, `expat_difftest::tok`, fuzz target
 `tok_diff`): every scanner is compared with C on token *and* `next` (including

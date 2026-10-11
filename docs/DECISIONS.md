@@ -246,3 +246,30 @@ comparison is exact.
   read until a terminator (D-015) pad with `>` instead of NUL for unknown
   encodings, because the map may make NUL a lead byte but must map `>` to
   itself.
+
+## D-019 Encoding detection and the XML declaration (module 7)
+
+- **`InitEncoding`** is `INIT_ENCODING` after `XmlInitEncoding(NS)`: the index
+  of the encoding the application named and the namespace flag. C stores the
+  index in the `isUtf16` byte and makes the parser's encoding pointer point at
+  the init encoding until `initScan` overwrites it; the port returns the
+  selected encoding from `init_scan` as `InitScan::encoding` (`None` exactly
+  when C leaves `*encPtr` at the init encoding) and the parser will hold
+  either state explicitly.
+- **`Known`** names a built-in encoding (`Normal` or `Utf16`) and dispatches
+  `XmlTok` to the generic scanners; `Known::from_index` is `NS(encodings)`.
+- **`parse_xml_decl`** returns every out-parameter of `XmlParseXmlDecl` as C
+  leaves it, including those written before a failure, so the differential
+  test can compare all of them. `findEncoding`'s result is `FoundEncoding`:
+  `Input` for C returning the document's own encoding (`UTF-16` read as
+  UTF-16), `Known`, or `Unrecognized` (`NULL`).
+- **`toAscii`** returns the converted byte as a C `char` (sign-extended,
+  D-017). Declaration tokens never convert to a byte where the sign matters
+  (that would need a converted `0xFF`).
+- **Precondition.** Like C, `parse_xml_decl` is only specified for a token the
+  scanner returned as `XML_TOK_XML_DECL`; on other input C can move past `end`
+  and read out of bounds, while the port stays inside the slice. The oracle
+  wrapper asserts the shape C needs (at least `<?xml?>`, whole characters) and
+  pads the buffer; the harness calls it on every declaration token a scanner
+  accepts.
+- **Q-3** is resolved as "replicate" (DIVERGENCES.md).
