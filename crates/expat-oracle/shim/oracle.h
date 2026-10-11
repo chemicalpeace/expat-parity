@@ -15,7 +15,10 @@ enum {
   ORACLE_TABLE_ASCII = 6,
   ORACLE_TABLE_ASCII_NS = 7,
   ORACLE_TABLE_LITTLE2 = 8,
-  ORACLE_TABLE_LITTLE2_NS = 9
+  ORACLE_TABLE_LITTLE2_NS = 9,
+  /* Encodings only (no separate table: same as LITTLE2). */
+  ORACLE_TABLE_BIG2 = 10,
+  ORACLE_TABLE_BIG2_NS = 11
 };
 
 enum {
@@ -48,27 +51,47 @@ unsigned long long oracle_siphash24(const unsigned char key[16],
                                     size_t split);
 int oracle_sip24_valid(void);
 
-/* xmltok_impl.c through the ENCODING vtable of table `table` (an
- * ORACLE_TABLE_* id). `which`: 0 prolog, 1 content, 2 CDATA section,
+/* The built-in ENCODING with ORACLE_TABLE_* id `id` (NULL if unknown). */
+const void *oracle_encoding(int id);
+
+/* xmltok_impl.c through the vtable of `enc`, an ENCODING from
+ * oracle_encoding() or oracle_unknown_enc(). `which`: 0 prolog, 1 content, 2 CDATA section,
  * 3 ignore section, 4 attribute value, 5 entity value. Offsets are relative
  * to `buf`; -1 means the C function did not write the pointer. Functions
  * without a `len` read until a terminator, like the C ones: only call them on
  * input that satisfies their precondition. */
-int oracle_tok_scan(int table, int which, const char *buf, size_t len,
+int oracle_tok_scan(const void *enc, int which, const char *buf, size_t len,
                     size_t ptr, long long *next);
-int oracle_tok_is_public_id(int table, const char *buf, size_t len, size_t ptr,
+int oracle_tok_is_public_id(const void *enc, const char *buf, size_t len, size_t ptr,
                             long long *bad);
-int oracle_tok_get_atts(int table, const char *buf, size_t ptr, int atts_max,
+int oracle_tok_get_atts(const void *enc, const char *buf, size_t ptr, int atts_max,
                         long long *out);
-int oracle_tok_char_ref_number(int table, const char *buf, size_t ptr);
-int oracle_tok_predefined_entity_name(int table, const char *buf, size_t len,
+int oracle_tok_char_ref_number(const void *enc, const char *buf, size_t ptr);
+int oracle_tok_predefined_entity_name(const void *enc, const char *buf, size_t len,
                                       size_t ptr);
-int oracle_tok_name_matches_ascii(int table, const char *buf, size_t len,
+int oracle_tok_name_matches_ascii(const void *enc, const char *buf, size_t len,
                                   size_t ptr, const char *ascii);
-long long oracle_tok_name_length(int table, const char *buf, size_t ptr);
-long long oracle_tok_skip_s(int table, const char *buf, size_t ptr);
-void oracle_tok_update_position(int table, const char *buf, size_t len,
+long long oracle_tok_name_length(const void *enc, const char *buf, size_t ptr);
+long long oracle_tok_skip_s(const void *enc, const char *buf, size_t ptr);
+void oracle_tok_update_position(const void *enc, const char *buf, size_t len,
                                 size_t ptr, unsigned long long pos[2]);
+
+/* utf8Convert (to_utf16 == 0, `to` is char[to_len]) or utf16Convert
+ * (`to` is unsigned short[to_len]) of `enc` on from[0..from_len]. Returns the
+ * XML_Convert_Result; *read and *written are how far fromP and toP moved.
+ * For an unknown encoding the input must end on a sequence boundary. */
+int oracle_convert(const void *enc, int to_utf16, const char *from,
+                   size_t from_len, void *to, size_t to_len, size_t *read,
+                   size_t *written);
+/* _INTERNAL_trim_to_complete_utf8_characters: the trimmed length. */
+size_t oracle_trim_utf8(const char *from, size_t len);
+
+/* XmlInitUnknownEncoding(NS) with `map`; `tab` (65536 ints) defines the
+ * converter (see oracle_internals.c), NULL for none. Returns a handle, or
+ * NULL if the C function rejects the map. */
+void *oracle_unknown_new(const int map[256], const int *tab, int ns);
+const void *oracle_unknown_enc(const void *h);
+void oracle_unknown_free(void *h);
 
 /* Runs the full parser and writes a canonical event trace (see
  * docs/ARCHITECTURE.md, "Trace format") into a malloc'd buffer.
