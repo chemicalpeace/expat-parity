@@ -1,1 +1,0 @@
-<!ENTITY % p1 'first declaration wins'><!ENTITY % p1 '%p1;'>

@@ -1,4 +1,0 @@
-<!DOCTYPE doc [
-<!ENTITY foo '<suspend>Hi<suspend>Ho</suspend></suspend>'>
-]>
-<doc>&foo;</doc>

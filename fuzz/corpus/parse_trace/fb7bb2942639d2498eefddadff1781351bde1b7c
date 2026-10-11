@@ -1,4 +1,0 @@
-<!DOCTYPE r [
-<!ENTITY e "111<![CDATA[2 <= 2]]>333">
-]>
-<r>&e;</r>

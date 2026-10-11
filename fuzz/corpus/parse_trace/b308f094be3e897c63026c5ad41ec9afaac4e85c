@@ -1,4 +1,0 @@
-<!DOCTYPE day [
-  <!ENTITY draft.day '10'>
-]>
-<day>&draft.day;</day>

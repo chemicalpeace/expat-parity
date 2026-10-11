@@ -1,6 +1,0 @@
-<!DOCTYPE doc [
-  <!ENTITY ge1 'head1Ztail1'>
-  <!ENTITY ge2 'head2&ge1;tail2'>
-  <!ENTITY ge3 'head3&ge2;tail3'>
-]>
-<doc>&ge3;</doc>

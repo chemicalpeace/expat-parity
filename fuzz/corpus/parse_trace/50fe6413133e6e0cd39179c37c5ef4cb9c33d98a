@@ -1,0 +1,12 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc
+            attr NMTOKENS #REQUIRED
+            ents ENTITIES #REQUIRED
+            refs IDREFS   #REQUIRED>
+]>
+<doc attr='    a  b c		d	e	' refs=' id-1   	  id-2		'  
+     ents=' ent-1   	
+            ent-2  ' >
+  <e id='id-1'/>
+  <e id='id-2'/>
+</doc>

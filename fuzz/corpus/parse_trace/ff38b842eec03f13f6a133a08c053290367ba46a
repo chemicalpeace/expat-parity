@@ -1,2 +1,0 @@
-<!DOCTYPE foo:!bad [ <!ENTITY bar 'baz' ]>
-<foo:!bad>&bar;</foo:!bad>

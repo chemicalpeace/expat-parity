@@ -1,4 +1,0 @@
-<!DOCTYPE doc [
-  <!ENTITY entity '&#x110000;'>
-]>
-<doc>&entity;</doc>

@@ -1,0 +1,5 @@
+<!DOCTYPE t0 [
+   <!ENTITY open '<t1>'>
+   <!ENTITY close '</t1>'>
+]>
+<t0>&open;&close;</t0>

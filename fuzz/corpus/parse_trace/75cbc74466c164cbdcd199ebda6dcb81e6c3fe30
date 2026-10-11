@@ -1,2 +1,0 @@
-<!DOCTYPE 1+ [ <!ENTITY foo 'bar'> ]>
-<1+>&foo;</1+>

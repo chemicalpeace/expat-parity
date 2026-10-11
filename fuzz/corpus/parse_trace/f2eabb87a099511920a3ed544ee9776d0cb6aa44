@@ -1,4 +1,0 @@
-<!ENTITY % entity '<!ELEMENT doc (#PCDATA)>'>
-%entity;
-]>
-<doc></doc>
