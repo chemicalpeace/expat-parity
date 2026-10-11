@@ -1,0 +1,98 @@
+# libFuzzer log, trimmed: 1452 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.29s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.05s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2611529395
+INFO: Loaded 1 modules   (54668 inline 8-bit counters): 54668 [0xaaaad1fa25e0, 0xaaaad1fafb6c), 
+INFO: Loaded 1 PC tables (54668 PCs): 54668 [0xaaaad1fafb70,0xaaaad2085430), 
+INFO:     7719 files found in <corpus>
+INFO: seed corpus: files: 7719 min: 1b max: 3719b total: 902502b rss: 37Mb
+#7720	INITED cov: 9282 ft: 37102 corp: 7632/877Kb exec/s: 2573 rss: 307Mb
+#8192	pulse  cov: 9282 ft: 37102 corp: 7632/877Kb lim: 3730 exec/s: 2730 rss: 316Mb
+#16384	pulse  cov: 9282 ft: 37104 corp: 7634/876Kb lim: 3752 exec/s: 4096 rss: 439Mb
+#32768	pulse  cov: 9282 ft: 37108 corp: 7637/876Kb lim: 3763 exec/s: 5461 rss: 491Mb
+#65536	pulse  cov: 9284 ft: 37124 corp: 7647/877Kb lim: 3818 exec/s: 6553 rss: 491Mb
+#131072	pulse  cov: 9286 ft: 37177 corp: 7674/901Kb lim: 3917 exec/s: 6241 rss: 491Mb
+#262144	pulse  cov: 9293 ft: 37272 corp: 7712/925Kb lim: 4038 exec/s: 6241 rss: 491Mb
+#524288	pulse  cov: 9300 ft: 37550 corp: 7787/985Kb lim: 4416 exec/s: 6241 rss: 491Mb
+#576388	DONE   cov: 9304 ft: 37576 corp: 7801/988Kb lim: 4512 exec/s: 6004 rss: 491Mb
+###### Recommended dictionary. ######
+"e13" # Uses: 3868
+"\003\000\000\000\000\000\000\000" # Uses: 3389
+"dy_" # Uses: 2818
+"\2233\017\354tQ\000\000" # Uses: 1886
+"\260\003\342\353\204Q\000\000" # Uses: 1862
+"skipped" # Uses: 1909
+"\376\377\377\377\377\377\377\377" # Uses: 1751
+"\001\000\000*" # Uses: 1834
+"nsstart" # Uses: 1771
+"\377\377\377\023" # Uses: 1302
+"text" # Uses: 1299
+"\016\000\000\000\000\000\000\000" # Uses: 1173
+"\377\007" # Uses: 1267
+"pre1n" # Uses: 1139
+"\0023333333" # Uses: 1106
+"\003\377\377\377\377\377\377\377" # Uses: 1066
+"\004\000\000\000" # Uses: 1075
+"\000\000" # Uses: 902
+"\002\000\000\000\000\000\000\000" # Uses: 810
+"\377\377\377\377" # Uses: 924
+"\001\000\000\000\000\000\000\010" # Uses: 799
+"]t\321E\027]t\001" # Uses: 860
+"xmlnps" # Uses: 736
+"\000\000\000\000" # Uses: 725
+"\003\000" # Uses: 698
+"\005\000" # Uses: 691
+"eoc" # Uses: 663
+"\377\377" # Uses: 580
+"\000\000\000\376" # Uses: 604
+"d0c" # Uses: 603
+"\000\000\000\000\000\000\000\004" # Uses: 522
+"\377\377\372\377\274\212\215\200" # Uses: 529
+"start" # Uses: 587
+"doc" # Uses: 536
+"do_" # Uses: 512
+"f.ns5p3333333333333333334e-00" # Uses: 386
+"fons6p3333333333333333333333333300000000033333333333333333333333" # Uses: 327
+"fo_" # Uses: 455
+"\000\000\000\005" # Uses: 441
+"fons3333333333333330000000003333333333333333333333333300000006p3" # Uses: 318
+"attr" # Uses: 416
+"\001\013" # Uses: 336
+"E2" # Uses: 354
+"doI" # Uses: 371
+"\001\000\000\000\000\000\000\000" # Uses: 275
+"do_\303\277" # Uses: 262
+"$\000\000\000" # Uses: 278
+"n8f" # Uses: 277
+"e2" # Uses: 252
+"\000\000\000\000\000\000\000\000" # Uses: 227
+"http://www.w3.org/2000/xmlns/" # Uses: 190
+"\022\000\000\000\000\000\000\000" # Uses: 167
+"\004\000" # Uses: 174
+"\377\377\377\375" # Uses: 138
+"nss" # Uses: 143
+"fons6p3333333333333333333333333300000000033330000000000000000000" # Uses: 112
+"e1" # Uses: 124
+"H\000\000\000\000\000\000\000" # Uses: 117
+"\350\201\256" # Uses: 83
+"\001\000" # Uses: 87
+"\020\000" # Uses: 69
+"fons6p33333333333330000000000" # Uses: 57
+"\000\000\000(" # Uses: 41
+"\377\016" # Uses: 32
+"attlist" # Uses: 39
+"\377\377\377\377\377\377\377\007" # Uses: 32
+"xmldecl" # Uses: 29
+"foo" # Uses: 21
+"xmlns:" # Uses: 28
+"\0043333333" # Uses: 12
+"H\001\000\000" # Uses: 8
+###### End of recommended dictionary. ######
+Done 576388 runs in 96 second(s)
+stat::number_of_executed_units: 576388
+stat::average_exec_per_sec:     6004
+stat::new_units_added:          1452
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              491
