@@ -351,3 +351,14 @@ comparison is exact.
   `XML_ParserCreate_MM` whose allocation hooks record and refuse requests
   (the allocation tracker is disabled). Runs are serialised by a lock in
   `expat-oracle` because the hooks use global state.
+
+## D-022 Optimised dev/test builds of the port, harness and oracle
+
+`Cargo.toml` sets `opt-level = 2` in the `dev` profile (which `cargo test`
+uses) for `expat`, `expat-difftest` and `expat-oracle` (the C oracle is then
+built with `-O2` too, as it already is for fuzzing). Debug assertions and
+overflow checks are profile settings that stay on, so nothing that is checked
+changes; the differential suites just run 10-20 times faster (whole
+workspace 208 s -> 57 s including the build on the 2-core sandbox,
+`tok_diff.rs` 163 s -> 8 s). Miri ignores `opt-level`. Taken in module 9
+because each module adds heavy differential tests.
