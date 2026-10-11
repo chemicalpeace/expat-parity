@@ -165,7 +165,7 @@ impl TraceWriter {
     }
 
     /// `XML_EntityDeclHandler` (`is_param` comes second, like the shim).
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)] // reason: mirrors XML_EntityDeclHandler.
     pub fn entity(
         &mut self,
         name: &[u8],
