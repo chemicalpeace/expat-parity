@@ -9,10 +9,11 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 - **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-5 done.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
-- **CI:** GitHub Actions. First run on `main` (run 38147233705, `ebc8e89`) green
-  on all jobs (check, test ubuntu/macos, Miri, fuzz smoke). The PR that adds
-  modules 1-5 also adds `windows-latest` to the test matrix; see the PR's CI
-  result and D-016 if it had to be scoped.
+- **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
+  tables, doc, deny), test on ubuntu-latest / macos-latest / windows-latest,
+  Miri, fuzz smoke (60 s per target). Green on PR #1 (modules 1-5) before
+  merge; see the PR for the run. Windows needed two fixes (D-016,
+  `.gitattributes`).
 
 ## Blockers
 
