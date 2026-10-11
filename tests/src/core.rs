@@ -3,7 +3,7 @@
 //!
 //! A *program* is a list of pool operations ([`PoolOp`]) or hash table
 //! operations ([`HashOp`]). [`run_c`] encodes it and runs it in
-//! `shim/oracle_core.c` on the real C structures; [`run_port`] runs it on
+//! `shim/oracle_core.c` on the real C structures; [`run_port_pool`] and [`run_port_hash`] run it on
 //! `expat::internal::pool` / `hash`. Both write the same text trace, which
 //! records after every operation its result, every allocation request
 //! (with its size and whether the harness heap granted it), and the complete
