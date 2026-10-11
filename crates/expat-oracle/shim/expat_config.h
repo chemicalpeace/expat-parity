@@ -6,7 +6,8 @@
  *
  *   XML_DTD, XML_GE=1, XML_NS, XML_CONTEXT_BYTES=1024, UTF-8 XML_Char.
  *
- * Entropy: /dev/urandom (Linux, macOS, BSD). The oracle always sets a fixed
+ * Entropy: /dev/urandom (Linux, macOS, BSD) or rand_s (Windows, selected by
+ * xmlparse.c itself under _WIN32; build.rs compiles the matching file). The oracle always sets a fixed
  * hash salt through XML_SetHashSalt, so the entropy source never influences
  * observable output; it only has to compile. See docs/DECISIONS.md (D-008).
  */
@@ -15,14 +16,17 @@
 
 #include <stdint.h>
 
-#define HAVE_FCNTL_H 1
+#ifndef _WIN32
+#  define HAVE_FCNTL_H 1
+#  define HAVE_UNISTD_H 1
+#  define XML_DEV_URANDOM 1
+#endif
 #define HAVE_INTTYPES_H 1
 #define HAVE_STDINT_H 1
 #define HAVE_STDLIB_H 1
 #define HAVE_STRING_H 1
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
-#define HAVE_UNISTD_H 1
 #define STDC_HEADERS 1
 
 #define PACKAGE "expat"
@@ -34,7 +38,6 @@
 #define PACKAGE_BUGREPORT ""
 
 #define XML_CONTEXT_BYTES 1024
-#define XML_DEV_URANDOM 1
 #define XML_DTD 1
 #define XML_GE 1
 #define XML_NS 1

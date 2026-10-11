@@ -185,3 +185,18 @@ call the C functions that rely on a terminator on a copy of the buffer
 followed by a padding that ends every one of them (four NUL characters, then
 `>">'>` for `getAtts` or `;` for `charRefNumber`), so the wrappers are safe
 to call on arbitrary input and AddressSanitizer stays meaningful under fuzz.
+
+## D-016 Windows in the CI matrix; width of line/column counters
+
+`windows-latest` (MSVC) joins the test matrix. The oracle builds there with
+upstream's own Windows entropy source (`random_rand_s.c`, selected by
+`build.rs`; `shim/expat_config.h` defines the POSIX-only macros only outside
+`_WIN32`).
+
+libexpat's `XML_Size` is `unsigned long` in the default configuration
+(`XML_LARGE_SIZE` off): 64-bit on Linux/macOS, 32-bit on Windows. The port
+uses `u64` line and column counters on every platform, i.e. it matches C on
+LP64 targets and does not replicate the 32-bit wrap-around of the Windows
+build. The difference is only observable after 2^32 lines or columns. The
+differential tests compare the wrap-around near `u64::MAX` on LP64 targets
+and use small start values on Windows.

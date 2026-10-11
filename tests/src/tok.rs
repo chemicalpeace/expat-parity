@@ -161,14 +161,17 @@ pub fn check_total_helpers(enc: Normal, buf: &[u8], ptr: usize) {
         c::skip_s(t, buf, ptr),
         "{enc:?} skipS at {ptr} of {buf:?}"
     );
+    // Start near the top of the range to compare the wrap-around, except
+    // where C's `XML_Size` is 32 bits (Windows); see DECISIONS D-016.
+    let column = if cfg!(windows) { 3 } else { u64::MAX - 2 };
     let mut pos = rs::Position {
         line_number: 7,
-        column_number: u64::MAX - 2,
+        column_number: column,
     };
     rs::update_position(&enc, buf, ptr, &mut pos);
     assert_eq!(
         (pos.line_number, pos.column_number),
-        c::update_position(t, buf, ptr, (7, u64::MAX - 2)),
+        c::update_position(t, buf, ptr, (7, column)),
         "{enc:?} updatePosition at {ptr} of {buf:?}"
     );
     let r = rs::is_public_id(&enc, buf, ptr).map_err(Some);
