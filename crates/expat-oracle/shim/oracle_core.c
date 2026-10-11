@@ -722,3 +722,84 @@ oracle_parser_hash(const unsigned char salt[16], const char *key, size_t len,
   *ulong_bits = (int)(sizeof(unsigned long) * CHAR_BIT);
   return (unsigned long long)h;
 }
+
+/* ---- input buffer (module 10) ------------------------------------------ */
+
+static long
+buf_off(XML_Parser p, const char *ptr) {
+  if (ptr == NULL || p->m_buffer == NULL)
+    return -1;
+  return (long)(ptr - p->m_buffer);
+}
+
+/* Feeds `doc` to a parser with a sequence of operations and writes the
+   buffer state after each one. `ops` holds `nops` triples (req, n, final):
+   req == INT_MIN calls XML_Parse with the next n bytes of the document;
+   otherwise XML_GetBuffer(req) is called, the next min(n, req) bytes are
+   copied into the returned space (padded with spaces past the end of the
+   document), and XML_ParseBuffer(n, final) follows
+   when the buffer was granted. Callers keep n <= req, or n larger than the
+   free space (which XML_ParseBuffer rejects), so no byte is parsed that
+   was not written. */
+int
+oracle_buffer_run(const unsigned char *doc, size_t len, const int *ops,
+                  size_t nops, int ns, int deferral, unsigned char **out,
+                  size_t *out_len) {
+  static const unsigned char salt[16] = {1, 2, 3, 4, 5, 6, 7, 8,
+                                         9, 10, 11, 12, 13, 14, 15, 16};
+  struct obuf o = {NULL, 0, 0, 0};
+  XML_Parser p = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
+  if (p == NULL)
+    return -1;
+  XML_SetHashSalt16Bytes(p, salt);
+  XML_SetReparseDeferralEnabled(p, deferral ? XML_TRUE : XML_FALSE);
+  size_t cur = 0;
+  for (size_t i = 0; i < nops; i++) {
+    int req = ops[3 * i], n = ops[3 * i + 1], fin = ops[3 * i + 2];
+    size_t avail = len - cur;
+    long got = -2;
+    enum XML_Status st;
+    if (req == INT_MIN) {
+      size_t k = n < 0 ? 0 : (size_t)n;
+      if (k > avail)
+        k = avail;
+      st = XML_Parse(p, (const char *)doc + cur, (int)k, fin);
+      cur += k;
+    } else {
+      char *b = XML_GetBuffer(p, req);
+      got = buf_off(p, b);
+      if (b == NULL) {
+        st = XML_STATUS_ERROR;
+      } else {
+        /* Write all n bytes that XML_ParseBuffer will read (when n <= req):
+           the next document bytes, then spaces past the document's end. */
+        size_t k = n < 0 ? 0 : (size_t)n;
+        if (k > (size_t)req)
+          k = (size_t)req;
+        size_t d = k > avail ? avail : k;
+        memcpy(b, doc + cur, d);
+        memset(b + d, ' ', k - d);
+        cur += d;
+        st = XML_ParseBuffer(p, n, fin);
+      }
+    }
+    ob_printf(&o, "%d %d %ld %ld %ld %zu %d %llu %ld %ld %ld\n", (int)st,
+              (int)XML_GetErrorCode(p), buf_off(p, p->m_bufferPtr),
+              buf_off(p, p->m_bufferEnd), buf_off(p, p->m_bufferLim),
+              p->m_partialTokenBytesBefore, p->m_lastBufferRequestSize,
+              (unsigned long long)p->m_parseEndByteIndex,
+              buf_off(p, p->m_eventPtr), buf_off(p, p->m_positionPtr), got);
+  }
+  unsigned long long line = XML_GetCurrentLineNumber64(p);
+  unsigned long long col = XML_GetCurrentColumnNumber64(p);
+  ob_printf(&o, "end %llu %llu %lld\n", line, col,
+            (long long)XML_GetCurrentByteIndex64(p));
+  XML_ParserFree(p);
+  if (o.failed) {
+    free(o.data);
+    return -1;
+  }
+  *out = (unsigned char *)o.data;
+  *out_len = o.len;
+  return 0;
+}

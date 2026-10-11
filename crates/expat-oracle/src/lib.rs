@@ -218,6 +218,11 @@ pub struct ParseOptions {
     pub chunk_size: usize,
     /// Parameter entity parsing mode.
     pub param_entity_parsing: ParamEntityParsing,
+    /// Feed each piece with `XML_GetBuffer(2n + 3)` + `XML_ParseBuffer(n)`
+    /// instead of `XML_Parse`.
+    pub buffer_api: bool,
+    /// `XML_SetReparseDeferralEnabled(parser, XML_FALSE)`.
+    pub no_reparse_deferral: bool,
 }
 
 /// Errors of the oracle wrapper itself (never of the parse being traced).
@@ -262,6 +267,8 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
             ParamEntityParsing::UnlessStandalone => 1,
             ParamEntityParsing::Always => 2,
         },
+        buffer_api: c_int::from(opts.buffer_api),
+        no_reparse_deferral: c_int::from(opts.no_reparse_deferral),
     };
     let mut out: *mut u8 = std::ptr::null_mut();
     let mut out_len: usize = 0;
@@ -316,6 +323,74 @@ pub fn core_run(prog: &[u8]) -> Option<String> {
         v
     };
     Some(String::from_utf8(bytes).expect("the trace is ASCII"))
+}
+
+/// One input operation of [`buffer_run`]: `XML_Parse` with the next `n`
+/// bytes, or `XML_GetBuffer(req)` followed by `XML_ParseBuffer(n)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BufferOp {
+    /// `XML_Parse(next n bytes, is_final)`.
+    Parse {
+        /// Number of document bytes.
+        n: i32,
+        /// `isFinal`.
+        is_final: bool,
+    },
+    /// `XML_GetBuffer(req)`, copy `min(n, req)` document bytes, then
+    /// `XML_ParseBuffer(n, is_final)` if the buffer was granted.
+    Buffer {
+        /// The `len` given to `XML_GetBuffer`.
+        req: i32,
+        /// The `len` given to `XML_ParseBuffer`.
+        n: i32,
+        /// `isFinal`.
+        is_final: bool,
+    },
+}
+
+/// Feeds `doc` to libexpat with `ops` and returns the white-box trace of
+/// its input buffer after each operation (`shim/oracle_core.c`,
+/// `oracle_buffer_run`; the format is reproduced by the test crate's
+/// `port::buffer_run`).
+pub fn buffer_run(doc: &[u8], ops: &[BufferOp], ns: bool, reparse_deferral: bool) -> String {
+    let mut flat: Vec<c_int> = Vec::with_capacity(ops.len() * 3);
+    for op in ops {
+        match *op {
+            BufferOp::Parse { n, is_final } => {
+                flat.extend_from_slice(&[c_int::MIN, n, c_int::from(is_final)]);
+            }
+            BufferOp::Buffer { req, n, is_final } => {
+                flat.extend_from_slice(&[req, n, c_int::from(is_final)]);
+            }
+        }
+    }
+    let mut out: *mut u8 = std::ptr::null_mut();
+    let mut out_len: usize = 0;
+    // SAFETY: `doc` and `flat` are live slices of the given lengths (`flat`
+    // holds `ops.len()` triples); `out`/`out_len` are valid out-pointers.
+    // The function uses no global state.
+    let rc = unsafe {
+        ffi::oracle_buffer_run(
+            doc.as_ptr(),
+            doc.len(),
+            flat.as_ptr(),
+            ops.len(),
+            c_int::from(ns),
+            c_int::from(reparse_deferral),
+            &mut out,
+            &mut out_len,
+        )
+    };
+    assert!(
+        rc == 0 && !out.is_null(),
+        "oracle_buffer_run failed to allocate"
+    );
+    // SAFETY: on success `out` is a malloc'd buffer of exactly `out_len`
+    // initialised bytes that we own until `oracle_free`.
+    let v = unsafe { std::slice::from_raw_parts(out, out_len) }.to_vec();
+    // SAFETY: `out` came from the shim's allocator and is freed once.
+    unsafe { ffi::oracle_free(out.cast()) };
+    String::from_utf8(v).expect("the trace is ASCII")
 }
 
 /// `poolBytesToAllocateFor(block_size)` of `xmlparse.c`.

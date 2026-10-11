@@ -12,7 +12,7 @@ use crate::trace::{Status, TraceWriter};
 use expat::internal::parse::{
     self, Handler, HandlerSet, ParamEntityParsing as PortPep, Parser, Stop,
 };
-use expat_oracle::{ParamEntityParsing, ParseOptions};
+use expat_oracle::{BufferOp, ParamEntityParsing, ParseOptions};
 
 /// The fixed hash salt of the C shim (`ORACLE_HASH_SALT` in
 /// `oracle_trace.c`).
@@ -86,6 +86,37 @@ fn traced_handlers() -> HandlerSet {
     }
 }
 
+/// One piece of input, like the shim's `feed`: [`Parser::parse`], or
+/// [`Parser::get_buffer`] for `2n + 3` bytes and [`Parser::parse_buffer`]
+/// for `n`.
+fn feed(
+    p: &mut Parser,
+    t: &mut Tracer,
+    s: &[u8],
+    is_final: bool,
+    buffer_api: bool,
+) -> parse::Status {
+    if !buffer_api {
+        return p.parse(t, s, is_final);
+    }
+    let n = s.len();
+    let req = if n <= (0x7fff_ffff - 3) / 2 {
+        2 * n + 3
+    } else {
+        n
+    };
+    let (Ok(req), Ok(len)) = (i32::try_from(req), i32::try_from(n)) else {
+        return parse::Status::Error;
+    };
+    let Some(b) = p.get_buffer(req) else {
+        return parse::Status::Error;
+    };
+    if let Some(dst) = b.get_mut(..n) {
+        dst.copy_from_slice(s);
+    }
+    p.parse_buffer(t, len, is_final)
+}
+
 /// Parses `doc` with the port under `opts` and returns its trace.
 pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
     let mut p = Parser::new(
@@ -102,18 +133,21 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
     let mut t = Tracer {
         w: TraceWriter::new(),
     };
+    if opts.no_reparse_deferral {
+        p.set_reparse_deferral_enabled(false);
+    }
     let mut st = parse::Status::Ok;
     if opts.chunk_size == 0 || opts.chunk_size >= doc.len() {
-        st = p.parse(&mut t, doc, true);
+        st = feed(&mut p, &mut t, doc, true, opts.buffer_api);
     } else {
         for chunk in doc.chunks(opts.chunk_size) {
-            st = p.parse(&mut t, chunk, false);
+            st = feed(&mut p, &mut t, chunk, false, opts.buffer_api);
             if st != parse::Status::Ok {
                 break;
             }
         }
         if st == parse::Status::Ok {
-            st = p.parse(&mut t, b"", true);
+            st = feed(&mut p, &mut t, b"", true, opts.buffer_api);
         }
     }
     let code = match p.error_code() {
@@ -147,4 +181,73 @@ impl TraceSource for Port {
             PortTrace::DtdNotPorted => b"unported dtd\n".to_vec(),
         }
     }
+}
+
+/// No-op handler for [`buffer_run`].
+struct Quiet;
+impl Handler for Quiet {}
+
+/// The port's version of [`expat_oracle::buffer_run`]: the same operations
+/// and the same trace lines.
+pub fn buffer_run(doc: &[u8], ops: &[BufferOp], ns: bool, reparse_deferral: bool) -> String {
+    use std::fmt::Write as _;
+    let salt: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    let mut p = Parser::new(None, ns.then_some(b'|'), salt);
+    p.set_reparse_deferral_enabled(reparse_deferral);
+    let mut out = String::new();
+    let mut cur = 0usize;
+    for op in ops {
+        let mut got = -2i64;
+        let st = match *op {
+            BufferOp::Parse { n, is_final } => {
+                let k = usize::try_from(n).unwrap_or(0).min(doc.len() - cur);
+                let st = p.parse(&mut Quiet, &doc[cur..cur + k], is_final);
+                cur += k;
+                st
+            }
+            BufferOp::Buffer { req, n, is_final } => match p.get_buffer(req) {
+                None => {
+                    got = -1;
+                    parse::Status::Error
+                }
+                Some(b) => {
+                    let k = usize::try_from(n)
+                        .unwrap_or(0)
+                        .min(usize::try_from(req).unwrap_or(0));
+                    let d = k.min(doc.len() - cur);
+                    b[..d].copy_from_slice(&doc[cur..cur + d]);
+                    b[d..k].fill(b' ');
+                    cur += d;
+                    got = p.buffer_state().buffer_end;
+                    p.parse_buffer(&mut Quiet, n, is_final)
+                }
+            },
+        };
+        let st = match st {
+            parse::Status::Error => 0,
+            parse::Status::Ok => 1,
+            parse::Status::Suspended => 2,
+        };
+        let code = match p.error_code() {
+            Stop::Error(e) => e.to_c(),
+            Stop::DtdNotPorted => 999,
+        };
+        let b = p.buffer_state();
+        let _ = writeln!(
+            out,
+            "{st} {code} {} {} {} {} {} {} {} {} {got}",
+            b.buffer_ptr,
+            b.buffer_end,
+            b.buffer_lim,
+            b.partial_token_bytes_before,
+            b.last_buffer_request_size,
+            b.parse_end_byte_index,
+            b.event_ptr,
+            b.position_ptr
+        );
+    }
+    let line = p.current_line_number();
+    let col = p.current_column_number();
+    let _ = writeln!(out, "end {line} {col} {}", p.current_byte_index());
+    out
 }

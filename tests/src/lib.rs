@@ -7,12 +7,14 @@
 //! - [`vectors`]: test documents extracted from libexpat's test suite.
 //! - [`tok`]: differential checks of the tokenizer port.
 //! - [`role`]: differential checks of the prolog state machine.
+//! - [`docgen`]: random XML-ish documents for whole-parser tests.
 //! - [`port`]: the trace adapter of the port's parser.
 //! - [`core`]: white-box differential checks of the string pool and hash
 //!   table of the parser core.
 
 pub mod core;
 pub mod diff;
+pub mod docgen;
 pub mod port;
 pub mod role;
 pub mod tok;
@@ -55,5 +57,6 @@ pub fn options_from_selector(sel: u8) -> ParseOptions {
         ns_separator,
         chunk_size,
         param_entity_parsing,
+        ..ParseOptions::default()
     }
 }

@@ -37,6 +37,8 @@ struct oracle_options {
   int ns_separator;      /* 0: no namespace processing; else separator byte */
   size_t chunk_size;     /* 0: feed whole document in one XML_Parse call */
   int param_entity_parsing; /* XML_ParamEntityParsing value */
+  int buffer_api; /* 1: XML_GetBuffer(2n+3) + XML_ParseBuffer(n) per chunk */
+  int no_reparse_deferral; /* 1: XML_SetReparseDeferralEnabled(p, 0) */
 };
 
 int oracle_type_table(int id, unsigned char out[256]);
@@ -149,6 +151,11 @@ void oracle_free(void *p);
  * serialise runs. Returns -1 for a malformed header or a shim allocation
  * failure. */
 #define ORACLE_CORE_HEAP_CAP ((size_t)32 << 20)
+/* Module 10: feeds `doc` with (req, n, final) operations (req == INT_MIN:
+ * XML_Parse) and traces the input buffer state after each (oracle_core.c). */
+int oracle_buffer_run(const unsigned char *doc, size_t len, const int *ops,
+                      size_t nops, int ns, int deferral, unsigned char **out,
+                      size_t *out_len);
 int oracle_core_run(const unsigned char *prog, size_t len, unsigned char **out,
                     size_t *out_len);
 /* poolBytesToAllocateFor and offsetof(BLOCK, s). */

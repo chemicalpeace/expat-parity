@@ -1,11 +1,15 @@
-//! Whole-document target. The first input byte selects the parse options
-//! (namespaces, chunk size, encoding override); the rest is the document.
+//! Whole-document differential target. The first input byte selects the
+//! parse options (namespaces, chunk size, encoding override, parameter
+//! entity parsing); the rest is the document.
 //!
-//! Until the Rust parser exists this target exercises the oracle and the
-//! trace format (it must never crash and must always end with a `result`
-//! line). When `expat::Parser` lands it becomes a differential target.
+//! The port's parser and the C oracle parse the document and their
+//! canonical traces must be equal. Documents with a document type
+//! declaration stop the port with `Stop::DtdNotPorted` until module 11;
+//! for those only the oracle's trace is checked for well-formedness.
 #![no_main]
 
+use expat_difftest::port::{PortTrace, port_trace};
+use expat_difftest::trace::{first_difference, is_well_formed_trace};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
@@ -13,9 +17,11 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
     let opts = expat_difftest::options_from_selector(sel);
-    let trace = expat_oracle::parse_trace(doc, &opts).expect("oracle shim allocation");
-    assert!(
-        expat_difftest::trace::is_well_formed_trace(&trace),
-        "malformed trace"
-    );
+    let c = expat_oracle::parse_trace(doc, &opts).expect("oracle shim allocation");
+    assert!(is_well_formed_trace(&c), "malformed trace");
+    if let PortTrace::Trace(rust) = port_trace(doc, &opts) {
+        if let Some((line, l, r)) = first_difference(&c, &rust) {
+            panic!("trace mismatch at line {line}: C `{l}` port `{r}` ({opts:?})");
+        }
+    }
 });

@@ -170,6 +170,28 @@ pub trait Handler {
     fn skipped_entity(&mut self, _name: &[u8], _is_param: bool) {}
 }
 
+/// White-box view of the input buffer (offsets from `m_buffer`, -1 for a
+/// `NULL` pointer), for the differential tests of buffer management.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BufferState {
+    /// `m_bufferPtr`
+    pub buffer_ptr: i64,
+    /// `m_bufferEnd`
+    pub buffer_end: i64,
+    /// `m_bufferLim`
+    pub buffer_lim: i64,
+    /// `m_partialTokenBytesBefore`
+    pub partial_token_bytes_before: usize,
+    /// `m_lastBufferRequestSize`
+    pub last_buffer_request_size: i32,
+    /// `m_parseEndByteIndex`
+    pub parse_end_byte_index: u64,
+    /// `m_eventPtr`
+    pub event_ptr: i64,
+    /// `m_positionPtr`
+    pub position_ptr: i64,
+}
+
 /// The parser's encoding (`m_encoding`): the initial encoding until
 /// detection has seen enough bytes, then a built-in encoding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -390,6 +412,24 @@ impl Parser {
     /// The billion-laughs counters.
     pub fn accounting(&self) -> &Accounting {
         &self.accounting
+    }
+
+    /// The state of the input buffer.
+    pub fn buffer_state(&self) -> BufferState {
+        let off = |p: Option<usize>| match (self.has_buffer, p) {
+            (true, Some(p)) => p as i64,
+            _ => -1,
+        };
+        BufferState {
+            buffer_ptr: off(Some(self.buffer_ptr)),
+            buffer_end: off(Some(self.buffer_end)),
+            buffer_lim: off(Some(self.buffer.len())),
+            partial_token_bytes_before: self.partial_token_bytes_before,
+            last_buffer_request_size: self.last_buffer_request_size,
+            parse_end_byte_index: self.parse_end_byte_index,
+            event_ptr: off(self.event_ptr),
+            position_ptr: off(self.position_ptr),
+        }
     }
 
     /// `XML_GetCurrentByteIndex64`.

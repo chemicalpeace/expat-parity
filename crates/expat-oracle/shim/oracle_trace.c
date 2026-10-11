@@ -348,6 +348,23 @@ on_enddoctype_w(void *ud) {
   on_enddoctype(((struct start_ctx *)ud)->t);
 }
 
+/* Feeds n bytes, through XML_Parse or through the buffer API with a
+   larger buffer request than the data (so the request size, which the
+   reparse-deferral heuristic reads, differs from the chunk). */
+static enum XML_Status
+feed(XML_Parser p, const unsigned char *s, size_t n, int final,
+     int buffer_api) {
+  if (! buffer_api)
+    return XML_Parse(p, (const char *)s, (int)n, final);
+  int req = n <= (size_t)(0x7fffffff - 3) / 2 ? (int)(2 * n + 3) : (int)n;
+  void *b = XML_GetBuffer(p, req);
+  if (b == NULL)
+    return XML_STATUS_ERROR;
+  if (n > 0)
+    memcpy(b, s, n);
+  return XML_ParseBuffer(p, (int)n, final);
+}
+
 int
 oracle_parse_trace(const unsigned char *doc, size_t len,
                    const struct oracle_options *opts, unsigned char **out,
@@ -387,18 +404,20 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   XML_SetAttlistDeclHandler(p, on_attlist);
   XML_SetNamespaceDeclHandler(p, on_nsstart, on_nsend);
   XML_SetSkippedEntityHandler(p, on_skipped);
+  if (opts->no_reparse_deferral)
+    XML_SetReparseDeferralEnabled(p, XML_FALSE);
 
   if (opts->chunk_size == 0 || opts->chunk_size >= len) {
-    st = XML_Parse(p, (const char *)doc, (int)len, 1);
+    st = feed(p, doc, len, 1, opts->buffer_api);
   } else {
     size_t off = 0;
     while (off < len && st == XML_STATUS_OK) {
       size_t n = len - off < opts->chunk_size ? len - off : opts->chunk_size;
-      st = XML_Parse(p, (const char *)doc + off, (int)n, 0);
+      st = feed(p, doc + off, n, 0, opts->buffer_api);
       off += n;
     }
     if (st == XML_STATUS_OK)
-      st = XML_Parse(p, "", 0, 1);
+      st = feed(p, (const unsigned char *)"", 0, 1, opts->buffer_api);
   }
 
   flush_text(&t);
