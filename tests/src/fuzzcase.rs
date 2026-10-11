@@ -8,7 +8,7 @@
 //! [`seeds`] produces the seed inputs the corpora are regenerated from
 //! (`docs/FUZZING.md`); it is a pure function of a fixed seed.
 
-use crate::docgen::{Rng, document};
+use crate::docgen::{Rng, document, dtd_document};
 use crate::port::{PortTrace, port_trace};
 use crate::trace::{first_difference, is_well_formed_trace};
 use crate::vectors::upstream;
@@ -127,9 +127,11 @@ const VECTOR_SELECTORS: [[u8; 2]; 8] = [
 ///
 /// `parse_trace`: every upstream vector under each of
 /// `VECTOR_SELECTORS`, then 2,000 generated documents ([`document`]) with
-/// random selector pairs. `buffer_diff`: every upstream vector and 2,000
-/// generated documents, each with a random operation header of 1-16
-/// operations whose sizes cover the document.
+/// random selector pairs, then 2,000 documents with a document type
+/// declaration ([`dtd_document`]). `buffer_diff`: every upstream vector,
+/// 2,000 generated documents and 1,000 documents with a DTD, each with a
+/// random operation header of 1-16 operations whose sizes cover the
+/// document.
 pub fn seeds(target: &str) -> Option<Vec<Vec<u8>>> {
     let mut r = Rng::new(SEED);
     let vectors: Vec<Vec<u8>> = upstream().iter().map(|v| v.doc()).collect();
@@ -149,6 +151,13 @@ pub fn seeds(target: &str) -> Option<Vec<Vec<u8>>> {
                 input.extend_from_slice(&doc);
                 out.push(input);
             }
+            // Module 11: documents with a document type declaration.
+            for _ in 0..2000 {
+                let doc = dtd_document(&mut r);
+                let mut input = vec![r.next_u64() as u8, r.next_u64() as u8];
+                input.extend_from_slice(&doc);
+                out.push(input);
+            }
             Some(out)
         }
         "buffer_diff" => {
@@ -156,6 +165,11 @@ pub fn seeds(target: &str) -> Option<Vec<Vec<u8>>> {
             let generated: Vec<Vec<u8>> = (0..2000).map(|_| document(&mut r)).collect();
             for doc in vectors.iter().chain(&generated) {
                 out.push(buffer_seed(&mut r, doc));
+            }
+            // Module 11: documents with a document type declaration.
+            for _ in 0..1000 {
+                let doc = dtd_document(&mut r);
+                out.push(buffer_seed(&mut r, &doc));
             }
             Some(out)
         }

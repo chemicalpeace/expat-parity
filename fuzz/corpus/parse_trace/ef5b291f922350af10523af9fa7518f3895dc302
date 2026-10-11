@@ -1,0 +1,8 @@
+„û
+<!DOCTYPE a PUBLIC '-//X//DTD x//EN' 'doc.dtd' [<!ATTLIST n-1 xmlns NMTOKENS #FIXED '&lt;&gt;&quot;&apos;' b NMTOKEN #FIXED 'a&amp;b' xmlns:q IDREF #FIXED "a|b"><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13' d14 CDATA 'v14' d15 CDATA 'v15' d16 CDATA 'v16' d17 CDATA 'v17'><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1'><!ENTITY e1 SYSTEM 'sys.ent'>
+<!ATTLIST a c IDREFS "x&e2;y">
+<!ATTLIST Ã© xmlns:q ENTITY 'urn:q' a ( x | y ) #F|IXED "http://www.w3.org/2000/xmlns/">
+<!ELEMENT doc ((_u?,a?))*>
+<!ATTLIST doc xmlns:q ( x | y ) #REQUIRED xmlns:p NMTOKEN "&undeclared;">
+<?xml version='1.0'?><!ATTLIST p:e q:a CDATA #IMPLIED>]>
+<doc c='&lt;'>&unp;</doc>

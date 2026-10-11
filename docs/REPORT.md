@@ -283,6 +283,84 @@ coverage is not included. Uncovered parser code is mostly the
 suspend/resume and handler-status branches that only the public API
 (module 12) can reach (D-023) and allocation-failure paths.
 
+### Module 11a (declarations): the DTD versus C
+
+Specification first: `docs/DTD-SECURITY.md` (C 2.9.0 entity behaviour,
+external access, recursion, amplification and allocation limits, error
+codes, with `xmlparse.c` line references) and D-026 (security defaults
+identical to C), committed before the port (a651129).
+
+Ported in 11a (`parse/decl.rs`, `parse/model.rs`, `parse/dtd.rs`): every
+`doProlog` role of the internal subset — doctype name/public/system id,
+element declarations with content models (`nextScaffoldPart`,
+`build_model`, connector checks), attribute-list declarations (types,
+enumerations, `NOTATION`, defaults normalised with `storeAttributeValue`,
+`defineAttribute`), general and parameter entity declarations with
+`storeEntityValue`, unparsed entities, notations, parameter entity
+references when they are not expanded, and in content and attribute
+values every entity check that does not expand: undeclared, declared in a
+PE, recursive, unparsed (`XML_ERROR_BINARY_ENTITY_REF`), external in an
+attribute (`XML_ERROR_ATTRIBUTE_EXTERNAL_ENTITY_REF`), external in content
+(skipped without a handler). Still stopping with `Stop::DtdNotPorted`:
+expanding a declared internal entity (content, attribute value, parameter
+entity in the prolog) — 11b — and the external subset / conditional
+sections, which need external entity parsers (module 12).
+
+Local run (2026-10-12, aarch64 Linux, commit ae1413a):
+`cargo test -p expat-difftest --test parse_diff -- --nocapture` →
+`upstream: 494 of 540 vectors compared under every option set` (was 398),
+`upstream: 5634 pairs equal to C, 306 stopped at a DTD`,
+`generated dtd: 8938 pairs equal to C, 62 stopped at a DTD` (3,000
+seeded documents with a DTD x 3 random option sets including all three
+parameter-entity-parsing modes, a quarter damaged),
+`attribute definitions: 88 pairs equal to C`, `deep models` (content
+models nested 1, 31, 32, 33, 1,000 and 20,000 groups, whole and in
+1,000-byte chunks) equal, `generated: 7500 pairs equal to C`; 9 tests
+passed, no mismatch. `generated_dtd_documents_cover_outcomes` asserts that
+the generator reaches the `doctype`, `enddoctype`, `entity`, `notation`,
+`element`, `attlist` and `skipped` events and the error codes 0, 2, 4, 10,
+11, 14, 15, 16 and 32 (measured: `{0: 562, 2: 277, 3: 30, 4: 783, 5: 86,
+8: 68, 10: 32, 11: 461, 12: 2, 14: 20, 15: 6, 16: 7, 17: 6, 18: 245,
+19: 48, 27: 87, 28: 36, 30: 35, 32: 207, 40: 2}` over 3,000 documents).
+Every compared pair includes the error code, line, column and byte index.
+
+**Injected bugs** (2026-10-12, each reverted after the run):
+
+- `normalizePublicId` without removing the trailing space
+  (`parse/decl.rs`): `generated_dtd_documents_match_c` failed
+  (`C doctype a doc.d spaced%20id 1`, port `... spaced%20id%20 1`).
+- Last instead of first attribute definition recorded in
+  `defaultAttForName` (`parse/dtd.rs`): **not detected** at first. Root
+  cause: `storeAtts` in the port looked the type up in the default list
+  instead of through `defaultAttForName`, so the map was not used the way
+  C uses it. Fixed by using the map like C and adding
+  `repeated_attribute_definitions_match_c`, which then failed on the
+  mutation (`C attr x %20%20p%20%20q%20%20`, port `attr x p%20q` for
+  `<!ATTLIST a x CDATA #IMPLIED x NMTOKEN #IMPLIED>`).
+
+**Fuzzing** (aarch64 Linux, `cargo-fuzz` 0.13, AddressSanitizer, flags
+`-max_len=65536 -rss_limit_mb=2048`, commit ae1413a, working corpora
+started from the committed corpora plus the new seeds, which add 2,000
+DTD documents to `parse_trace` and 1,000 to `buffer_diff`), from the
+trimmed logs in `docs/fuzz-logs/module-11a/`:
+
+| Target | Slices | Seconds (sum of `Done ... in N second(s)`) | Executions (sum of `stat::number_of_executed_units`) | Findings |
+|---|---|---|---|---|
+| `parse_trace` | 7 | 682 | 2,223,813 | none |
+| `buffer_diff` | 7 | 689 | 5,237,959 | none |
+
+Three further slices of each target were started concurrently by mistake
+and wrote into one log file each; those logs are mixed and are not counted
+(two of the concurrent `buffer_diff` processes exited with status 1 and
+no crash artifact, consistent with corpus files removed under a running
+process). To rule out a hidden finding, every input of both final
+working corpora was then executed once (`-runs=0`): 24,348 `parse_trace`
+and 22,392 `buffer_diff` inputs, exit status 0. The merged corpora
+(`-merge=1` of committed corpus, working corpus and seeds) are committed:
+`parse_trace` 10,647 files (41,905 inputs, 13,750 edges), `buffer_diff`
+9,674 files (32,718 inputs, 12,256 edges); both are replayed by
+`tests/tests/fuzz_corpus.rs` on every CI platform.
+
 ## Divergences
 
 `docs/DIVERGENCES.md`. No divergences yet. Three C quirks found by the
@@ -302,10 +380,11 @@ comparisons start when the parser exists.
 - No public parser API yet (module 12): no default handler,
   `XML_StopParser`/`XML_ResumeParser`, external entity parsers,
   unknown-encoding handler or `XML_GetInputContext`.
-- Module 10 stops at any document type declaration or declared entity with
-  `Stop::DtdNotPorted` (D-023), never with a guessed error; 142 of the 540
-  upstream vectors (and every DTD input of the fuzz targets) are therefore
-  not compared yet. Module 11 removes the variant.
+- After module 11a the port stops with `Stop::DtdNotPorted` (never a
+  guessed error) only when a declared internal entity is expanded
+  (module 11b) or where an external entity parser would be needed
+  (module 12); 46 of the 540 upstream vectors are not yet compared under
+  every option set.
 - The allocation tracker's byte counts (`XML_SetAllocTrackerMaximumAmplification`)
   are replicated for the hash tables only; whether every parser structure is
   replicated is decided in module 11 (D-021, D-023). Without a failing

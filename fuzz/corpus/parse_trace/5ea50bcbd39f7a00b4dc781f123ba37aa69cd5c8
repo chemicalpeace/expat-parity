@@ -1,0 +1,7 @@
+°_<?xml version='1.0'?><!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ATTLIST doc p:a ENTITIES '&undeclared;'><!NOTATION n2 PUBLIC "a'b">%pe2;
+<!ENTITY % extpe "<!ENTITY e9 'nine'>" ><!ATTLIST b a (x|y|z) #REQUIRED>
+
+<!ENTITY lt PUBLIC "a'b" 'sys2.ent'>
+<!ELEMENT q:e (b+|q:e|b)+>
+<!ATTLIST n-1 c NOTATION (n:|n2) #FIXED '&lt;&gt;&quot;&apos;' xmlns ID '&unp;' b NMTOKEN #IMPE
+>I<!DLATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDAT' Av3' d4 CDATA 'v4' d5 CDATA

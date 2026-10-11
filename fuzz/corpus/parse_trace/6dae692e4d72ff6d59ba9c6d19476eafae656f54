@@ -1,0 +1,8 @@
+M﻿<!DOCTYPE doc [
+<!ATTLIST doc d0 CDATA 'v0'><!ELEMENT _u ANY>
+<!ENTITY é PUBLIC '  spaced 
+  id  ' 'sys2.ent'>
+<!--dtd comment--><!ELEMENT a (#PCDATA|a|a)*>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13'>
+<!ENTITY a><!ELEMENT doc EMPTY><!ENTITY e2 PUBLIC "a'b" 'sys2.ent' > %pe1; ]>
+<b a='&e1;' xmlns:p='1'></b>

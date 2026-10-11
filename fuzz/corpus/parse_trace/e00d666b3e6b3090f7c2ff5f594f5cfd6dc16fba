@@ -1,0 +1,4 @@
+<!DOCTYPE doc [
+<!ELEMENT doc (a|b|c)+><!ELEMENT doc (a|b|c)+>*<!ELEMENT>A ]]PTY>
+<!ELEMENT b (A*<!ELEMENT>A ]]PTY>
+<!ELEMENTdoca 

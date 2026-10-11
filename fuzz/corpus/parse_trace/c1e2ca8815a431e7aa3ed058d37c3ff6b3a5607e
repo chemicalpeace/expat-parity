@@ -1,0 +1,10 @@
+ ¡ï»¿
+<!DOCTYPE doc SYSTEM 'doc.dtd' [<?dtdpi x?>
+<!ATTLIST a c CDATA #REQUIRED b ENTITY "&unp;" xmlns:q CDATA #FIXED "urn:p">
+<!ATTLIST a xmlns:p ID #FIXED '' xmlns:p NOTATION (n1|n2) #FIXED "&#65;&#x42;&#32;">
+<!ATTLIST doc>
+<!NOTATION n1 PUBLIC ""><!NOTATION n1 PUBLIC ''>
+<!ATTLIST p:e a ( x | y ) #FIXED 'a&amp;b' xmlns:p NMTOKENS #IMPLIED b NMTOKEN #FIXED 'urn:p'><!ATTLIST _u id ( x | y ) #IMPLIED a CDATA #FIXED 'aÂ b' xmlns:q IDREF '&lt;'><!ATTLIST a b ( x | y ) #REQUIRED id IDREFS #REQUIRED xmlns:q NMTOKENS #IMPLIED>
+<!NOTATION n2 PUBLIC 'p' 'viewer'>
+<!ATTLIST Ã© q:a ENTITY #REQUIRED id NMTOKENS #IMPLIED><!ATTLIST a p:a IDREF '&ext;'>
+]><b>&e9;</b>

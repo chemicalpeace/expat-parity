@@ -6,10 +6,10 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 ## Snapshot
 
 - **Target:** libexpat 2.9.0 (`R_2_9_0`, `a76b1174c1ea52abb639a4c69d52b630a8a106a2`) — frozen (D-001).
-- **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-10 done
-  (module 10 = the parser core for documents without a document type
-  declaration; a DOCTYPE stops the port with `Stop::DtdNotPorted` until
-  module 11, D-023).
+- **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-10 done;
+  module 11 in progress: 11a (declarations) on branch `module-11-dtd`;
+  expanding a declared internal entity still stops the port with
+  `Stop::DtdNotPorted` until 11b (D-023, D-027).
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
@@ -67,7 +67,7 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 8 | `role` prolog state machine | `xmlrole.c` | **done** — `role::PrologState`, all 51 handlers; D-020 |
 | 9 | `pool` / `hash` / `heap`: string pool, hash table, allocation accounting | `xmlparse.c` | **done** — `StringPool`, `HashTable`, `Heap`; white-box vs C (block lists, slot layout, every allocation request, failure of each attempt); D-021 |
 | 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors under 11 option sets incl. namespace triplets, generated documents, fuzzing), buffer state white-box; D-023, D-025; Q-1/Q-2 resolved (replicate, D-024). DTD roles stop with `Stop::DtdNotPorted` |
-| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | not started |
+| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables): 494/540 upstream vectors fully compared; spec `docs/DTD-SECURITY.md`, D-026, D-027. 11b (expansion, recursion, billion laughs) and 11c (tracker decision, remove `Stop::DtdNotPorted`) next |
 | 12 | public API `expat::Parser` (default handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers, unknown-encoding handler, `XML_GetInputContext`, entropy for the salt) | — | not started (the trace adapter and differential `parse_trace` already exist, module 10) |
 | 13 | `expat-capi` (optional) | `expat.h` | not started |
 
@@ -86,17 +86,18 @@ with allocation failures, white-box).
 
 ## Next steps
 
-1. Module 11: the DTD in `doProlog` (doctype, element and attribute-list
-   declarations with content models and default attributes, notations,
-   entity declarations, parameter entities, conditional sections, the
-   external subset with `XML_SetParamEntityParsing`), internal entity
-   expansion in content and attribute values (`processEntity`,
-   `internalEntityProcessor`, `storeEntityValue`), the amplification limits,
-   and the removal of `Stop::DtdNotPorted`. Decide whether the allocation
-   tracker's byte counts are replicated for every parser structure (D-021,
-   D-023). Then the 142 upstream vectors with a DTD are compared too
-   (`parse_diff::upstream_vectors_match_c` pins 398 fully compared vectors
-   today).
+1. Module 11b: internal entity expansion (`processEntity`,
+   `internalEntityProcessor`, the open-entity lists for content, attribute
+   values and entity values, `XML_TOK_NONE` inside PEs /
+   `XML_ERROR_INCOMPLETE_PE`, event pointers of open entities), recursion
+   errors, `XML_SetBillionLaughsAttackProtection*` in the oracle options and
+   the port, billion-laughs and quadratic-blowup differential tests with
+   time bounds, injected-bug checks, >= 10 min fuzzing per target. Then
+   11c: decide whether the allocation tracker's byte counts are replicated
+   (D-021, D-023; DTD-SECURITY.md section 5), remove `Stop::DtdNotPorted`
+   so 540/540 vectors are compared (external subset and external entity
+   handler tests via a test handler need module 12's external entity
+   parsers, or an oracle option; decided there).
 2. Module 12: public `expat::Parser` on top of `parse::Parser`: default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt

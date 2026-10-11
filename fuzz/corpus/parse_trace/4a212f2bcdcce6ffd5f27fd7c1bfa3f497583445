@@ -1,0 +1,5 @@
+nÍ<?xml version='1.0'?>
+<!DOCTYPE a [<!ATTLIST a xmlns ( x | y ) #FIXED '&#65;&#x42;&#32;'>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6'>
+<!ELEMENT b p:a='&ext;'>&e2;&lt;
+</doc>

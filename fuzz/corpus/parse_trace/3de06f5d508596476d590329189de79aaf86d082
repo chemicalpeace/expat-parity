@@ -1,9 +1,0 @@
-@<!DOCTYPE doc [
-  <!ENTITY e SYSTEM 'entity.ent'>
-  <!ELEMENT doc ANY>
-  <!ELEMENT tag EMPTY>
-
-  <!ELEMENT tag EMPTY>
-  <!ATTLIST tag fiATTLIST tag seMPLIED>
-]>
-<S #IMPLI™

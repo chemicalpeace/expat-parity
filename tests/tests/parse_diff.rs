@@ -8,11 +8,11 @@
 //! `Stop::DtdNotPorted` until module 11; they are counted, never compared.
 
 use expat_difftest::diff::option_matrix;
-use expat_difftest::docgen::{Rng, document};
+use expat_difftest::docgen::{Rng, document, dtd_document};
 use expat_difftest::port::{PortTrace, port_trace};
 use expat_difftest::trace::first_difference;
 use expat_difftest::vectors::upstream;
-use expat_oracle::{ParseOptions, parse_trace};
+use expat_oracle::{ParamEntityParsing, ParseOptions, parse_trace};
 
 #[derive(Default)]
 struct Tally {
@@ -105,7 +105,7 @@ fn upstream_vectors_match_c() {
     tally.assert_clean("upstream");
     // Every vector without a document type declaration is compared under
     // every option set; the count changes only with the ported scope.
-    assert_eq!(fully, 398);
+    assert_eq!(fully, 494);
 }
 
 /// Random option set for generated documents.
@@ -256,4 +256,128 @@ fn generated_documents_cover_outcomes() {
         assert!(events.contains_key(tag), "event {tag} never produced");
     }
     assert!(long_docs > 100);
+}
+
+/// Random option set for documents with a DTD: also varies parameter
+/// entity parsing.
+fn random_dtd_options(r: &mut Rng) -> ParseOptions {
+    ParseOptions {
+        param_entity_parsing: *r.pick(&[
+            ParamEntityParsing::Never,
+            ParamEntityParsing::UnlessStandalone,
+            ParamEntityParsing::Always,
+        ]),
+        ..random_options(r)
+    }
+}
+
+/// Module 11: generated documents with a document type declaration
+/// (element, attribute-list, entity and notation declarations, parameter
+/// entity references, malformed declarations, entity references in
+/// content and attribute values), whole and damaged.
+#[test]
+fn generated_dtd_documents_match_c() {
+    let mut r = Rng::new(0x6474_642d_6765_6e31);
+    let mut tally = Tally::default();
+    for i in 0..3000 {
+        let doc = dtd_document(&mut r);
+        for _ in 0..3 {
+            let o = random_dtd_options(&mut r);
+            tally.check(&format!("dtd #{i}"), &doc, &o);
+        }
+    }
+    tally.assert_clean("generated dtd");
+    assert!(tally.compared > 4000, "generator lost coverage");
+}
+
+/// The DTD generator reaches the declaration events and the DTD error
+/// codes (so a generator change cannot silently stop testing them).
+#[test]
+fn generated_dtd_documents_cover_outcomes() {
+    use std::collections::BTreeMap;
+    let mut r = Rng::new(0x6474_642d_6765_6e31);
+    let mut codes: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut events: BTreeMap<String, usize> = BTreeMap::new();
+    for _ in 0..3000 {
+        let doc = dtd_document(&mut r);
+        let o = random_dtd_options(&mut r);
+        let t = parse_trace(&doc, &o).expect("oracle");
+        let text = String::from_utf8_lossy(&t).into_owned();
+        for l in text.lines() {
+            let tag = l.split(' ').next().unwrap_or("").to_owned();
+            *events.entry(tag).or_default() += 1;
+        }
+        let code = expat_difftest::trace::result_error_code(&t).expect("result");
+        *codes.entry(code).or_default() += 1;
+    }
+    eprintln!("codes {codes:?}\nevents {events:?}");
+    for code in [0, 2, 4, 10, 11, 14, 15, 16, 32] {
+        assert!(
+            codes.contains_key(&code),
+            "error code {code} never produced"
+        );
+    }
+    for tag in [
+        "doctype",
+        "enddoctype",
+        "entity",
+        "notation",
+        "element",
+        "attlist",
+        "skipped",
+        "start",
+        "attr",
+    ] {
+        assert!(events.contains_key(tag), "event {tag} never produced");
+    }
+}
+
+/// Attribute-list declarations whose effect depends on C's rules for
+/// repeated definitions: the first definition of an attribute decides its
+/// type (CDATA or tokenized normalisation) and default; an ID attribute
+/// never gets a default; the first ID attribute is the element's ID.
+#[test]
+fn repeated_attribute_definitions_match_c() {
+    let docs: &[&[u8]] = &[
+        b"<!DOCTYPE a [<!ATTLIST a x CDATA #IMPLIED x NMTOKEN #IMPLIED>]><a x='  p  q  '/>",
+        b"<!DOCTYPE a [<!ATTLIST a x NMTOKENS #IMPLIED x CDATA #IMPLIED>]><a x='  p  q  '/>",
+        b"<!DOCTYPE a [<!ATTLIST a x CDATA 'd1' x CDATA 'd2'>]><a/>",
+        b"<!DOCTYPE a [<!ATTLIST a x CDATA #IMPLIED><!ATTLIST a x CDATA 'd'>]><a/>",
+        b"<!DOCTYPE a [<!ATTLIST a x ID 'd' y ID #IMPLIED z CDATA 'z'>]><a y='1'/>",
+        b"<!DOCTYPE a [<!ATTLIST a x ID #IMPLIED x NMTOKEN ' n '>]><a x=' v  w '/>",
+        b"<!DOCTYPE a [<!ATTLIST a xmlns:p CDATA 'urn:p' p:x CDATA 'v'>]><a/>",
+        b"<!DOCTYPE a [<!ATTLIST a x (u|v) 'u' y NOTATION (n) #REQUIRED>]><a/>",
+    ];
+    let mut tally = Tally::default();
+    for (i, doc) in docs.iter().enumerate() {
+        for o in extended_options() {
+            assert!(tally.check(&format!("attdef #{i}"), doc, &o));
+        }
+    }
+    tally.assert_clean("attribute definitions");
+}
+
+/// Deeply nested content models: C builds them without recursion
+/// (`build_model`); so do the port and its trace writer. Compared with C
+/// whole and in chunks.
+#[test]
+fn deep_content_models_match_c() {
+    for depth in [1usize, 31, 32, 33, 1000, 20_000] {
+        let mut doc = b"<!DOCTYPE r [<!ELEMENT r ".to_vec();
+        doc.extend(std::iter::repeat_n(b'(', depth));
+        doc.extend_from_slice(b"a");
+        for i in 0..depth {
+            doc.extend_from_slice(if i % 2 == 0 { b",b)*" } else { b"|c)" });
+        }
+        doc.extend_from_slice(b">]><r/>");
+        let mut tally = Tally::default();
+        for chunk in [0, 1000] {
+            let o = ParseOptions {
+                chunk_size: chunk,
+                ..ParseOptions::default()
+            };
+            assert!(tally.check(&format!("depth {depth}"), &doc, &o));
+        }
+        tally.assert_clean("deep models");
+    }
 }

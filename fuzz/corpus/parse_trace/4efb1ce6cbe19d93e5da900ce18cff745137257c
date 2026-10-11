@@ -1,0 +1,7 @@
+�﻿<?xml version='1.0'?><!DOCTYPE p:e SYSTEM 'doc.dtd' [<!NOTATION n1 PUBLIC 'p' 'viewer'><!ELEMENT é ANY>
+<!----><!ATTLIST doc d0 CDATA 'v0'>
+	<!NOTATION n2 PUBLIC "-//X//DTD x//EN"><!ELEMENT é EMPTY><!ATTLIST é xmlns IDREFS 'http://www.w3.org/XML/1998/namespace' xmlns:q NOTATION (n1|n2) #FIXED '&#65;&#x42;&#32;'>
+<!ELEMENT n-1 EMPTY>
+<!----><!ENTITY amp PUBLIC "a'b" 'sys2.ent' >%undeclared;
+]>
+<doc><!--c-->&lt;<!--c--></doc>

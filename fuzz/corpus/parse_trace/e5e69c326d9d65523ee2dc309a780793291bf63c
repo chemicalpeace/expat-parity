@@ -1,0 +1,7 @@
+<!DOCTYPE r [
+<!ENTITY % draft 'INCLUDE'>
+<!ENTITY % final 'IGNORE'>
+<!ENTITY % import SYSTEC "first.%nt">
+%ort;
+]>
+<r/>

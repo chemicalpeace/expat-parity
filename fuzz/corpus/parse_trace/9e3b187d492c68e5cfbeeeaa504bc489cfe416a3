@@ -1,0 +1,4 @@
+$�﻿
+<!DOCTYPE a SYSTEM 'doc.dtd' [<!ATTLIST b c (x|y|z) #REQUIRED xmlns:p CDATA #REQUIRED xml:lang NMTOKEN '&lt;&gt;&quot;&apos;'>	
+<!ATTLIST é xmlns ( x | y ) #FIXED "a|b">
+]><doc>&e2;<!--c-->&e3;<?pi?></doc>

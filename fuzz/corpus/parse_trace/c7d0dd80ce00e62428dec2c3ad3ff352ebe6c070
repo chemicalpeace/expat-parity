@@ -1,0 +1,5 @@
+b�﻿<!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ATTLIST p:e b (x|y|z) "&ext;" xmlns:p NMTOKENS #FIXED "a b">
+<!ELEMENT a EMPTY>
+<!ATTLIST n-0 b NOTATION (n1|n2) #IMPLIED xmlns:p ( x | y ) "" p:a CDATA #FIXED 'http://www.w3.org/XML/1998/namespace'>
+<!NOTATION n1 PUBLIC 'p' 'viewer'><!ELEMENT q:e ((a+|doc|n-1)*,a?,a)>
+<!ATTLIST % id (x|y|z) #FKXED "urn:aq">] ><doc></doc>

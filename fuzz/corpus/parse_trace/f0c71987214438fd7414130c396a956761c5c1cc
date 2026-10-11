@@ -1,0 +1,5 @@
+¹ 
+<!DOCTYPE a [ %pe1;  %pe1; <!NOTATION n2 PUBLIC "a'b">
+<!ATTLIST doc id NOTATION (n1|n2) #REQUIRED a ENTITIES #REQUIRED xmlns ID #REQUIRED>	
+<!ATTLIST doc xmlns:p NMTOKEN #FIXED "&#65;&#x42;&#32;"><!--dtd comment--><!ATTLIST a xmlns NMTOKEN #FIXED 'http://www.w3.org/2000/xmlns/'>]>
+<b xmlns:p='1'>&e1;</b>

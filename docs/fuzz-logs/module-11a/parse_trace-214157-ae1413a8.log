@@ -1,0 +1,71 @@
+# libFuzzer log, trimmed: 972 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=99 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2765677218
+INFO: Loaded 1 modules   (62913 inline 8-bit counters): 62913 [0xaaaad32b67c0, 0xaaaad32c5d81), 
+INFO: Loaded 1 PC tables (62913 PCs): 62913 [0xaaaad32c5d88,0xaaaad33bb998), 
+INFO:    20091 files found in <corpus>
+INFO: seed corpus: files: 20091 min: 1b max: 11360b total: 5647213b rss: 45Mb
+#16384	pulse  cov: 13001 ft: 46878 corp: 8796/487Kb exec/s: 4096 rss: 425Mb
+#20092	INITED cov: 13581 ft: 55255 corp: 10316/2289Kb exec/s: 1674 rss: 469Mb
+#32768	pulse  cov: 13581 ft: 55255 corp: 10316/2288Kb lim: 11373 exec/s: 2340 rss: 525Mb
+#65536	pulse  cov: 13586 ft: 55283 corp: 10333/2299Kb lim: 11399 exec/s: 3120 rss: 567Mb
+#131072	pulse  cov: 13598 ft: 55340 corp: 10362/2314Kb lim: 11477 exec/s: 3744 rss: 567Mb
+#262144	pulse  cov: 13612 ft: 55429 corp: 10405/2325Kb lim: 11633 exec/s: 3692 rss: 567Mb
+#371301	DONE   cov: 13625 ft: 55510 corp: 10439/2355Kb lim: 11711 exec/s: 3676 rss: 567Mb
+###### Recommended dictionary. ######
+"nsstart" # Uses: 3374
+"\007\000\000\000\000\000\000\000" # Uses: 2402
+"attr" # Uses: 1794
+"\377\377\377\377\377\377\377\377" # Uses: 1678
+"\000\000\000\000\000\000\000\000" # Uses: 1447
+"\001\000\000\001" # Uses: 1234
+"\000\000\000\000\000\000\000J" # Uses: 1141
+"a5" # Uses: 1124
+"\000\000\000\000\000\000\000\011" # Uses: 1119
+"skipped" # Uses: 1080
+"\000\016" # Uses: 1120
+"xmlns" # Uses: 1097
+"\377\377\377\002" # Uses: 1070
+"doctype" # Uses: 837
+"xmldecl" # Uses: 805
+"\006\000\000\000" # Uses: 766
+"\001\000\000\000\000\000\0004" # Uses: 632
+"\001\017" # Uses: 591
+"\033\000" # Uses: 621
+"\001\004\000\000" # Uses: 598
+"comment" # Uses: 507
+"H\000\000\000" # Uses: 432
+"\000\000\000\034" # Uses: 367
+"nsend" # Uses: 373
+"c5" # Uses: 439
+"\377\377\377\377" # Uses: 356
+"\007\000" # Uses: 370
+"\000\000\000\000\000\000\010\000" # Uses: 335
+"\377\377\372\377\223\307p\000" # Uses: 333
+"CD" # Uses: 344
+"\027\000" # Uses: 287
+"xml" # Uses: 271
+"\000\006" # Uses: 254
+"doc" # Uses: 220
+"\020\000\000\000\000\000\000\000" # Uses: 202
+"xmlns:" # Uses: 213
+"\001\031" # Uses: 215
+"\001\350\272.\213\242\350\272" # Uses: 187
+"endcdata" # Uses: 157
+"\315\000-\0001\000" # Uses: 178
+"\006\000\000\000\000\000\000\000" # Uses: 127
+"\000\000\000\000" # Uses: 126
+"\001\000\000\000\000\000\000\000" # Uses: 70
+"\377\377\377\377\377\377\377\355" # Uses: 66
+"\356\377\377\377" # Uses: 40
+"\001\000\000\002" # Uses: 16
+###### End of recommended dictionary. ######
+Done 371301 runs in 101 second(s)
+stat::number_of_executed_units: 371301
+stat::average_exec_per_sec:     3676
+stat::new_units_added:          972
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              567

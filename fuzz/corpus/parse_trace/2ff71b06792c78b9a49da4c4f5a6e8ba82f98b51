@@ -1,0 +1,4 @@
+G<?xml version='1.0' standalone='yes'?><!--before--><!DOCTYPE a [
+<!ENTITY % pe3 "<!ENTITY e1 '&#37;pe1;'>">
+<!ATTLIST a xml:lang NMTOKEN "&unp;" xml:lang ENTITY #REQUIRED>
+]><doc></doc>

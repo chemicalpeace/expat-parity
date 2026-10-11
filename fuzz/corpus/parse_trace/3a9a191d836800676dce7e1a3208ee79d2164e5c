@@ -1,0 +1,2 @@
+«9<?xml version='1.0' standalone='yes'?><!--before--><!DOCTYPE doc [<!ENTITY % extpe 'text'>
+<!ATTLIST b id ID #FIXED "urn:q"><!ELEMENT a ANY><!ELEMENT q:e (a,p:e*,a,b)+><!ENTITY % extpe SRS[&e1;]]>&e1;&lt;&lt;</doc>

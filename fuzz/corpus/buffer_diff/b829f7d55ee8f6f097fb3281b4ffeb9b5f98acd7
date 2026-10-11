@@ -1,0 +1,4 @@
+Ù<?xml version='1.0' standalone='yes'?><!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [%pe2;
+<!NOTATION n1 SYSTEM 'viewer'><!ENTITY e2 SYSTEM 'sys.ent'><!ELEMENT _u EMPTY>
+<!ATTLIST doc c ENTITY #FIXED "&#x10000;" p:a ENTITIES #REQUIRED><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7'd{char}' "sys2.ent" ><!ATTLIST5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10'>]>
+ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿe2; '><a/>&e3;</doc>&undeclared;</doc>

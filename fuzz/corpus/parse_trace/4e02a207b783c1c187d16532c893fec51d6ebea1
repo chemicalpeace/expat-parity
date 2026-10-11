@@ -1,0 +1,4 @@
+¯<?xml version='1.0' standalone='no'?><!--before--><!DOCTYPE a [<!ATTLIST a a ENTITIES #FIXED "1"><!ENTITY e2 "&#38;#38;">
+<!ATTLIST n-1 xmlns:q IDREFS #REQUIRED id IDREF #FIXED ' x  y ' xmlns NMTOKENS #FIXED 'urn:p'>
+]><a c='urn:p' a='&undeclared;'><b p:a=' x &e2; ' p:a=' x &e2; '>&e1;<doc/>&unp;
+</b>&e3;&ext;</a>

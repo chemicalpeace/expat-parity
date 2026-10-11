@@ -1,0 +1,6 @@
+„
+<!DOCTYPE a PUBLIC "a'b" 'doc.dtd' [<!ATTLIST doc c IDREF '&ext;' xmlns:p ENTITY #FIXED 'urn:q' xmlns:q ID #IMPLIED>
+<!ENTITY Ã© '&#38;#38;'>
+%extpe;
+<!ATTLIST b xmlns:q NMTOKEN #FIXED "a&amp;b"><!NOTATION n1 PUBLIC ""><!ATTLIST a q:a ( x | y ) #IMPLIED a IDREF "&#65;&#x42;&#32;" b CDATA #IMPLIED>
+] ><b xmlns:p=' x &e2; '></b>

@@ -1,0 +1,3 @@
+ø=<?xml version='1.0'?><!--before--><!DOCTYPE a SYSTEM 'doc.dtd' [<!ATTLIST b xmlns:q NOTATION (n1|n2) #IMPLIED xmlns NOTATION (n1|n2) #FIXED 'http://www.w3.org/XML/1998/namespace'>
+<!--dtd comment-->
+<!ATTLIST q:e xmlns:q NOTATION (n1|n2) #REQUIRED p:a NOTATIMN (n1|n2) #REQUIRED><!ATTLIST doc d0 Cc xmlns:p NOTATION (n1|n2) #FIXED "&#x10000;"></a>

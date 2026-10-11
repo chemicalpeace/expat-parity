@@ -1,0 +1,4 @@
+>﻿<?xml version='1.0' standalone='no'?><!DOCTYPE doc PUBLIC '  spaced 
+  id  ' 'doc.dtd' [<!ATTLIST é xmlns:q NOTATION (n1|n2) #REQUIRED a ENTITY 'urn:q'>
+<!ELEMENT doc (#PCDATA|p:e|é|p:e)*><!ELEMENT _u (#PCDATA->
+<!NO[ATIO_ n2 PUBLIC 'p' 'viewergif' NDATA n2><!ATTLIST doc d0 CDA

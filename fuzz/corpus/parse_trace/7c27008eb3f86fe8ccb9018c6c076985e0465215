@@ -1,0 +1,7 @@
+;�﻿<?xml version='1.0' encoding='UTF-8'?><!--before--><!DOCTYPE a PUBLIC "  spaced 
+  id  " 'doc.dtd' [<!ENTITY amp ''><!NOTATION n1 SYSTEM 'viewer'>
+<!ENTITY ext "&#x10000;☃" >
+<!---->
+<!ATTLIST b xml:lang ID #REQUIRED xmlns:q NMTOKEN #IMPLIED>
+<!ATTLIST doc xmlns IDREF #REQUIRED a ID #FIXED '&lt;&gt;&quot;&apos;' xml:lang IDREFS "http://www.w3.org/XML/1998/namespace"> ]><doc p:a='&ext;' id='&lt;'>	<b>&lt;&e9;</b>
+&unp;</doc>

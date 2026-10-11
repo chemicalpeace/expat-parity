@@ -1,0 +1,74 @@
+# libFuzzer log, trimmed: 903 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=96 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1466566769
+INFO: Loaded 1 modules   (62913 inline 8-bit counters): 62913 [0xaaaab77967c0, 0xaaaab77a5d81), 
+INFO: Loaded 1 PC tables (62913 PCs): 62913 [0xaaaab77a5d88,0xaaaab789b998), 
+INFO:    21513 files found in <corpus>
+INFO: seed corpus: files: 21513 min: 1b max: 17989b total: 7240062b rss: 46Mb
+#8192	pulse  cov: 8490 ft: 23459 corp: 5747/145Kb exec/s: 2730 rss: 423Mb
+#16384	pulse  cov: 11606 ft: 37091 corp: 8357/503Kb exec/s: 3276 rss: 453Mb
+#21514	INITED cov: 12230 ft: 43886 corp: 9563/1746Kb exec/s: 3073 rss: 453Mb
+#32768	pulse  cov: 12230 ft: 43888 corp: 9564/1746Kb lim: 18059 exec/s: 4096 rss: 581Mb
+#65536	pulse  cov: 12230 ft: 43892 corp: 9567/1745Kb lim: 18171 exec/s: 5461 rss: 589Mb
+#131072	pulse  cov: 12234 ft: 43920 corp: 9583/1747Kb lim: 18395 exec/s: 6241 rss: 589Mb
+#262144	pulse  cov: 12237 ft: 43987 corp: 9622/1759Kb lim: 18857 exec/s: 6721 rss: 589Mb
+#524288	pulse  cov: 12241 ft: 44118 corp: 9683/1799Kb lim: 19725 exec/s: 7182 rss: 589Mb
+#713026	DONE   cov: 12245 ft: 44210 corp: 9718/1807Kb lim: 20411 exec/s: 7350 rss: 589Mb
+###### Recommended dictionary. ######
+"b1" # Uses: 4627
+"_u" # Uses: 4617
+"\377\377\377\377\377\377\377\377" # Uses: 4610
+"\013\000" # Uses: 3129
+"999" # Uses: 3014
+"\000\000\000\017" # Uses: 2912
+"Zv\352\260\264\352\260\264\350\200\230" # Uses: 2721
+"vPwvvvvvvv" # Uses: 2737
+"\377\377\377\377\377\377\377\213" # Uses: 2291
+"Zvvvvvvv" # Uses: 2060
+"d1" # Uses: 1684
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\200\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 1049
+"vZvvvvvvv" # Uses: 1344
+"Zvvvv6vv" # Uses: 1358
+"\000\013" # Uses: 1343
+"\001\000\000\024" # Uses: 1318
+"\000\000\000\000" # Uses: 1270
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\202\220\350\276\217\350\261\260\347" # Uses: 914
+"\000\000\000\000\000\000\000\004" # Uses: 1201
+"\004\000\000\000\000\000\000\000" # Uses: 1035
+"^t\321E\027]t\001" # Uses: 1074
+"\377\377\377\016" # Uses: 1078
+"\001\000\000\000\000\000\000\012" # Uses: 1013
+"vvvvvwvvvvv" # Uses: 970
+"d16" # Uses: 1030
+"\377\377\377\375" # Uses: 1077
+"\001\000\000\000\000\000\000$" # Uses: 941
+"l1" # Uses: 689
+"c6" # Uses: 679
+"b6" # Uses: 667
+"xml\320\240" # Uses: 607
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\345\251\266\347\231\266\347\230\266\347\231\266\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 389
+"\340\250\206" # Uses: 482
+"\377#" # Uses: 463
+"\377\377\377\377" # Uses: 484
+"\376\377\377\377" # Uses: 456
+"\377\377" # Uses: 349
+"\002\000\000\000\000\000\000\000" # Uses: 305
+"d10" # Uses: 297
+"\014\000\000\000" # Uses: 234
+"\001\000" # Uses: 190
+"\000\000\000\000\000\000\000\020" # Uses: 200
+"\377\034" # Uses: 175
+"\377\002" # Uses: 121
+"id" # Uses: 100
+"\017\000\000\000\000\000\000\000" # Uses: 80
+"\377\377\377\377\377\377\3771" # Uses: 0
+###### End of recommended dictionary. ######
+Done 713026 runs in 97 second(s)
+stat::number_of_executed_units: 713026
+stat::average_exec_per_sec:     7350
+stat::new_units_added:          903
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              589

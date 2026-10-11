@@ -1,0 +1,3 @@
+<!DOCTYPE r [
+<!ENTITY e2 'v1'>
+<!ENTITY e2 SYSTEM 'v2'>ot;]</r>

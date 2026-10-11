@@ -1,0 +1,6 @@
+7﻿
+<!DOCTYPE doc [<!ATTLIST _u b ENTITY '&#65;&#x42;&#32;'>
+<!ENTITY lt "<a/>">%pe1;
+%extpe;<!ENTITY % pe3 PUBLIC "a'b" 'sys2.ent' >
+%pe1;<!NOTATION n2 SYSTEM 'viewer'>]>
+<b>&lt;&#13;</b>

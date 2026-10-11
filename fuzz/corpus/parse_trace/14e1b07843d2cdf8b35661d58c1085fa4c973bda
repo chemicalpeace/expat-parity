@@ -1,0 +1,4 @@
+h¢<?xml version='1.0' standalone='yes'?><!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ENTITY e1 "&#x3C;b>x&#x3C;/b>" ><!NOTATION n2 PUBLI .''p Cviewer'>
+<!ATTLIST b id IDREF #IMPLIED>
+<!ENTITY % pe1 "a&.gif' NDATA n2 >
+]><docdoc>

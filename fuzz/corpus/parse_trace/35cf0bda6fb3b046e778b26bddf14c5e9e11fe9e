@@ -1,0 +1,6 @@
+hs<!DOCTYPE doc [<!ELEMENT p:e EMPTY>%pe2; <!ELEMENT q:e (#PCDATA|_u|_u|a)*>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12'><!NOTATION n2 SYSTEM 'viewer'>
+<!ELEMENT b (#PCDATA|doc)*>
+<!ELEMENT a (#PCDATA)>
+<!NOTATION n1 SYSTEM 'viewer'>%pe1;
+ %pe1; <!ATTLIST _u xmlns IDREFS #REQUIRED xmlns:p CDATA #IMPLIED>]><doc c='&undeclared;'> </doc>

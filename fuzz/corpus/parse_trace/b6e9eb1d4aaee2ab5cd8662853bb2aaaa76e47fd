@@ -1,0 +1,9 @@
+lĞ<!--before--><!DOCTYPE p:e PUBLIC '-//X//DTD x//EN' 'doc.dtd' [%extpe;<?dtdpi x?><?dtdpi x?><!--dtd comment-->
+<!---->
+<!ENTITY ext "line
+brcr" ><?dtdpi x?>
+<!ENTITY % pe2 PUB
+<!ENTITY ext "line
+break
+andcr" ><?dt PUBLIC "  spaced 
+  id  " ><doc c='&undeclared;'>&lt;&#60;&#x3C;<a/><!--c--></doc>

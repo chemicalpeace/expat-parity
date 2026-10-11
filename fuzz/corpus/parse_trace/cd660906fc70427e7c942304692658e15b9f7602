@@ -1,0 +1,4 @@
+ø=<?xml version='1.0'?><!--before--><!DOCTYPE a SYSTEM 'doc.dtd' [<!ATTLIST b xmlns:q NOTATION (n1|n2) #IMPLIED xmlns NOTATION (n1|n2) #FIXED 'http://www.w3.org/XML/1998/namespace'>
+<!--dtd comment-->
+<!ATTLIST q:e xmlns:q NOTATION (n1|n2) #REQUIRED p:a NOTATION (n1|n2) #REQUIRED> 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA NOTATIONx10000;"> <!ATTLIST a b CDATA '<'>]>
+<a c='urn:p' a='urn:p'><!--c-->&e1;<b x='y'/></a>

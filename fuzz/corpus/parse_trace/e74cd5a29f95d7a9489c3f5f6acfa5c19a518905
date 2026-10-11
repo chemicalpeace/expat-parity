@@ -1,0 +1,8 @@
+ž±ï»¿<!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!--dtd comment--><!ENTITY Ã© "line
+break
+andcr" >
+<!ATTLIST b xmlns:q NOTATION (n1|n2) "line
+break
+andcr	tab" id CDATA '&lt;'><!ATTLIST n-1 xmlns:q NOTATION (n1|n2) #FIXED "">
+<!ATTLIST b p:a IDREF '&#x10000;' c CDATA #IMPLIED q:a NOTATION (n1|n2) #FIXED '&#x10000;'>]>
+<b p:a='urn:p'>&ext;&ext;</b>

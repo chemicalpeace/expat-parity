@@ -1,0 +1,4 @@
+~ 
+<!DOCTYPE a [<!ELEMENT a (b|a|q:e)?><!ENTITY % pe2 "&#37;pe1;" >
+<!ATTLIST a xmlns ENTITIES #FIXED 'a|b' a NMTOKEN #FIXED 'a|b'>]><doc id=' x &e2; ' id='urn:p'>
+<?pi?></doc>

@@ -1,0 +1,5 @@
+
+þ<?xml version='1.0' standalone='yes'?><!DOCTYPE p:e [<!ELEMENT b (b,a*,n-1,_u+)?>
+<?dtdpi x?><!ATTLIST b q:a ( x | y ) #FIXED "urn:q" xmlns:p ENTITY #REQUIRED><!ATTLIST q:e xmlns:q NOTATION (n1|n2) #REQUIRED><?dtdpi x?>
+<!ATTLIST doc xmlns:p CDATA '1' q:a ( x | y ) '&#65;&#x42;&#32;' xmlns:p NOTATION (n1|n2) #REQUIRED>
+<!ATTLIST p:e q:a ( x | y ) "&ext;" ITY "" xmlns:q NMTOKEN #IMPLIED><!---->] ><a>]]&e9;&e1;</a>

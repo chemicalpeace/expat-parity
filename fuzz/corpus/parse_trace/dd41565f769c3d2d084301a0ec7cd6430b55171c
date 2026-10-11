@@ -1,0 +1,5 @@
+@<!DOCTYPE t0 [
+  <!ENTITY g0 ''>
+  <!ENTITY g1 '&g0;</t0>'>
+]>
+<t0>&g1;

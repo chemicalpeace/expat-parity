@@ -1,0 +1,5 @@
+ˆá<?xml version='1.0' encoding='UTF-8'?><!--before--><!DOCTYPE p:e PUBLIC "-//X//DTD x//EN" 'doc.dtd' [
+<!ELEMENT p:e (#PCDATA|q:e|a|n-1)*>
+
+<!ATTLIST a q:a ENTITIES "&lt;" xmlns:p ENTITY #FIXED '">%extpe;]>
+<doc a=' x &e2; '></doc>

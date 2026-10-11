@@ -1,0 +1,7 @@
+®³<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE doc [ 
+<!ENTITY amp '&e3;' >
+<!ENTITY amp '&#38;#38;' ><!ELEMENT doc ANY>
+<!ENTITY % extpe ''><!ATTLIST doc xmlns:p ENTITY #REQUIRED c IDREF #REQUIRED><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13' d14 CDATA 'v14' d15 CDATA 'v15' d16 CDATA 'v16' d17 CDATA 'v17' d18 CDATA 'v18'>
+<!ENTITY % pe3 "]]>">
+<!ATTLIST doc d0 CDATA 'vt;&gt;&quot;&apos;" xmlns:p ENTITIES #REQUIRED>] ><b>&undeclared;<doc a='1'><!--c--></doc>&e2;&ext;</b>

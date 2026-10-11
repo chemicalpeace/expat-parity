@@ -1,0 +1,9 @@
+�~﻿<!DOCTYPE a PUBLIC "a'b" 'doc.dtd' [ <!--dtd comment-->
+<!----><!NOTATION n2 PUBLIC 'p' 'viewer'>
+<!ELEMENT _u ((n-1*,(é,(b*)+,a?,n-1+),a?)?|p:e?)>
+<!ELEMENT a EMPTY><!NOTATION n1 PUBLIC '-//X//DTD x//EN'>
+<!----><!ATTLIST a b ID #FIXED 'x'>
+<!ATTLIST é id ID #IMPLIED q:a IDREFS #IMPLIED c ENTITIES 'a|b'>
+%extpe;<!ENTITY e2 PUBLIC "" 'sys2.ent' >
+]>
+<b a='&lt;'><?pi?></b>

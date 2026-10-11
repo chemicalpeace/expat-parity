@@ -1,0 +1,50 @@
+# libFuzzer log, trimmed: 617 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=96 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1373190014
+INFO: Loaded 1 modules   (62913 inline 8-bit counters): 62913 [0xaaaae7da67c0, 0xaaaae7db5d81), 
+INFO: Loaded 1 PC tables (62913 PCs): 62913 [0xaaaae7db5d88,0xaaaae7eab998), 
+INFO:    22570 files found in <corpus>
+INFO: seed corpus: files: 22570 min: 1b max: 11360b total: 6740039b rss: 46Mb
+#16384	pulse  cov: 12670 ft: 43689 corp: 8281/353Kb exec/s: 5461 rss: 421Mb
+#22571	INITED cov: 13695 ft: 56022 corp: 10541/2440Kb exec/s: 1736 rss: 468Mb
+#32768	pulse  cov: 13695 ft: 56024 corp: 10543/2441Kb lim: 11399 exec/s: 2184 rss: 524Mb
+#65536	pulse  cov: 13695 ft: 56030 corp: 10546/2438Kb lim: 11464 exec/s: 2427 rss: 535Mb
+#131072	pulse  cov: 13696 ft: 56056 corp: 10560/2459Kb lim: 11581 exec/s: 2621 rss: 535Mb
+#262144	pulse  cov: 13704 ft: 56119 corp: 10590/2517Kb lim: 11763 exec/s: 3013 rss: 535Mb
+#292163	DONE   cov: 13707 ft: 56142 corp: 10599/2526Kb lim: 11815 exec/s: 3011 rss: 535Mb
+###### Recommended dictionary. ######
+"h\000\000\000\000\000\000\000" # Uses: 2634
+"xmldecl" # Uses: 2491
+"skipped" # Uses: 2083
+"\377\377\377\377\377\377\377\377" # Uses: 1724
+"\001\000\000\000\000\000\000\000" # Uses: 1452
+"d7" # Uses: 1345
+"dgc" # Uses: 1239
+"xm" # Uses: 1102
+"\001\200" # Uses: 1181
+"\377*" # Uses: 1036
+"\377\377Qd\313\202i\243" # Uses: 1027
+"\001\000\000+" # Uses: 1056
+":\000" # Uses: 1043
+"\000\000\000\033" # Uses: 942
+"1\000\000\000" # Uses: 912
+"id" # Uses: 594
+"comment" # Uses: 433
+"\000\000\000\000" # Uses: 447
+"&\000\000\000\000\000\000\000" # Uses: 356
+"attr" # Uses: 248
+"dP;\022p\002\000\000" # Uses: 231
+"\023\000\000\000" # Uses: 176
+"do_\303\276" # Uses: 136
+"do_\303\277" # Uses: 61
+"\001\000\002p\017\360W\024" # Uses: 16
+###### End of recommended dictionary. ######
+Done 292163 runs in 97 second(s)
+stat::number_of_executed_units: 292163
+stat::average_exec_per_sec:     3011
+stat::new_units_added:          617
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              535

@@ -1,0 +1,6 @@
+��﻿<?xml version='1.0' encoding='UTF-8'?><!--before--><!DOCTYPE a [<!ELEMENT a (a+ , (q:e?,b,doc,é)* , (b*)+)><!ATTLIST a xmlns NOTATION (n1|n2) "&#x10000;" id NMTOKENS "&#x10000;"><!ATTLIST p:e p:a CDATA #IMPLIED><!ATTLIST a q:a CDATA #FIXED 'a&amp;b' p:a NMTOKENS "&lt;" xml:lang NOTATION (n1|n2) #IMPLIED><!ELEMENT a EMPTY><!ENTITY amp "&#60;b/&#62;">
+<!ATTLIST a xmlns IDREF #REQUIRED>
+
+<!ENTITY é '&#38;#38;'>
+<!ELEMENT n-1 ((doc?|doc)?|((a)+,a,b*)?|b?)><!ELEMENT b ((é+ , n-1 , _u*)+)+><!ENTITY ext SYSTEM "sys.ent" >
+] ><doc><b x='y'/>&unp;<?pi?></doc>

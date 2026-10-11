@@ -1,0 +1,9 @@
+ÊLï»¿<!--before--><!DOCTYPE p:e PUBLIC "  spaced 
+  id  " 'doc.dtd' [
+<!NOTATION n2 SYSTEM 'viewer'>
+<!---->
+	
+<!ELEMENT q:e ((b+|_u*|_u+)+|a?)+><!NOTATION n2 SYSTEM 'viewer'>
+<!NOTATION n2 PUBLIC 'p' 'viewer'>
+<!ATTLIST doc xmlns NMTOKENS #FIXED 'http://www.w3.org/XML/1998/Eamespace'>]>
+<a x/a>

@@ -1,0 +1,9 @@
+Ä«<?xml version='1.0' encoding='ISO-8859-1'?>
+<!DOCTYPE p:e [<!ENTITY % pe1 PUBLIC "  spaced 
+  id  " "sys2.ent">
+<!ENTITY é SYSTEM 'u.gif' NDATA n2>%pe1;
+<!ENTITY é SYSTEM 'sys.ent'>
+<!ELEMENT a ANY>
+
+%undeclaree2;
+]><b xmlns:p='&ext;'>&lt;<!--c--><!--c--></b>

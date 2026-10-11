@@ -1,0 +1,6 @@
+õ<?xml version='1.0' standalone='no'?><!--before--><!DOCTYPE a [<!ELEMENT q:e (#PCDATA)*>
+<!ELEMENT n-1 (#PCDATA|a|_u)*><!ATTLIST p:e xmlns:p ENTITY "&lt;&gt;&quot;&apos;" b CDATA #IMPLIED xmlns ID #FIXED 'http://www.w3.org/2000/xmlns/'>
+<!ATTLIST p:e xmlns:q (x|y|z) '1' xmlns:q (x|y|z) #IMPLIED>
+<!ELEMENT doc (#PCDATA|b|p:e|a)*>
+%pe2;<!ELEMENT b (#PCDATA|_u|q:e|a)*>
+]><a></a>

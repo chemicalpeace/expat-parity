@@ -1,0 +1,4 @@
+E†
+<!DOCTYPE p:e PUBLIC '  spaced 
+  id  ' 'doc.dtd' [<!ATTLIST a p:a ENTITIES ' x  y ' p:a NOTATION (n1|n2) #IMPLIED id ( x | y ) #IMPLIED>
+]><b id='1' p:a='&ext;'>&#13;<a/><!--c--></b>

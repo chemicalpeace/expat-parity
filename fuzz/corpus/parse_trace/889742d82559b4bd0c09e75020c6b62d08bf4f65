@@ -1,0 +1,5 @@
+I	
+<!DOCTYPE doc SYSTEM 'doc.dtd' [<!NOTATION n2 PUBLIC 'p' 'viewer'>
+<!NOTATION n2 SYSTEM 'viewer'><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12'>
+<!ATTLIST b q:a ENTITIES #FIXED "">
+]><b>&e2;<b x='y'/></b>

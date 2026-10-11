@@ -1,0 +1,11 @@
+B„Ôªø<!--before--><!DOCTYPE doc [%uneclared;
+<!ELEMENT n-1 (#PCDATA)>
+<!ENTITY e2 PUBLIC "-//X//DTD x//EN" "sys2.ent" ><!ELEMENT a ANY>
+%pe2;
+
+
+<!--dtd comment-->	
+<!ATTLIST a xml:lang ENTITIES #REQUIRED>
+<!ELEMENT b (#PCDATA)>
+]>
+<doc></doc>

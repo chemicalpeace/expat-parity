@@ -1,0 +1,5 @@
+ì9<?xml version='1.0' encoding='ISO-8859-1'?>
+<!DOCTYPE doc PUBLIC '-//X//DTD x//EN' 'doc.dtd' [<?dtdpi x?><!ENTITY amp '' >
+<!ATTLIST b id CDATA #REQUIRED xmlns ENTITIES #REQUIRED>
+<!ATTLIST b p:a (x|y|z) #FIXED "a b" id ( x | y ) "a|b"><!---->
+]><doc><b x='y'/></doc>
