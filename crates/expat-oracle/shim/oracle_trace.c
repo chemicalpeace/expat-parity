@@ -261,25 +261,61 @@ on_notation(void *ud, const XML_Char *name, const XML_Char *base,
   end_line(t);
 }
 
+/* Writes the model as `<type><quant> <name>(<child>,<child>...)` without
+   recursion (an explicit heap stack), so a deeply nested model cannot
+   overflow the C stack of a test thread (2 MiB on macOS/Windows test
+   threads; a 20,000-deep model did with the earlier recursive version). */
+struct model_frame {
+  const XML_Content *node;
+  unsigned int next;
+};
+
 static void
-model(struct buf *b, const XML_Content *m, int depth) {
-  char head[8];
-  /* Expat bounds content model depth itself; this guard only protects the
-     shim's own recursion against a hypothetical unbounded model. */
-  if (depth > 100000) {
+model(struct buf *b, const XML_Content *m) {
+  size_t cap = 64, len = 0;
+  struct model_frame *st = malloc(cap * sizeof *st);
+  if (st == NULL) {
     b->failed = 1;
     return;
   }
-  snprintf(head, sizeof head, "%d%d", (int)m->type, (int)m->quant);
-  buf_str(b, head);
-  buf_field(b, m->name);
-  buf_push(b, "(", 1);
-  for (unsigned int i = 0; i < m->numchildren; i++) {
-    if (i > 0)
-      buf_push(b, ",", 1);
-    model(b, &m->children[i], depth + 1);
+  for (;;) {
+    char head[8];
+    snprintf(head, sizeof head, "%d%d", (int)m->type, (int)m->quant);
+    buf_str(b, head);
+    buf_field(b, m->name);
+    buf_push(b, "(", 1);
+    if (len == cap) {
+      struct model_frame *grown;
+      cap *= 2;
+      grown = realloc(st, cap * sizeof *st);
+      if (grown == NULL) {
+        b->failed = 1;
+        free(st);
+        return;
+      }
+      st = grown;
+    }
+    st[len].node = m;
+    st[len].next = 0;
+    len++;
+    /* Close finished nodes; descend into the next unvisited child. */
+    m = NULL;
+    while (len > 0) {
+      struct model_frame *f = &st[len - 1];
+      if (f->next < f->node->numchildren) {
+        if (f->next > 0)
+          buf_push(b, ",", 1);
+        m = &f->node->children[f->next];
+        f->next++;
+        break;
+      }
+      buf_push(b, ")", 1);
+      len--;
+    }
+    if (m == NULL)
+      break;
   }
-  buf_push(b, ")", 1);
+  free(st);
 }
 
 static void XMLCALL
@@ -288,7 +324,7 @@ on_element(void *ud, const XML_Char *name, XML_Content *m) {
   struct tracer *t = begin(c->t, "element");
   buf_field(&t->out, name);
   buf_push(&t->out, " ", 1);
-  model(&t->out, m, 0);
+  model(&t->out, m);
   end_line(t);
   XML_FreeContentModel(c->p, m);
 }
