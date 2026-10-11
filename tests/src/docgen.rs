@@ -615,3 +615,123 @@ pub fn dtd_document(r: &mut Rng) -> Vec<u8> {
     }
     doc
 }
+
+/// A piece of replacement text for a general entity: text, character and
+/// predefined references, references to other entities (by index, so the
+/// caller controls cycles), balanced or unbalanced elements, comments,
+/// processing instructions and CDATA sections.
+fn entity_text(r: &mut Rng, out: &mut String, n_entities: usize, below: usize) {
+    for _ in 0..r.below(5) {
+        match r.below(12) {
+            0..=2 => out.push_str(r.pick(&["x", "text ", " sp  ace ", "\u{e9}", "a\nb", "\t"])),
+            3 => out.push_str(r.pick(&["&#65;", "&#x20;", "&amp;", "&lt;", "&#38;#60;", "&#38;#38;"])),
+            4 | 5 => {
+                // Mostly references to later entities (no cycle); sometimes
+                // to any entity, which can close a cycle.
+                let j = if below < n_entities && !r.one_in(6) {
+                    below + r.below(n_entities - below)
+                } else {
+                    r.below(n_entities.max(1))
+                };
+                out.push_str(&format!("&e{j};"));
+            }
+            6 => out.push_str(r.pick(&["&undeclared;", "&un;", "&ext;", "&unp;"])),
+            7 => out.push_str(r.pick(&["<i/>", "<i a=\"v\"/>", "<i>in</i>", "<i a=\"&amp;\">t</i>"])),
+            8 => out.push_str(r.pick(&["<b>", "</b>", "<b></b>", "<b>x</b>", "<b/>", "<i>", "<b>y</b>", "]]>"])),
+            9 => out.push_str(r.pick(&["<!--c-->", "<?pi d?>", "<![CDATA[x<y]]>"])),
+            // Rare: a character reference C rejects at declaration time.
+            _ => out.push_str(r.pick(&["\r\n", "&#13;", "&#x10FFFF;", "\r", "&#10;", "&#xD800;"])),
+        }
+    }
+}
+
+/// A random document built around internal entities (general and
+/// parameter), as text. References form a random graph with occasional
+/// direct and indirect cycles; entities are referenced in content, in
+/// attribute values, in default attribute values, and through parameter
+/// entities between and inside declarations.
+pub fn entity_document_text(r: &mut Rng) -> String {
+    let n = 1 + r.below(7);
+    let mut out = String::new();
+    out.push_str(r.pick(&[
+        "",
+        "",
+        "<?xml version='1.0'?>",
+        "<?xml version='1.0' standalone='yes'?>",
+        "<?xml version='1.0' standalone='no'?>",
+    ]));
+    out.push_str("<!DOCTYPE r");
+    if r.one_in(5) {
+        out.push_str(" SYSTEM 'r.dtd'");
+    }
+    out.push_str(" [");
+    if r.one_in(3) {
+        out.push_str("<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n>");
+    }
+    for i in 0..n {
+        let mut v = String::new();
+        entity_text(r, &mut v, n, i + 1);
+        out.push_str(&format!("<!ENTITY e{i} '{v}'>"));
+        if r.one_in(4) {
+            // A repeated declaration: the first one wins.
+            out.push_str(&format!("<!ENTITY e{i} 'second'>"));
+        }
+    }
+    let pe = r.below(4);
+    for k in 0..pe {
+        let body = match r.below(6) {
+            0 => format!("<!ENTITY e{} \"from pe\">", r.below(n + 2)),
+            1 => "<!ATTLIST r d CDATA \"&e0;\">".to_string(),
+            // `&#37;` is stored as `%`, so the replacement text holds the
+            // parameter entity reference (a literal `%` in an entity value
+            // of the internal subset would be an error).
+            2 => format!("&#37;p{};", r.below(pe)),
+            3 => format!("<!ENTITY &#37; p{} \"&#37;p{};\">", pe + k, r.below(pe + 1)),
+            4 => "<!ELEMENT r ANY>".to_string(),
+            _ => r.pick(&["<!ENTITY", "\"x\">", "<!-- c -->", "<?pi?>"]).to_string(),
+        };
+        out.push_str(&format!("<!ENTITY % p{k} '{body}'>"));
+    }
+    for _ in 0..r.below(3) {
+        if pe > 0 {
+            out.push_str(&format!("%p{};", r.below(pe + 1)));
+        }
+    }
+    if r.one_in(2) {
+        out.push_str(&format!(
+            "<!ATTLIST r a CDATA \"&e{};\" t NMTOKENS \"  &e{}; x \" f CDATA #FIXED \"&amp;&e{};\">",
+            r.below(n),
+            r.below(n),
+            r.below(n)
+        ));
+    }
+    out.push_str("]>");
+    out.push_str("<r");
+    if r.one_in(2) {
+        out.push_str(&format!(" s=\"v&e{};w\"", r.below(n)));
+    }
+    if r.one_in(4) {
+        out.push_str(" t=' &e0;  y '");
+    }
+    out.push('>');
+    for _ in 0..1 + r.below(4) {
+        match r.below(4) {
+            0 => out.push_str("txt"),
+            1 => out.push_str("<c>&e0;</c>"),
+            _ => out.push_str(&format!("&e{};", r.below(n))),
+        }
+    }
+    out.push_str("</r>");
+    out
+}
+
+/// A random entity document ([`entity_document_text`]), encoded, and
+/// damaged with probability 1/5.
+pub fn entity_document(r: &mut Rng) -> Vec<u8> {
+    let text = entity_document_text(r);
+    let mut doc = encode(r, &text);
+    if r.one_in(5) {
+        mutate(r, &mut doc);
+    }
+    doc
+}
