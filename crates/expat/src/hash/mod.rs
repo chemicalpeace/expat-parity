@@ -300,6 +300,18 @@ impl<V> HashTable<V> {
         Ok(())
     }
 
+    /// The slot that holds the entry with key `key` (white-box view for the
+    /// differential tests).
+    pub fn find_slot(&self, salt: &SipKey, key: &[u8]) -> Option<usize> {
+        if self.slots.is_empty() {
+            return None;
+        }
+        match self.probe(hash(salt, key), key) {
+            (i, Some(_)) => Some(i),
+            (_, None) => None,
+        }
+    }
+
     /// `hashTableIterInit` + `hashTableIterNext`: the entries in slot order.
     pub fn iter(&self) -> impl Iterator<Item = EntryId> + '_ {
         self.slots.iter().flatten().copied()

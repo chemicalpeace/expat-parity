@@ -453,6 +453,11 @@ impl StringPool {
 
     /// `poolAppendString`: appends `s` without a terminator; returns
     /// `poolStart`. `s` must not contain NUL.
+    ///
+    /// Like C, appending an empty string to a pool without blocks fails:
+    /// nothing is allocated, so C returns the `NULL` `start`, which its
+    /// callers report as out of memory. (The parser only appends non-empty
+    /// constants.)
     pub fn append_string<H: Heap + ?Sized>(
         &mut self,
         heap: &mut H,
@@ -460,6 +465,9 @@ impl StringPool {
     ) -> Result<PoolStr, NoMemory> {
         debug_assert!(!s.contains(&0), "C string without interior NUL");
         self.append_chars(heap, s)?;
+        if self.is_null() {
+            return Err(NoMemory);
+        }
         Ok(self.start())
     }
 
