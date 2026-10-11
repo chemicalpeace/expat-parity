@@ -207,11 +207,11 @@ fn buffer_api() {
     assert!(p.get_buffer(-1).is_none());
     assert_eq!(p.error_code(), Stop::Error(XmlError::NoMemory));
     let doc = b"<d/>";
-    let Some(b) = p.get_buffer(10) else {
-        panic!("buffer refused");
-    };
-    assert_eq!(b.len(), 10);
-    b[..doc.len()].copy_from_slice(doc);
+    let b = p.get_buffer(10);
+    assert_eq!(b.as_ref().map(|b| b.len()), Some(10));
+    if let Some(dst) = b.and_then(|b| b.get_mut(..doc.len())) {
+        dst.copy_from_slice(doc);
+    }
     // The first buffer is twice INIT_BUFFER_SIZE.
     assert_eq!(p.buffer_state().buffer_lim, 2048);
     assert_eq!(p.parse_buffer(&mut ev, 4, true), Status::Ok);
@@ -228,7 +228,7 @@ fn encodings_and_declaration() {
     assert_eq!(texts(&ev), ["start d 0", "text é", "end d"]);
     let (st, _, ev) = parse(b"<?xml version='1.0' encoding='ISO-8859-1'?><d>\xe9</d>", None);
     assert_eq!(st, Status::Ok);
-    assert_eq!(texts(&ev)[2], "text é");
+    assert_eq!(texts(&ev).get(2), Some(&"text é"));
     let (st, p, _) = parse(b"<?xml version='1.0' encoding='x-y'?><d/>", None);
     assert_eq!((st, p.error_code()), (Status::Error, Stop::Error(XmlError::UnknownEncoding)));
 }

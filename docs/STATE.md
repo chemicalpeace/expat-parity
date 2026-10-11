@@ -6,13 +6,17 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 ## Snapshot
 
 - **Target:** libexpat 2.9.0 (`R_2_9_0`, `a76b1174c1ea52abb639a4c69d52b630a8a106a2`) — frozen (D-001).
-- **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-9 done.
+- **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-10 done
+  (module 10 = the parser core for documents without a document type
+  declaration; a DOCTYPE stops the port with `Stop::DtdNotPorted` until
+  module 11, D-023).
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
   tables, doc, deny), test on ubuntu-latest / macos-latest / windows-latest,
   Miri, fuzz smoke (60 s per target). Green on PR #1 (modules 1-5), PR #2
-  (modules 6-7), PR #3 (module 8) and the module 9 PR before merge; see the PRs for the runs. Windows needed two
+  (modules 6-7), PR #3 (module 8), PR #4 (module 9) and PR #5 (module 10)
+  before merge; see the PRs for the runs. Windows needed two
   fixes in PR #1 (D-016, `.gitattributes`).
 
 ## Blockers
@@ -62,12 +66,14 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 7 | `tok` XML decl + encoding detection (`initScan`, Q-3) | `xmltok.c`, `xmltok_ns.c` | **done** — `tok::init`, `tok::xmldecl`; D-019; Q-3 resolved (replicate) |
 | 8 | `role` prolog state machine | `xmlrole.c` | **done** — `role::PrologState`, all 51 handlers; D-020 |
 | 9 | `pool` / `hash` / `heap`: string pool, hash table, allocation accounting | `xmlparse.c` | **done** — `StringPool`, `HashTable`, `Heap`; white-box vs C (block lists, slot layout, every allocation request, failure of each attempt); D-021 |
-| 10 | `parse` content, attributes, namespaces, epilog (Q-1, Q-2) | `xmlparse.c` | not started |
+| 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors, generated documents, fuzzing), buffer state white-box; D-023; Q-1/Q-2 resolved (replicate, D-024). DTD roles stop with `Stop::DtdNotPorted` |
 | 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | not started |
-| 12 | public API `expat::Parser` + trace adapter + differential fuzzing | — | not started |
+| 12 | public API `expat::Parser` (default handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers, unknown-encoding handler, `XML_GetInputContext`, entropy for the salt) | — | not started (the trace adapter and differential `parse_trace` already exist, module 10) |
 | 13 | `expat-capi` (optional) | `expat.h` | not started |
 
-Fuzz targets: `parse_trace` (oracle only until module 12), `leaf_diff`
+Fuzz targets: `parse_trace` (differential since module 10: port vs C by
+trace, documents with a DTD are skipped until module 11), `buffer_diff`
+(module 10: buffer state after every input call, white-box), `leaf_diff`
 (modules 1-4), `tok_diff` (modules 5-7: all 12 built-in encodings and
 seeded unknown encodings; scanners, helpers, converters, `initScan`,
 `XmlParseXmlDecl`), `role_diff` (module 8: documents tokenized in the
@@ -77,18 +83,19 @@ with allocation failures, white-box).
 
 ## Next steps
 
-1. Module 10: content, attributes, namespaces, epilog; decide Q-1/Q-2. This
-   is where `InitEncoding`/`Known`/`Unknown`, `PrologState`, `StringPool`
-   and `HashTable` get their consumer (the processors of `xmlparse.c`).
-   Start with the parser state and buffer management (`XML_Parse`,
-   `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), then
-   `doContent`/`storeAtts`/namespaces, so the trace adapter of module 12
-   can be used early for differential tests.
-2. Module 11: DTD, entities, amplification limits; decide whether the port
-   replicates the allocation tracker's byte counts for every parser
-   structure (D-021 leaves it open; the pool and table already report C's
-   sizes).
-3. Module 12: public `expat::Parser` + trace adapter, which turns
-   `parse_trace` into a true differential fuzz target. If the trace learns
-   external entity references, their context string depends on the hash
-   salt (D-021): the port must use the oracle's fixed salt there.
+1. Module 11: the DTD in `doProlog` (doctype, element and attribute-list
+   declarations with content models and default attributes, notations,
+   entity declarations, parameter entities, conditional sections, the
+   external subset with `XML_SetParamEntityParsing`), internal entity
+   expansion in content and attribute values (`processEntity`,
+   `internalEntityProcessor`, `storeEntityValue`), the amplification limits,
+   and the removal of `Stop::DtdNotPorted`. Decide whether the allocation
+   tracker's byte counts are replicated for every parser structure (D-021,
+   D-023). Then the 142 upstream vectors with a DTD are compared too
+   (`parse_diff::upstream_vectors_match_c` pins 398 fully compared vectors
+   today).
+2. Module 12: public `expat::Parser` on top of `parse::Parser`: default
+   handler, stop/resume, external entity parsers (`getContext` with the
+   oracle's salt, D-021), unknown-encoding handler, input context, salt
+   from an entropy source behind `std`.
+3. Phase 4: long fuzzing runs, coverage, benchmarks against C.

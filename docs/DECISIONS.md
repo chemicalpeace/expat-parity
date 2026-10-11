@@ -362,3 +362,97 @@ changes; the differential suites just run 10-20 times faster (whole
 workspace 208 s -> 57 s including the build on the 2-core sandbox,
 `tok_diff.rs` 163 s -> 8 s). Miri ignores `opt-level`. Taken in module 9
 because each module adds heavy differential tests.
+
+## D-023 Parser core without the DTD (module 10)
+
+`expat::parse` ports the processors of `xmlparse.c` that a document
+without a document type declaration reaches: `XML_Parse`,
+`XML_GetBuffer`, `XML_ParseBuffer`, `callProcessor` with reparse deferral,
+`prologInitProcessor`/`prologProcessor`/`doProlog` (roles without a DTD),
+`processXmlDecl`, `contentProcessor`/`doContent`, `storeAtts`,
+`addBinding`/`freeBindings`, `storeAttributeValue`/`appendAttributeValue`,
+CDATA sections, `epilogProcessor`, the reports of PIs and comments, the
+implicit `xml` binding (`setContext(implicitContext)`), the position and
+byte-index getters, and the billion-laughs counters
+(`accountingDiffTolerated`).
+
+- **Handlers.** C behaves differently depending on whether a handler
+  pointer is set (for example `m_eventPtr` after an empty element), so
+  which handlers are set is parser configuration (`HandlerSet`) and the
+  callbacks are one `Handler` object passed to `parse`. The start handler
+  receives `XML_GetSpecifiedAttributeCount` as an argument. The default
+  handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers and
+  the unknown-encoding handler belong to the public API (module 12); the
+  status checks after every token (`XML_SUSPENDED`, `XML_FINISHED`,
+  `m_reenter`) are ported now and become reachable then.
+- **Buffer exactly like C.** `m_buffer`/`m_bufferPtr`/`m_bufferEnd`/
+  `m_bufferLim` are offsets into a `Vec<u8>` whose length is the C
+  allocation; the first allocation (2 x 1024), the doubling, the 1024
+  context bytes kept before the parse position, the in-place move and the
+  overflow checks follow `XML_GetBuffer`. This is observable: the
+  reparse-deferral heuristic reads the free space and
+  `m_lastBufferRequestSize`, and decides when a partial token is scanned
+  again (and with it chunk-dependent results such as Q-1/Q-2). Event,
+  position and parse-end pointers are `Option<usize>` offsets (`None` =
+  `NULL`).
+- **Encodings.** `m_encoding` is `Enc::Init(InitEncoding)` until detection
+  decides, then `Enc::Known`; the processors are generic over
+  `tok::Encoding` and instantiated per family (`with_known!`). When the XML
+  declaration switches the encoding, `doProlog` returns and the next token
+  is scanned in the new encoding, which is what C's loop does.
+- **Structures.** Element types, attribute ids and prefixes live in the
+  module 9 hash tables (slot order is C's; it becomes observable through
+  `getContext` with external entities); the `name[-1]` flag of an
+  attribute id is a field; bindings are an arena with C's free list. Open
+  tags keep a copy of their raw name, so `storeRawNames` has nothing to do.
+  Expanded element names are computed when the tag starts; C rebuilds the
+  same bytes at the end tag from the binding's URI, which cannot change
+  while the tag is open. The duplicate check for prefixed attributes
+  (`m_nsAtts`, a hash table with version stamps) is a list of
+  (SipHash value, expanded name) pairs per start tag with C's comparison
+  rule (same hash, and the stored name starts with the new one); entries
+  with equal hashes share a probe sequence in C, so both find the same
+  duplicates.
+- **`errorProcessor`** returns `m_errorCode`. After an error, a later
+  `XML_Parse` whose processing the reparse-deferral heuristic skips resets
+  `m_errorCode` to `XML_ERROR_NONE`, and the next call then succeeds. The
+  port does the same (found by `buffer_diff`, see REPORT).
+- **Allocation accounting.** The parser does not announce allocations
+  beyond those of the hash tables (with an unlimited heap). Without a
+  failing allocator or an allocation-tracker limit nothing observable
+  depends on them; whether the port replicates the tracker's byte counts
+  for every parser structure is still decided in module 11 (D-021).
+- **Salt.** `Parser::new` takes the 16-byte hash salt: the core crate is
+  `no_std` without an entropy source. The public API (module 12) chooses
+  where it comes from; the differential harness uses the oracle's fixed
+  salt.
+- **Scope boundary.** Any `doProlog` role that belongs to a document type
+  declaration, and a declared general entity (which only a DTD can
+  create), stops the parser with `Stop::DtdNotPorted`, never with a guessed
+  libexpat error. The trace adapter reports such documents separately and
+  every differential test counts them; module 11 removes the variant.
+- **Oracle additions.** `oracle_options` gains `buffer_api` (each piece fed
+  through `XML_GetBuffer(2n + 3)` + `XML_ParseBuffer(n)`, so the request
+  size differs from the data) and `no_reparse_deferral`.
+  `oracle_buffer_run` (`shim/oracle_core.c`, which includes `xmlparse.c`)
+  feeds a document with an operation list and writes the buffer state
+  after every operation; operations never parse bytes the caller did not
+  write (comparing uninitialised C memory would be meaningless).
+
+## D-024 Q-1 and Q-2: replicate (module 10)
+
+Both quirks are in `epilogProcessor`: a CR at the end of the available
+input is a partial `XML_TOK_PROLOG_S` that the epilog consumes, so its
+line break is counted when the chunk ends there and again when an LF
+follows in the next chunk (Q-1), and a final CR is consumed only when it
+arrived in a non-final chunk (Q-2). Decision: **replicate**. XML 1.0
+§2.11 governs the characters passed to the application, and libexpat
+passes none for white space in the epilog in either case; error and
+position reporting is not specified by XML 1.0. The difference is a
+position after the root element, never an event, an error or a
+well-formedness verdict, so there is no specification violation to fix,
+and replicating keeps the port equal to C under every chunking.
+Regression tests: `tests/tests/parse_diff.rs::q1_q2_epilog_line_breaks_replicate_c`
+(the reproducers whole and in 1-byte chunks, compared with C and pinned to
+C's values), `crates/expat/src/parse/tests.rs::epilog_cr_lf_split_counts_two_lines_like_c`,
+and the chunk-dependence pin of the upstream vectors.
