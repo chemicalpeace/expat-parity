@@ -624,7 +624,14 @@ fn entity_text(r: &mut Rng, out: &mut String, n_entities: usize, below: usize) {
     for _ in 0..r.below(5) {
         match r.below(12) {
             0..=2 => out.push_str(r.pick(&["x", "text ", " sp  ace ", "\u{e9}", "a\nb", "\t"])),
-            3 => out.push_str(r.pick(&["&#65;", "&#x20;", "&amp;", "&lt;", "&#38;#60;", "&#38;#38;"])),
+            3 => out.push_str(r.pick(&[
+                "&#65;",
+                "&#x20;",
+                "&amp;",
+                "&lt;",
+                "&#38;#60;",
+                "&#38;#38;",
+            ])),
             4 | 5 => {
                 // Mostly references to later entities (no cycle); sometimes
                 // to any entity, which can close a cycle.
@@ -636,8 +643,12 @@ fn entity_text(r: &mut Rng, out: &mut String, n_entities: usize, below: usize) {
                 out.push_str(&format!("&e{j};"));
             }
             6 => out.push_str(r.pick(&["&undeclared;", "&un;", "&ext;", "&unp;"])),
-            7 => out.push_str(r.pick(&["<i/>", "<i a=\"v\"/>", "<i>in</i>", "<i a=\"&amp;\">t</i>"])),
-            8 => out.push_str(r.pick(&["<b>", "</b>", "<b></b>", "<b>x</b>", "<b/>", "<i>", "<b>y</b>", "]]>"])),
+            7 => {
+                out.push_str(r.pick(&["<i/>", "<i a=\"v\"/>", "<i>in</i>", "<i a=\"&amp;\">t</i>"]))
+            }
+            8 => out.push_str(r.pick(&[
+                "<b>", "</b>", "<b></b>", "<b>x</b>", "<b/>", "<i>", "<b>y</b>", "]]>",
+            ])),
             9 => out.push_str(r.pick(&["<!--c-->", "<?pi d?>", "<![CDATA[x<y]]>"])),
             // Rare: a character reference C rejects at declaration time.
             _ => out.push_str(r.pick(&["\r\n", "&#13;", "&#x10FFFF;", "\r", "&#10;", "&#xD800;"])),
@@ -688,7 +699,9 @@ pub fn entity_document_text(r: &mut Rng) -> String {
             2 => format!("&#37;p{};", r.below(pe)),
             3 => format!("<!ENTITY &#37; p{} \"&#37;p{};\">", pe + k, r.below(pe + 1)),
             4 => "<!ELEMENT r ANY>".to_string(),
-            _ => r.pick(&["<!ENTITY", "\"x\">", "<!-- c -->", "<?pi?>"]).to_string(),
+            _ => r
+                .pick(&["<!ENTITY", "\"x\">", "<!-- c -->", "<?pi?>"])
+                .to_string(),
         };
         out.push_str(&format!("<!ENTITY % p{k} '{body}'>"));
     }
