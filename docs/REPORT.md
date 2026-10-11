@@ -16,7 +16,8 @@ See the module table in `docs/STATE.md`. Ported and verified: modules 1-7
 built-in encoding and for application-defined encodings, the converters to
 UTF-8/UTF-16, encoding detection and the XML declaration), i.e. all of
 `xmltok.c`, `xmltok_impl.c` and `xmltok_ns.c`; module 8 is `xmlrole.c` (the
-prolog/DTD state machine). No public parser API exists yet.
+prolog/DTD state machine); module 9 is the string pool and hash table of
+`xmlparse.c` with C's allocation behaviour. No public parser API exists yet.
 
 ## Verification infrastructure
 
@@ -49,6 +50,13 @@ prolog/DTD state machine). No public parser API exists yet.
 - Deliberate bug in ported code (module 8, 2026-10-11, reverted): `#FIXED`
   moving to `attlist1` instead of `attlist9` (`role/mod.rs`) failed
   `every_handler_token_and_keyword` and `dtd_constructs`.
+- Deliberate bugs in ported code (module 9, 2026-10-11, each reverted):
+  `poolClear` moving the blocks to a non-empty free list oldest first
+  instead of newest first (`pool/mod.rs`) failed
+  `pool_random_programs_match_c`; saturating instead of truncating
+  `PROBE_STEP` to 8 bits (`hash/mod.rs`) failed `hash_large_tables_match_c`
+  and `hash_random_programs_match_c`. (A first attempt at the second
+  mutation was a no-op because `| 1` masked it; it was replaced.)
 
 ## Test and fuzz statistics
 
