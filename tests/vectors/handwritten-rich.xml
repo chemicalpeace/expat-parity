@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!DOCTYPE r [
+  <!ENTITY e "v&#x41;l">
+  <!ENTITY % p "x">
+  <!ENTITY ext SYSTEM "ext.xml">
+  <!NOTATION n PUBLIC "pub">
+  <!ELEMENT r (a|b)*>
+  <!ELEMENT a (#PCDATA)>
+  <!ATTLIST r d CDATA "def" q (x|y) #REQUIRED>
+]>
+<r q="x" xmlns:p="urn:p"><!-- c -->&e;<?t d ?><![CDATA[<&]]><p:a p:z='1'>t&#233;~(,)%</p:a></r>

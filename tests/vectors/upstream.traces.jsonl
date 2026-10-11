@@ -1,0 +1,540 @@
+{"id":"acc_tests.c:63","trace":"start e 0\nend e\nresult ok 0 1 4 4\n"}
+{"id":"acc_tests.c:64","trace":"start e 0\nend e\nresult ok 0 1 7 7\n"}
+{"id":"acc_tests.c:67","trace":"start e 4\nattr k1 v2\nattr k2 v2\nend e\nresult ok 0 1 20 20\n"}
+{"id":"acc_tests.c:68","trace":"start e 4\nattr k1 v2\nattr k2 v2\nend e\nresult ok 0 1 23 23\n"}
+{"id":"acc_tests.c:70","trace":"start e 2\nattr k &'><\"\nend e\nresult ok 0 1 35 35\n"}
+{"id":"acc_tests.c:73","trace":"start e2 2\nattr xmlns \nend e2\nresult error 4 2 1 18\n"}
+{"id":"acc_tests.c:78","trace":"start e 0\ntext text\nend e\nresult ok 0 1 11 11\n"}
+{"id":"acc_tests.c:79","trace":"start e1 0\nstart e2 0\ntext text1\nstart e3 0\nend e3\ntext text2\nend e2\nend e1\nresult ok 0 1 33 33\n"}
+{"id":"acc_tests.c:80","trace":"start e 0\ntext &'><\"\nend e\nresult ok 0 1 32 32\n"}
+{"id":"acc_tests.c:82","trace":"start e 0\ntext A%29\nend e\nresult ok 0 1 17 17\n"}
+{"id":"acc_tests.c:85","trace":"xmldecl 1.0 ~ -1\nstart root 0\nend root\nresult ok 0 1 28 28\n"}
+{"id":"acc_tests.c:88","trace":"start e1 0\ntext %20%20\nstart e2 0\ntext %20%20\nend e2\ntext %20%20\nend e1\nresult ok 0 1 28 28\n"}
+{"id":"acc_tests.c:89","trace":"start e1 0\nstart e2 0\nend e2\nend e1\nresult ok 0 1 20 20\n"}
+{"id":"acc_tests.c:90","trace":"start e1 0\nstart e2 2\nattr k v\nend e2\nstart e3 2\nattr k v\nend e3\nend e1\nresult ok 0 1 35 35\n"}
+{"id":"acc_tests.c:93","trace":"comment %20Comment%20\nstart e 0\ncomment %20Comment%20\nend e\nresult ok 0 1 39 39\n"}
+{"id":"acc_tests.c:98","trace":"pi pi0 \npi pi1 \npi pi2 \nstart r 0\nend r\npi pi4 \nresult ok 0 1 35 35\n"}
+{"id":"acc_tests.c:100","trace":"pi pi0 \npi pi1 \npi pi2 \ndoctype r first.ent ~ 0\nenddoctype\nstart r 0\nend r\nresult ok 0 1 59 59\n"}
+{"id":"acc_tests.c:101","trace":"pi pi3 \nresult error 2 1 7 7\n"}
+{"id":"acc_tests.c:101#1","trace":"pi pi6 \nresult error 3 1 7 7\n"}
+{"id":"acc_tests.c:106","trace":"start e 0\ncdata\ntext one%20two%20three\nendcdata\nend e\nresult ok 0 1 32 32\n"}
+{"id":"acc_tests.c:111","trace":"doctype r ~ ~ 1\nentity e 0 111<![CDATA[2%20<=%202]]>333 ~ ~ ~ ~\nenddoctype\nstart r 0\ntext 111\ncdata\ntext 2%20<=%202\nendcdata\ntext 333\nend r\nresult ok 0 5 0 67\n"}
+{"id":"acc_tests.c:115","trace":"result error 4 1 3 3\n"}
+{"id":"acc_tests.c:119","trace":"doctype r ~ ~ 1\nentity draft 1 INCLUDE ~ ~ ~ ~\nentity final 1 IGNORE ~ ~ ~ ~\nentity import 1 ~ ~ first.ent ~ ~\nenddoctype\nstart r 0\nend r\nresult ok 0 8 0 124\n"}
+{"id":"acc_tests.c:126","trace":"result error 2 1 0 0\n"}
+{"id":"acc_tests.c:132","trace":"doctype root ~ ~ 1\nentity nine 0 123456789 ~ ~ ~ ~\nenddoctype\nstart root 0\ntext 123456789\nend root\nresult ok 0 4 19 66\n"}
+{"id":"acc_tests.c:137","trace":"doctype root ~ ~ 1\nentity nine 0 123456789 ~ ~ ~ ~\nenddoctype\nstart root 2\nattr k1 123456789\nend root\nresult ok 0 4 19 66\n"}
+{"id":"acc_tests.c:142","trace":"doctype root ~ ~ 1\nentity nine 0 123456789 ~ ~ ~ ~\nentity nine2 0 &nine;&nine; ~ ~ ~ ~\nenddoctype\nstart root 0\ntext 123456789123456789123456789123456789123456789123456789\nend root\nresult ok 0 5 34 112\n"}
+{"id":"acc_tests.c:150","trace":"doctype r ~ ~ 1\nentity five 0 ~ ~ first.ent ~ ~\nenddoctype\nstart r 0\nend r\nresult ok 0 4 13 66\n"}
+{"id":"acc_tests.c:159","trace":"result error 3 1 1 3\n"}
+{"id":"acc_tests.c:163","trace":"doctype r ~ ~ 1\nentity comment 1 <!----> ~ ~ ~ ~\nenddoctype\nstart r 0\nend r\nresult ok 0 5 4 61\n"}
+{"id":"acc_tests.c:168","trace":"comment \nresult error 3 1 7 7\n"}
+{"id":"acc_tests.c:169","trace":"doctype r ~ ~ 1\nentity ninedef 1 <!ENTITY%20nine%20\"123456789\"> ~ ~ ~ ~\nenddoctype\nstart r 0\nskipped nine 0\nend r\nresult ok 0 5 13 105\n"}
+{"id":"acc_tests.c:176","trace":"result error 2 1 0 0\n"}
+{"id":"acc_tests.c:177","trace":"doctype r ~ ~ 1\nentity comment 1 <!--1--> ~ ~ ~ ~\nentity comment2 1 %25comment;<!--22-->%25comment; ~ ~ ~ ~\nenddoctype\nstart r 0\nend r\nresult ok 0 7 0 123\n"}
+{"id":"acc_tests.c:185","trace":"result error 10 1 0 0\n"}
+{"id":"acc_tests.c:185#1","trace":"comment 1\nresult error 3 1 8 8\n"}
+{"id":"acc_tests.c:186","trace":"doctype r ~ ~ 1\nentity five 1 12345 ~ ~ ~ ~\nentity five2def 1 <!ENTITY%20five2%20\"[%25five;][%25five;]]]]\"> ~ ~ ~ ~\nenddoctype\nstart r 0\nskipped five2 0\nend r\nresult ok 0 6 14 158\n"}
+{"id":"acc_tests.c:194","trace":"result error 2 1 0 0\n"}
+{"id":"acc_tests.c:197","trace":"doctype r first.ent ~ 0\nenddoctype\nstart r 0\nend r\nresult ok 0 2 4 36\n"}
+{"id":"acc_tests.c:199","trace":"result error 2 1 0 0\n"}
+{"id":"acc_tests.c:204","trace":"comment 22\nresult error 10 1 9 9\n"}
+{"id":"acc_tests.c:206","trace":"doctype r first.ent ~ 0\nenddoctype\nstart r 0\nend r\nresult ok 0 2 4 36\n"}
+{"id":"acc_tests.c:208","trace":"result error 2 1 0 0\n"}
+{"id":"acc_tests.c:211","trace":"comment 22\ncomment 1\ncomment 22\nresult error 3 1 26 26\n"}
+{"id":"acc_tests.c:215","trace":"result error 2 1 0 0\n"}
+{"id":"acc_tests.c:217","trace":"xmldecl 1.0 utf-8 -1\nresult error 2 2 0 39\n"}
+{"id":"acc_tests.c:227","trace":"xmldecl 1.0 utf-8 -1\nresult error 2 2 0 39\n"}
+{"id":"acc_tests.c:232","trace":"doctype doc first.ent ~ 0\nenddoctype\nstart doc 0\nend doc\nresult ok 0 3 0 46\n"}
+{"id":"acc_tests.c:234","trace":"result error 2 1 0 0\n"}
+{"id":"acc_tests.c:238","trace":"result error 2 1 1 3\n"}
+{"id":"acc_tests.c:326","trace":"result error 2 1 0 0\n"}
+{"id":"acc_tests.c:427","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:88","trace":"xmldecl 1.0 utf-8 -1\nstart doc 0\ntext Hello%2C%20world\nend doc\nresult ok 0 2 23 62\n"}
+{"id":"alloc_tests.c:119","trace":"xmldecl 1.0 ThisIsAStupidlyLongEncodingNameIntendedToTriggerPoolGrowth123456ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMN -1\nresult error 18 1 30 30\n"}
+{"id":"alloc_tests.c:162","trace":"xmldecl 1.0 utf-8 -1\npi pi unknown\nstart doc 0\ntext Hello%2C%20world\nend doc\nresult ok 0 3 23 77\n"}
+{"id":"alloc_tests.c:188","trace":"xmldecl 1.0 utf-8 -1\nstart doc 0\ntext Hello%2C%20world\npi pi unknown\ntext %0A\nend doc\nresult ok 0 3 6 77\n"}
+{"id":"alloc_tests.c:215","trace":"pi This processing%20instruction%20should%20be%20long%20enough%20to%20ensure%20thatit%20triggers%20the%20growth%20of%20an%20internal%20string%20pool%20when%20the%20%20%20%20%20%20allocator%20fails%20at%20a%20cruicial%20moment%20FGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPQ\nstart doc 0\nend doc\nresult ok 0 1 1035 1035\n"}
+{"id":"alloc_tests.c:255","trace":"xmldecl 1.0 utf-8 -1\ncomment %20Test%20parsing%20this%20comment%20\nstart doc 0\ntext Hi\nend doc\nresult ok 0 2 47 86\n"}
+{"id":"alloc_tests.c:279","trace":"xmldecl 1.0 utf-8 -1\nstart doc 0\ntext Hello%2C%20world\ncomment %20Parse%20this%20comment%20too%20\nend doc\nresult ok 0 2 54 93\n"}
+{"id":"alloc_tests.c:308","trace":"xmldecl 1.0 us-ascii -1\ndoctype doc foo ~ 0\nenddoctype\nstart doc 0\nskipped entity 0\nend doc\nresult ok 0 3 19 89\n"}
+{"id":"alloc_tests.c:311","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:355","trace":"xmldecl 1.0 ~ -1\nresult error 3 2 0 22\n"}
+{"id":"alloc_tests.c:360","trace":"result error 4 1 0 0\n"}
+{"id":"alloc_tests.c:410","trace":"doctype doc ~ ~ 1\nresult error 3 2 0 16\n"}
+{"id":"alloc_tests.c:412","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:440","trace":"xmldecl 1.0 unsupported-encoding -1\nresult error 18 1 30 30\n"}
+{"id":"alloc_tests.c:465","trace":"doctype foo ~ ~ 1\nentity param1 1 <!ENTITY%20internal%20'some_text'> ~ ~ ~ ~\nenddoctype\nstart foo 0\nskipped internal 0\ntext content\nend foo\nresult ok 0 1 105 105\n"}
+{"id":"alloc_tests.c:497","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:503","trace":"start doc 0\ntext text%20in%20doc\nend doc\nresult ok 0 10 22 31\n"}
+{"id":"alloc_tests.c:661","trace":"doctype doc ~ ~ 1\nattlist doc za CDATA default 0\nattlist doc zb CDATA def2 0\nattlist doc zc CDATA def3 0\nenddoctype\nstart doc 36\nattr a 1\nattr b 2\nattr c 3\nattr d 4\nattr e 5\nattr f 6\nattr g 7\nattr h 8\nattr i 9\nattr j 10\nattr k 11\nattr l 12\nattr m 13\nattr n 14\nattr p 15\nattr q 16\nattr r 17\nattr s 18\nattr za default\nattr zb def2\nattr zc def3\nend doc\nresult ok 0 6 196 311\n"}
+{"id":"alloc_tests.c:707","trace":"start doc 0\nend doc\nresult ok 0 2 0 12\n"}
+{"id":"alloc_tests.c:709","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:762","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:822","trace":"xmldecl 1.0 utf-8 -1\nresult error 5 2 21 60\n"}
+{"id":"alloc_tests.c:826","trace":"result error 4 1 15 15\n"}
+{"id":"alloc_tests.c:871","trace":"xmldecl 1.0 utf-8 -1\nresult error 3 2 0 39\n"}
+{"id":"alloc_tests.c:874","trace":"result error 4 1 15 15\n"}
+{"id":"alloc_tests.c:915","trace":"xmldecl 1.0 us-ascii -1\nstart doc 0\nresult error 11 2 5 47\n"}
+{"id":"alloc_tests.c:944","trace":"xmldecl 1.0 ~ 0\ndoctype animal test.dtd ~ 0\nenddoctype\nstart animal 0\ntext This%20is%20a%20%0A%20%20%20%20\nstart a 0\nend a\ntext %20%20%0A%0Ayellow%20tiger\nend animal\nresult ok 0 6 21 126\n"}
+{"id":"alloc_tests.c:947","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:976","trace":"xmldecl 1.0 ~ 0\ndoctype animal test.dtd ~ 0\nenddoctype\nstart animal 0\ntext This%20is%20a%20yellow%20tiger\nend animal\nresult ok 0 3 39 113\n"}
+{"id":"alloc_tests.c:985","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:1038","trace":"doctype doc ~ ~ 1\nelement doc 10 ~()\nattlist doc a %28ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|BBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|CBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|DBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|EBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|FBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|GBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|HBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|IBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|JBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|KBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|LBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|MBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|NBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|OBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|PBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMN%29 ~ 0\nenddoctype\nstart doc 0\nend doc\nresult ok 0 4 8 1096\n"}
+{"id":"alloc_tests.c:1088","trace":"doctype doc ~ ~ 1\nelement doc 10 ~()\nattlist doc a %28ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|BBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|CBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|DBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|EBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|FBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|GBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|HBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|IBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|JBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|KBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|LBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|MBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|NBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|OBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO|PBCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMN%29 ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO 0\nenddoctype\nstart doc 0\nattr a ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO\nend doc\nresult ok 0 4 8 1153\n"}
+{"id":"alloc_tests.c:1133","trace":"doctype doc ~ ~ 1\nresult error 3 2 1035 1051\n"}
+{"id":"alloc_tests.c:1154","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:1201","trace":"doctype doc ~ ~ 1\nresult error 5 2 23 39\n"}
+{"id":"alloc_tests.c:1222","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:1250","trace":"doctype doc ~ ~ 1\nresult error 5 2 23 39\n"}
+{"id":"alloc_tests.c:1298","trace":"doctype doc ~ ~ 1\nelement doc 60 ~(40 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e(),60 ~(41 e()))))))))))))))))))))))))))))))))\nelement e 10 ~()\nenddoctype\nstart doc 0\nstart e 0\nend e\nend doc\nresult ok 0 4 15 226\n"}
+{"id":"alloc_tests.c:1377","trace":"doctype doc ~ ~ 1\nelement doc 53 ~(40 a1(),40 a2(),40 a3(),40 a4(),40 a5(),40 a6(),40 a7(),40 a8(),40 b1(),40 b2(),40 b3(),40 b4(),40 b5(),40 b6(),40 b7(),40 b8(),40 c1(),40 c2(),40 c3(),40 c4(),40 c5(),40 c6(),40 c7(),40 c8(),40 d1(),40 d2(),40 d3(),40 d4(),40 d5(),40 d6(),40 d7(),40 d8(),40 e1())\nenddoctype\nstart doc 0\ntext %0A\nstart a1 0\nend a1\ntext %0A\nend doc\nresult ok 0 7 0 155\n"}
+{"id":"alloc_tests.c:1413","trace":"doctype doc ~ ~ 1\nelement doc 53 ~(40 a1(),40 a2(),40 a3(),40 a4(),40 a5(),40 a6(),40 a7(),40 a8(),40 b1(),40 b2(),40 b3(),40 b4(),40 b5(),40 b6(),40 b7(),40 b8(),40 c1(),40 c2(),40 c3(),40 c4(),40 c5(),40 c6(),40 c7(),40 c8(),40 d1(),40 d2(),40 d3(),40 d4(),40 d5(),40 d6(),40 d7(),40 d8(),40 e1())\nenddoctype\nstart doc 0\ntext %0A\nstart a1 0\nend a1\ntext %0A\nstart b2 2\nattr attr foo\ntext This%20is%20a%20foo\nend b2\ntext %0A\nstart c3 0\nend c3\ntext %0A\nend doc\nresult ok 0 9 0 199\n"}
+{"id":"alloc_tests.c:1451","trace":"start doc 0\nend doc\npi pi in%20epilog\nresult ok 0 2 16 28\n"}
+{"id":"alloc_tests.c:1477","trace":"start doc 0\nend doc\ncomment %20comment%20in%20epilog%20\nresult ok 0 2 26 38\n"}
+{"id":"alloc_tests.c:1504","trace":"doctype doc ~ ~ 1\nentity foo 0 This%20entity%20will%20be%20substituted%20as%20an%20attribute%20value%2C%20and%20is%20%20%20calculated%20to%20be%20exactly%20long%20enough%20that%20the%20terminating%20NUL%20%20%20that%20the%20library%20adds%20internally%20will%20trigger%20the%20string%20pool%20togrow.%20GHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP ~ ~ ~ ~\nenddoctype\nstart doc 2\nattr a This%20entity%20will%20be%20substituted%20as%20an%20attribute%20value%2C%20and%20is%20%20%20calculated%20to%20be%20exactly%20long%20enough%20that%20the%20terminating%20NUL%20%20%20that%20the%20library%20adds%20internally%20will%20trigger%20the%20string%20pool%20togrow.%20GHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP\nend doc\nresult ok 0 2 21 1079\n"}
+{"id":"alloc_tests.c:1544","trace":"start doc 2\nattr a %20\nend doc\nresult ok 0 1 17 17\n"}
+{"id":"alloc_tests.c:1565","trace":"start doc 2\nattr a &\nend doc\nresult ok 0 1 21 21\n"}
+{"id":"alloc_tests.c:1591","trace":"doctype doc ~ ~ 1\nattlist doc a CDATA ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHI1 0\nenddoctype\nstart doc 0\nattr a ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHI1\nend doc\nresult ok 0 2 6 1072\n"}
+{"id":"alloc_tests.c:1635","trace":"doctype test ~ ~ 1\nentity foo 0 %0AABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP ~ ~ ~ ~\nenddoctype\nstart test 2\nattr a %20ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP\nend test\nresult ok 0 3 17 1077\n"}
+{"id":"alloc_tests.c:1681","trace":"start doc 0\nend doc\nresult ok 0 1 7 7\n"}
+{"id":"alloc_tests.c:1683","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:1718","trace":"start doc 0\nend doc\nresult ok 0 1 6 6\n"}
+{"id":"alloc_tests.c:1720","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:1766","trace":"result error 2 1 0 0\n"}
+{"id":"alloc_tests.c:1809","trace":"doctype doc ~ ~ 1\nattlist doc a1 %28a|b|c%29 a 0\nattlist doc a2 %28foo|bar%29 ~ 0\nattlist doc a3 NMTOKEN ~ 0\nattlist doc a4 NMTOKENS ~ 0\nattlist doc a5 ID ~ 0\nattlist doc a6 IDREF ~ 0\nattlist doc a7 IDREFS ~ 0\nattlist doc a8 ENTITY ~ 0\nattlist doc a9 ENTITIES ~ 0\nattlist doc a10 CDATA ~ 0\nenddoctype\nstart doc 0\nattr a1 a\ntext wombat\nend doc\nresult ok 0 15 0 321\n"}
+{"id":"alloc_tests.c:1846","trace":"start LongRootElementNameThatWillCauseTheNextAllocationToExpandTheStringPoolForTheDTDQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZ 2\nattr a 1\nend LongRootElementNameThatWillCauseTheNextAllocationToExpandTheStringPoolForTheDTDQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZ\nresult ok 0 1 1032 1032\n"}
+{"id":"alloc_tests.c:1883","trace":"doctype doc ~ ~ 1\nentity e 0 ~ ~ foo ~ ~\nenddoctype\nstart doc 0\nend doc\nresult ok 0 4 14 60\n"}
+{"id":"alloc_tests.c:1936","trace":"doctype doc ~ ~ 1\nentity e 0 ~ ~ bar LongPublicIDThatShouldResultInAnInternalStringPoolGrowingAtASpecificMomentKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AB ~\nenddoctype\nstart doc 0\nend doc\nresult ok 0 4 14 1087\n"}
+{"id":"alloc_tests.c:1983","trace":"doctype doc ~ ~ 1\nentity e1 0 Long%20entity%20value%20that%20should%20provoke%20a%20string%20pool%20to%20grow%20while%20setting%20up%20to%20parse%20the%20external%20entity%20below.%20xyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AB ~ ~ ~ ~\nentity e2 0 ~ ~ bar ~ ~\nenddoctype\nstart doc 0\nend doc\nresult ok 0 5 15 1104\n"}
+{"id":"alloc_tests.c:2031","trace":"doctype doc ~ ~ 1\nnotation note ~ ALongNotationNameThatShouldProvokeStringPoolGrowthWhileCallingAnExternalEntityParserUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AB ~\nentity e1 0 ~ ~ foo ~ ALongNotationNameThatShouldProvokeStringPoolGrowthWhileCallingAnExternalEntityParserUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AB\nentity e2 0 ~ ~ bar ~ ~\nenddoctype\nstart doc 0\nend doc\nresult ok 0 6 15 2174\n"}
+{"id":"alloc_tests.c:2099","trace":"doctype doc foo ~ 0\nenddoctype\nstart doc 0\nend doc\nresult ok 0 1 33 33\n"}
+{"id":"alloc_tests.c:2184","trace":"start e 0\nresult error 3 1 3 3\n"}
+{"id":"basic_tests.c:106","trace":"start doc 0\nresult error 4 1 5 5\n"}
+{"id":"basic_tests.c:119","trace":"start doc 0\nresult error 14 1 5 5\n"}
+{"id":"basic_tests.c:161","trace":"start e 0\nend e\nresult ok 0 1 5 7\n"}
+{"id":"basic_tests.c:170","trace":"start e 0\nend e\nresult ok 0 1 5 10\n"}
+{"id":"basic_tests.c:179","trace":"start e 0\nend e\nresult ok 0 1 5 10\n"}
+{"id":"basic_tests.c:188","trace":"start e 0\nend e\nresult ok 0 1 5 10\n"}
+{"id":"basic_tests.c:213","trace":"start doc 0\ntext %0A\nstart a1 0\nend a1\nstart a2 0\nend a2\nstart a3 0\nend a3\nstart a4 0\nend a4\nstart a5 0\nend a5\nstart a6 0\nend a6\nstart a7 0\nend a7\nstart a8 0\nend a8\ntext %0A\nstart b1 0\nend b1\nstart b2 2\nattr attr foo\ntext This%20is%20a%20foo\nend b2\nstart b3 0\nend b3\nstart b4 0\nend b4\ntext %0A\nstart b5 0\nend b5\nstart b6 0\nend b6\nstart b7 0\nend b7\nstart b8 0\nend b8\ntext %0A\nstart c1 0\nend c1\nstart c2 0\nend c2\nstart c3 0\nend c3\nstart c4 0\nend c4\nstart c5 0\nend c5\nstart c6 0\nend c6\nstart c7 0\nend c7\nstart c8 0\nend c8\ntext %0A\nstart d1 0\nend d1\nstart d2 0\nend d2\nstart d3 0\nend d3\nstart d4 0\nend d4\nstart d5 0\nend d5\nstart d6 0\nend d6\nstart d7 0\nend d7\ntext %0A\nstart d8 0\ntext This%20triggers%20the%20table%20growth%20and%20collides%20with%20b2\nend d8\ntext %0A\nend doc\nresult ok 0 9 0 290\n"}
+{"id":"basic_tests.c:256","trace":"xmldecl 1.0 iso-8859-1 -1\nstart e 0\ntext J%C3%B8rgen%20%C3%A6%C3%B8%C3%A5%C3%86%C3%98%C3%85\nend e\nresult ok 0 2 20 64\n"}
+{"id":"basic_tests.c:271","trace":"xmldecl 1.0 iso-8859-1 -1\nstart doc 0\ntext %C3%A9%C3%A8%C3%A0%C3%A7%C3%AA%C3%88\nend doc\nresult ok 0 2 47 91\n"}
+{"id":"basic_tests.c:284","trace":"xmldecl 1.0 iso-8859-1 -1\nstart doc 0\ntext %C3%A9%C3%A8%C3%A0%C3%A7%C3%AA%C3%88\nend doc\nresult ok 0 2 47 91\n"}
+{"id":"basic_tests.c:297","trace":"xmldecl 1.0 iso-8859-1 -1\nstart doc 0\ntext %C3%A9%C3%A8%C3%A0%C3%A7%C3%AA%C3%88\nend doc\nresult ok 0 2 17 61\n"}
+{"id":"basic_tests.c:310","trace":"xmldecl 1.0 utf-8 -1\nstart doc 0\ntext %C3%A9\nend doc\nresult ok 0 2 12 52\n"}
+{"id":"basic_tests.c:327","trace":"start doc 0\ntext %EF%BA%BF\nend doc\nresult ok 0 1 12 14\n"}
+{"id":"basic_tests.c:347","trace":"start e 0\ntext %25ccd\nend e\nresult ok 0 1 11 11\n"}
+{"id":"basic_tests.c:430","trace":"xmldecl 1.0 UTF-16 -1\nstart doc 2\nattr a 123\ntext some%20%EF%BC%A1%20text\nend doc\nresult ok 0 2 30 140\n"}
+{"id":"basic_tests.c:456","trace":"start e 0\nend e\nresult ok 0 3 0 18\n"}
+{"id":"basic_tests.c:478","trace":"xmldecl 1.0 utf-16 -1\nresult error 19 1 30 30\n"}
+{"id":"basic_tests.c:490","trace":"start doc 0\ntext Hi\nend doc\nresult ok 0 1 13 13\n"}
+{"id":"basic_tests.c:502","trace":"xmldecl 1.0 iso-8859-1 -1\nstart e 2\nattr a %C3%A4%20%C3%B6%20%C3%BC%20%C3%A4%20%C3%B6%20%C3%BC%20%C3%A4%20%C3%B6%20%C3%BC%20>\ntext %C3%A4%20%C3%B6%20%C3%BC%20%C3%A4%20%C3%B6%20%C3%BC%20%C3%A4%20%C3%B6%20%C3%BC%20>\nend e\nresult ok 0 3 59 163\n"}
+{"id":"basic_tests.c:531","trace":"xmldecl 1.0 utf-8 -1\nresult error 4 2 3 42\n"}
+{"id":"basic_tests.c:544","trace":"xmldecl 1.0 iso-8859-1 -1\nstart doc 2\nattr att ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNO%C3%A4\ntext %0A\nend doc\nresult ok 0 3 6 1087\n"}
+{"id":"basic_tests.c:601","trace":"xmldecl 1.0 us-ascii -1\nstart doc 2\nattr att ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP01234\ntext %0A\nend doc\nresult ok 0 3 6 1090\n"}
+{"id":"basic_tests.c:649","trace":"start tag 0\ntext %0A%0A%0A\nend tag\nresult ok 0 4 6 14\n"}
+{"id":"basic_tests.c:668","trace":"start tag 0\nend tag\nresult ok 0 1 11 11\n"}
+{"id":"basic_tests.c:686","trace":"start a 0\ntext %0A%20%20\nstart b 0\ntext %0A%20%20%20%20\nstart c 0\nend c\ntext %0A%20%20\nend b\ntext %0A%20%20\nstart d 0\ntext %0A%20%20%20%20\nstart f 0\nend f\ntext %0A%20%20\nend d\ntext %0A\nend a\nresult ok 0 8 4 53\n"}
+{"id":"basic_tests.c:718","trace":"start a 0\ntext %0A%20%20\nstart b 0\ntext %0A%20%20\nresult error 7 3 4 14\n"}
+{"id":"basic_tests.c:762","trace":"start e 0\ntext ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+\nend e\nresult ok 0 1 1095 1095\n"}
+{"id":"basic_tests.c:797","trace":"xmldecl 1.0 iso-8859-1 -1\nstart e 0\ntext ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+\nend e\nresult ok 0 1 1138 1138\n"}
+{"id":"basic_tests.c:838","trace":"start a 0\nstart b 0\nstart c 0\nend c\nend b\nstart d 0\nstart f 0\nend f\nend d\nend a\nresult ok 0 1 29 29\n"}
+{"id":"basic_tests.c:940","trace":"doctype doc ~ ~ 1\nattlist doc attr NMTOKENS ~ 1\nattlist doc ents ENTITIES ~ 1\nattlist doc refs IDREFS ~ 1\nenddoctype\nstart doc 6\nattr attr a%20b%20c%20d%20e\nattr refs id-1%20id-2\nattr ents ent-1%20ent-2\ntext %0A%20%20\nstart e 2\nattr id id-1\nend e\ntext %0A%20%20\nstart e 2\nattr id id-2\nend e\ntext %0A\nend doc\nresult ok 0 12 6 286\n"}
+{"id":"basic_tests.c:966","trace":"result error 17 2 0 1\n"}
+{"id":"basic_tests.c:975","trace":"result error 30 1 20 20\n"}
+{"id":"basic_tests.c:981","trace":"result error 30 1 6 6\n"}
+{"id":"basic_tests.c:987","trace":"result error 30 1 50 50\n"}
+{"id":"basic_tests.c:995","trace":"result error 30 1 15 15\n"}
+{"id":"basic_tests.c:1015","trace":"result error 30 1 15 15\n"}
+{"id":"basic_tests.c:1082","trace":"result error 30 1 6 6\n"}
+{"id":"basic_tests.c:1112","trace":"result error 30 1 7 9\n"}
+{"id":"basic_tests.c:1134","trace":"result error 30 1 6 6\n"}
+{"id":"basic_tests.c:1165","trace":"doctype doc foo ~ 0\nenddoctype\nstart doc 0\nskipped entity 0\nend doc\nresult ok 0 2 19 47\n"}
+{"id":"basic_tests.c:1178","trace":"start doc 0\nresult error 11 1 5 5\n"}
+{"id":"basic_tests.c:1188","trace":"xmldecl 1.0 us-ascii 1\ndoctype doc foo ~ 0\nenddoctype\nstart doc 0\nresult error 11 3 5 92\n"}
+{"id":"basic_tests.c:1223","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1291","trace":"doctype t1 ~ ~ 1\nentity e1 0 hello ~ ~ ~ ~\nenddoctype\nstart t1 0\ntext %0A%20%20\nstart t2 0\ntext hello\nend t2\ntext %0A\nend t1\nresult ok 0 7 0 68\n"}
+{"id":"basic_tests.c:1307","trace":"doctype doc ~ ~ 1\nentity entity 0 &entity; ~ ~ ~ ~\nenddoctype\nstart doc 0\nresult error 12 4 5 58\n"}
+{"id":"basic_tests.c:1325","trace":"doctype a ~ ~ 1\nentity e1 0 &e2; ~ ~ ~ ~\nentity e2 0 &e1; ~ ~ ~ ~\nenddoctype\nstart a 0\nresult error 12 4 5 63\n"}
+{"id":"basic_tests.c:1332","trace":"doctype a ~ ~ 1\nentity e1 0 &e2; ~ ~ ~ ~\nentity e2 0 &e1; ~ ~ ~ ~\nenddoctype\nresult error 12 4 2 60\n"}
+{"id":"basic_tests.c:1339","trace":"doctype doc ~ ~ 1\nentity p1 1 %25p2; ~ ~ ~ ~\nentity p2 1 %25p1; ~ ~ ~ ~\nentity define_g 1 <!ENTITY%20g%20'%25p2;'> ~ ~ ~ ~\nenddoctype\nstart doc 0\nend doc\nresult ok 0 8 0 143\n"}
+{"id":"basic_tests.c:1411","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1412","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1415","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1418","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1456","trace":"result error 6 1 0 0\n"}
+{"id":"basic_tests.c:1458","trace":"start tag 0\nresult error 6 1 5 5\n"}
+{"id":"basic_tests.c:1480","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1497","trace":"start doc 0\nend doc\nresult ok 0 8 6 13\n"}
+{"id":"basic_tests.c:1503","trace":"doctype doc ~ ~ 1\nelement doc 10 ~()\nresult error 3 3 0 37\n"}
+{"id":"basic_tests.c:1506","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1513","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1517","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1521","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1559","trace":"start e 2\nattr xmlns:prefix \nend e\nresult error 4 2 1 24\n"}
+{"id":"basic_tests.c:1573","trace":"doctype e:element ~ ~ 1\nresult error 3 3 0 44\n"}
+{"id":"basic_tests.c:1576","trace":"result error 2 1 6 6\n"}
+{"id":"basic_tests.c:1667","trace":"start a 0\ncdata\ntext <greeting>Hello%2C%20world!</greeting>\nendcdata\nend a\nresult ok 0 1 53 53\n"}
+{"id":"basic_tests.c:1668","trace":"start greeting 0\ntext Hello%2C%20world!\nend greeting\nresult ok 0 1 34 34\n"}
+{"id":"basic_tests.c:1703","trace":"result error 30 1 34 68\n"}
+{"id":"basic_tests.c:1730","trace":"result error 4 1 34 68\n"}
+{"id":"basic_tests.c:1764","trace":"xmldecl 1.0 utf-16 -1\nstart a 0\ncdata\nresult error 20 1 51 102\n"}
+{"id":"basic_tests.c:1788","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:1839","trace":"result error 30 1 34 68\n"}
+{"id":"basic_tests.c:1876","trace":"result error 30 1 34 68\n"}
+{"id":"basic_tests.c:1930","trace":"start a 0\ntext %ED%9F%BF%ED%9F%BF\nend a\nresult ok 0 1 9 18\n"}
+{"id":"basic_tests.c:1936","trace":"start a 0\ntext %ED%9F%BF\nresult error 4 1 4 8\n"}
+{"id":"basic_tests.c:1942","trace":"start a 0\ntext %ED%9F%BF\nresult error 4 1 4 8\n"}
+{"id":"basic_tests.c:1948","trace":"start a 0\ntext %ED%9F%BF\nresult error 4 1 4 8\n"}
+{"id":"basic_tests.c:1954","trace":"start a 0\ntext %ED%9F%BF\nresult error 4 1 4 8\n"}
+{"id":"basic_tests.c:1960","trace":"start a 0\ntext %ED%9F%BF%EE%80%80\nend a\nresult ok 0 1 9 18\n"}
+{"id":"basic_tests.c:1967","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:1973","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:1979","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:1985","trace":"start a 0\ntext %F0%90%80%80\nend a\nresult ok 0 1 8 18\n"}
+{"id":"basic_tests.c:1991","trace":"start a 0\ntext %F0%90%8F%BF\nend a\nresult ok 0 1 8 18\n"}
+{"id":"basic_tests.c:1997","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2004","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2010","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2016","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2022","trace":"start a 0\ntext %F4%8F%B0%80\nend a\nresult ok 0 1 8 18\n"}
+{"id":"basic_tests.c:2028","trace":"start a 0\ntext %F4%8F%BF%BF\nend a\nresult ok 0 1 8 18\n"}
+{"id":"basic_tests.c:2034","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2041","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2047","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2053","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2059","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2065","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2071","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2078","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2084","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2090","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2096","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2102","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2108","trace":"start a 0\nresult error 4 1 3 6\n"}
+{"id":"basic_tests.c:2115","trace":"start a 0\ntext %EE%80%80%ED%9F%BF\nend a\nresult ok 0 1 9 18\n"}
+{"id":"basic_tests.c:2121","trace":"start a 0\ntext %EE%80%80\nresult error 4 1 4 8\n"}
+{"id":"basic_tests.c:2127","trace":"start a 0\ntext %EE%80%80\nresult error 4 1 4 8\n"}
+{"id":"basic_tests.c:2133","trace":"start a 0\ntext %EE%80%80\nresult error 4 1 4 8\n"}
+{"id":"basic_tests.c:2139","trace":"start a 0\ntext %EE%80%80\nresult error 4 1 4 8\n"}
+{"id":"basic_tests.c:2145","trace":"start a 0\ntext %EE%80%80%EE%80%80\nend a\nresult ok 0 1 9 18\n"}
+{"id":"basic_tests.c:2196","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2197","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2198","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2199","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2200","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2201","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2202","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2203","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2205","trace":"start a 0\ncdata\nresult error 20 1 12 12\n"}
+{"id":"basic_tests.c:2206","trace":"start a 0\ncdata\nresult error 20 1 12 12\n"}
+{"id":"basic_tests.c:2207","trace":"start a 0\ncdata\nresult error 20 1 12 12\n"}
+{"id":"basic_tests.c:2209","trace":"start a 0\nresult error 4 1 5 5\n"}
+{"id":"basic_tests.c:2210","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2211","trace":"start a 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:2212","trace":"start a 0\nresult error 4 1 8 8\n"}
+{"id":"basic_tests.c:2213","trace":"start a 0\nresult error 4 1 9 9\n"}
+{"id":"basic_tests.c:2214","trace":"start a 0\nresult error 4 1 10 10\n"}
+{"id":"basic_tests.c:2215","trace":"start a 0\nresult error 4 1 11 11\n"}
+{"id":"basic_tests.c:2217","trace":"start a 0\ncdata\ntext <a/>\nresult error 20 1 16 16\n"}
+{"id":"basic_tests.c:2218","trace":"start a 0\ncdata\ntext ]<a/>\nresult error 20 1 17 17\n"}
+{"id":"basic_tests.c:2219","trace":"start a 0\ncdata\ntext ]]<a/>\nresult error 20 1 18 18\n"}
+{"id":"basic_tests.c:2252","trace":"result error 30 1 34 68\n"}
+{"id":"basic_tests.c:2261","trace":"result error 5 1 0 0\n"}
+{"id":"basic_tests.c:2262","trace":"result error 5 1 0 0\n"}
+{"id":"basic_tests.c:2263","trace":"result error 5 1 0 0\n"}
+{"id":"basic_tests.c:2264","trace":"result error 5 1 0 0\n"}
+{"id":"basic_tests.c:2265","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2266","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2267","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2268","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2269","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2270","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2271","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2272","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2273","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2274","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2275","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2276","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2277","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2278","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2279","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2281","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2283","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2284","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2286","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:2390","trace":"start doc 0\ntext hell]\nend doc\nresult ok 0 1 16 16\n"}
+{"id":"basic_tests.c:2391","trace":"doctype doc ~ ~ 1\nentity entity 0 %25 ~ ~ ~ ~\nenddoctype\nstart doc 0\ntext %25\nend doc\nresult ok 0 4 19 63\n"}
+{"id":"basic_tests.c:2622","trace":"start r 0\ntext hello\nend r\nresult ok 0 1 12 12\n"}
+{"id":"basic_tests.c:2653","trace":"doctype doc ~ ~ 1\nelement doc 60 ~(40 chapter())\nelement chapter 30 ~()\nenddoctype\nstart doc 0\nstart chapter 0\ntext Wombats%20are%20go\nend chapter\nend doc\nresult ok 0 5 44 117\n"}
+{"id":"basic_tests.c:2727","trace":"doctype foo ~ ~ 1\nelement junk 60 ~(50 ~(40 bar(),40 foo(),43 xyz()),42 zebra())\nenddoctype\nstart foo 0\nend foo\nresult ok 0 4 6 66\n"}
+{"id":"basic_tests.c:2746","trace":"xmldecl 1.0 us-ascii -1\nresult error 3 2 0 42\n"}
+{"id":"basic_tests.c:2815","trace":"xmldecl 1.0 us-ascii -1\ndoctype doc ~ ~ 1\nentity entity 0 hello%20world ~ ~ ~ ~\nenddoctype\nresult error 3 3 0 90\n"}
+{"id":"basic_tests.c:2852","trace":"doctype doc ~ ~ 1\nentity foo 0 bar ~ ~ ~ ~\nenddoctype\nstart doc 0\ntext bar\nend doc\nresult ok 0 2 16 53\n"}
+{"id":"basic_tests.c:2897","trace":"doctype doc ~ ~ 1\nelement doc 60 ~(40 tag())\nattlist doc id ID ~ 1\nenddoctype\nstart doc 6\nattr a 1\nattr id one\nattr b 2\nstart tag 2\nattr c 3\nend tag\nend doc\nresult ok 0 4 46 114\n"}
+{"id":"basic_tests.c:2941","trace":"doctype doc ~ ~ 1\nattlist doc attribute CDATA expected 0\nattlist doc attribute CDATA ignored 0\nenddoctype\nstart doc 0\nattr attribute expected\nend doc\nresult ok 0 5 0 96\n"}
+{"id":"basic_tests.c:2979","trace":"doctype doc ~ ~ 1\nattlist doc identifier CDATA expected 0\nattlist doc identifier ID ~ 1\nenddoctype\nstart doc 0\nattr identifier expected\nend doc\nresult ok 0 5 0 95\n"}
+{"id":"basic_tests.c:3017","trace":"doctype doc ~ ~ 1\nattlist doc identifier ID ~ 1\nattlist doc identifier CDATA unexpected 0\nenddoctype\nstart doc 0\nend doc\nresult ok 0 5 0 97\n"}
+{"id":"basic_tests.c:3053","trace":"doctype doc ~ ~ 1\nattlist doc attribute CDATA expected 0\nattlist doc attribute CDATA ignored 0\nenddoctype\nstart doc 0\nattr attribute expected\nend doc\nresult ok 0 6 0 113\n"}
+{"id":"basic_tests.c:3089","trace":"doctype doc ~ ~ 1\nattlist doc attribute CDATA expected_doc 0\nattlist tag attribute CDATA expected_tag 0\nattlist doc attribute CDATA ignored_doc 0\nenddoctype\nstart doc 0\nattr attribute expected_doc\nstart tag 0\nattr attribute expected_tag\nend tag\nend doc\nresult ok 0 7 0 185\n"}
+{"id":"basic_tests.c:3129","trace":"doctype doc ~ ~ 1\nattlist doc attribute CDATA expected_doc 0\nattlist tag attribute CDATA expected_tag 0\nattlist doc second_attribute CDATA second_expected_doc 0\nattlist doc attribute CDATA ignored_doc 0\nenddoctype\nstart doc 0\nattr attribute expected_doc\nattr second_attribute second_expected_doc\nstart tag 0\nattr attribute expected_tag\nend tag\nend doc\nresult ok 0 7 0 230\n"}
+{"id":"basic_tests.c:3170","trace":"doctype doc ~ ~ 1\nattlist doc identifier ID ~ 1\nattlist tag identifier CDATA identifier_tag 0\nattlist doc identifier CDATA ignored 0\nenddoctype\nstart doc 2\nattr identifier doc_identity\nstart tag 0\nattr identifier identifier_tag\nend tag\nend doc\nresult ok 0 7 0 204\n"}
+{"id":"basic_tests.c:3250","trace":"doctype doc ~ ~ 1\nentity e 0 ~ ~ entity.ent ~ ~\nelement doc 20 ~()\nelement tag 10 ~()\nattlist tag first CDATA ~ 0\nattlist tag second NMTOKENS ~ 0\nenddoctype\nstart doc 0\nend doc\nresult ok 0 9 0 192\n"}
+{"id":"basic_tests.c:3285","trace":"doctype doc ~ ~ 1\nentity wombat 0 wom ~ ~ ~ ~\nentity entity 0 hi%20&wom;%20there ~ ~ ~ ~\nenddoctype\nstart doc 0\ntext hi%20\nresult error 11 5 5 81\n"}
+{"id":"basic_tests.c:3311","trace":"start doc 0\ntext Hello\nresult error 5 1 10 10\n"}
+{"id":"basic_tests.c:3327","trace":"start doc 0\ntext Hello\nstart meep 0\nend meep\ntext world\nend doc\nresult ok 0 1 28 28\n"}
+{"id":"basic_tests.c:3346","trace":"start doc 0\ncdata\ntext Hello%0Aworld\nendcdata\nend doc\nresult ok 0 2 14 34\n"}
+{"id":"basic_tests.c:3396","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:3431","trace":"xmldecl 1.0 us-ascii -1\nresult error 5 1 41 41\n"}
+{"id":"basic_tests.c:3435","trace":"xmldecl 1.0 utf-8 -1\nresult error 6 1 38 38\n"}
+{"id":"basic_tests.c:3455","trace":"start doc 0\ntext Hello%20\nresult error 3 1 11 11\n"}
+{"id":"basic_tests.c:3456","trace":"result error 4 1 6 6\n"}
+{"id":"basic_tests.c:3481","trace":"start doc 0\ntext %0A\nresult error 3 1 5 5\n"}
+{"id":"basic_tests.c:3541","trace":"start doc 0\ntext ]\nresult error 3 1 6 6\n"}
+{"id":"basic_tests.c:3542","trace":"start doc 0\ntext ]\nresult error 3 1 7 14\n"}
+{"id":"basic_tests.c:3618","trace":"xmldecl 1.0 us-ascii -1\ncomment %20Primary%20parse%20\ndoctype doc foo ~ 0\nenddoctype\nstart doc 0\nskipped entity 0\nresult error 3 4 13 106\n"}
+{"id":"basic_tests.c:3622","trace":"comment %20Back%20to%20primary%20parser%20\nresult error 4 2 1 33\n"}
+{"id":"basic_tests.c:3693","trace":"start doc 0\nend doc\nresult ok 0 1 11 11\n"}
+{"id":"basic_tests.c:3694","trace":"start doc 0\nresult error 3 1 5 5\n"}
+{"id":"basic_tests.c:3724","trace":"start root 0\nend root\nresult ok 0 1 7 7\n"}
+{"id":"basic_tests.c:3802","trace":"start r 0\nend r\nresult ok 0 1 7 7\n"}
+{"id":"basic_tests.c:3924","trace":"result error 5 1 0 0\n"}
+{"id":"basic_tests.c:3925","trace":"start doc 0\nresult error 5 1 5 5\n"}
+{"id":"basic_tests.c:3926","trace":"start document 0\nresult error 5 1 10 10\n"}
+{"id":"basic_tests.c:3927","trace":"start averylongelementnamesuchthatitwillhopefullystretchacrossmultiplelinesandlookprettyridiculousitsalsoveryhardtoreadandifyouredoingitihavetowonderifyoureallydonthaveanythingbettertodoofcourseiguessicouldveputsomethingbadinherebutipromisethatididntheybtwhowgreatarespacesandpunctuationforhelpingwithreadabilityprettygreatithinkanywaysthisisprobablylongenoughbye 0\nresult error 5 1 359 359\n"}
+{"id":"basic_tests.c:4060","trace":"start doc 0\ntext <>&\"'\nend doc\nresult ok 0 1 36 36\n"}
+{"id":"basic_tests.c:4062","trace":"result error 4 1 1 1\n"}
+{"id":"basic_tests.c:4092","trace":"doctype doc 004-1.ent ~ 0\nenddoctype\nstart doc 0\nend doc\nresult ok 0 3 0 46\n"}
+{"id":"basic_tests.c:4104","trace":"start doc 0\nresult error 11 1 5 5\n"}
+{"id":"basic_tests.c:4104#1","trace":"start doc 0\nresult error 11 1 5 5\n"}
+{"id":"basic_tests.c:4105","trace":"start doc 0\nresult error 11 1 5 5\n"}
+{"id":"basic_tests.c:4105#1","trace":"start doc 0\nresult error 11 1 5 5\n"}
+{"id":"basic_tests.c:4119","trace":"doctype doc foo ~ 0\nenddoctype\nstart doc 0\nstart e 0\nskipped entity 0\nend e\nend doc\nresult ok 0 2 26 54\n"}
+{"id":"basic_tests.c:4122","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4145","trace":"doctype d s ~ 0\nenddoctype\nstart d 0\nstart e 0\nskipped en 0\nend e\nend d\nresult ok 0 2 18 84\n"}
+{"id":"basic_tests.c:4149","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4172","trace":"doctype d s ~ 0\nenddoctype\nstart d 0\nstart e 0\nskipped en 0\nend e\nend d\nresult ok 0 2 18 84\n"}
+{"id":"basic_tests.c:4202","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4204","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4207","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4307","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4308","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4315","trace":"result error 30 1 5 5\n"}
+{"id":"basic_tests.c:4320","trace":"xmldecl 1.0 utf-8 -1\nresult error 4 2 0 39\n"}
+{"id":"basic_tests.c:4323","trace":"xmldecl 1.0 utf-8 -1\nresult error 5 2 0 39\n"}
+{"id":"basic_tests.c:4326","trace":"xmldecl 1.0 utf-8 -1\nresult error 6 2 0 39\n"}
+{"id":"basic_tests.c:4349","trace":"doctype doc foo ~ 0\nenddoctype\nstart doc 0\nend doc\nresult ok 0 2 11 39\n"}
+{"id":"basic_tests.c:4373","trace":"xmldecl 1.0 utf-8 -1\nresult error 32 2 22 61\n"}
+{"id":"basic_tests.c:4411","trace":"doctype doc ~ ~ 1\nenddoctype\nstart doc 0\ntext '\nend doc\nresult ok 0 4 17 57\n"}
+{"id":"basic_tests.c:4423","trace":"doctype doc ~ ~ 1\nenddoctype\nstart doc 0\nend doc\nresult ok 0 4 8 50\n"}
+{"id":"basic_tests.c:4440","trace":"doctype doc ~ ~ 1\nnotation note ~ ~ foo\nelement doc 10 ~()\nenddoctype\nstart doc 0\nend doc\nresult ok 0 5 6 76\n"}
+{"id":"basic_tests.c:4483","trace":"doctype doc ~ ~ 1\nelement doc 53 ~(40 a(),40 b(),40 c())\nelement a 10 ~()\nelement b 30 ~()\nelement c 20 ~()\nenddoctype\nstart doc 0\ntext %0A\nstart a 0\nend a\ntext %0A\nstart b 2\nattr attr foo\ntext This%20is%20a%20foo\nend b\ntext %0A\nstart c 0\nend c\ntext %0A\nend doc\nresult ok 0 12 0 160\n"}
+{"id":"basic_tests.c:4506","trace":"xmldecl 1.0 ~ 1\nresult error 3 2 0 39\n"}
+{"id":"basic_tests.c:4508","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4512","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4528","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4553","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4567","trace":"doctype doc foo ~ 0\nenddoctype\nstart doc 0\nend doc\nresult ok 0 3 0 40\n"}
+{"id":"basic_tests.c:4615","trace":"start doc 0\nend doc\nresult ok 0 3 0 14\n"}
+{"id":"basic_tests.c:4675","trace":"start doc 0\nend doc\nresult error 5 1 11 11\n"}
+{"id":"basic_tests.c:4683","trace":"start doc 0\nend doc\nresult error 6 1 11 11\n"}
+{"id":"basic_tests.c:4700","trace":"doctype doc ~ ~ 1\nentity foo 0 <suspend>Hi<suspend>Ho</suspend></suspend> ~ ~ ~ ~\nenddoctype\nstart doc 0\nstart suspend 0\ntext Hi\nstart suspend 0\ntext Ho\nend suspend\nend suspend\nend doc\nresult ok 0 5 0 95\n"}
+{"id":"basic_tests.c:4729","trace":"doctype a ~ ~ 1\nentity e 0 <!--COMMENT-->a ~ ~ ~ ~\nenddoctype\nstart a 0\ncomment COMMENT\ntext a\nstart b 0\ntext %0A\nstart aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 0\nend aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nend b\nend a\nresult ok 0 2 2011 2065\n"}
+{"id":"basic_tests.c:4800","trace":"doctype doc ~ ~ 1\nentity foo 0 <suspend>Hi</wombat> ~ ~ ~ ~\nenddoctype\nstart doc 0\nstart suspend 0\ntext Hi\nresult error 7 4 5 61\n"}
+{"id":"basic_tests.c:4820","trace":"doctype doc ~ ~ 1\nentity foo 1 <!ELEMENT%20doc%20%28#PCDATA%29*> ~ ~ ~ ~\nenddoctype\nstart doc 0\ntext Hello%2C%20world\nend doc\nresult ok 0 5 23 92\n"}
+{"id":"basic_tests.c:4845","trace":"result error 4 1 1 1\n"}
+{"id":"basic_tests.c:4861","trace":"doctype doc ~ ~ 1\nresult error 4 1 38 38\n"}
+{"id":"basic_tests.c:4870","trace":"doctype doc ~ ~ 1\nresult error 4 1 38 38\n"}
+{"id":"basic_tests.c:4879","trace":"start doc 2\nattr a value%20\nend doc\nresult ok 0 2 3 17\n"}
+{"id":"basic_tests.c:4891","trace":"xmldecl 1.0 ~ 1\ndoctype doc ~ ~ 1\nelement doc 30 ~()\nentity pe 1 <!ATTLIST%20doc%20att2%20CDATA%20\"&ge;\"> ~ ~ ~ ~\nentity ge 0 AttDefaultValue ~ ~ ~ ~\nenddoctype\nstart doc 2\nattr att2 any\nend doc\nresult ok 0 8 17 195\n"}
+{"id":"basic_tests.c:4911","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4926","trace":"doctype doc ~ ~ 1\nelement a 60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(40 b()))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))\nentity e 1 ~ ~ ext ~ ~\nelement c 60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(60 ~(40 d())))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))\nenddoctype\nstart doc 0\nend doc\nresult ok 0 7 6 344\n"}
+{"id":"basic_tests.c:4937","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4961","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:4997","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:5001","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:5025","trace":"doctype doc ~ ~ 1\nentity entity 0  ~ ~ ~ ~\nresult error 14 2 19 35\n"}
+{"id":"basic_tests.c:5036","trace":"doctype doc ~ ~ 1\nentity entity 0  ~ ~ ~ ~\nresult error 4 2 22 38\n"}
+{"id":"basic_tests.c:5049","trace":"doctype doc ~ ~ 1\nentity entity 0 &%E0%B8%84%E0%B8%88; ~ ~ ~ ~\nenddoctype\nstart doc 0\nresult error 11 4 5 96\n"}
+{"id":"basic_tests.c:5069","trace":"doctype doc ~ ~ 1\nentity entity 0  ~ ~ ~ ~\nresult error 14 2 19 35\n"}
+{"id":"basic_tests.c:5081","trace":"pi test processing%20instruction\nstart doc 0\nend doc\nresult ok 0 2 6 38\n"}
+{"id":"basic_tests.c:5097","trace":"comment %20This%20is%20a%20comment%20\nstart doc 0\nend doc\nresult ok 0 2 6 33\n"}
+{"id":"basic_tests.c:5113","trace":"pi yml something%20like%20data\nstart doc 0\nend doc\nresult ok 0 1 33 33\n"}
+{"id":"basic_tests.c:5128","trace":"pi xnl nothing%20like%20data\nstart doc 0\nend doc\nresult ok 0 1 31 31\n"}
+{"id":"basic_tests.c:5143","trace":"pi xmm everything%20like%20data\nstart doc 0\nend doc\nresult ok 0 1 34 34\n"}
+{"id":"basic_tests.c:5163","trace":"pi %E0%B8%84%E0%B8%88 \nstart q 0\nend q\nresult ok 0 1 10 20\n"}
+{"id":"basic_tests.c:5189","trace":"pi %E0%B8%84%E0%B8%88 \nstart q 0\nend q\nresult ok 0 1 10 20\n"}
+{"id":"basic_tests.c:5213","trace":"comment %20Comment%20A%20\nstart doc 0\nend doc\nresult ok 0 2 6 50\n"}
+{"id":"basic_tests.c:5232","trace":"comment %20Comment%20B%20\nstart doc 0\nend doc\nresult ok 0 2 6 50\n"}
+{"id":"basic_tests.c:5252","trace":"xmldecl 1.0 no-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5268","trace":"xmldecl 1.0 failing-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5284","trace":"xmldecl 1.0 prefix-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5295","trace":"xmldecl 1.0 prefix-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5306","trace":"xmldecl 1.0 prefix-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5319","trace":"xmldecl 1.0 prefix-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5341","trace":"xmldecl 1.0 prefix-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5360","trace":"xmldecl 1.0 invalid-9 -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5370","trace":"xmldecl 1.0 ascii-like -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5379","trace":"xmldecl 1.0 ascii-like -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5389","trace":"xmldecl 1.0 invalid-len -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5399","trace":"xmldecl 1.0 invalid-a -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5409","trace":"xmldecl 1.0 invalid-surrogate -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5419","trace":"xmldecl 1.0 invalid-high -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5429","trace":"xmldecl 1.0 prefix-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5440","trace":"xmldecl 1.0 x-unk -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5456","trace":"doctype r ~ ~ 1\nentity ext 0 ~ ~ ext.ent ~ ~\nenddoctype\nstart r 0\nend r\nresult ok 0 5 0 63\n"}
+{"id":"basic_tests.c:5460","trace":"xmldecl 1.0 x-unk -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:5492","trace":"result error 4 1 1 2\n"}
+{"id":"basic_tests.c:5523","trace":"result error 4 1 1 2\n"}
+{"id":"basic_tests.c:5616","trace":"start e 0\nend e\nresult ok 0 1 4 8\n"}
+{"id":"basic_tests.c:5645","trace":"start e 0\nend e\nresult ok 0 1 4 8\n"}
+{"id":"basic_tests.c:5721","trace":"start doc 0\ncdata\ntext one%20%C3%A9%20two\nendcdata\nend doc\nresult ok 0 1 32 33\n"}
+{"id":"basic_tests.c:5734","trace":"start doc 0\ncdata\ntext %C3%A9]%C3%A9two\nendcdata\nend doc\nresult ok 0 1 29 31\n"}
+{"id":"basic_tests.c:5816","trace":"result error 4 1 1 1\n"}
+{"id":"basic_tests.c:5853","trace":"start doc 0\ntext Hi\nend doc\nresult ok 0 1 17 17\n"}
+{"id":"basic_tests.c:5874","trace":"start d 2\nattr %E0%B8%84%E0%B8%88 a\nend d\nresult ok 0 1 11 22\n"}
+{"id":"basic_tests.c:5893","trace":"start d 4\nattr a 1\nattr %E0%B8%84%E0%B8%88 2\nend d\nresult ok 0 1 17 34\n"}
+{"id":"basic_tests.c:5909","trace":"result error 4 1 16 16\n"}
+{"id":"basic_tests.c:5925","trace":"doctype doc ~ ~ 1\nentity %E0%B8%84%E0%B8%88 1 <!ELEMENT%20doc%20%28#PCDATA%29> ~ ~ ~ ~\nenddoctype\nstart doc 0\nend doc\nresult ok 0 5 11 154\n"}
+{"id":"basic_tests.c:5933","trace":"result error 4 1 0 0\n"}
+{"id":"basic_tests.c:5936","trace":"result error 4 1 2 6\n"}
+{"id":"basic_tests.c:5952","trace":"doctype doc ~ ~ 1\nresult error 4 2 28 44\n"}
+{"id":"basic_tests.c:5975","trace":"doctype d ~ ~ 1\nresult error 2 2 20 68\n"}
+{"id":"basic_tests.c:5992","trace":"xmldecl 1.0 prefix-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:6002","trace":"result error 4 1 10 10\n"}
+{"id":"basic_tests.c:6016","trace":"doctype doc ~ ~ 1\nresult error 2 1 16 32\n"}
+{"id":"basic_tests.c:6029","trace":"result error 4 1 11 11\n"}
+{"id":"basic_tests.c:6038","trace":"result error 4 1 11 11\n"}
+{"id":"basic_tests.c:6047","trace":"result error 4 1 11 11\n"}
+{"id":"basic_tests.c:6056","trace":"xmldecl 1.0 prefix-conv -1\nresult error 18 1 30 30\n"}
+{"id":"basic_tests.c:6059","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:6075","trace":"start e 2\nattr a %C3%A4%20%C3%A4\nend e\nresult ok 0 1 27 54\n"}
+{"id":"basic_tests.c:6097","trace":"start e 2\nattr a %C3%A4%20%C3%A4\nend e\nresult ok 0 1 27 54\n"}
+{"id":"basic_tests.c:6119","trace":"doctype d ~ ~ 1\nentity e 1 ~ ~ bar.ent foo ~\nenddoctype\nstart d 0\nskipped j 0\nend d\nresult ok 0 5 10 136\n"}
+{"id":"basic_tests.c:6131","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:6151","trace":"doctype d ~ ~ 1\nentity e 1 ~ ~ bar.ent foo ~\nenddoctype\nstart d 0\nskipped j 0\nend d\nresult ok 0 5 10 136\n"}
+{"id":"basic_tests.c:6163","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:6184","trace":"doctype doc ~ ~ 0\nenddoctype\nresult error 4 1 15 15\n"}
+{"id":"basic_tests.c:6191","trace":"result error 2 1 20 20\n"}
+{"id":"basic_tests.c:6198","trace":"result error 2 1 20 20\n"}
+{"id":"basic_tests.c:6205","trace":"result error 2 1 33 33\n"}
+{"id":"basic_tests.c:6211","trace":"doctype doc ~ ~ 1\nresult error 2 2 21 37\n"}
+{"id":"basic_tests.c:6222","trace":"doctype doc ~ ~ 1\nresult error 2 2 17 33\n"}
+{"id":"basic_tests.c:6232","trace":"doctype doc ~ ~ 1\nresult error 2 2 23 39\n"}
+{"id":"basic_tests.c:6242","trace":"doctype doc ~ ~ 1\nresult error 2 2 23 39\n"}
+{"id":"basic_tests.c:6252","trace":"doctype doc ~ ~ 1\nresult error 2 2 21 37\n"}
+{"id":"basic_tests.c:6263","trace":"doctype doc test.dtd pubname 1\nentity foo 0 bar ~ ~ ~ ~\nenddoctype\nstart doc 0\ntext bar\nend doc\nresult ok 0 4 16 85\n"}
+{"id":"basic_tests.c:6285","trace":"start abort 0\nend abort\nresult ok 0 1 8 8\n"}
+{"id":"basic_tests.c:6298","trace":"xmldecl 1.0 UTF-8 -1\ndoctype foo ~ ~ 1\nelement foo 20 ~()\nentity entp 1 ~ ~ external.dtd ~ ~\nenddoctype\nstart a 0\nend a\nresult ok 0 8 0 131\n"}
+{"id":"basic_tests.c:6323","trace":"doctype foo ~ ~ 1\nentity e1 0 test ~ ~ ~ ~\nenddoctype\nstart foo 0\ntext test\nresult error 3 3 12 48\n"}
+{"id":"basic_tests.c:6349","trace":"doctype foo ~ ~ 1\nentity s0 0 deepText ~ ~ ~ ~\nresult error 3 3 0 41\n"}
+{"id":"basic_tests.c:6353","trace":"result error 2 1 2 2\n"}
+{"id":"basic_tests.c:6357","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:6403","trace":"result error 2 1 0 0\n"}
+{"id":"basic_tests.c:6438","trace":"doctype foo ~ ~ 1\nresult error 2 2 11 27\n"}
+{"id":"basic_tests.c:6443","trace":"result error 2 1 2 2\n"}
+{"id":"basic_tests.c:6448","trace":"result error 2 1 2 2\n"}
+{"id":"basic_tests.c:6467","trace":"doctype a ~ ~ 1\nentity e1 0 <!--e1--> ~ ~ ~ ~\nentity e2 0 <!--e2%20head-->&e1;<!--e2%20tail--> ~ ~ ~ ~\nentity e3 0 <!--e3%20head-->&e2;<!--e3%20tail--> ~ ~ ~ ~\nenddoctype\nstart a 0\ncomment start\ncomment e3%20head\ncomment e2%20head\ncomment e1\ncomment e2%20tail\ncomment e3%20tail\ncomment end\nend a\nresult ok 0 6 33 177\n"}
+{"id":"basic_tests.c:6497","trace":"doctype doc ~ ~ 1\nentity ge1 0 head1Ztail1 ~ ~ ~ ~\nentity ge2 0 head2&ge1;tail2 ~ ~ ~ ~\nentity ge3 0 head3&ge2;tail3 ~ ~ ~ ~\nenddoctype\nstart doc 0\ntext head3head2head1Ztail1tail2tail3\nend doc\nresult ok 0 6 16 133\n"}
+{"id":"basic_tests.c:6531","trace":"start a 0\nresult error 3 1 3 3\n"}
+{"id":"basic_tests.c:6531#1","trace":"result error 4 1 1 1\n"}
+{"id":"basic_tests.c:6532","trace":"start b 0\ncdata\ntext %20value:%20\nresult error 20 1 20 20\n"}
+{"id":"basic_tests.c:6532#1","trace":"result error 2 1 1 1\n"}
+{"id":"basic_tests.c:6533","trace":"result error 5 1 0 0\n"}
+{"id":"basic_tests.c:6533#1","trace":"result error 5 1 0 0\n"}
+{"id":"basic_tests.c:6534","trace":"start d 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:6534#1","trace":"result error 2 1 1 1\n"}
+{"id":"basic_tests.c:6535","trace":"start e 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:6535#1","trace":"result error 4 1 0 0\n"}
+{"id":"basic_tests.c:6612","trace":"start d 0\nresult error 3 1 3 3\n"}
+{"id":"basic_tests.c:6613","trace":"result error 5 1 0 0\n"}
+{"id":"basic_tests.c:6614","trace":"result error 5 1 0 0\n"}
+{"id":"basic_tests.c:6782","trace":"doctype document something.ext ~ 0\nenddoctype\nstart document 0\nend document\nresult ok 0 1 53 53\n"}
+{"id":"basic_tests.c:6815","trace":"start d 0\nresult error 5 1 3 3\n"}
+{"id":"basic_tests.c:7123","trace":"doctype r ext.dtd ~ 0\nenddoctype\nstart r 0\nend r\nresult ok 0 1 33 33\n"}
+{"id":"basic_tests.c:7125","trace":"result error 2 1 0 0\n"}
+{"id":"misc_tests.c:264","trace":"start D 6\nattr xmlns:L D\nattr l:a \nattr L:a \nend D\nresult ok 0 1 30 30\n"}
+{"id":"misc_tests.c:283","trace":"xmldecl 1.0 ~ -1\nstart q 0\ntext Hi\nend q\nresult ok 0 1 30 60\n"}
+{"id":"misc_tests.c:307","trace":"start doc 0\nstart e1 0\nend e1\nstart e 0\nstart foo 0\nend foo\nend e\nend doc\nresult ok 0 1 29 29\n"}
+{"id":"misc_tests.c:329","trace":"start doc 0\nstart elem 0\nend elem\nend doc\nresult ok 0 1 18 18\n"}
+{"id":"misc_tests.c:349","trace":"doctype d ~ ~ 1\nentity element_d 1 <!ELEMENT%20d%20%28#PCDATA%29*> ~ ~ ~ ~\nresult error 3 6 3 101\n"}
+{"id":"misc_tests.c:356","trace":"doctype d ~ ~ 1\nentity element_d 1 <!ELEMENT%20d%20%28#PCDATA%29*> ~ ~ ~ ~\nresult error 3 6 4 128\n"}
+{"id":"misc_tests.c:363","trace":"doctype d ~ ~ 1\nentity element_d 1 <!ELEMENT%20d%20%28#PCDATA%29*> ~ ~ ~ ~\nresult error 4 6 3 99\n"}
+{"id":"misc_tests.c:370","trace":"doctype doc ~ ~ 1\nentity element_doc 1 <!ELEMENT%20doc%20%28#PCDATA%29*> ~ ~ ~ ~\nenddoctype\nstart doc 0\ntext Hello%2C%20world\nresult error 7 8 19 156\n"}
+{"id":"misc_tests.c:508","trace":"doctype r ~ ~ 1\nentity e1 0 v1 ~ ~ ~ ~\nentity e2 0 ~ ~ v2 ~ ~\nenddoctype\nstart r 2\nattr a1 [v1]\ntext [v1][][&'><\"]\nend r\nresult ok 0 5 58 118\n"}
+{"id":"misc_tests.c:538","trace":"result error 2 1 0 0\n"}
+{"id":"misc_tests.c:543","trace":"result error 2 1 0 0\n"}
+{"id":"misc_tests.c:562","trace":"doctype t1 ~ ~ 1\nentity e1 0 angle< ~ ~ ~ ~\nentity e2 0 &e1; ~ ~ ~ ~\nenddoctype\nstart t1 0\ntext angle\nresult error 5 1 59 59\n"}
+{"id":"misc_tests.c:607","trace":"doctype doc ~ ~ 1\nentity e1 0 &e2; ~ ~ ~ ~\nentity e2 0 &e3; ~ ~ ~ ~\nentity e3 0 ~ ~ 012.ent ~ ~\nentity e4 0 &e5; ~ ~ ~ ~\nentity e5 0 %28e5%29 ~ ~ ~ ~\nelement doc 30 ~()\nenddoctype\nstart doc 0\nend doc\nresult ok 0 10 0 170\n"}
+{"id":"misc_tests.c:677","trace":"doctype day ~ ~ 1\nentity draft.day 0 10 ~ ~ ~ ~\nenddoctype\nstart day 0\ntext 10\nend day\nresult ok 0 5 0 69\n"}
+{"id":"misc_tests.c:695","trace":"doctype t0 ~ ~ 1\nentity a 0 <t1></t1> ~ ~ ~ ~\nentity b 0 <t2>two</t2> ~ ~ ~ ~\nentity c 0 <t3>three<t4>four</t4>three</t3> ~ ~ ~ ~\nentity d 0 <t5>&b;</t5> ~ ~ ~ ~\nenddoctype\nstart t0 0\nstart t1 0\nend t1\nstart t2 0\ntext two\nend t2\nstart t3 0\ntext three\nstart t4 0\ntext four\nend t4\ntext three\nend t3\nstart t5 0\nstart t2 0\ntext two\nend t2\nend t5\nend t0\nresult ok 0 8 0 177\n"}
+{"id":"misc_tests.c:722","trace":"doctype t0 ~ ~ 1\nentity open 0 <t1> ~ ~ ~ ~\nentity close 0 </t1> ~ ~ ~ ~\nenddoctype\nstart t0 0\nstart t1 0\nresult error 13 5 4 74\n"}
+{"id":"misc_tests.c:729","trace":"doctype t0 ~ ~ 1\nentity g0 0  ~ ~ ~ ~\nentity g1 0 &g0;</t1> ~ ~ ~ ~\nenddoctype\nstart t0 0\nstart t1 0\nresult error 13 5 8 71\n"}
+{"id":"misc_tests.c:736","trace":"doctype t0 ~ ~ 1\nentity g0 0  ~ ~ ~ ~\nentity g1 0 &g0;</t0> ~ ~ ~ ~\nenddoctype\nstart t0 0\nresult error 13 5 4 67\n"}
+{"id":"misc_tests.c:743","trace":"doctype t0 ~ ~ 1\nentity g0 0  ~ ~ ~ ~\nentity g1 0 <t1>&g0; ~ ~ ~ ~\nenddoctype\nstart t0 0\nstart t1 0\nresult error 13 5 4 66\n"}
+{"id":"misc_tests.c:750","trace":"doctype t0 ~ ~ 1\nentity open 0 <t1> ~ ~ ~ ~\nentity close 0 </t1> ~ ~ ~ ~\nenddoctype\nstart t0 0\nstart t1 0\nresult error 13 5 8 76\n"}
+{"id":"misc_tests.c:790","trace":"doctype d secondary.txt ~ 0\nenddoctype\nresult error 3 1 35 35\n"}
+{"id":"misc_tests.c:794","trace":"result error 2 1 0 0\n"}
+{"id":"misc_tests.c:795","trace":"xmldecl 1.0 ~ -1\nresult error 5 1 21 21\n"}
+{"id":"misc_tests.c:817","trace":"start doc 0\ntext Hello%20world!\nend doc\nresult ok 0 1 23 23\n"}
+{"id":"misc_tests.c:888","trace":"xmldecl 1.0 reentrant-conv -1\nresult error 18 1 30 30\n"}
+{"id":"misc_tests.c:965","trace":"doctype d ~ ~ 1\nresult error 5 2 13 54\n"}
+{"id":"misc_tests.c:967","trace":"result error 4 3 6 24\n"}
+{"id":"misc_tests.c:999","trace":"xmldecl 1.0 ~ -1\nstart doc 0\nend doc\nresult ok 0 1 27 27\n"}
+{"id":"ns_tests.c:73","trace":"result error 4 1 1 1\n"}
+{"id":"ns_tests.c:139","trace":"start n:f 2\nattr n:attr foo\nend n:f\nresult error 9 2 2 24\n"}
+{"id":"ns_tests.c:226","trace":"xmldecl 1.0 ~ -1\nstart docelem 2\nattr xmlns:pre \nend docelem\nresult ok 0 2 23 45\n"}
+{"id":"ns_tests.c:236","trace":"doctype doc ~ ~ 1\nelement doc 10 ~()\nattlist doc xmlns:prefix CDATA  0\nenddoctype\nstart doc 0\nattr xmlns:prefix \nend doc\nresult ok 0 6 6 91\n"}
+{"id":"ns_tests.c:250","trace":"doctype doc ~ ~ 1\nelement prefix:doc 10 ~()\nresult error 3 4 0 69\n"}
+{"id":"ns_tests.c:254","trace":"result error 2 1 0 0\n"}
+{"id":"ns_tests.c:288","trace":"start e 2\nattr xmlns \nend e\nresult error 4 2 1 17\n"}
+{"id":"ns_tests.c:337","trace":"start doc 2\nattr a:attr \nend doc\nresult ok 0 1 16 16\n"}
+{"id":"ns_tests.c:345","trace":"start a:doc 0\nend a:doc\nresult ok 0 1 8 8\n"}
+{"id":"ns_tests.c:354","trace":"result error 5 1 0 0\n"}
+{"id":"ns_tests.c:357","trace":"result error 4 1 1 1\n"}
+{"id":"ns_tests.c:374","trace":"result error 5 1 0 0\n"}
+{"id":"ns_tests.c:376","trace":"result error 4 1 1 1\n"}
+{"id":"ns_tests.c:390","trace":"start foo:thisisalongenoughnametotriggerallocationaction 2\nattr foo:a 12\nend foo:thisisalongenoughnametotriggerallocationaction\nresult error 4 1 69 69\n"}
+{"id":"ns_tests.c:443","trace":"result error 5 1 0 0\n"}
+{"id":"ns_tests.c:480","trace":"result error 4 1 2055 2055\n"}
+{"id":"ns_tests.c:527","trace":"xmldecl 1.0 prefix-conv -1\nresult error 18 1 30 30\n"}
+{"id":"ns_tests.c:597","trace":"start n:e 4\nattr xmlns:n URI\nattr n:%E0%B8%84 a\nend n:e\nresult ok 0 1 29 58\n"}
+{"id":"ns_tests.c:617","trace":"start n:%E0%B8%84 2\nattr xmlns:n URI\nend n:%E0%B8%84\nresult ok 0 1 20 40\n"}
+{"id":"ns_tests.c:640","trace":"doctype foo:%E0%B8%84 ~ ~ 1\nentity bar 0 baz ~ ~ ~ ~\nenddoctype\nstart foo:%E0%B8%84 2\nattr xmlns:foo URI\ntext baz\nend foo:%E0%B8%84\nresult ok 0 2 36 154\n"}
+{"id":"ns_tests.c:667","trace":"result error 4 1 14 14\n"}
+{"id":"ns_tests.c:676","trace":"doctype foo:a:doc ~ ~ 1\nentity bar 0 baz ~ ~ ~ ~\nresult error 2 1 41 41\n"}
+{"id":"ns_tests.c:691","trace":"start doc 2\nattr xmlns one_two\nend doc\nresult ok 0 1 23 23\n"}
+{"id":"ns_tests.c:692","trace":"start doc 2\nattr xmlns one%0Atwo\nend doc\nresult ok 0 1 28 28\n"}
+{"id":"ns_tests.c:693","trace":"start doc 2\nattr xmlns one:two\nend doc\nresult ok 0 1 23 23\n"}
+{"id":"nsalloc_tests.c:114","trace":"start doc 0\ntext Hello\nend doc\nresult ok 0 1 16 16\n"}
+{"id":"nsalloc_tests.c:183","trace":"result error 5 1 0 0\n"}
+{"id":"nsalloc_tests.c:219","trace":"result error 4 1 1 1\n"}
+{"id":"nsalloc_tests.c:279","trace":"result error 4 1 63 63\n"}
+{"id":"nsalloc_tests.c:519","trace":"start e 2\nattr xmlns \nend e\nresult error 4 2 1 18\n"}
+{"id":"nsalloc_tests.c:627","trace":"result error 5 1 0 0\n"}
+{"id":"nsalloc_tests.c:663","trace":"result error 4 1 1 1\n"}
+{"id":"nsalloc_tests.c:702","trace":"result error 5 1 0 0\n"}
+{"id":"nsalloc_tests.c:739","trace":"start ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZ:f 2\nattr ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZ:attr foo\nend ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZ:f\nresult error 4 2 1 2067\n"}
+{"id":"nsalloc_tests.c:819","trace":"result error 5 1 0 0\n"}
+{"id":"nsalloc_tests.c:839","trace":"start ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678:f 2\nattr ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678:att foo\nend ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AZABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678:f\nresult error 4 2 1 1036\n"}
+{"id":"nsalloc_tests.c:889","trace":"doctype doc foo ~ 1\nattlist doc baz ID ~ 1\nentity en 0 ~ ~ bar ~ ~\nenddoctype\nresult error 3 5 0 94\n"}
+{"id":"nsalloc_tests.c:895","trace":"result error 4 1 15 15\n"}
+{"id":"nsalloc_tests.c:915","trace":"result error 2 1 0 0\n"}
+{"id":"nsalloc_tests.c:969","trace":"doctype doc foo ~ 1\nentity en 0 ~ ~ bar ~ ~\nenddoctype\nresult error 3 4 0 60\n"}
+{"id":"nsalloc_tests.c:974","trace":"result error 4 1 15 15\n"}
+{"id":"nsalloc_tests.c:1005","trace":"result error 4 1 15 15\n"}
+{"id":"nsalloc_tests.c:1036","trace":"result error 4 1 15 15\n"}
+{"id":"nsalloc_tests.c:1067","trace":"result error 4 1 15 15\n"}
+{"id":"nsalloc_tests.c:1098","trace":"result error 4 1 15 15\n"}
+{"id":"nsalloc_tests.c:1129","trace":"result error 4 1 15 15\n"}
+{"id":"nsalloc_tests.c:1159","trace":"result error 4 1 15 15\n"}
+{"id":"nsalloc_tests.c:1185","trace":"doctype doc foo ~ 1\nentity ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP 0 ~ ~ bar ~ ~\nenddoctype\nresult error 3 4 0 1082\n"}
+{"id":"nsalloc_tests.c:1207","trace":"result error 4 1 0 0\n"}
+{"id":"nsalloc_tests.c:1228","trace":"result error 2 1 0 0\n"}
+{"id":"nsalloc_tests.c:1228#1","trace":"start el 0\nend el\nresult ok 0 1 5 5\n"}
+{"id":"nsalloc_tests.c:1258","trace":"doctype ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP:doc ~ ~ 1\nentity First 0 ~ ~ foo/First ~ ~\nenddoctype\nstart ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP:doc 2\nattr xmlns:ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP foo/Second\nresult error 3 4 2081 3162\n"}
+{"id":"nsalloc_tests.c:1315","trace":"result error 4 1 1 1\n"}
+{"id":"nsalloc_tests.c:1361","trace":"doctype doc ~ ~ 1\nattlist e a1 CDATA ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP 0\nentity x 0 ~ ~ foo ~ ~\nenddoctype\nstart doc 0\nend doc\nresult ok 0 5 14 1111\n"}
+{"id":"nsalloc_tests.c:1410","trace":"doctype doc foo ~ 1\nentity en 0 ~ ~ ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ABCDEFGHIJKLMNO/ ~ ~\nenddoctype\nstart doc 0\nend doc\nresult ok 0 4 15 1096\n"}
+{"id":"nsalloc_tests.c:1481","trace":"doctype pfx:element foo ~ 1\nattlist pfx:element baz ID ~ 1\nentity en 0 ~ ~ bar ~ ~\nenddoctype\nresult error 3 5 0 110\n"}
+{"id":"nsalloc_tests.c:1486","trace":"result error 4 1 0 0\n"}

@@ -1,0 +1,26 @@
+[package]
+name = "expat-fuzz"
+description = "cargo-fuzz targets: the safe expat port versus the libexpat C oracle"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+expat = { path = "../crates/expat", features = ["internal-api"] }
+expat-oracle = { path = "../crates/expat-oracle" }
+expat-difftest = { path = "../tests" }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "parse_trace"
+path = "fuzz_targets/parse_trace.rs"
+test = false
+doc = false
+bench = false
