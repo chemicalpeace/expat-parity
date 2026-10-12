@@ -37,6 +37,7 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | `XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, `callProcessor`, prolog without DTD, `processXmlDecl`, content, `storeAtts`, namespaces, CDATA, epilog, position getters, accounting (`xmlparse.c`) | `expat::parse` (`mod`, `prolog`, `content`, `dtd`, `accounting`, `error`) | see STATE.md |
 | `doProlog` DTD roles, `storeEntityValue`, `defineAttribute`, `getElementType`, `nextScaffoldPart`, `build_model`, `normalizePublicId` (`xmlparse.c`) | `expat::parse` (`decl`, `model`, `dtd`) | module 11a |
 | `processEntity`, `internalEntityProcessor`, `storeAttributeValue`, `callStoreEntityValue`, the open-entity lists | `expat::parse` (`entity`) | module 11b |
+| `MALLOC_TRACKER`, `expat_heap_increase_tolerable`, `XML_SetAllocTracker*` | `expat::parse` (`tracker`) | module 11c |
 | External entity parsers, external subset (`XML_ExternalEntityParserCreate`, `externalEntityInitProcessor*`) | `expat::parse` | module 11d / 12 |
 
 Internal modules are reachable from tests only through the `internal-api`
@@ -230,11 +231,25 @@ direct and indirect recursion are detected. Event pointers inside an
 expansion belong to the open entity (D-028). Verification:
 `tests/tests/entity_diff.rs` (REPORT.md, module 11b).
 
+## Allocation tracker (module 11c)
+
+`parse::tracker::AllocTracker` is C's `MALLOC_TRACKER` (same header size,
+same refusal test). The port does not allocate C's structures, so it
+*charges* the tracker where C allocates, never later and never less
+(D-030): `PoolShadow` replays `poolGrow` on string lengths for each of
+C's pools (temporary, DTD, entity value, `m_temp2Pool`), the hash tables
+charge through `heap::Heap`, and `Tracker` keeps the sizes of tag buffers,
+bindings, attribute arrays, open-entity records, default-attribute arrays
+and the scaffold. Parser creation is charged as a 16 KiB upper bound. The
+input buffer is not charged, as in C. Verification:
+`tests/tests/tracker_diff.rs` and the tracker relation in `parse_trace`
+(REPORT.md, module 11c; divergence DV-1).
+
 ## Safety and resource limits
 
 - No `unsafe` in `crates/expat`; no global or static mutable state.
 - All input-dependent indexing goes through checked accessors; clippy
   `indexing_slicing` and `arithmetic_side_effects` are denied in CI.
-- libexpat's billion-laughs and allocation-amplification protections are part
-  of the port's observable behaviour (error codes) and will be ported, not
-  replaced.
+- libexpat's billion-laughs protection is ported with C's exact counters
+  (module 11b2, D-029); the allocation-amplification tracker is ported as a
+  charge that is never below C's (module 11c, D-030, divergence DV-1).
