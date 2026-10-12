@@ -96,8 +96,10 @@ enum DataIn {
 }
 
 impl Parser {
-    /// `contentProcessor` (`storeRawNames` is not needed: open tags keep a
-    /// copy of their raw name from the start).
+    /// `contentProcessor` and `externalEntityContentProcessor`: `doContent`,
+    /// then `storeRawNames` after a successful one (the port's tags keep
+    /// their raw names anyway; the tracker charges the copy where C makes
+    /// it, D-034 stage 5).
     pub(crate) fn content_processor<H: Handler>(
         &mut self,
         h: &mut H,
@@ -111,13 +113,18 @@ impl Parser {
         // because none of its bytes are direct).
         let start_tag_level = i32::from(self.is_child);
         let have_more = !self.final_buffer;
-        let k = match self.enc {
-            Enc::Known(k) => k,
+        match self.enc {
+            Enc::Known(k) => {
+                with_known!(k, e => self.do_content(h, e, start_tag_level, buf, s, next_ptr, have_more, Account::Direct))?;
+            }
             // Only an external entity can reach content before its
             // encoding is known (an empty or very short entity).
-            Enc::Init(init) => return self.content_undecided(h, init, buf, s, next_ptr, have_more, start_tag_level),
-        };
-        with_known!(k, e => self.do_content(h, e, start_tag_level, buf, s, next_ptr, have_more, Account::Direct))
+            Enc::Init(init) => self.content_undecided(h, init, buf, s, next_ptr, have_more, start_tag_level)?,
+        }
+        let direct = self.direct();
+        self.tracker
+            .store_raw_names(direct)
+            .map_err(|_| Stop::Error(XmlError::NoMemory))
     }
 
     /// `cdataSectionProcessor`.

@@ -571,6 +571,19 @@ pub const TRACKER_SIZES: &[(&str, usize)] = &[
     ("INT", core::mem::size_of::<i32>()),
 ];
 
+/// A `TAG` of `m_tagStack` as far as its allocations go.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OpenTag {
+    /// Bytes of `buf` (`bufEnd - buf.raw`).
+    pub size: usize,
+    /// Bytes of the converted name (`name.strLen`).
+    pub name_len: usize,
+    /// Bytes of the raw name in the input encoding (`rawNameLength`).
+    pub raw_len: usize,
+    /// The raw name is in `buf` (`rawName == buf.raw + nameLen`).
+    pub raw_stored: bool,
+}
+
 /// The tracker with the shadows of C's structures whose allocations depend
 /// on the input.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -585,8 +598,8 @@ pub struct Tracker {
     pub dtd_pool: PoolShadow,
     /// `dtd->entityValuePool`
     pub entity_value_pool: PoolShadow,
-    /// Buffer sizes of the open tags (`m_tagStack`), innermost last.
-    pub open_tags: alloc::vec::Vec<usize>,
+    /// The open tags (`m_tagStack`), innermost last.
+    pub open_tags: alloc::vec::Vec<OpenTag>,
     /// Buffer sizes of `m_freeTagList`, head last.
     pub free_tags: alloc::vec::Vec<usize>,
     /// `uriAlloc` of each binding, by binding id.
@@ -663,8 +676,9 @@ impl Tracker {
         let tags = self
             .open_tags
             .iter()
-            .chain(self.free_tags.iter())
-            .map(|&b| sz(TAG_SIZE) + h + sz(b) + h)
+            .map(|t| t.size)
+            .chain(self.free_tags.iter().copied())
+            .map(|b| sz(TAG_SIZE) + h + sz(b) + h)
             .sum::<u64>();
         let bindings = self
             .binding_alloc
@@ -689,10 +703,12 @@ impl Tracker {
 
     /// The start tag of an element with a converted name of `name_len`
     /// bytes and a raw name of `raw_len` bytes: a `TAG` from the free list
-    /// or a new one, its buffer doubled until the name fits
-    /// (`doContent`, `xmlparse.c` 3750-3793), and enlarged to also hold
-    /// the raw name, as `storeRawNames` does when the input buffer moves
-    /// (3395-3439; charged at once, which is never later than C).
+    /// or a new one, its buffer doubled while the name does not fit before
+    /// `bufEnd - 1` (`doContent`, `xmlparse.c` 3750-3800; where
+    /// `XmlConvert` stops inside the buffer changes no allocation, see
+    /// [`PoolShadow::append_text`]). The raw name is copied into the buffer
+    /// later, by [`Tracker::store_raw_names`] (D-034 stage 5; the port
+    /// charged it here before).
     pub fn open_tag(&mut self, name_len: usize, raw_len: usize, direct: u64) -> Result<(), NoMemory> {
         let mut size = match self.free_tags.pop() {
             Some(s) => s,
@@ -707,9 +723,7 @@ impl Tracker {
                 INIT_TAG_BUF_SIZE
             }
         };
-        // XmlConvert writes into `buf .. bufEnd - 1` and may stop three
-        // bytes early before a multi-byte character.
-        while size < name_len.saturating_add(4) {
+        while size < name_len.saturating_add(1) {
             let new = size.saturating_mul(2);
             if !self.t.realloc(size, new, direct) {
                 self.free_tags.push(size);
@@ -717,23 +731,46 @@ impl Tracker {
             }
             size = new;
         }
-        let raw_need = name_len.saturating_add(1).saturating_add(raw_len);
-        if raw_need > size {
-            if !self.t.realloc(size, raw_need, direct) {
-                self.free_tags.push(size);
-                return Err(NoMemory);
+        self.open_tags.push(OpenTag {
+            size,
+            name_len,
+            raw_len,
+            raw_stored: false,
+        });
+        Ok(())
+    }
+
+    /// `storeRawNames` (`xmlparse.c` 3395-3440), which `contentProcessor`
+    /// and `externalEntityContentProcessor` call after every successful
+    /// `doContent`: from the innermost open tag outwards, up to the first
+    /// whose raw name is already in its buffer, the buffer is enlarged to
+    /// hold the name, its NUL and the raw name.
+    pub fn store_raw_names(&mut self, direct: u64) -> Result<(), NoMemory> {
+        for tag in self.open_tags.iter_mut().rev() {
+            if tag.raw_stored {
+                break;
             }
-            size = raw_need;
+            let need = tag
+                .name_len
+                .checked_add(1)
+                .and_then(|n| n.checked_add(tag.raw_len))
+                .ok_or(NoMemory)?;
+            if need > tag.size {
+                if !self.t.realloc(tag.size, need, direct) {
+                    return Err(NoMemory);
+                }
+                tag.size = need;
+            }
+            tag.raw_stored = true;
         }
-        self.open_tags.push(size);
         Ok(())
     }
 
     /// The end tag of the innermost element: its `TAG` goes to the free
     /// list.
     pub fn close_tag(&mut self) {
-        if let Some(s) = self.open_tags.pop() {
-            self.free_tags.push(s);
+        if let Some(t) = self.open_tags.pop() {
+            self.free_tags.push(t.size);
         }
     }
 
