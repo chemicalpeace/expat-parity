@@ -74,16 +74,21 @@ enum Ctx {
     /// External parameter entity referenced in the internal subset (NULL
     /// context, prolog state).
     Param,
+    /// External parameter entity referenced inside an entity value (NULL
+    /// context, `entityValueInitProcessor`: its text declaration goes
+    /// through `processXmlDecl(parser, 0, ...)`).
+    Value,
 }
 
 impl Ctx {
-    const ALL: [Ctx; 3] = [Ctx::General, Ctx::Subset, Ctx::Param];
+    const ALL: [Ctx; 4] = [Ctx::General, Ctx::Subset, Ctx::Param, Ctx::Value];
 
     fn name(self) -> &'static str {
         match self {
             Ctx::General => "G",
             Ctx::Subset => "S",
             Ctx::Param => "P",
+            Ctx::Value => "V",
         }
     }
 
@@ -100,7 +105,28 @@ impl Ctx {
             Ctx::Param => {
                 format!("{decl}<!DOCTYPE d [<!ENTITY % p SYSTEM \"ent\">%p;]><d>&x;</d>")
             }
+            // A parameter entity reference in an entity value is only
+            // allowed outside the internal subset: the external subset
+            // `sub` declares both.
+            Ctx::Value => format!("{decl}<!DOCTYPE d SYSTEM \"sub\"><d>&x;</d>"),
         }
+    }
+
+    /// The in-memory entities: `ent` (the entity under test) and, for
+    /// [`Ctx::Value`], the external subset `sub`, written in the scheme
+    /// the `encodingName` argument (which applies to every child) reads.
+    fn entities(self, ext: Option<&str>, body: Vec<u8>) -> Vec<(Vec<u8>, Vec<u8>)> {
+        let mut v = vec![(b"ent".to_vec(), body)];
+        if self == Ctx::Value {
+            let scheme = match ext {
+                Some("UTF-16" | "UTF-16BE") => Scheme::Be,
+                Some("UTF-16LE") => Scheme::Le,
+                _ => Scheme::Utf8,
+            };
+            let sub = encode(scheme, "<!ENTITY % p SYSTEM \"ent\"><!ENTITY x \"[%p;]\">");
+            v.push((b"sub".to_vec(), sub));
+        }
+        v
     }
 
     /// The entity's content after the text declaration: a non-ASCII
@@ -109,6 +135,7 @@ impl Ctx {
         match self {
             Ctx::General => "<t>\u{e9}x</t>",
             Ctx::Subset | Ctx::Param => "<!ENTITY x \"\u{e9}x\">",
+            Ctx::Value => "\u{e9}x",
         }
     }
 }
@@ -230,6 +257,7 @@ fn bodies() -> Vec<Body> {
         raw("u8-error-late", |c| {
             let t = match c {
                 Ctx::General => "<t>ok</t>\n<u>&#0;</u>".to_string(),
+                Ctx::Value => format!("{}\n&#0;", c.payload()),
                 _ => format!("{}\n<!ENTITY y \"&#0;\">", c.payload()),
             };
             t.into_bytes()
@@ -237,6 +265,7 @@ fn bodies() -> Vec<Body> {
         raw("le-bom-error-late", |c| {
             let t = match c {
                 Ctx::General => "<t>ok</t>\n<u></v>".to_string(),
+                Ctx::Value => format!("{}\n%undeclared;", c.payload()),
                 _ => format!("{}\n<!ENTITY y >", c.payload()),
             };
             encode(Scheme::LeBom, &t)
@@ -430,6 +459,7 @@ impl Run {
 }
 
 fn options(
+    ctx: Ctx,
     parent: Option<&str>,
     ext_encoding: Option<&str>,
     body: Vec<u8>,
@@ -439,7 +469,7 @@ fn options(
         encoding: parent.map(str::to_string),
         ext_encoding: ext_encoding.map(str::to_string),
         ext_handler: ExtHandler::Read,
-        ext_entities: vec![(b"ent".to_vec(), body)],
+        ext_entities: ctx.entities(ext_encoding, body),
         param_entity_parsing: ParamEntityParsing::Always,
         chunk_size: chunk,
         buffer_api,
@@ -477,7 +507,7 @@ fn encoding_matrix() {
                             enc_name(ext),
                             parent_name(parent)
                         );
-                        let o = options(parent.0, ext, bytes.clone(), feed);
+                        let o = options(ctx, parent.0, ext, bytes.clone(), feed);
                         run.check(&id, &doc, &o);
                     }
                 }
@@ -538,10 +568,7 @@ fn configuration_matrix() {
                                             let o = ParseOptions {
                                                 ext_encoding: ext.map(str::to_string),
                                                 ext_handler: mode,
-                                                ext_entities: vec![(
-                                                    b"ent".to_vec(),
-                                                    bytes.clone(),
-                                                )],
+                                                ext_entities: ctx.entities(ext, bytes.clone()),
                                                 param_entity_parsing: pep,
                                                 ns_separator: ns,
                                                 ns_triplets: triplets,
@@ -677,7 +704,14 @@ fn c_behaviour_pins() {
     // `extend` line or "" when no child is created)
     const P8: (Option<&str>, Scheme) = (None, Scheme::Utf8);
     const PLAT: (Option<&str>, Scheme) = (Some("ISO-8859-1"), Scheme::Latin1);
-    let pins: [(Ctx, &str, Option<&str>, (Option<&str>, Scheme), i64, &str); 22] = [
+    let pins: [(Ctx, &str, Option<&str>, (Option<&str>, Scheme), i64, &str); 24] = [
+        // An external parameter entity read inside an entity value: its
+        // text declaration goes through processXmlDecl(parser, 0, ...)
+        // (entityValueInitProcessor), i.e. the XML declaration rules:
+        // without version it is XML_ERROR_XML_DECL (30), version-only is
+        // accepted. The first `extend` is the inner child (`ent`).
+        (Ctx::Value, "u8-decl8", None, P8, 21, "extend 0 30 1 6 6"),
+        (Ctx::Value, "u8-veronly", None, P8, 0, "extend 1 0 1 0 0"),
         // Unknown or empty encodingName: the child fails on its first
         // parse call with XML_ERROR_UNKNOWN_ENCODING, before any token
         // (byte index -1); the handler's error stops the parent with
@@ -869,7 +903,7 @@ fn c_behaviour_pins() {
     ];
     for (ctx, b, ext, parent, code, child) in pins {
         let doc = encode(parent.1, &ctx.document(false));
-        let o = options(parent.0, ext, body(b).bytes(ctx), (0, false));
+        let o = options(ctx, parent.0, ext, body(b).bytes(ctx), (0, false));
         let id = format!("pin {} {b} ext={}", ctx.name(), enc_name(ext));
         let (c, _) = run.check(&id, &doc, &o);
         assert_eq!(c.code, code, "{id}: C result code");
@@ -896,7 +930,7 @@ fn matrix_dump() {
             let doc = encode(parent.1, &ctx.document(false));
             for body in bodies() {
                 for ext in EXT_ENCODINGS {
-                    let o = options(parent.0, ext, body.bytes(ctx), (0, false));
+                    let o = options(ctx, parent.0, ext, body.bytes(ctx), (0, false));
                     let c = Outcome::from_trace(&parse_trace(&doc, &o).expect("oracle"), &o);
                     let r = Outcome::from_trace(&port_trace(&doc, &o), &o);
                     let _ = writeln!(
@@ -933,7 +967,7 @@ fn matrix_dump() {
                     for not_standalone in [None, Some(true), Some(false)] {
                         let o = ParseOptions {
                             ext_handler: mode,
-                            ext_entities: vec![(b"ent".to_vec(), u8body.bytes(ctx))],
+                            ext_entities: ctx.entities(None, u8body.bytes(ctx)),
                             param_entity_parsing: pep,
                             not_standalone,
                             ..ParseOptions::default()
