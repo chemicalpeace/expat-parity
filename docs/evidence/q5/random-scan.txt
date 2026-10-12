@@ -1,0 +1,3 @@
+# init_diff::xml_decl_in_every_builtin_encoding, release build of 020a0618 + init_diff PROPTEST_CASES override (library = fb35448e), Linux aarch64
+PROPTEST_CASES=100000 PROPTEST_RNG_SEED=11: test result: ok. 1 passed; 0 failed; finished in 113.63s
+PROPTEST_CASES=95000 PROPTEST_RNG_SEED=12: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 105.88s

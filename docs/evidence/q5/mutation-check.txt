@@ -1,0 +1,21 @@
+# The fix reverted (crates/expat/src/tok/{unknown,xmldecl,mod}.rs from fb35448e^), regression tests otherwise unchanged:
+# cargo +1.99.0 test --release -p expat-difftest --test xmldecl_unknown_diff   (aarch64 Linux)
+test multibyte_sequences_at_every_pseudo_attribute_position ... FAILED
+test random_test_seeds_match_c ... FAILED
+test q5_sequence_past_the_buffer_is_not_read ... FAILED
+test same_declarations_whole_parse_match_c ... ok
+test same_declarations_in_every_builtin_encoding ... ok
+thread 'multibyte_sequences_at_every_pseudo_attribute_position' panicked at tests/src/tok.rs:633:5:
+assertion `left == right` failed: Unknown(Lead(2) Lead(2) -> 0x61) XmlParseXmlDecl(ns false, text decl false) of [60, 63, 120, 109, 108, 32, 195, 169, 63, 62]
+  left: XmlDecl { ok: false, bad: Some(7), version: None, version_end: None, encoding_name: None, encoding: Untouched, standalone: None }
+ right: XmlDecl { ok: false, bad: Some(8), version: None, version_end: None, encoding_name: None, encoding: Untouched, standalone: None }
+thread 'random_test_seeds_match_c' panicked at tests/tests/xmldecl_unknown_diff.rs:53:17:
+assertion `left == right` failed: port, seed 0x52f43d23123766f6
+  left: (false, Some(7))
+ right: (false, Some(8))
+thread 'q5_sequence_past_the_buffer_is_not_read' panicked at tests/tests/xmldecl_unknown_diff.rs:283:9:
+assertion `left == right` failed: tail [60, 97]
+  left: -1
+ right: 97
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out
+# (same_declarations_* use built-in encodings, which the fix does not touch.)
