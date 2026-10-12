@@ -728,8 +728,8 @@ two-minute command limit of the measuring machine when instrumented; it
 exercises the tokenizer, not the DTD code). The report warns that 65
 functions have mismatched profile data (the same generic functions
 instantiated in different test binaries); the numbers were identical with
-and without the unit-test profile. Raw table: one run, not re-measured on
-other platforms.
+and without the unit-test profile. Raw table (one run, not re-measured on
+other platforms): `docs/coverage/module-11-ccf66a1.txt`.
 
 `crates/expat` overall:
 
