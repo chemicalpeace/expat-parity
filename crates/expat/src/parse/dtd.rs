@@ -192,7 +192,7 @@ pub(crate) const PREFIX_SIZE: usize = super::c_layout::PREFIX;
 pub(crate) const ATTRIBUTE_ID_SIZE: usize = super::c_layout::ATTRIBUTE_ID;
 /// `sizeof(ELEMENT_TYPE)` bound: twelve pointer-sized words, 8 bytes more
 /// than C's 88 on 64-bit targets ([`super::c_layout::ELEMENT_TYPE`]). An
-/// over-count, kept until the size-parity stage of D-033.
+/// over-count, kept until the size-parity stage of D-034.
 pub(crate) const ELEMENT_TYPE_SIZE: usize = 12 * crate::heap::POINTER_SIZE;
 /// `sizeof(ENTITY)` ([`super::c_layout::ENTITY`]).
 pub(crate) const ENTITY_SIZE: usize = super::c_layout::ENTITY;

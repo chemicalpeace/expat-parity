@@ -198,7 +198,7 @@ size_t oracle_last_heap_peak(void);
    calling thread's last oracle_parse_trace: after creation and the limit
    setters, and at the end of the parse. */
 void oracle_last_tracker(unsigned long long *created, unsigned long long *end);
-/* sizeof / offsetof of the tracked C structures (D-033), in the order of
+/* sizeof / offsetof of the tracked C structures (D-034), in the order of
    ORACLE_C_SIZE_NAMES in src/lib.rs; returns the number written. */
 size_t oracle_c_sizes(size_t *out, size_t n);
 

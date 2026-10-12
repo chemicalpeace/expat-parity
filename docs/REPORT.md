@@ -728,8 +728,11 @@ two-minute command limit of the measuring machine when instrumented; it
 exercises the tokenizer, not the DTD code). The report warns that 65
 functions have mismatched profile data (the same generic functions
 instantiated in different test binaries); the numbers were identical with
-and without the unit-test profile. Raw table (one run, not re-measured on
-other platforms): `docs/coverage/module-11-ccf66a1.txt`.
+and without the unit-test profile. Raw table (one run):
+`docs/coverage/module-11-ccf66a1.txt`. Re-measured on Linux, macOS and
+Windows in CI with the full suite, see "Coverage on every CI platform":
+7 of the 388 uncovered lines (`tok::unknown::done`) were an llvm-cov
+reporting artefact; corrected 94.95 % lines.
 
 `crates/expat` overall:
 
@@ -785,6 +788,161 @@ Notable uncovered areas (from `--show-missing-lines`):
   of the `Handler` trait and getters such as `id_attribute_index` in
   `mod.rs` (the harness overrides every handler).
 
+### Coverage on every CI platform (PR #13)
+
+The CI job `coverage` (`.github/workflows/ci.yml`) measures `crates/expat`
+on the three platforms of the `test` matrix with `scripts/coverage.sh`:
+cargo-llvm-cov 0.9.1 (taiki-e/install-action), the pinned toolchain
+1.99.0, an instrumented `--release` build, and the **full** test suite —
+the two commands of the `test` job, `cargo test --workspace --all-features`
+and `cargo test -p expat --no-default-features`, nothing skipped (this
+includes `tok_diff::upstream_vectors_every_offset`, 108 s on the ubuntu
+runner). The report filter is the one of module 11 step E (harness,
+oracle, benches, fuzz, vendored C). Each platform uploads an artifact
+`coverage-<OS>` with the summary table (txt and JSON), lcov, the uncovered
+lines and llvm-cov's warnings, both raw and corrected (below). The
+numbers here come from CI run 38220630479 (commit 2f6a37a; the library
+code is that of main 81e02b3); raw tables: `docs/coverage/ci-2f6a37a-*.txt`.
+
+**llvm-cov drops counts when it reports several test binaries together** (D-033).
+A test binary that links a function without calling it carries a dummy
+coverage record for it (function hash 0). llvm-cov looks each record up
+by (name, hash); for the dummy, LLVM's `IndexedInstrProfReader` answers
+`hash_mismatch` only if a profile record of that name has bit 60 of its
+hash (the context-sensitive flag) equal to the dummy's, i.e. clear;
+otherwise it answers `unknown_function`, llvm-cov gives the dummy zero
+counts and registers it as the function's record, and the real record of
+any binary loaded later is skipped as a duplicate (`RecordProvenance` in
+`CoverageMapping.cpp`). About half of all hashes have bit 60 set, so the
+result depends on which binary is loaded first. Reproduced locally:
+`tok::unknown::done` has 4,439,354 executions in the profile and is
+reported as covered with the `tok_diff` binary alone, and as never
+executed once `core_diff` (which links it unused) is added in front.
+`scripts/coverage_fix_profdata.py` adds, for every profile name whose
+hashes all have bit 60 set, a record with hash 1 and one counter; no
+mapping has hash 1, so its only effect is that the dummy lookups end in
+`hash_mismatch` and the dummies are dropped like the others. On a local run of a
+subset of the test binaries (aarch64 Linux), the corrected line set
+equals the union of the reports of every binary taken alone (8,290
+covered lines over all files, 0 differences; the raw report lost 16). The correction adds no test, removes no code from the report
+and changes no count that llvm-cov did read; the raw report is kept next
+to it.
+
+The "N functions have mismatched data" warning (65 in module 11 step E,
+117 / 107 / 105 raw on Linux / macOS / Windows, 216 on every platform
+after the correction) is the harmless half of the same mechanism: every
+listed record (`llvm-cov -dump`, artifact `*-mismatch.txt`) has hash 0,
+i.e. it is a dummy of a function that another binary executed, and the
+real record is used. No mismatch with a non-zero hash occurs.
+
+`crates/expat`, full suite, corrected (raw in brackets where it differs):
+
+| Platform | Lines | Regions | Functions |
+|---|---|---|---|
+| Linux (ubuntu-latest, x86_64) | 7,171 / 7,552 (94.95 %) [7,164, 94.86 %] | 12,791 / 13,441 (95.16 %) [12,787, 95.13 %] | 561 / 608 (92.27 %) [560, 92.11 %] |
+| macOS (macos-latest, aarch64) | 7,171 / 7,552 (94.95 %) | 12,791 / 13,441 (95.16 %) | 561 / 608 (92.27 %) |
+| Windows (windows-latest, x86_64 MSVC) | 7,169 / 7,552 (94.93 %) [7,162, 94.84 %] | 12,784 / 13,439 (95.13 %) [12,780, 95.10 %] | 561 / 608 (92.27 %) [560, 92.11 %] |
+
+The DTD modules (identical on Linux and macOS; Windows differs only where
+marked):
+
+| File | Lines | Regions | Functions |
+|---|---|---|---|
+| `parse/dtd.rs` | 268 / 269 (99.63 %) | 410 / 421 (97.39 %); Windows 409 (97.15 %) | 22 / 22 (100 %) |
+| `parse/decl.rs` | 704 / 744 (94.62 %) | 1,341 / 1,430 (93.78 %) | 21 / 25 (84.00 %) |
+| `parse/model.rs` | 80 / 82 (97.56 %) | 108 / 111 (97.30 %) | 5 / 5 (100 %) |
+| `parse/entity.rs` | 352 / 361 (97.51 %) | 543 / 567 (95.77 %) | 24 / 26 (92.31 %) |
+| `parse/tracker.rs` | 473 / 500 (94.60 %); Windows 471 (94.20 %) | 749 / 803 (93.28 %); Windows 745 (92.78 %) | 52 / 58 (89.66 %) |
+| `parse/accounting.rs` | 34 / 36 (94.44 %) | 37 / 39 (94.87 %) | 3 / 3 (100 %) |
+| `parse/external.rs` | 565 / 614 (92.02 %) | 1,008 / 1,124 (89.68 %) | 25 / 26 (96.15 %) |
+
+**Linux re-run with the full suite versus 94.86 %.** The raw Linux figures
+equal module 11 step E to the line (7,164 / 7,552, 12,787 / 13,441,
+560 / 608): `upstream_vectors_every_offset` and the `--no-default-features`
+run add no covered line (the `all-features` and `full` reports are equal
+on every platform). The 7 lines, 4 regions and 1 function between 94.86 %
+and 94.95 % are `tok::unknown::done` (`tok/unknown.rs` 282-288), lost by
+the llvm-cov behaviour above. The raw macOS report already keeps it
+(another binary order or other hashes on that platform), which is why it
+showed 94.95 % without the correction.
+
+**Differences between platforms** (corrected reports; the lcov line sets
+of Linux and macOS are identical):
+
+- No platform-specific code in `crates/expat`: it has no `cfg(target_*)`
+  and no `cfg(unix/windows)`; Linux x86_64 and macOS aarch64 instrument
+  the same 13,441 regions and cover the same lines.
+- Windows instruments 2 regions fewer (`hash/mod.rs` 310 instead of 311,
+  `parse/content.rs` 1,739 instead of 1,740; the same 7,552 lines). These
+  are the only two files that use `core::ffi::c_ulong` (libexpat's hash
+  type `unsigned long`), which is 32 bits on Windows (LLP64) and 64 bits
+  elsewhere; the exact region was not identified.
+- Windows leaves `parse/tracker.rs` 576-577 uncovered (the refusal when a
+  tag buffer grows to the raw-name length, 3 executions elsewhere), 2 more
+  regions there and 1 region in `parse/dtd.rs`. Probable cause (inferred, not verified per
+  test): the tracker tests take their thresholds from C's tracked byte
+  counts measured on the running platform (threshold at C's final count,
+  bisected boundaries), and `long`/`unsigned long` (`XML_Size`, hash
+  values) is 32 bits on Windows, so C's counts, the probed thresholds and
+  the port's refusal points can differ there.
+- The harness itself has one Windows switch (`tests/src/tok.rs`, the
+  position wrap-around test starts at column 3 because C's `XML_Size` is
+  32 bits there, D-016); it does not change library coverage.
+
+**Doctests.** `cargo llvm-cov --doctests` needs nightly. With the nightly
+of the run (rustc 1.101.0-nightly 080cc2714 2026-10-11) the coverage data
+is not usable: on the same test suite it reports 64.90 % regions against
+91.26 % lines (stable: 95.16 % / 94.95 %), e.g. `role/mod.rs` 58 % regions
+with 99 % lines, and its llvm-cov aborts in `-dump`
+(`docs/coverage/ci-2f6a37a-nightly.txt`). Compared on that nightly, the
+doctests add no covered line and no covered region of the library (Linux
+and macOS: 663 uncovered lines and 4,747 uncovered regions with and
+without them; the 58 extra instrumented lines lie in the doctest examples
+themselves).
+The CI job therefore measures without doctests; `scripts/coverage.sh DIR
+nightly-doctests` (and `nightly` as the control) remain for a later
+nightly.
+
+**Below 95 % lines.** Corrected, `crates/expat` is at 94.95 % lines on
+Linux and macOS (4 lines short of 95 %) and 94.93 % on Windows; regions
+are above 95 % everywhere, functions at 92.27 %. Nothing was excluded or
+skipped to get there. The uncovered lines (`docs/coverage/ci-2f6a37a-linux.txt`,
+381 lines) by area:
+
+- `parse/mod.rs` (98 lines, 19 functions): the default no-op bodies of the
+  `Handler` trait (the harness overrides every handler) and getters and
+  public-API paths (`XML_Parse` length guard, suspend/finish states) that
+  module 12 will reach.
+- Suspend / abort / reenter branches in `content.rs`, `prolog.rs`,
+  `external.rs` (module 12, `XML_StopParser`/`XML_ResumeParser`).
+- Allocation refusals at single points in `decl.rs`, `entity.rs`,
+  `external.rs`, `tracker.rs`, `pool`, `hash` (`NoMemory` returns of
+  `dtdCopy`, `setContext`, child creation, `storeEntityValue`, tag /
+  binding / `m_nsAtts` / scaffold growth), compared only in aggregate.
+- `XML_UnparsedEntityDeclHandler` call site (`decl.rs` 487-493), not
+  compared by the harness.
+- Error branches of the external processors after a text declaration and
+  late encoding detection (`external.rs`), defensive
+  `XML_ERROR_UNEXPECTED_STATE` returns and `None` lookups.
+- Code that never runs at run time: the `const fn` table builder
+  `chartab::build` (evaluated by the compiler; the tables are checked
+  against C), `Default`/`Display` impls, `EncodingIndex::to_c` and
+  accessors in `tok/init.rs`, the closure `Converter` impl in
+  `tok/unknown.rs`.
+
+**Finding while measuring (not fixed here).** The proptest
+`init_diff::xml_decl_in_every_builtin_encoding` uses random seeds and
+failed twice in the coverage job on Windows (nightly runs of runs
+38220053354 and 38220630479): for an unknown encoding made from seed
+`0x52f43d23123766f6`, `XmlParseXmlDecl` on `<?xml é?>` (`é` as the
+bytes C3 A9) returns `bad` 7 in the port and 8 in C; for seed
+`0xfe8d9b29cbd0ff22` on `<?xml noé ?>` 9 against 11. The first case
+reproduces on aarch64 Linux with the pinned toolchain, so it is a port
+divergence in `toAscii` / pseudo-attribute parsing for unknown encodings,
+not a Windows or nightly effect. It is recorded in `docs/STATE.md` as an
+open finding; fixing it changes library behaviour and is left to a
+separate change.
+
 ### Module 11 summary: all test groups
 
 One row per test group of module 11 (details, counts and injected bugs in
@@ -810,7 +968,7 @@ behaviour and defaults are C's (D-026).
 
 **Remaining gaps** (module 11):
 
-1. DV-1: owner decision 2026-10-12 is exact parity in stages (D-033);
+1. DV-1: owner decision 2026-10-12 is exact parity in stages (D-034);
    phase 1 (sizes, R1 fix) below, W1/W2 remain until the later stages.
 2. Suspend / resume, the default handler, the unknown-encoding handler and
    `XML_GetInputContext` are module 12; their branches in the DTD code are
@@ -823,11 +981,14 @@ behaviour and defaults are C's (D-026).
    at each allocation point; `m_nsAtts` growth is uncovered.
 6. libexpat does not cap the number or depth of external entity parsers;
    the port replicates that (an application must cap them in its handler).
-7. Coverage: 94.86 % lines for `crates/expat`, below the Phase 4 target of
-   95 %; measured on one platform, without doctests.
+7. Coverage (CI, full suite, corrected for an llvm-cov artefact):
+   94.95 % lines on Linux and macOS, 94.93 % on Windows, below the Phase 4
+   target of 95 %; regions 95.16 % / 95.13 %, functions 92.27 %. Doctests
+   are not measured (nightly coverage unusable; on nightly they add no
+   covered line).
 8. Out of scope: `XML_UNICODE` builds (D-002).
 
-### DV-1 parity, phase 1 (D-033): structure sizes and the reverse violation R1
+### DV-1 parity, phase 1 (D-034): structure sizes and the reverse violation R1
 
 What was wrong: `BINDING` (48 vs C's 56) and `NAME_AND_DEFAULT_ATTRIBUTE`
 (16 vs 24) were charged below C's `sizeof`, so the port accepted
@@ -837,10 +998,33 @@ cost a whole pool block (W2).
 
 | Group (test) | Inputs | C behaviour | Port behaviour | Divergence |
 |---|---|---|---|---|
-| Sizes (`tracker_sizes`) | 16 structures and quantities: TAG, BINDING, PREFIX, ENTITY, CONTENT_SCAFFOLD, offsetof(BLOCK, s), ATTRIBUTE_ID, DEFAULT_ATTRIBUTE, NAME_AND_DEFAULT_ATTRIBUTE, NS_ATT, ELEMENT_TYPE, OPEN_INTERNAL_ENTITY, ATTRIBUTE, NAMED *, malloc header, int | `sizeof`/`offsetof` from the vendored `xmlparse.c` built for the CI platform (oracle). 64-bit Linux: 96, 56, 16, 64, 32, 12, 24, 24, 24, 24, 88, 48, 32, 8, 8, 4. | Computed from C's field lists (`parse::c_layout`): equal for 15; ELEMENT_TYPE 96 (known over-count, step 6 of D-033). An under-count fails on every platform. | ELEMENT_TYPE +8 (and NS_ATT +8 on Windows), fail-closed |
+| Sizes (`tracker_sizes`) | 16 structures and quantities: TAG, BINDING, PREFIX, ENTITY, CONTENT_SCAFFOLD, offsetof(BLOCK, s), ATTRIBUTE_ID, DEFAULT_ATTRIBUTE, NAME_AND_DEFAULT_ATTRIBUTE, NS_ATT, ELEMENT_TYPE, OPEN_INTERNAL_ENTITY, ATTRIBUTE, NAMED *, malloc header, int | `sizeof`/`offsetof` from the vendored `xmlparse.c` built for the CI platform (oracle). 64-bit Linux: 96, 56, 16, 64, 32, 12, 24, 24, 24, 24, 88, 48, 32, 8, 8, 4. | Computed from C's field lists (`parse::c_layout`): equal for 15; ELEMENT_TYPE 96 (known over-count, step 6 of D-034). An under-count fails on every platform. | ELEMENT_TYPE +8 (and NS_ATT +8 on Windows), fail-closed |
 | R1 (`dv1_windows::r1_attribute_defaults`) | W1 document with 10,000 ATTLIST defaults, pads 187,657, 188,000, 188,322, 188,323, 188,456, 188,457 | Refuses the first three (end 35,211,416), accepts from 188,323. | Refuses the first five (end 35,224,776), accepts from 188,457. Before the fix it accepted all six. | none in the C-refuses direction; DV-1 W1 shape for 188,323-188,456 |
 | W1 (`dv1_windows::w1_creation_charge`) | pads 330,745, 330,746, 330,878, 330,879 | Refuses at 330,745, accepts from 330,746 (end 67,117,916). | Refuses up to 330,878 (end 33,576,836), accepts at 330,879. | DV-1 (W1), pinned until step 3 |
 | W2 (`dv1_windows::w2_pool_slack`) | 84,947 references + tail 362, 363, 366, 367 | Accepts 362-366 (end 33,563,484), refuses 367. | Accepts 362, refuses 363-367. | DV-1 (W2), pinned until step 2 |
+
+Per platform (CI run 38223508229 at 4e3c255, `tracker sizes and DV-1
+windows` step; the test bisects both boundaries on each platform):
+
+| Platform | Sizes | W1: C / port accept from pad (width; margin) | R1: C / port (width; margin) | W2: C / port refuse from tail (width) |
+|---|---|---|---|---|
+| ubuntu-latest x86_64 | 15 equal, ELEMENT_TYPE 96 vs 88 | 330,746 / 330,879 (133; 13,352) | 188,323 / 188,457 (134; 13,360) | 367 / 363 (4) |
+| macos-latest aarch64 | as Linux | 330,746 / 330,879 (133; 13,352) | 188,323 / 188,457 (134; 13,360) | 367 / 363 (4) |
+| windows-latest x86_64 | 14 equal, ELEMENT_TYPE 96 vs 88, NS_ATT 24 vs 16 | 330,745 / 330,879 (134; 13,384) | 188,323 / 188,457 (134; 13,392) | 367 / 363 (4) |
+
+C's tracker is 32 bytes lower on Windows x64 at the same point (W1 end
+67,117,884 vs 67,117,916; the creation allocations differ by platform,
+measured per event in the next stage), so C's W1 boundary is one
+document lower there. The first CI run (38222937126) failed on Windows
+because the test then hard-coded Linux's pads; it now bisects per
+platform.
+
+Fuzzing at 4e3c255 (`fuzz-slice5.sh`, logs kept in the working notes):
+`parse_trace` 7 slices, 707 s, 899,500 executions; `buffer_diff` 7
+slices, 711 s, 4,582,373 executions; no findings. Differential suites at
+6d1e645 (release, aarch64 Linux): tracker_diff 9/9, external_parser_diff
+7/7, amplification_diff 8/8, entity_diff 4/4, parse_diff 9/9,
+upstream_vectors 5/5, buffer_diff 3/3, workspace all passed.
 
 Injected bugs (logs: `inject-logs/phase1` in the working notes, not in the
 repository): P1 `BINDING_SIZE` back to 6 words: caught by `tracker_sizes`

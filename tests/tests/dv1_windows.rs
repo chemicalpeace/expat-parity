@@ -1,5 +1,5 @@
 //! Permanent regressions for the default-limit windows of the allocation
-//! tracker (docs/DIVERGENCES.md DV-1 and R1, decision D-033): documents of
+//! tracker (docs/DIVERGENCES.md DV-1 and R1, decision D-034): documents of
 //! 340-690 KB whose ~33.5 MB attribute expansion puts both trackers at the
 //! 64 MiB activation threshold with an amplification near 100, so a few
 //! bytes of difference between the port's and C's counts decide the
@@ -13,7 +13,7 @@
 //!   no padding. C fills its 32 MiB pool block to the last byte; the port's
 //!   `POOL_SLACK` of 4 makes it double the block to 64 MiB for tails
 //!   363-366.
-//! - **R1** (reverse violation, fixed by D-033): the W1 document with 10,000
+//! - **R1** (reverse violation, fixed by D-034): the W1 document with 10,000
 //!   attribute defaults on an unused element type. With `BINDING` and
 //!   `NAME_AND_DEFAULT_ATTRIBUTE` 8 bytes below C's `sizeof`, the port
 //!   accepted documents of 686,993-687,658 bytes that C refuses with
@@ -196,7 +196,7 @@ fn accept_window(
 
 /// R1: C refuses at both ends of the former reverse window (686,993 and
 /// 687,658 bytes on 64-bit Linux); the port must refuse at least as far.
-/// Before D-033 the port accepted from 66,640 bytes of margin below C.
+/// Before D-034 the port accepted from 66,640 bytes of margin below C.
 #[test]
 fn r1_attribute_defaults() {
     let (c_from, p_from) = accept_window("R1", 187_000, 190_000, &|pad| window_doc(pad, 10_000));
@@ -206,7 +206,7 @@ fn r1_attribute_defaults() {
         let r = run("R1", &window_doc(pad, 10_000));
         assert!(!r.c && !r.port, "R1 pad {pad}: both must refuse");
     }
-    // Pinned at the current stage of D-033: the creation-charge window
+    // Pinned at the current stage of D-034: the creation-charge window
     // (W1 shape) is still open, the reverse one is closed.
     assert!(
         p_from > c_from,
@@ -215,7 +215,7 @@ fn r1_attribute_defaults() {
 }
 
 /// W1: the creation-charge window (DV-1), pinned open until step 3 of
-/// D-033.
+/// D-034.
 #[test]
 fn w1_creation_charge() {
     let (c_from, p_from) = accept_window("W1", 330_000, 332_000, &|pad| window_doc(pad, 0));
@@ -225,7 +225,7 @@ fn w1_creation_charge() {
     );
 }
 
-/// W2: the pool-slack window (DV-1), pinned open until step 2 of D-033.
+/// W2: the pool-slack window (DV-1), pinned open until step 2 of D-034.
 /// The tail grows the expanded value, so documents become refused as it
 /// grows: C accepts up to the tail that fills its 32 MiB block exactly.
 #[test]

@@ -416,7 +416,7 @@ pub const TAG_SIZE: usize = c_layout::TAG;
 /// `INIT_TAG_BUF_SIZE`
 pub const INIT_TAG_BUF_SIZE: usize = 32;
 /// `sizeof(BINDING)` ([`c_layout::BINDING`]: five pointers and two
-/// `size_t`; 56 bytes on 64-bit targets). Before D-033 the port charged
+/// `size_t`; 56 bytes on 64-bit targets). Before D-034 the port charged
 /// six pointers, 8 bytes less than C per binding (DIVERGENCES.md R1).
 pub const BINDING_SIZE: usize = c_layout::BINDING;
 /// `EXPAND_SPARE`
@@ -428,13 +428,13 @@ pub const ATTRIBUTE_SIZE: usize = c_layout::ATTRIBUTE;
 /// `sizeof(NS_ATT)` bound: two `unsigned long`s and a pointer, counted as
 /// three 8-byte words. Equal to C ([`c_layout::NS_ATT`]) where `unsigned
 /// long` has 8 bytes; 8 bytes more than C on Windows (4-byte `unsigned
-/// long`). An over-count, kept until the size-parity stage of D-033.
+/// long`). An over-count, kept until the size-parity stage of D-034.
 pub const NS_ATT_SIZE: usize = 3 * 8;
 /// `sizeof(DEFAULT_ATTRIBUTE)` ([`c_layout::DEFAULT_ATTRIBUTE`]).
 pub const DEFAULT_ATTRIBUTE_SIZE: usize = c_layout::DEFAULT_ATTRIBUTE;
 /// `sizeof(NAME_AND_DEFAULT_ATTRIBUTE)`
 /// ([`c_layout::NAME_AND_DEFAULT_ATTRIBUTE`]: a pointer, `size_t attIndex`
-/// and `bool initialized`; 24 bytes on 64-bit targets). Before D-033 the
+/// and `bool initialized`; 24 bytes on 64-bit targets). Before D-034 the
 /// port charged two pointers, 8 bytes less than C per entry
 /// (DIVERGENCES.md R1).
 pub const NAME_AND_DEFAULT_ATTRIBUTE_SIZE: usize = c_layout::NAME_AND_DEFAULT_ATTRIBUTE;

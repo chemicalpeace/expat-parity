@@ -1,5 +1,5 @@
 //! The sizes of libexpat's C structures that the allocation tracker
-//! charges (D-030, D-033), computed from the C definitions with the C
+//! charges (D-030, D-034), computed from the C definitions with the C
 //! layout rules of the target.
 //!
 //! Each structure is written as its list of fields in declaration order,
