@@ -484,6 +484,7 @@ static ORACLE_TLS size_t ext_len;
 static ORACLE_TLS size_t ext_chunk;
 static ORACLE_TLS int ext_buffer_api;
 static ORACLE_TLS int ext_depth;
+static ORACLE_TLS const char *ext_encoding;
 
 static enum XML_Status feed(XML_Parser p, const unsigned char *s, size_t n,
                             int final, int buffer_api);
@@ -527,7 +528,7 @@ read_external(XML_Parser p, struct tracer *t, const XML_Char *context,
     end_line(begin(t, "extdepth"));
     return XML_STATUS_ERROR;
   }
-  XML_Parser child = XML_ExternalEntityParserCreate(p, context, NULL);
+  XML_Parser child = XML_ExternalEntityParserCreate(p, context, ext_encoding);
   if (child == NULL) {
     end_line(begin(t, "extcreate"));
     return XML_STATUS_ERROR;
@@ -705,6 +706,7 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   ext_chunk = opts->chunk_size;
   ext_buffer_api = opts->buffer_api;
   ext_depth = 0;
+  ext_encoding = opts->ext_encoding;
   if (opts->ext_handler)
     XML_SetExternalEntityRefHandler(p, on_extref);
   if (opts->not_standalone)

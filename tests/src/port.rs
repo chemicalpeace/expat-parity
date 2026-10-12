@@ -32,6 +32,9 @@ struct Tracer {
     buffer_api: bool,
     /// Nesting depth of external entity parsers.
     depth: usize,
+    /// The encoding name passed to every external entity parser creation
+    /// (the shim's `ext_encoding`).
+    ext_encoding: Option<Vec<u8>>,
 }
 
 impl Tracer {
@@ -47,7 +50,8 @@ impl Tracer {
             self.w.raw_line("extdepth", &[]);
             return false;
         }
-        let Some(mut child) = parsers.create(context, None) else {
+        let encoding = self.ext_encoding.clone();
+        let Some(mut child) = parsers.create(context, encoding.as_deref()) else {
             self.w.raw_line("extcreate", &[]);
             return false;
         };
@@ -316,6 +320,7 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
         chunk_size: opts.chunk_size,
         buffer_api: opts.buffer_api,
         depth: 0,
+        ext_encoding: opts.ext_encoding.as_ref().map(|e| e.as_bytes().to_vec()),
     };
     // Same order as the C shim.
     if let Some(f) = opts.limits.bl_amplification {

@@ -88,6 +88,7 @@ const ALWAYS: ParseOptions = ParseOptions {
     not_standalone: None,
     use_foreign_dtd: false,
     ext_entities: Vec::new(),
+    ext_encoding: None,
 };
 
 /// (id, document, expected C error code with parameter entity parsing
