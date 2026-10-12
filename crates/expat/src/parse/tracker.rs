@@ -1165,7 +1165,17 @@ mod tests {
         let mut shadow = PoolShadow::default();
         let mut hp = Rec::default();
         let mut hs = Rec::default();
-        for step in 0..6000 {
+        // Miri interprets every character of these texts: the full run
+        // (6,000 steps, texts up to 12,000 characters) did not finish in
+        // CI's Miri job within 80 minutes (aarch64: 64 steps took 212 s,
+        // 33 steps 112 s, about 3.4 s a step; 6,000 steps would take
+        // hours). Under Miri: the first 33 steps
+        // of the same sequence, which already make the first block, its
+        // doublings from 1,036 to 16,396 bytes and a second first block
+        // that grows (natively the full run adds seven more requests, at
+        // steps 38 to 3,003).
+        let steps = if cfg!(miri) { 33 } else { 6000 };
+        for step in 0..steps {
             let op = next() % 14;
             let chars = match next() % 4 {
                 0 => (next() % 8) as usize,
@@ -1243,6 +1253,9 @@ mod tests {
             }
             assert_eq!(hs.0, hp.0, "step {step} op {op}");
         }
+        // The shortened run must still cross blocks: the first block's
+        // four doublings and the growth of a second one.
+        assert!(hp.0.iter().filter(|r| r.0 == 'r').count() >= 5);
         Ok(())
     }
 

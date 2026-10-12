@@ -187,6 +187,7 @@ unsafe extern "C" {
     pub(crate) fn oracle_last_heap_peak() -> usize;
     pub(crate) fn oracle_last_tracker(created: *mut u64, end: *mut u64);
     pub(crate) fn oracle_c_sizes(out: *mut usize, n: usize) -> usize;
+    pub(crate) fn oracle_c_compiler() -> *const core::ffi::c_char;
     pub(crate) fn oracle_tracker_events_capture(on: c_int);
     pub(crate) fn oracle_tracker_events_take(
         out: *mut *mut OracleTrackerEvent,

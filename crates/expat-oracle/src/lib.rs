@@ -400,6 +400,18 @@ pub fn c_sizes() -> Vec<(&'static str, usize)> {
     ORACLE_C_SIZE_NAMES.iter().copied().zip(v).take(n).collect()
 }
 
+/// The C compiler that built the vendored `xmlparse.c` for the current
+/// target (and so took [`c_sizes`]), from its predefined macros: `MSVC
+/// _MSC_FULL_VER=...` for cl.exe, `clang ...` (clang-cl adds its
+/// `_MSC_VER`), `gcc ...`.
+pub fn c_compiler() -> String {
+    // SAFETY: the shim returns a pointer to a static NUL-terminated string
+    // literal.
+    unsafe { core::ffi::CStr::from_ptr(ffi::oracle_c_compiler()) }
+        .to_string_lossy()
+        .into_owned()
+}
+
 /// One event of libexpat's allocation tracker (`expat_malloc`,
 /// `expat_realloc`, `expat_free`; D-034), as `expat_heap_stat` reports it
 /// with `EXPAT_MALLOC_DEBUG=2`.

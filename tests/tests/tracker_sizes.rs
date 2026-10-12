@@ -37,6 +37,16 @@ fn tracker_sizes_match_the_c_compiler() {
         std::env::consts::OS,
         std::env::consts::FAMILY
     );
+    let compiler = expat_oracle::c_compiler();
+    println!("SIZES {target} C compiler: {compiler}");
+    // The Windows CI job builds the oracle for x86_64-pc-windows-msvc: its
+    // sizes must come from an MSVC-ABI compiler (cl.exe, or clang-cl).
+    if cfg!(target_env = "msvc") {
+        assert!(
+            compiler.contains("MSVC") || compiler.contains("_MSC_VER"),
+            "{target}: oracle not built by an MSVC-ABI compiler: {compiler}"
+        );
+    }
     let mut failures = Vec::new();
     for &(name, c_size) in &c {
         let port = TRACKER_SIZES
