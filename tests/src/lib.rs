@@ -11,9 +11,12 @@
 //! - [`port`]: the trace adapter of the port's parser.
 //! - [`fuzzcase`]: the checks of the whole-parser fuzz targets and their
 //!   deterministic seed generator.
+//! - [`bounded`]: comparisons bounded in input size, wall-clock time and
+//!   memory, for the resource-limit tests.
 //! - [`core`]: white-box differential checks of the string pool and hash
 //!   table of the parser core.
 
+pub mod bounded;
 pub mod core;
 pub mod diff;
 pub mod docgen;
@@ -69,7 +72,11 @@ pub fn options_from_selector(sel: u8) -> ParseOptions {
 /// `XML_ParseBuffer`, bit 1 disables reparse deferral, bits 2-3 pick the
 /// namespace separator used when namespaces are on (`|`, `\n`, `:`, `#`),
 /// bits 4-5 replace the chunk size of 64 by 2, 7, 1024 or keep it, bit 6
-/// turns on `XML_SetReturnNSTriplet` (namespace triplets).
+/// turns on `XML_SetReturnNSTriplet` (namespace triplets), bit 7 sets
+/// small billion-laughs limits (module 11: factor `1 + (sel2 & 3)`,
+/// activation threshold `32 * ((sel2 >> 2) & 15)` bytes) and traces the
+/// accounting counters, so the fuzzer reaches
+/// `XML_ERROR_AMPLIFICATION_LIMIT_BREACH` everywhere.
 pub fn options_from_selectors(sel: u8, sel2: u8) -> ParseOptions {
     let mut o = options_from_selector(sel);
     o.buffer_api = sel2 & 1 != 0;
@@ -80,6 +87,11 @@ pub fn options_from_selectors(sel: u8, sel2: u8) -> ParseOptions {
     o.ns_triplets = sel2 & 0x40 != 0;
     if o.chunk_size == 64 {
         o.chunk_size = [2, 7, 1024, 64][usize::from((sel2 >> 4) & 3)];
+    }
+    if sel2 & 0x80 != 0 {
+        o.trace_accounting = true;
+        o.limits.bl_amplification = Some(expat_oracle::Factor(1.0 + f32::from(sel2 & 3)));
+        o.limits.bl_threshold = Some(32 * u64::from((sel2 >> 2) & 15));
     }
     o
 }

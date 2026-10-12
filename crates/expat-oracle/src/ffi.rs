@@ -12,6 +12,17 @@ pub(crate) struct OracleOptions {
     pub(crate) buffer_api: c_int,
     pub(crate) no_reparse_deferral: c_int,
     pub(crate) ns_triplets: c_int,
+    pub(crate) set_bl_amplification: c_int,
+    pub(crate) bl_amplification: f32,
+    pub(crate) set_bl_threshold: c_int,
+    pub(crate) bl_threshold: u64,
+    pub(crate) set_at_amplification: c_int,
+    pub(crate) at_amplification: f32,
+    pub(crate) set_at_threshold: c_int,
+    pub(crate) at_threshold: u64,
+    pub(crate) text_digest: c_int,
+    pub(crate) trace_accounting: c_int,
+    pub(crate) heap_cap: usize,
 }
 
 /// Mirror of `struct oracle_role_state`.
@@ -155,6 +166,7 @@ unsafe extern "C" {
         out: *mut *mut u8,
         out_len: *mut usize,
     ) -> c_int;
+    pub(crate) fn oracle_last_heap_peak() -> usize;
     pub(crate) fn oracle_free(p: *mut c_void);
     pub(crate) fn oracle_core_run(
         prog: *const u8,

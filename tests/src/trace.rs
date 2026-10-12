@@ -7,7 +7,7 @@
 use std::fmt::Write as _;
 
 /// Event tags that may start a trace line.
-pub const TAGS: [&str; 18] = [
+pub const TAGS: [&str; 21] = [
     "xmldecl",
     "doctype",
     "enddoctype",
@@ -26,7 +26,15 @@ pub const TAGS: [&str; 18] = [
     "nsstart",
     "nsend",
     "skipped",
+    "textdigest",
+    "limit",
+    "accounting",
 ];
+
+/// FNV-1a 64 offset basis (`textdigest` lines).
+const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+/// FNV-1a 64 prime.
+const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
 fn needs_escape(b: u8) -> bool {
     b <= 0x20 || b >= 0x7f || matches!(b, b'%' | b'~' | b'(' | b')' | b',')
@@ -65,6 +73,9 @@ pub struct TraceWriter {
     out: String,
     text: Vec<u8>,
     in_text: bool,
+    /// Digest mode (`text_digest` option): length and FNV-1a 64 of the
+    /// pending text instead of the text.
+    digest: Option<(u64, u64)>,
 }
 
 impl TraceWriter {
@@ -73,7 +84,34 @@ impl TraceWriter {
         Self::default()
     }
 
+    /// A writer that traces character data as `textdigest <len> <hash>`.
+    pub fn with_text_digest() -> Self {
+        TraceWriter {
+            digest: Some((0, FNV_OFFSET)),
+            ..Self::default()
+        }
+    }
+
+    /// `limit <name> <rc>`: the result of a resource-limit setter.
+    pub fn limit(&mut self, name: &str, accepted: bool) {
+        let _ = writeln!(self.out, "limit {name} {}", i32::from(accepted));
+    }
+
+    /// `accounting <direct> <indirect>` before the result line.
+    pub fn accounting(&mut self, direct: u64, indirect: u64) {
+        self.flush_text();
+        let _ = writeln!(self.out, "accounting {direct} {indirect}");
+    }
+
     fn flush_text(&mut self) {
+        if let Some((len, hash)) = self.digest {
+            if self.in_text {
+                let _ = writeln!(self.out, "textdigest {len} {hash:016x}");
+                self.digest = Some((0, FNV_OFFSET));
+                self.in_text = false;
+            }
+            return;
+        }
         if self.in_text {
             self.out.push_str("text");
             let text = std::mem::take(&mut self.text);
@@ -136,6 +174,14 @@ impl TraceWriter {
     /// `XML_CharacterDataHandler` (coalesced).
     pub fn text(&mut self, data: &[u8]) {
         self.in_text = true;
+        if let Some((len, hash)) = &mut self.digest {
+            for &b in data {
+                *hash ^= u64::from(b);
+                *hash = hash.wrapping_mul(FNV_PRIME);
+            }
+            *len = len.wrapping_add(data.len() as u64);
+            return;
+        }
         self.text.extend_from_slice(data);
     }
 
@@ -335,4 +381,39 @@ pub fn first_difference(a: &[u8], b: &[u8]) -> Option<(usize, String, String)> {
             )
         })
     })
+}
+
+/// Quirk Q-4 (docs/DIVERGENCES.md): for a name token cut off by the end of
+/// the buffer in the epilog, libexpat 2.9.0's `epilogProcessor` passes an
+/// unset (`NULL`) end pointer to `accountingDiffTolerated`, so its direct
+/// byte counter becomes an address-dependent value (undefined behaviour in
+/// C); the parse then ends with `XML_ERROR_JUNK_AFTER_DOC_ELEMENT` (9)
+/// either way. The port counts 0 bytes for that token. When the C trace
+/// shows this (result code 9 and a direct counter of at least 2^62, far
+/// above any real count), the `accounting` line of both traces is
+/// replaced by `accounting q4`; everything else is still compared.
+pub fn mask_q4(c: &[u8], port: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    let direct = std::str::from_utf8(c).ok().and_then(|t| {
+        t.lines()
+            .find_map(|l| l.strip_prefix("accounting "))
+            .and_then(|r| r.split(' ').next())
+            .and_then(|d| d.parse::<u64>().ok())
+    });
+    let garbage = direct.is_some_and(|d| d >= 1 << 62) && result_error_code(c) == Some(9);
+    if !garbage {
+        return (c.to_vec(), port.to_vec());
+    }
+    let mask = |t: &[u8]| -> Vec<u8> {
+        let text = String::from_utf8_lossy(t);
+        let mut out = String::new();
+        for l in text.split_inclusive('\n') {
+            if l.starts_with("accounting ") {
+                out.push_str("accounting q4\n");
+            } else {
+                out.push_str(l);
+            }
+        }
+        out.into_bytes()
+    };
+    (mask(c), mask(port))
 }

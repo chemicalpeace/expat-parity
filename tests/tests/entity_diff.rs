@@ -86,6 +86,10 @@ const ALWAYS: ParseOptions = ParseOptions {
     buffer_api: false,
     no_reparse_deferral: false,
     ns_triplets: false,
+    limits: expat_oracle::Limits::NONE,
+    text_digest: false,
+    trace_accounting: false,
+    heap_cap: 0,
 };
 
 /// (id, document, expected C error code with parameter entity parsing
