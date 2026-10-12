@@ -181,7 +181,7 @@ impl AllocTracker {
     }
 
     /// Charges the creation of an external entity parser (the same bound
-    /// as a root parser's creation, [`CREATION_CHARGE`], plus the encoding
+    /// as a root parser's creation, `CREATION_CHARGE`, plus the encoding
     /// name), checked against the root parser's limits like C's
     /// `parserCreate` with a parent; `false` = refused, nothing charged.
     pub fn charge_child_creation(&mut self, encoding_name_len: Option<usize>, direct: u64) -> bool {
