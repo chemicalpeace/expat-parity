@@ -77,8 +77,24 @@ const INIT_BLOCK_SIZE: i64 = 1024;
 /// simulated pool larger.
 const POOL_SLACK: i64 = 4;
 
+/// One change of the tracker's count, for the per-event comparison with
+/// libexpat's tracker (D-034): what `expat_heap_stat` reports in C.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TrackerEvent {
+    /// An increase (charge) rather than a decrease (release).
+    pub increase: bool,
+    /// The increase was refused; the count did not change.
+    pub refused: bool,
+    /// Bytes of the change.
+    pub size: u64,
+    /// `bytes_allocated` after the event.
+    pub total: u64,
+    /// `peak_bytes_allocated` after the event.
+    pub peak: u64,
+}
+
 /// `MALLOC_TRACKER` of the root parser.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AllocTracker {
     /// `bytesAllocated`: what the port has charged and not released.
     pub bytes_allocated: u64,
@@ -88,6 +104,9 @@ pub struct AllocTracker {
     pub maximum_amplification_factor: f32,
     /// `activationThresholdBytes`
     pub activation_threshold_bytes: u64,
+    /// Every change of the count while enabled ([`AllocTracker::log_events`]),
+    /// for the per-event comparison with C (tests only; `None` normally).
+    pub events: Option<alloc::vec::Vec<TrackerEvent>>,
 }
 
 impl Default for AllocTracker {
@@ -97,11 +116,53 @@ impl Default for AllocTracker {
             peak_bytes_allocated: 0,
             maximum_amplification_factor: ALLOC_MAXIMUM_AMPLIFICATION_DEFAULT,
             activation_threshold_bytes: ALLOC_ACTIVATION_THRESHOLD_DEFAULT,
+            events: None,
         }
     }
 }
 
 impl AllocTracker {
+    /// Starts (or stops, discarding them) recording every change of the
+    /// count as a [`TrackerEvent`].
+    /// The count so far is recorded as one first event (the parser's
+    /// creation charge, which C reports as several allocations).
+    pub fn log_events(&mut self, on: bool) {
+        self.events = on.then(alloc::vec::Vec::new);
+        if on && self.bytes_allocated > 0 {
+            self.record(true, false, self.bytes_allocated);
+        }
+    }
+
+    fn record(&mut self, increase: bool, refused: bool, size: u64) {
+        let (total, peak) = (self.bytes_allocated, self.peak_bytes_allocated);
+        if let Some(e) = self.events.as_mut() {
+            e.push(TrackerEvent {
+                increase,
+                refused,
+                size,
+                total,
+                peak,
+            });
+        }
+    }
+
+    /// Lowers the count by `size` (a release), recorded as an event.
+    pub fn release(&mut self, size: u64) {
+        self.bytes_allocated = self.bytes_allocated.saturating_sub(size);
+        if size > 0 {
+            self.record(false, false, size);
+        }
+    }
+
+    /// `increase_tolerable` that records a refusal.
+    fn tolerable(&mut self, increase: u64, direct: u64) -> bool {
+        let ok = self.increase_tolerable(increase, direct);
+        if !ok {
+            self.record(true, true, increase);
+        }
+        ok
+    }
+
     /// `setAllocTrackerMaximumAmplification` on a root parser: `false`,
     /// and no change, for NaN or a value below 1.0.
     pub fn set_maximum_amplification(&mut self, factor: f32) -> bool {
@@ -140,6 +201,7 @@ impl AllocTracker {
         if self.bytes_allocated > self.peak_bytes_allocated {
             self.peak_bytes_allocated = self.bytes_allocated;
         }
+        self.record(true, false, increase);
     }
 
     /// Charges `MALLOC(size)`; `false` = C's `expat_malloc` returns
@@ -151,7 +213,7 @@ impl AllocTracker {
         else {
             return false;
         };
-        if !self.increase_tolerable(increase, direct) {
+        if !self.tolerable(increase, direct) {
             return false;
         }
         self.add(increase);
@@ -164,21 +226,19 @@ impl AllocTracker {
     pub fn realloc(&mut self, old: usize, size: usize, direct: u64) -> bool {
         let (old, size) = (old as u64, size as u64);
         if size > old {
-            if !self.increase_tolerable(size - old, direct) {
+            if !self.tolerable(size - old, direct) {
                 return false;
             }
             self.add(size - old);
         } else {
-            self.bytes_allocated = self.bytes_allocated.saturating_sub(old - size);
+            self.release(old - size);
         }
         true
     }
 
     /// Releases a charged allocation of `size` bytes (`FREE`).
     pub fn free(&mut self, size: usize) {
-        self.bytes_allocated = self
-            .bytes_allocated
-            .saturating_sub((size as u64).saturating_add(MALLOC_HEADER));
+        self.release((size as u64).saturating_add(MALLOC_HEADER));
     }
 
     /// Charges the creation of an external entity parser (the same bound
@@ -188,7 +248,7 @@ impl AllocTracker {
     pub fn charge_child_creation(&mut self, encoding_name_len: Option<usize>, direct: u64) -> bool {
         let increase = CREATION_CHARGE
             .saturating_add(encoding_name_len.map_or(0, |n| (n as u64).saturating_add(1 + MALLOC_HEADER)));
-        if !self.increase_tolerable(increase, direct) {
+        if !self.tolerable(increase, direct) {
             return false;
         }
         self.add(increase);
@@ -200,7 +260,7 @@ impl AllocTracker {
     pub fn release_child_creation(&mut self, encoding_name_len: Option<usize>) {
         let charge = CREATION_CHARGE
             .saturating_add(encoding_name_len.map_or(0, |n| (n as u64).saturating_add(1 + MALLOC_HEADER)));
-        self.bytes_allocated = self.bytes_allocated.saturating_sub(charge);
+        self.release(charge);
     }
 
     /// Charges the parser creation (`CREATION_CHARGE` plus the copy of

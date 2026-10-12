@@ -64,7 +64,7 @@ mod tracker;
 mod tests;
 
 pub use accounting::{Account, Accounting};
-pub use tracker::{AllocTracker, PoolShadow, TableShadow, Tracker, TrackerHeap, TRACKER_SIZES};
+pub use tracker::{AllocTracker, PoolShadow, TableShadow, Tracker, TrackerEvent, TrackerHeap, TRACKER_SIZES};
 pub use dtd::{
     AttributeId, Binding, BindingId, DefaultAttribute, Dtd, ElementType, Entity, EntityRef, Prefix,
     PrefixId,
@@ -653,6 +653,17 @@ impl Parser {
     /// limits.
     pub fn alloc_tracker(&self) -> &AllocTracker {
         &self.tracker.t
+    }
+
+    /// Starts (or stops) recording the tracker's events
+    /// ([`AllocTracker::log_events`], D-034).
+    pub fn log_tracker_events(&mut self, on: bool) {
+        self.tracker.t.log_events(on);
+    }
+
+    /// The tracker events recorded so far (and stops recording).
+    pub fn take_tracker_events(&mut self) -> Vec<tracker::TrackerEvent> {
+        self.tracker.t.events.take().unwrap_or_default()
     }
 
     /// Charges the growth of the current string of pool `pool` to `len`

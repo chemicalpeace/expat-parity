@@ -279,6 +279,27 @@ std::thread_local! {
     };
 }
 
+std::thread_local! {
+    static LOG_EVENTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static LAST_EVENTS: std::cell::RefCell<Vec<expat::internal::parse::TrackerEvent>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// A [`port_trace`] that also returns the port tracker's events (D-034);
+/// the first event is the creation charge.
+pub fn port_trace_with_tracker_events(
+    doc: &[u8],
+    opts: &ParseOptions,
+) -> (Vec<u8>, Vec<expat::internal::parse::TrackerEvent>) {
+    LOG_EVENTS.with(|c| c.set(true));
+    let t = port_trace(doc, opts);
+    LOG_EVENTS.with(|c| c.set(false));
+    (
+        t,
+        LAST_EVENTS.with(|e| std::mem::take(&mut *e.borrow_mut())),
+    )
+}
+
 /// [`PortTracker`] of the calling thread's last [`port_trace`].
 pub fn last_port_tracker() -> PortTracker {
     LAST_TRACKER.with(std::cell::Cell::get)
@@ -291,6 +312,9 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
         opts.ns_separator,
         ORACLE_HASH_SALT,
     );
+    if LOG_EVENTS.with(std::cell::Cell::get) {
+        p.log_tracker_events(true);
+    }
     p.set_handlers(HandlerSet {
         external_entity_ref: opts.ext_handler != ExtHandler::None,
         not_standalone: opts.not_standalone.is_some(),
@@ -354,6 +378,10 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
         if st == parse::Status::Ok {
             st = feed(&mut p, &mut t, b"", true, opts.buffer_api);
         }
+    }
+    if LOG_EVENTS.with(std::cell::Cell::get) {
+        let events = p.take_tracker_events();
+        LAST_EVENTS.with(|e| *e.borrow_mut() = events);
     }
     LAST_TRACKER.with(|c| {
         c.set(PortTracker {

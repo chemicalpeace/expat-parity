@@ -317,12 +317,15 @@ impl Parser {
     fn external_entity_parser_create(&mut self, context: Option<&[u8]>, encoding: Option<&[u8]>) -> Option<(Parser, u64)> {
         let bytes_before = self.tracker.t.bytes_allocated;
         let direct = self.direct();
-        let mut t = self.tracker.t;
+        // The root's tracker moves into the child and back when the child
+        // is dropped (D-032).
+        let mut t = core::mem::take(&mut self.tracker.t);
         // C checks the new parser structure against the root parser's
         // tracker and then allocates its arrays, the DTD (general
         // entities) and the encoding name through it; the port charges its
         // creation bound with one check.
         if !t.charge_child_creation(encoding.map(<[u8]>::len), direct) {
+            self.tracker.t = t;
             return None;
         }
         let ns_sep = self.ns.then_some(self.namespace_separator);
@@ -340,11 +343,22 @@ impl Parser {
         match context {
             Some(context) => {
                 let salt = self.salt;
-                let dtd = self.dtd.copy_for_child(&salt, &mut child.tracker, direct).ok()?;
-                child.dtd = dtd;
-                child.tracker.scaff_size = self.tracker.scaff_size;
-                child.tracker.scaff_index_size = self.tracker.scaff_index_size;
-                if !child.set_context(context) {
+                let copied = self.dtd.copy_for_child(&salt, &mut child.tracker, direct);
+                let ok = match copied {
+                    Ok(dtd) => {
+                        child.dtd = dtd;
+                        child.tracker.scaff_size = self.tracker.scaff_size;
+                        child.tracker.scaff_index_size = self.tracker.scaff_index_size;
+                        child.set_context(context)
+                    }
+                    Err(_) => false,
+                };
+                if !ok {
+                    // C frees the partly created parser: the root's count
+                    // returns to its value before the creation.
+                    let mut t = core::mem::take(&mut child.tracker.t);
+                    t.release(t.bytes_allocated.saturating_sub(bytes_before));
+                    self.tracker.t = t;
                     return None;
                 }
                 child.processor = Processor::ExternalEntityInit;
@@ -375,7 +389,7 @@ impl Parser {
     /// the structures the child owns itself (`Tracker::own_bytes`), which
     /// C frees with the child.
     fn external_entity_parser_free(&mut self, child: &mut Parser, bytes_before: u64) {
-        let mut t = child.tracker.t;
+        let mut t = core::mem::take(&mut child.tracker.t);
         if child.is_param_entity {
             self.dtd = core::mem::take(&mut child.dtd);
             self.tracker.dtd_pool = core::mem::take(&mut child.tracker.dtd_pool);
@@ -385,9 +399,9 @@ impl Parser {
             self.pending_value = core::mem::take(&mut child.pending_value);
             self.charged_len = child.charged_len;
             t.release_child_creation(child.protocol_encoding_name.as_ref().map(Vec::len));
-            t.bytes_allocated = t.bytes_allocated.saturating_sub(child.own_charged_bytes());
+            t.release(child.own_charged_bytes());
         } else {
-            t.bytes_allocated = bytes_before;
+            t.release(t.bytes_allocated.saturating_sub(bytes_before));
         }
         self.tracker.t = t;
         self.accounting = child.accounting;
