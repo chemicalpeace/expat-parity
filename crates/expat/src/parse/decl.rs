@@ -249,10 +249,18 @@ impl Parser {
                     self.tracker.temp_pool.clear();
                 }
                 if self.doctype_sysid.is_some() || self.use_foreign_dtd {
-                    // Reading the external subset needs an external
-                    // entity reference handler (public API, module 12),
-                    // without one C only records the reference.
+                    // The external subset (or the foreign DTD) is read only
+                    // by the external entity reference handler
+                    // (`xmlparse.c` 5702-5745).
+                    let had_param_entity_refs = self.dtd.has_param_entity_refs;
                     self.dtd.has_param_entity_refs = true;
+                    if self.param_entity_parsing != ParamEntityParsing::Never && self.handlers.external_entity_ref {
+                        self.read_external_subset(h)?;
+                        if !self.dtd.param_entity_read && self.doctype_sysid.is_none() {
+                            // No external subset after all.
+                            self.dtd.has_param_entity_refs = had_param_entity_refs;
+                        }
+                    }
                     self.use_foreign_dtd = false;
                 }
                 if self.handlers.end_doctype_decl {
@@ -367,7 +375,7 @@ impl Parser {
                     // This stores the replacement text of m_declEntity.
                     let mut text = Vec::new();
                     self.charged_len = 0;
-                    let result = self.call_store_entity_value(enc, buf, s + m, next - m, &mut text, Account::None);
+                    let result = self.call_store_entity_value(h, enc, buf, s + m, next - m, &mut text, Account::None);
                     self.charge_current(Pool::EntityValue, text.len())?;
                     self.finish_current(Pool::EntityValue, false, self.decl_entity.is_some())?;
                     if let Some(r) = self.decl_entity {
@@ -413,8 +421,9 @@ impl Parser {
                         // handler is set.
                         EXTERNAL_SUBSET_NAME.to_vec()
                     });
-                    // The not-standalone handler (public API, module 12)
-                    // is not set.
+                    if self.param_entity_parsing == ParamEntityParsing::Never {
+                        self.check_not_standalone(h)?;
+                    }
                     if self.decl_entity.is_none() {
                         let (r, _) = self
                             .dtd
@@ -732,6 +741,31 @@ impl Parser {
             .unwrap_or(0)
     }
 
+    /// The external subset `#` handed to the external entity reference
+    /// handler at the end of the doctype, or before the first element for
+    /// a foreign DTD (`xmlparse.c` 5706-5742, 5762-5793; the caller checks
+    /// that parameter entity parsing is on and a handler is set). With a
+    /// foreign DTD the entity's base is the parser's base. After a read,
+    /// the not-standalone handler decides.
+    pub(crate) fn read_external_subset<H: Handler>(&mut self, h: &mut H) -> Result<(), Stop> {
+        let salt = self.salt;
+        let direct = self.direct();
+        let (r, _) = self
+            .dtd
+            .declare_entity(&salt, &mut self.tracker, direct, true, EXTERNAL_SUBSET_NAME)
+            .map_err(|_| Stop::Error(XmlError::NoMemory))?;
+        if self.use_foreign_dtd {
+            let base = self.cur_base.clone();
+            if let Some(e) = self.dtd.entity_mut(r) {
+                e.base = base;
+            }
+        }
+        if self.external_param_entity(h, r, false)? {
+            self.check_not_standalone(h)?;
+        }
+        Ok(())
+    }
+
     /// `XML_ROLE_PARAM_ENTITY_REF` / `XML_ROLE_INNER_PARAM_ENTITY_REF`.
     fn param_entity_ref<E: Encoding, H: Handler>(
         &mut self,
@@ -745,7 +779,7 @@ impl Parser {
         self.dtd.has_param_entity_refs = true;
         if self.param_entity_parsing == ParamEntityParsing::Never {
             self.dtd.keep_processing = self.dtd.standalone;
-            return Ok(());
+            return self.check_not_standalone(h);
         }
         let name = Self::literal(enc, buf, s, next);
         // The name is stored in `dtd->pool` for the lookup.
@@ -788,18 +822,22 @@ impl Parser {
         if has_text {
             return self.open_param_entity(r, role == Role::ParamEntityRef);
         }
-        // An external parameter entity: without an external entity
-        // reference handler (public API, module 12) it is not read.
-        self.dtd.keep_processing = self.dtd.standalone;
-        Ok(())
+        // An external parameter entity: only the external entity
+        // reference handler can read it.
+        if !self.handlers.external_entity_ref || !self.external_param_entity(h, r, true)? {
+            self.dtd.keep_processing = self.dtd.standalone;
+            return Ok(());
+        }
+        self.check_not_standalone(h)
     }
 
     /// `storeEntityValue` on `buf[ptr..]` (the slice ends at the end of the
     /// literal or replacement text), appending the replacement text to
     /// `out`. Returns at the end, or after opening a parameter entity
     /// (`*next_ptr` is then where to continue).
-    pub(crate) fn store_entity_value<E: Encoding>(
+    pub(crate) fn store_entity_value<E: Encoding, H: Handler>(
         &mut self,
+        h: &mut H,
         enc: &E,
         buf: &[u8],
         ptr: usize,
@@ -810,7 +848,7 @@ impl Parser {
         let old_in_entity_value = self.prolog_state.in_entity_value;
         self.prolog_state.in_entity_value = true;
         let mut next = ptr;
-        let r = self.store_entity_value_inner(enc, buf, ptr, out, account, &mut next);
+        let r = self.store_entity_value_inner(h, enc, buf, ptr, out, account, &mut next);
         self.prolog_state.in_entity_value = old_in_entity_value;
         // If 'nextPtr' is given, it should be updated during the
         // processing.
@@ -818,8 +856,9 @@ impl Parser {
         r
     }
 
-    fn store_entity_value_inner<E: Encoding>(
+    fn store_entity_value_inner<E: Encoding, H: Handler>(
         &mut self,
+        h: &mut H,
         enc: &E,
         buf: &[u8],
         ptr: usize,
@@ -872,10 +911,11 @@ impl Parser {
                             return Err(XmlError::RecursiveEntityRef.into());
                         }
                         if external {
-                            // Read only by an external entity reference
-                            // handler (public API); without one it is
-                            // skipped.
-                            self.dtd.keep_processing = self.dtd.standalone;
+                            // Read only by the external entity reference
+                            // handler; without one it is skipped.
+                            if !self.handlers.external_entity_ref || !self.external_param_entity(h, r, true)? {
+                                self.dtd.keep_processing = self.dtd.standalone;
+                            }
                             ptr = next;
                             continue;
                         }

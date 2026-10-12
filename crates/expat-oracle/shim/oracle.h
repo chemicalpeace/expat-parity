@@ -63,6 +63,17 @@ struct oracle_options {
      allocation failure inside libexpat). oracle_last_heap_peak() returns
      the peak live heap of the calling thread's last such parse. */
   size_t heap_cap;
+  /* Module 11d: external entities through a test handler. The library
+     never fetches anything; these handlers only trace their arguments.
+     ext_handler: 0 no XML_SetExternalEntityRefHandler; 1 a handler that
+     traces "extref <context> <base> <systemId> <publicId>" and returns
+     XML_STATUS_ERROR; 2 the same handler returning XML_STATUS_OK without
+     reading anything. not_standalone: 0 no XML_SetNotStandaloneHandler; 1
+     a handler that traces "notstandalone" and returns 1; 2 the same,
+     returning 0. use_foreign_dtd: 1 calls XML_UseForeignDTD(p, XML_TRUE). */
+  int ext_handler;
+  int not_standalone;
+  int use_foreign_dtd;
 };
 
 int oracle_type_table(int id, unsigned char out[256]);

@@ -406,11 +406,12 @@ impl Parser {
                                     // true without a default handler
                                     // (public API, module 12).
                                     self.open_content_entity(r)?;
+                                } else if self.handlers.external_entity_ref {
+                                    self.external_general_entity(h, r)?;
                                 }
-                                // An external entity: without an external
-                                // entity reference handler or a default
-                                // handler (public API, module 12) nothing
-                                // happens.
+                                // An external entity without a handler: C
+                                // only reports it to the default handler
+                                // (public API, module 12).
                             }
                         }
                     }

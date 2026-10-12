@@ -245,6 +245,19 @@ impl Parser {
             match role {
                 Role::XmlDecl => rescan = self.process_xml_decl(h, enc, buf, s, next)?,
                 Role::InstanceStart => {
+                    // Without a document type declaration this is the last
+                    // chance to read the foreign DTD (`xmlparse.c`
+                    // 5755-5797).
+                    if self.use_foreign_dtd {
+                        let had_param_entity_refs = self.dtd.has_param_entity_refs;
+                        self.dtd.has_param_entity_refs = true;
+                        if self.param_entity_parsing != ParamEntityParsing::Never && self.handlers.external_entity_ref {
+                            self.read_external_subset(h)?;
+                            if !self.dtd.param_entity_read {
+                                self.dtd.has_param_entity_refs = had_param_entity_refs;
+                            }
+                        }
+                    }
                     self.processor = Processor::Content;
                     self.content_processor(h, buf, s, next_ptr)?;
                     return Ok(PrologDone::Done);

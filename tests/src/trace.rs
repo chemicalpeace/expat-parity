@@ -210,6 +210,22 @@ impl TraceWriter {
         self.line("skipped", &[Some(name)], &[i64::from(is_param)]);
     }
 
+    /// The shim's test `XML_ExternalEntityRefHandler` (module 11d).
+    pub fn extref(
+        &mut self,
+        context: Option<&[u8]>,
+        base: Option<&[u8]>,
+        system_id: Option<&[u8]>,
+        public_id: Option<&[u8]>,
+    ) {
+        self.line("extref", &[context, base, system_id, public_id], &[]);
+    }
+
+    /// The shim's test `XML_NotStandaloneHandler` (module 11d).
+    pub fn not_standalone(&mut self) {
+        self.line("notstandalone", &[], &[]);
+    }
+
     /// `XML_EntityDeclHandler` (`is_param` comes second, like the shim).
     #[allow(clippy::too_many_arguments)] // reason: mirrors XML_EntityDeclHandler.
     pub fn entity(

@@ -159,6 +159,11 @@ pub struct HandlerSet {
     pub element_decl: bool,
     /// `XML_SetAttlistDeclHandler`
     pub attlist_decl: bool,
+    /// `XML_SetExternalEntityRefHandler` (module 11d). The library never
+    /// reads an external entity itself; the handler decides.
+    pub external_entity_ref: bool,
+    /// `XML_SetNotStandaloneHandler` (module 11d).
+    pub not_standalone: bool,
 }
 
 /// Receives the parser's events. Only the methods whose [`HandlerSet`]
@@ -189,6 +194,25 @@ pub trait Handler {
     fn end_namespace_decl(&mut self, _prefix: Option<&[u8]>) {}
     /// `XML_SkippedEntityHandler`.
     fn skipped_entity(&mut self, _name: &[u8], _is_param: bool) {}
+    /// `XML_ExternalEntityRefHandler`: `context` is `None` for parameter
+    /// entities and the external subset, otherwise C's `getContext`
+    /// string. Returns `false` for `XML_STATUS_ERROR`, which stops the
+    /// parse with `XML_ERROR_EXTERNAL_ENTITY_HANDLING`. The default
+    /// refuses.
+    fn external_entity_ref(
+        &mut self,
+        _context: Option<&[u8]>,
+        _base: Option<&[u8]>,
+        _system_id: Option<&[u8]>,
+        _public_id: Option<&[u8]>,
+    ) -> bool {
+        false
+    }
+    /// `XML_NotStandaloneHandler`: `false` stops the parse with
+    /// `XML_ERROR_NOT_STANDALONE`. The default refuses.
+    fn not_standalone(&mut self) -> bool {
+        false
+    }
     /// `XML_StartDoctypeDeclHandler`.
     fn start_doctype_decl(
         &mut self,
@@ -528,6 +552,17 @@ impl Parser {
         if self.parsing == Parsing::Initialized {
             self.ns_triplets = on;
         }
+    }
+
+    /// `XML_UseForeignDTD`: `false` (C:
+    /// `XML_ERROR_CANT_CHANGE_FEATURE_ONCE_PARSING`) once parsing has
+    /// started.
+    pub fn use_foreign_dtd(&mut self, on: bool) -> bool {
+        if matches!(self.parsing, Parsing::Parsing | Parsing::Suspended) {
+            return false;
+        }
+        self.use_foreign_dtd = on;
+        true
     }
 
     /// `XML_SetParamEntityParsing`: `false` once parsing has started.
