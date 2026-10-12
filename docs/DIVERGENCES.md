@@ -35,6 +35,10 @@ XML 1.0 specifications or to libexpat's own documentation.
 - The opposite direction never happens by construction and is tested:
   whenever C refuses through its tracker, the port refuses
   (`tests/tests/tracker_diff.rs`, `parse_trace` fuzz target).
+- **Status: pending owner decision** (2026-10-12). Whether the ~13 KB
+  window above 64 MiB at the default limits is acceptable, or the port
+  must be brought to C's exact count there, is open; the behaviour is
+  left unchanged until decided.
 - Regression tests: `tests/tests/tracker_diff.rs::threshold_boundary_sweep`
   (asserts the 36/36 count), `generated_documents_tracker_relation` and
   `upstream_vectors_tracker_relation` (no refusal at default limits where

@@ -583,6 +583,42 @@ on commit 7762e9d (parse_trace 665 s / 1,257,130, buffer_diff 660 s /
 4,667,919 executions, no findings) is not counted: its logs were lost
 with the sandbox before they were committed.
 
+### Module 11d step D1 (external entity test handlers): handler calls versus C
+
+Ported: the call sites of `XML_ExternalEntityRefHandler` and
+`XML_NotStandaloneHandler` in content (`doContent` 3724-3743), at the end of
+the doctype (external subset, 5702-5745), before the first element
+(`XML_UseForeignDTD`, 5754-5797), at parameter entity references
+(6382-6418) and in entity values (7186-7206), `getContext` (7685-7769) for
+the context string, and `Parser::use_foreign_dtd`. The oracle gained test
+handlers (`ParseOptions::ext_handler` None / Fail / Accept,
+`not_standalone`, `use_foreign_dtd`, D-031). **The library never fetches
+anything**: an external entity reaches only the caller's handler. Reading
+an entity's bytes through an external entity parser is step D2.
+
+Local run (2026-10-12, aarch64 Linux, commit 7d8cd76, `--release`):
+`cargo test -p expat-difftest --test external_diff -- --nocapture`:
+
+| Group (test) | Pairs | C behaviour | Security policy | Known divergences |
+|---|---|---|---|---|
+| Curated cases x matrix (`curated_external_cases_match_c`) | 1,863 (23 documents x 81 option sets: 3 handler modes x 3 not-standalone modes x 3 PE-parsing modes x {whole, 1-byte + namespaces, 7-byte buffer API + foreign DTD}) | Handler called 852 times, not-standalone handler 171 times; results 0 (1,170), 21 handler error (381), 22 not standalone (81), 16 external entity in attribute (75), 15/10 (156). External subset and external PEs are offered only when PE parsing is not NEVER *and* a handler is set; the not-standalone handler is called only for a non-standalone document, and after an external PE only if an external entity parser actually read it (`paramEntityRead`). | Same call sites, same arguments, same errors; nothing is read by the library. | none |
+| Pinned behaviour (`pinned_external_behaviour`) | 7 | No handler: nothing read, success. Failing handler: 21 (`extref x ~ x.xml ~`). External subset: NULL context, name `#` never shown. Namespace context: `=default`, then bound prefixes in hash-slot order (incl. `xml`), form-feed separated. Open entities listed in slot order. NEVER + refusing not-standalone handler at an external subset: 22. | Same. | none |
+| Generated documents (`generated_documents_with_handlers_match_c`) | 6,000 (random handler mode, not-standalone mode, PE parsing, foreign DTD, namespaces, chunking, buffer API) | 16 distinct results incl. 21 (178) and 22 (244); 360 handler calls. | Same. | none |
+
+All groups: 0 mismatches. The context string's `m_tempPool` growth is
+charged to the tracker (D-030).
+
+**Injected bugs** (2026-10-12, each reverted after the run, logs in the
+working copy `inject-logs/d1`):
+
+| # | Mutation | Detected by |
+|---|---|---|
+| J1 | Content: the external entity reference handler is never called (`content.rs`) | all three tests |
+| J2 | `getContext` separator `;` instead of form feed (`entity.rs`) | all three tests |
+| J3 | The not-standalone check is skipped (`entity.rs`) | all three tests |
+| J4 | The foreign DTD is not offered when there is no doctype (`prolog.rs`) | `curated_external_cases_match_c` only (generated documents always have a doctype) |
+| J5 | The referenced entity is not marked open while the context is built (`entity.rs`) | all three tests |
+
 ## Divergences
 
 `docs/DIVERGENCES.md`. One divergence: DV-1 (module 11c, D-030), the
