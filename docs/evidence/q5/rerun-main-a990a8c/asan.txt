@@ -1,0 +1,321 @@
+# Linux aarch64, Debian clang version 19.1.7 (3+b1); repo commit 6d85983e
+## q5_asan parse 0 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 10)  <-- past the document
+  convert #6 at offset 11 (lead BE, reads 4 bytes up to offset 14; doc len 10)  <-- past the document
+  convert #7 at offset 15 (lead BE, reads 4 bytes up to offset 18; doc len 10)  <-- past the document
+  convert #8 at offset 19 (lead BE, reads 4 bytes up to offset 22; doc len 10)  <-- past the document
+  convert #9 at offset 23 (lead BE, reads 4 bytes up to offset 26; doc len 10)  <-- past the document
+  convert #10 at offset 27 (lead BE, reads 4 bytes up to offset 30; doc len 10)  <-- past the document
+  convert #11 at offset 31 (lead BE, reads 4 bytes up to offset 34; doc len 10)  <-- past the document
+  convert #12 at offset 35 (lead BE, reads 4 bytes up to offset 38; doc len 10)  <-- past the document
+=================================================================
+==18576==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x51d000000883 at pc 0xaaaad1fde838 bp 0xfffffb1721b0 sp 0xfffffb1721a8
+READ of size 1 at 0x51d000000883 thread T0
+    #0 0xaaaad1fde834 in unknown_toUtf8 <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1283:38
+    #1 0xaaaad1ffc99c in toAscii <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:918:3
+    #2 0xaaaad1ffc99c in parsePseudoAttribute <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:963:9
+    #3 0xaaaad1fdf090 in doParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1071:9
+    #4 0xaaaad1fdef44 in XmlParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok_ns.c:120:10
+    #5 0xaaaad1fc6fb4 in processXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5143:9
+    #6 0xaaaad1fbfba4 in doProlog <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5598:31
+    #7 0xaaaad1fbd36c in prologProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5478:10
+    #8 0xaaaad1fbd36c in prologInitProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5271:10
+    #9 0xaaaad1fbaca4 in callProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:1247:11
+    #10 0xaaaad1fba760 in XML_ParseBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2469:25
+    #11 0xaaaad1ffd30c in main <repo>/docs/evidence/q5/q5_overread.c:87:10
+    #12 0xffff821d2258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #13 0xffff821d2338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #14 0xaaaad1ed02ec in _start (<bin>/q5_asan+0x402ec) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+
+0x51d000000883 is located 3 bytes after 2048-byte region [0x51d000000080,0x51d000000880)
+allocated by thread T0 here:
+    #0 0xaaaad1f72dc4 in malloc (<bin>/q5_asan+0xe2dc4) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+    #1 0xaaaad1fba284 in XML_GetBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2603:28
+    #2 0xaaaad1fb9964 in XML_Parse <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2403:16
+    #3 0xaaaad1ffd30c in main <repo>/docs/evidence/q5/q5_overread.c:87:10
+    #4 0xffff821d2258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #5 0xffff821d2338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #6 0xaaaad1ed02ec in _start (<bin>/q5_asan+0x402ec) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1283:38 in unknown_toUtf8
+Shadow bytes around the buggy address:
+  0x51d000000600: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000680: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000700: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000780: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000800: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x51d000000880:[fa]fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x51d000000900: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x51d000000980: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x51d000000a00: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x51d000000a80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==18576==ABORTING
+exit 1
+## q5_asan parse 1 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #2 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #3 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #4 at offset 9 (lead A9, reads 4 bytes up to offset 12; doc len 13)
+  convert #5 at offset 13 (lead BE, reads 4 bytes up to offset 16; doc len 13)  <-- past the document
+  convert #6 at offset 17 (lead BE, reads 4 bytes up to offset 20; doc len 13)  <-- past the document
+  convert #7 at offset 21 (lead BE, reads 4 bytes up to offset 24; doc len 13)  <-- past the document
+  convert #8 at offset 25 (lead BE, reads 4 bytes up to offset 28; doc len 13)  <-- past the document
+  convert #9 at offset 29 (lead BE, reads 4 bytes up to offset 32; doc len 13)  <-- past the document
+  convert #10 at offset 33 (lead BE, reads 4 bytes up to offset 36; doc len 13)  <-- past the document
+  convert #11 at offset 37 (lead BE, reads 4 bytes up to offset 40; doc len 13)  <-- past the document
+  convert #12 at offset 41 (lead BE, reads 4 bytes up to offset 44; doc len 13)  <-- past the document
+=================================================================
+==18579==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x51d000000881 at pc 0xaaaace13e838 bp 0xfffffda7fcd0 sp 0xfffffda7fcc8
+READ of size 1 at 0x51d000000881 thread T0
+    #0 0xaaaace13e834 in unknown_toUtf8 <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1283:38
+    #1 0xaaaace15c99c in toAscii <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:918:3
+    #2 0xaaaace15c99c in parsePseudoAttribute <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:963:9
+    #3 0xaaaace13f090 in doParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1071:9
+    #4 0xaaaace13ef44 in XmlParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok_ns.c:120:10
+    #5 0xaaaace126fb4 in processXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5143:9
+    #6 0xaaaace11fba4 in doProlog <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5598:31
+    #7 0xaaaace11d36c in prologProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5478:10
+    #8 0xaaaace11d36c in prologInitProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5271:10
+    #9 0xaaaace11aca4 in callProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:1247:11
+    #10 0xaaaace11a760 in XML_ParseBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2469:25
+    #11 0xaaaace15d30c in main <repo>/docs/evidence/q5/q5_overread.c:87:10
+    #12 0xffffa9802258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #13 0xffffa9802338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #14 0xaaaace0302ec in _start (<bin>/q5_asan+0x402ec) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+
+0x51d000000881 is located 1 bytes after 2048-byte region [0x51d000000080,0x51d000000880)
+allocated by thread T0 here:
+    #0 0xaaaace0d2dc4 in malloc (<bin>/q5_asan+0xe2dc4) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+    #1 0xaaaace11a284 in XML_GetBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2603:28
+    #2 0xaaaace119964 in XML_Parse <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2403:16
+    #3 0xaaaace15d30c in main <repo>/docs/evidence/q5/q5_overread.c:87:10
+    #4 0xffffa9802258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #5 0xffffa9802338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #6 0xaaaace0302ec in _start (<bin>/q5_asan+0x402ec) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1283:38 in unknown_toUtf8
+Shadow bytes around the buggy address:
+  0x51d000000600: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000680: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000700: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000780: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000800: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x51d000000880:[fa]fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x51d000000900: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x51d000000980: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x51d000000a00: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x51d000000a80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x51d000000b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==18579==ABORTING
+exit 1
+## q5_asan parse 2 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 14)
+doc 2 (14 bytes), mode parse: status 0 error 30 (XML declaration not well-formed) byte index 8 line 1 column 7; convert calls 5, calls reading past the document 0, max offset read 10
+exit 0
+## q5_asan parsebuffer 0 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 10)  <-- past the document
+  convert #6 at offset 11 (lead BE, reads 4 bytes up to offset 14; doc len 10)  <-- past the document
+  convert #7 at offset 15 (lead BE, reads 4 bytes up to offset 18; doc len 10)  <-- past the document
+  convert #8 at offset 19 (lead BE, reads 4 bytes up to offset 22; doc len 10)  <-- past the document
+  convert #9 at offset 23 (lead BE, reads 4 bytes up to offset 26; doc len 10)  <-- past the document
+  convert #10 at offset 27 (lead BE, reads 4 bytes up to offset 30; doc len 10)  <-- past the document
+  convert #11 at offset 31 (lead BE, reads 4 bytes up to offset 34; doc len 10)  <-- past the document
+  convert #12 at offset 35 (lead BE, reads 4 bytes up to offset 38; doc len 10)  <-- past the document
+  convert #1000 at offset 3987 (lead BE, reads 4 bytes up to offset 3990; doc len 10)  <-- past the document
+=================================================================
+==18585==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x521000001103 at pc 0xaaaaabbbe838 bp 0xfffff6a68430 sp 0xfffff6a68428
+READ of size 1 at 0x521000001103 thread T0
+    #0 0xaaaaabbbe834 in unknown_toUtf8 <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1283:38
+    #1 0xaaaaabbdc99c in toAscii <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:918:3
+    #2 0xaaaaabbdc99c in parsePseudoAttribute <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:963:9
+    #3 0xaaaaabbbf090 in doParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1071:9
+    #4 0xaaaaabbbef44 in XmlParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok_ns.c:120:10
+    #5 0xaaaaabba6fb4 in processXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5143:9
+    #6 0xaaaaabb9fba4 in doProlog <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5598:31
+    #7 0xaaaaabb9d36c in prologProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5478:10
+    #8 0xaaaaabb9d36c in prologInitProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5271:10
+    #9 0xaaaaabb9aca4 in callProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:1247:11
+    #10 0xaaaaabb9a760 in XML_ParseBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2469:25
+    #11 0xaaaaabbdd2ec in main <repo>/docs/evidence/q5/q5_overread.c:82:10
+    #12 0xffff91892258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #13 0xffff91892338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #14 0xaaaaabab02ec in _start (<bin>/q5_asan+0x402ec) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+
+0x521000001103 is located 3 bytes after 4096-byte region [0x521000000100,0x521000001100)
+allocated by thread T0 here:
+    #0 0xaaaaabb52dc4 in malloc (<bin>/q5_asan+0xe2dc4) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+    #1 0xaaaaabb9a284 in XML_GetBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2603:28
+    #2 0xaaaaabbdd2b0 in main <repo>/docs/evidence/q5/q5_overread.c:78:17
+    #3 0xffff91892258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #4 0xffff91892338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #5 0xaaaaabab02ec in _start (<bin>/q5_asan+0x402ec) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1283:38 in unknown_toUtf8
+Shadow bytes around the buggy address:
+  0x521000000e80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x521000000f00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x521000000f80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x521000001000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x521000001080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x521000001100:[fa]fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001300: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001380: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==18585==ABORTING
+exit 1
+## q5_asan parsebuffer 1 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #2 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #3 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #4 at offset 9 (lead A9, reads 4 bytes up to offset 12; doc len 13)
+  convert #5 at offset 13 (lead BE, reads 4 bytes up to offset 16; doc len 13)  <-- past the document
+  convert #6 at offset 17 (lead BE, reads 4 bytes up to offset 20; doc len 13)  <-- past the document
+  convert #7 at offset 21 (lead BE, reads 4 bytes up to offset 24; doc len 13)  <-- past the document
+  convert #8 at offset 25 (lead BE, reads 4 bytes up to offset 28; doc len 13)  <-- past the document
+  convert #9 at offset 29 (lead BE, reads 4 bytes up to offset 32; doc len 13)  <-- past the document
+  convert #10 at offset 33 (lead BE, reads 4 bytes up to offset 36; doc len 13)  <-- past the document
+  convert #11 at offset 37 (lead BE, reads 4 bytes up to offset 40; doc len 13)  <-- past the document
+  convert #12 at offset 41 (lead BE, reads 4 bytes up to offset 44; doc len 13)  <-- past the document
+  convert #1000 at offset 3993 (lead BE, reads 4 bytes up to offset 3996; doc len 13)  <-- past the document
+=================================================================
+==18588==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x521000001101 at pc 0xaaaad20ce838 bp 0xffffde0d50d0 sp 0xffffde0d50c8
+READ of size 1 at 0x521000001101 thread T0
+    #0 0xaaaad20ce834 in unknown_toUtf8 <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1283:38
+    #1 0xaaaad20ec99c in toAscii <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:918:3
+    #2 0xaaaad20ec99c in parsePseudoAttribute <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:963:9
+    #3 0xaaaad20cf090 in doParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1071:9
+    #4 0xaaaad20cef44 in XmlParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok_ns.c:120:10
+    #5 0xaaaad20b6fb4 in processXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5143:9
+    #6 0xaaaad20afba4 in doProlog <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5598:31
+    #7 0xaaaad20ad36c in prologProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5478:10
+    #8 0xaaaad20ad36c in prologInitProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5271:10
+    #9 0xaaaad20aaca4 in callProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:1247:11
+    #10 0xaaaad20aa760 in XML_ParseBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2469:25
+    #11 0xaaaad20ed2ec in main <repo>/docs/evidence/q5/q5_overread.c:82:10
+    #12 0xffff98442258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #13 0xffff98442338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #14 0xaaaad1fc02ec in _start (<bin>/q5_asan+0x402ec) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+
+0x521000001101 is located 1 bytes after 4096-byte region [0x521000000100,0x521000001100)
+allocated by thread T0 here:
+    #0 0xaaaad2062dc4 in malloc (<bin>/q5_asan+0xe2dc4) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+    #1 0xaaaad20aa284 in XML_GetBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2603:28
+    #2 0xaaaad20ed2b0 in main <repo>/docs/evidence/q5/q5_overread.c:78:17
+    #3 0xffff98442258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #4 0xffff98442338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #5 0xaaaad1fc02ec in _start (<bin>/q5_asan+0x402ec) (BuildId: 40d05cacbda530a3af4a048e43347d5783156389)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1283:38 in unknown_toUtf8
+Shadow bytes around the buggy address:
+  0x521000000e80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x521000000f00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x521000000f80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x521000001000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x521000001080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x521000001100:[fa]fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001300: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x521000001380: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==18588==ABORTING
+exit 1
+## q5_asan parsebuffer 2 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 14)
+doc 2 (14 bytes), mode parsebuffer: status 0 error 30 (XML declaration not well-formed) byte index 8 line 1 column 7; convert calls 5, calls reading past the document 0, max offset read 10
+exit 0

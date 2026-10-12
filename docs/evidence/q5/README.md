@@ -11,4 +11,6 @@
 | `mutation-check.txt` | The C-differential regression tests fail with the fix reverted. |
 | `random-scan.txt` | Long runs of `init_diff::xml_decl_in_every_builtin_encoding`. |
 
-Reproduce: `docs/evidence/q5/build.sh && docs/evidence/q5/run.sh` (clang with ASan and MSan runtimes; `OUT` = build directory, default `/tmp/q5`).
+Security report: `docs/security/Q-5-libexpat-2.9.0-unknown_toUtf8-overread.md`. Re-run on main a990a8c: `rerun-main-a990a8c/`. `check.sh` checks the outputs (CI job `q5-sanitizers`).
+
+Reproduce: `docs/evidence/q5/build.sh && docs/evidence/q5/run.sh && docs/evidence/q5/check.sh` (clang with ASan and MSan runtimes; `OUT` = build directory, default `/tmp/q5`).

@@ -1,0 +1,11 @@
+# init_diff::xml_decl_in_every_builtin_encoding, release test binary of branch q5-verification (library = main a990a8c), Linux aarch64, 2026-10-12
+## PROPTEST_CASES=100000 PROPTEST_RNG_SEED=11 target/release/deps/init_diff-* --exact xml_decl_in_every_builtin_encoding
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 105.52s
+exit=0
+## PROPTEST_CASES=95000 PROPTEST_RNG_SEED=12 target/release/deps/init_diff-* --exact xml_decl_in_every_builtin_encoding
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 101.71s
+exit=0
+## PROPTEST_CASES=1000 PROPTEST_RNG_SEED=11 (scaling control)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 1.31s
+## PROPTEST_CASES=10000 PROPTEST_RNG_SEED=11 (scaling control)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 11.02s

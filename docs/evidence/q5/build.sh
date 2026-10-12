@@ -8,6 +8,9 @@ out=${OUT:-/tmp/q5}; mkdir -p $out
 cc=${CC:-clang}
 flags="-DXML_STATIC -I$shim -I$lib -g -O1"
 $cc $flags $src $here/q5_overread.c -o $out/q5_plain
-$cc $flags -fsanitize=address -fno-omit-frame-pointer $src $here/q5_overread.c -o $out/q5_asan
-$cc $flags -fsanitize=memory -fsanitize-memory-track-origins -fno-omit-frame-pointer $src $here/q5_overread.c -o $out/q5_msan
-echo built $out/q5_plain $out/q5_asan $out/q5_msan
+# SANITIZERS: which instrumented builds to make (default both; Apple clang has
+# no MemorySanitizer, so CI on macOS sets SANITIZERS=asan).
+sans=${SANITIZERS:-asan msan}
+case " $sans " in *" asan "*) $cc $flags -fsanitize=address -fno-omit-frame-pointer $src $here/q5_overread.c -o $out/q5_asan ;; esac
+case " $sans " in *" msan "*) $cc $flags -fsanitize=memory -fsanitize-memory-track-origins -fno-omit-frame-pointer $src $here/q5_overread.c -o $out/q5_msan ;; esac
+echo built $out/q5_plain $sans
