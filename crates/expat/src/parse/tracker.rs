@@ -376,32 +376,27 @@ impl PoolShadow {
         Ok(())
     }
 
-    /// `poolAppend` of a converted text (`text` is the UTF-8 the pool
-    /// receives): `XmlConvert` writes whole characters only and stops at
-    /// the first one that does not fit (up to three bytes before the end of
-    /// a block), then the pool grows; an empty pool grows first even for an
-    /// empty text (`! pool->ptr`). Exact where `XmlConvert` stops (D-034
-    /// stage 2; `POOL_SLACK` before).
+    /// `poolAppend` of a converted text of `text.len()` UTF-8 bytes: an
+    /// empty pool grows first, even for an empty text (`! pool->ptr`), then
+    /// the pool grows while the rest of the text does not fit.
+    ///
+    /// `XmlConvert` writes whole characters only and stops up to three
+    /// bytes before the end of a block when the next character does not
+    /// fit, but that changes no allocation: it reports
+    /// `XML_CONVERT_OUTPUT_EXHAUSTED` exactly when the rest of the text is
+    /// longer than the room left (`utf8_toUtf8` compares the lengths; the
+    /// Latin-1, ASCII and UTF-16 converters stop at the first character
+    /// that does not fit, which exists exactly then), and `poolGrow` sizes
+    /// the new block from `end - start`, not from where the conversion
+    /// stopped; the characters left over are written after the growth.
+    /// The shadow therefore needs only the length (D-034 stage 2; the unit
+    /// test checks it against the character-level pool on multi-byte
+    /// texts).
     pub fn append_text<H: Heap + ?Sized>(&mut self, heap: &mut H, text: &[u8]) -> Result<(), NoMemory> {
         if self.blocks.is_empty() {
             self.grow(heap)?;
         }
-        let mut rest = text;
-        loop {
-            let room = usize::try_from(self.end() - self.ptr).unwrap_or(0);
-            if rest.len() <= room {
-                self.ptr += i64::try_from(rest.len()).map_err(|_| NoMemory)?;
-                return Ok(());
-            }
-            // The longest prefix of whole characters that fits.
-            let mut k = room;
-            while k > 0 && rest.get(k).is_some_and(|&b| b & 0xC0 == 0x80) {
-                k -= 1;
-            }
-            self.ptr += i64::try_from(k).map_err(|_| NoMemory)?;
-            rest = rest.get(k..).unwrap_or_default();
-            self.grow(heap)?;
-        }
+        self.append_chars(heap, text.len())
     }
 
     /// `poolAppendChars` (`poolGrowUntil`, then the copy) of `n`
