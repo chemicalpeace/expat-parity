@@ -773,10 +773,24 @@ Notable uncovered areas (from `--show-missing-lines`):
   in aggregate, but not each point.
 - **`m_nsAtts` growth** (`Tracker::ns_atts` realloc beyond 8 slots, and
   the `m_nsAtts` term of `Tracker::own_bytes`, which an external parameter
-  entity parser never has).
-- **`XML_UnparsedEntityDeclHandler`** (`decl.rs` 487-493): the harness
-  traces unparsed entities through `XML_EntityDeclHandler` only, so the
-  port's call site of the unparsed-entity handler is not compared.
+  entity parser never has). Uncovered on ccf66a1. Since PR #18 (Part 2,
+  "`m_nsAtts` growth", `ns_atts_diff.rs`) the growth is compared by trace
+  (350 documents x 9 option sets = 3,150 comparisons) and its tracker
+  charge one way by a threshold sweep (9 documents, both namespace
+  separators: wherever C stops with `XML_ERROR_NO_MEMORY` the port stops
+  too; the port may stop earlier). Still not compared: the table's size
+  itself, an injected refusal at the table's own reallocation, and the
+  `m_nsAtts` term of `Tracker::own_bytes` (`tracker.rs` 560, 0 hits in
+  PR #18's CI coverage run 38299714072).
+- **`XML_UnparsedEntityDeclHandler`** (`decl.rs` 487-493): on ccf66a1 the
+  harness traced unparsed entities through `XML_EntityDeclHandler` only,
+  so the port's call site of the unparsed-entity handler was not compared.
+  Since PR #18 (Part 2, "`XML_UnparsedEntityDeclHandler`",
+  `unparsed_diff.rs`) it is compared with `ParseOptions::unparsed_handler`
+  on and off: 20 internal-subset documents x 7 option sets, and 4
+  external-subset / external parameter entity documents x 7 option sets x
+  3 parameter-entity modes. Only these tests set the handler; the
+  generated tests and the fuzz targets leave it off.
 - **Error branches of the external processors**: invalid, partial and
   partial-character tokens right after a text declaration in
   `entityValueInitProcessor` and `externalParEntInitProcessor`, an
@@ -922,7 +936,9 @@ skipped to get there. The uncovered lines (`docs/coverage/ci-2f6a37a-linux.txt`,
   `dtdCopy`, `setContext`, child creation, `storeEntityValue`, tag /
   binding / `m_nsAtts` / scaffold growth), compared only in aggregate.
 - `XML_UnparsedEntityDeclHandler` call site (`decl.rs` 487-493), not
-  compared by the harness.
+  compared by the harness on that tree; compared since PR #18 by
+  `unparsed_diff.rs` only (handler off in the generated tests and fuzz
+  targets). `m_nsAtts` growth: see module 11 step E above.
 - Error branches of the external processors after a text declaration and
   late encoding detection (`external.rs`), defensive
   `XML_ERROR_UNEXPECTED_STATE` returns and `None` lookups.
