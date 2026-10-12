@@ -173,6 +173,30 @@ fn feed(
     p.parse_buffer(t, len, is_final)
 }
 
+/// The port's allocation tracker during the calling thread's last
+/// [`port_trace`] (module 11c): bytes charged after creation and the limit
+/// setters, at the end of the parse, and the peak.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PortTracker {
+    /// After creation and the setters.
+    pub created: u64,
+    /// At the end of the parse.
+    pub end: u64,
+    /// The highest count during the parse.
+    pub peak: u64,
+}
+
+std::thread_local! {
+    static LAST_TRACKER: std::cell::Cell<PortTracker> = const {
+        std::cell::Cell::new(PortTracker { created: 0, end: 0, peak: 0 })
+    };
+}
+
+/// [`PortTracker`] of the calling thread's last [`port_trace`].
+pub fn last_port_tracker() -> PortTracker {
+    LAST_TRACKER.with(std::cell::Cell::get)
+}
+
 /// Parses `doc` with the port under `opts` and returns its trace.
 pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
     let mut p = Parser::new(
@@ -193,8 +217,7 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
             TraceWriter::new()
         },
     };
-    // Same order as the C shim. The allocation tracker setters
-    // (`limits.at_*`) are applied by the tracker (module 11c).
+    // Same order as the C shim.
     if let Some(f) = opts.limits.bl_amplification {
         let ok = p.set_billion_laughs_maximum_amplification(f.0);
         t.w.limit("bl-amplification", ok);
@@ -203,6 +226,15 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
         let ok = p.set_billion_laughs_activation_threshold(b);
         t.w.limit("bl-threshold", ok);
     }
+    if let Some(f) = opts.limits.at_amplification {
+        let ok = p.set_alloc_tracker_maximum_amplification(f.0);
+        t.w.limit("at-amplification", ok);
+    }
+    if let Some(b) = opts.limits.at_threshold {
+        let ok = p.set_alloc_tracker_activation_threshold(b);
+        t.w.limit("at-threshold", ok);
+    }
+    let created = p.alloc_tracker().bytes_allocated;
     if opts.no_reparse_deferral {
         p.set_reparse_deferral_enabled(false);
     }
@@ -223,6 +255,13 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
             st = feed(&mut p, &mut t, b"", true, opts.buffer_api);
         }
     }
+    LAST_TRACKER.with(|c| {
+        c.set(PortTracker {
+            created,
+            end: p.alloc_tracker().bytes_allocated,
+            peak: p.alloc_tracker().peak_bytes_allocated,
+        });
+    });
     let code = match p.error_code() {
         Stop::Error(e) => e.to_c(),
         Stop::DtdNotPorted => return PortTrace::DtdNotPorted,

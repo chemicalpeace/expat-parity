@@ -17,7 +17,11 @@ use alloc::vec::Vec;
 use super::model::Scaffold;
 
 use crate::hash::{EntryId, HashTable, Lookup};
-use crate::heap::{NoMemory, Unlimited};
+use crate::heap::NoMemory;
+
+use super::tracker::{
+    DEFAULT_ATTRIBUTE_SIZE, NAME_AND_DEFAULT_ATTRIBUTE_SIZE, Pool, TableShadow, Tracker,
+};
 use crate::siphash::SipKey;
 
 /// A namespace prefix (C: `PREFIX *`): the default (unnamed) prefix, or an
@@ -79,6 +83,10 @@ pub struct ElementType {
     /// `default_atts` of its first definition. C keeps a hash table whose
     /// slot order is never observable; a map gives the same lookups.
     pub default_att_for_name: BTreeMap<EntryId, usize>,
+    /// `allocDefaultAtts` (allocation tracker, D-030).
+    pub alloc_default_atts: usize,
+    /// The allocations of `defaultAttForName` (allocation tracker).
+    pub default_att_table: TableShadow,
 }
 
 /// `ENTITY` (without the name, which is the table key).
@@ -178,8 +186,8 @@ pub struct Dtd {
 }
 
 /// `sizeof(PREFIX)`, `sizeof(ATTRIBUTE_ID)`, `sizeof(ELEMENT_TYPE)`: the
-/// `createSize` of a table entry. The parser does not account allocations
-/// beyond the pools and tables yet (D-023), so only the tables see these.
+/// `createSize` of a table entry, charged to the allocation tracker
+/// (D-030).
 const PREFIX_SIZE: usize = 2 * crate::heap::POINTER_SIZE;
 const ATTRIBUTE_ID_SIZE: usize = 3 * crate::heap::POINTER_SIZE;
 const ELEMENT_TYPE_SIZE: usize = 12 * crate::heap::POINTER_SIZE;
@@ -255,11 +263,22 @@ impl Dtd {
         self.bindings.get(b.0)
     }
 
-    /// `lookup(parser, &dtd->prefixes, name, sizeof(PREFIX))`.
-    pub fn lookup_prefix(&mut self, salt: &SipKey, name: &[u8]) -> Result<PrefixId, NoMemory> {
-        let (id, _) =
+    /// `lookup(parser, &dtd->prefixes, name, sizeof(PREFIX))`, with the
+    /// name built in `dtd->pool` first (kept when the prefix is new).
+    pub fn lookup_prefix(
+        &mut self,
+        salt: &SipKey,
+        tr: &mut Tracker,
+        direct: u64,
+        name: &[u8],
+    ) -> Result<PrefixId, NoMemory> {
+        tr.store_discard(Pool::Dtd, name.len(), direct)?;
+        let (id, l) =
             self.prefixes
-                .lookup_or_insert(salt, &mut Unlimited, name, PREFIX_SIZE, Prefix::default)?;
+                .lookup_or_insert(salt, &mut tr.heap(direct), name, PREFIX_SIZE, Prefix::default)?;
+        if l == Lookup::Inserted {
+            tr.store(Pool::Dtd, name.len(), direct)?;
+        }
         Ok(PrefixId::Named(id))
     }
 
@@ -269,50 +288,78 @@ impl Dtd {
     pub fn element_type_for_content(
         &mut self,
         salt: &SipKey,
+        tr: &mut Tracker,
+        direct: u64,
         ns: bool,
         name: &[u8],
     ) -> Result<EntryId, NoMemory> {
         if let Some(id) = self.element_types.find(salt, name) {
             return Ok(id);
         }
+        // `poolCopyString(&dtd->pool, tagNamePtr->str)`
+        tr.store(Pool::Dtd, name.len(), direct)?;
         let (id, _) = self.element_types.lookup_or_insert(
             salt,
-            &mut Unlimited,
+            &mut tr.heap(direct),
             name,
             ELEMENT_TYPE_SIZE,
             ElementType::default,
         )?;
         if ns {
-            self.set_element_type_prefix(salt, id, name)?;
+            self.set_element_type_prefix(salt, tr, direct, id, name)?;
         }
         Ok(id)
     }
 
     /// `getElementType`: the element type `name`, created (with
     /// `setElementTypePrefix` when namespace processing is on) if new.
-    pub fn element_type(&mut self, salt: &SipKey, ns: bool, name: &[u8]) -> Result<EntryId, NoMemory> {
+    pub fn element_type(
+        &mut self,
+        salt: &SipKey,
+        tr: &mut Tracker,
+        direct: u64,
+        ns: bool,
+        name: &[u8],
+    ) -> Result<EntryId, NoMemory> {
+        // `poolStoreString(&dtd->pool, ...)`, discarded for a known name.
+        tr.store_discard(Pool::Dtd, name.len(), direct)?;
         let (id, l) = self.element_types.lookup_or_insert(
             salt,
-            &mut Unlimited,
+            &mut tr.heap(direct),
             name,
             ELEMENT_TYPE_SIZE,
             ElementType::default,
         )?;
-        if l == Lookup::Inserted && ns {
-            self.set_element_type_prefix(salt, id, name)?;
+        if l == Lookup::Inserted {
+            tr.store(Pool::Dtd, name.len(), direct)?;
+            if ns {
+                self.set_element_type_prefix(salt, tr, direct, id, name)?;
+            }
         }
         Ok(id)
     }
 
     /// `lookup(parser, table, name, sizeof(ENTITY))`: the entity `name`
     /// and whether it was created by this call (C: `entity->name == name`).
-    pub fn declare_entity(&mut self, salt: &SipKey, is_param: bool, name: &[u8]) -> Result<(EntityRef, bool), NoMemory> {
+    pub fn declare_entity(
+        &mut self,
+        salt: &SipKey,
+        tr: &mut Tracker,
+        direct: u64,
+        is_param: bool,
+        name: &[u8],
+    ) -> Result<(EntityRef, bool), NoMemory> {
         let table = if is_param {
             &mut self.param_entities
         } else {
             &mut self.general_entities
         };
-        let (id, l) = table.lookup_or_insert(salt, &mut Unlimited, name, ENTITY_SIZE, Entity::default)?;
+        // `poolStoreString(&dtd->pool, ...)`, discarded for a known name.
+        tr.store_discard(Pool::Dtd, name.len(), direct)?;
+        let (id, l) = table.lookup_or_insert(salt, &mut tr.heap(direct), name, ENTITY_SIZE, Entity::default)?;
+        if l == Lookup::Inserted {
+            tr.store(Pool::Dtd, name.len(), direct)?;
+        }
         let r = if is_param {
             EntityRef::Param(id)
         } else {
@@ -349,20 +396,56 @@ impl Dtd {
     /// `defineAttribute`: adds a declaration of the attribute `att` to the
     /// element type `et` (`value`: its default, `None` for `#IMPLIED` and
     /// `#REQUIRED`).
-    pub fn define_attribute(&mut self, et: EntryId, att: EntryId, is_cdata: bool, is_id: bool, value: Option<Vec<u8>>) {
+    /// The arrays it grows are charged to `tr`; `Err` when the tracker
+    /// refuses (C: `defineAttribute` returns 0, `XML_ERROR_NO_MEMORY`).
+    #[allow(clippy::too_many_arguments)] // reason: mirrors defineAttribute plus the tracker.
+    pub fn define_attribute(
+        &mut self,
+        tr: &mut Tracker,
+        direct: u64,
+        et: EntryId,
+        att: EntryId,
+        is_cdata: bool,
+        is_id: bool,
+        value: Option<Vec<u8>>,
+    ) -> Result<(), NoMemory> {
         let att_xmlns = self.attribute_ids.value(att).is_some_and(|a| a.xmlns);
         let Some(t) = self.element_types.value_mut(et) else {
-            return;
+            return Ok(());
         };
         if value.is_some() || is_id {
             // The handling of default attributes gets messed up if we have
             // a default which duplicates a non-default.
             if t.default_att_for_name.contains_key(&att) {
-                return;
+                return Ok(());
             }
             if is_id && t.id_att.is_none() && !att_xmlns {
                 t.id_att = Some(att);
             }
+        }
+        if t.default_atts.len() == t.alloc_default_atts {
+            let count = if t.alloc_default_atts == 0 {
+                8
+            } else {
+                t.alloc_default_atts.saturating_mul(2)
+            };
+            let ok = if t.alloc_default_atts == 0 {
+                tr.t.alloc(count * DEFAULT_ATTRIBUTE_SIZE, direct)
+            } else {
+                tr.t.realloc(
+                    t.alloc_default_atts * DEFAULT_ATTRIBUTE_SIZE,
+                    count * DEFAULT_ATTRIBUTE_SIZE,
+                    direct,
+                )
+            };
+            if !ok {
+                return Err(NoMemory);
+            }
+            t.alloc_default_atts = count;
+        }
+        if !t.default_att_for_name.contains_key(&att) {
+            t.default_att_table
+                .insert(&mut tr.heap(direct), NAME_AND_DEFAULT_ATTRIBUTE_SIZE)?;
         }
         let index = t.default_atts.len();
         t.default_atts.push(DefaultAttribute {
@@ -375,6 +458,7 @@ impl Dtd {
         if !is_cdata && let Some(a) = self.attribute_ids.value_mut(att) {
             a.maybe_tokenized = true;
         }
+        Ok(())
     }
 
     /// `setElementTypePrefix`: the prefix of a new element type is the part
@@ -382,11 +466,13 @@ impl Dtd {
     fn set_element_type_prefix(
         &mut self,
         salt: &SipKey,
+        tr: &mut Tracker,
+        direct: u64,
         id: EntryId,
         name: &[u8],
     ) -> Result<(), NoMemory> {
         if let Some(colon) = name.iter().position(|&c| c == b':') {
-            let prefix = self.lookup_prefix(salt, name.get(..colon).unwrap_or_default())?;
+            let prefix = self.lookup_prefix(salt, tr, direct, name.get(..colon).unwrap_or_default())?;
             if let Some(et) = self.element_types.value_mut(id) {
                 et.prefix = Some(prefix);
             }
@@ -395,24 +481,38 @@ impl Dtd {
     }
 
     /// `getAttributeId` for the (already converted) name `name`.
-    pub fn attribute_id(&mut self, salt: &SipKey, ns: bool, name: &[u8]) -> Result<EntryId, NoMemory> {
+    pub fn attribute_id(
+        &mut self,
+        salt: &SipKey,
+        tr: &mut Tracker,
+        direct: u64,
+        ns: bool,
+        name: &[u8],
+    ) -> Result<EntryId, NoMemory> {
+        // The flag character, the name and a NUL in `dtd->pool`, discarded
+        // for a known name.
+        tr.store_discard(Pool::Dtd, name.len() + 1, direct)?;
         let (id, l) = self.attribute_ids.lookup_or_insert(
             salt,
-            &mut Unlimited,
+            &mut tr.heap(direct),
             name,
             ATTRIBUTE_ID_SIZE,
             AttributeId::default,
         )?;
-        if l == Lookup::Found || !ns {
+        if l == Lookup::Found {
+            return Ok(id);
+        }
+        tr.store(Pool::Dtd, name.len() + 1, direct)?;
+        if !ns {
             return Ok(id);
         }
         let prefix = if name == b"xmlns" {
             Some((PrefixId::Default, true))
         } else if let Some(rest) = name.strip_prefix(b"xmlns:") {
-            Some((self.lookup_prefix(salt, rest)?, true))
+            Some((self.lookup_prefix(salt, tr, direct, rest)?, true))
         } else if let Some(colon) = name.iter().position(|&c| c == b':') {
             // Attributes without a prefix are *not* in the default namespace.
-            Some((self.lookup_prefix(salt, name.get(..colon).unwrap_or_default())?, false))
+            Some((self.lookup_prefix(salt, tr, direct, name.get(..colon).unwrap_or_default())?, false))
         } else {
             None
         };
@@ -435,15 +535,25 @@ impl Dtd {
         }
     }
 
-    /// Takes a binding from the free list or allocates a new one.
-    pub fn new_binding(&mut self, b: Binding) -> BindingId {
+    /// Takes a binding from the free list or allocates a new one; the
+    /// flag is true for a binding from the free list.
+    pub fn new_binding(&mut self, b: Binding) -> (BindingId, bool) {
         if let Some(id) = self.free_bindings.pop()
             && let Some(slot) = self.bindings.get_mut(id.0)
         {
             *slot = b;
-            return id;
+            return (id, true);
         }
         self.bindings.push(b);
-        BindingId(self.bindings.len().wrapping_sub(1))
+        (BindingId(self.bindings.len().wrapping_sub(1)), false)
+    }
+
+    /// The binding the next [`Dtd::new_binding`] returns, and whether it
+    /// comes from the free list.
+    pub fn next_binding(&self) -> (BindingId, bool) {
+        match self.free_bindings.last() {
+            Some(&id) if id.0 < self.bindings.len() => (id, true),
+            _ => (BindingId(self.bindings.len()), false),
+        }
     }
 }

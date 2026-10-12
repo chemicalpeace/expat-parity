@@ -22,6 +22,7 @@ use super::accounting::Account;
 use super::dtd::EntityRef;
 use super::error::{Stop, XmlError};
 use super::prolog::PrologDone;
+use super::tracker::{OPEN_ENTITY_SIZE, Pool};
 use super::{Handler, Parser, Parsing, Processor};
 use crate::tok::{Encoding, Normal, internal_encoding, prolog_tok};
 
@@ -114,6 +115,12 @@ impl Parser {
         }
         // C reuses a freed OPEN_INTERNAL_ENTITY or allocates one; the port
         // keeps the count of reusable ones (`m_freeEntities`).
+        if self.free_entities == 0 {
+            let direct = self.direct();
+            if !self.tracker.t.alloc(OPEN_ENTITY_SIZE, direct) {
+                return Err(XmlError::NoMemory.into());
+            }
+        }
         self.free_entities = self.free_entities.saturating_sub(1);
         if let Some(e) = self.dtd.entity_mut(r) {
             e.open = true;
@@ -288,6 +295,7 @@ impl Parser {
         in_prolog: bool,
     ) -> Result<alloc::vec::Vec<u8>, Stop> {
         let mut out = alloc::vec::Vec::new();
+        self.charged_len = 0;
         let doc = buf.get(..end).unwrap_or(buf);
         let mut next = ptr;
         loop {
@@ -336,6 +344,10 @@ impl Parser {
         if !is_cdata && out.last() == Some(&0x20) {
             out.pop();
         }
+        // `poolAppendChar(pool, '\0')`, then the caller's `poolFinish`.
+        let pool = if in_prolog { Pool::Dtd } else { Pool::Temp };
+        self.charge_current(pool, out.len())?;
+        self.finish_current(pool, true, true)?;
         Ok(out)
     }
 

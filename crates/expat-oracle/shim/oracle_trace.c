@@ -62,6 +62,20 @@ size_t
 oracle_last_heap_peak(void) {
   return heap_peak;
 }
+
+/* Allocation tracker readouts of the calling thread's last parse
+   (module 11c): the tracker's live byte count after XML_ParserCreate and
+   the limit setters, and at the end of the parse (before
+   XML_ParserFree). */
+unsigned long long oracle_tracker_bytes(const void *parser); /* oracle_core.c */
+static ORACLE_TLS unsigned long long tracker_created;
+static ORACLE_TLS unsigned long long tracker_end;
+
+void
+oracle_last_tracker(unsigned long long *created, unsigned long long *end) {
+  *created = tracker_created;
+  *end = tracker_end;
+}
 #define HEAP_HDR 16
 
 static void *
@@ -548,6 +562,7 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
     buf_push(&t.out, "\n", 1);
   }
 
+  tracker_created = oracle_tracker_bytes(p);
   ctx.t = &t;
   ctx.p = p;
   XML_SetHashSalt16Bytes(p, ORACLE_HASH_SALT);
@@ -600,6 +615,7 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   buf_int(&t.out, (long long)XML_GetCurrentByteIndex64(p));
   buf_push(&t.out, "\n", 1);
 
+  tracker_end = oracle_tracker_bytes(p);
   XML_ParserFree(p);
   free(t.text.data);
   if (t.out.failed) {

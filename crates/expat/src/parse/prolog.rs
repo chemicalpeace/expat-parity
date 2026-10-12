@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 use super::accounting::Account;
 use super::dtd::PrefixId;
 use super::error::{Stop, XmlError};
+use super::tracker::Pool;
 use super::{Enc, Handler, ParamEntityParsing, Parser, Parsing, Processor};
 use crate::role::Role;
 use crate::tok::{
@@ -248,8 +249,8 @@ impl Parser {
                     self.content_processor(h, buf, s, next_ptr)?;
                     return Ok(PrologDone::Done);
                 }
-                Role::Pi => self.report_processing_instruction(h, enc, buf, s, next),
-                Role::Comment => self.report_comment(h, enc, buf, s, next),
+                Role::Pi => self.report_processing_instruction(h, enc, buf, s, next)?,
+                Role::Comment => self.report_comment(h, enc, buf, s, next)?,
                 Role::None | Role::DoctypeNone => {}
                 Role::Error => {
                     return Err(match t {
@@ -335,8 +336,33 @@ impl Parser {
                 )),
                 _ => None,
             };
+            // Both strings are stored in `m_temp2Pool` (cleared at the end
+            // of `processXmlDecl`).
+            let direct = self.direct();
+            let no_mem = |_| Stop::Error(XmlError::NoMemory);
+            if let Some(n) = &enc_name {
+                self.tracker.store(Pool::Temp2, n.len(), direct).map_err(no_mem)?;
+            }
+            if let Some(v) = &version {
+                self.tracker.store(Pool::Temp2, v.len(), direct).map_err(no_mem)?;
+            }
             h.xml_decl(version.as_deref(), enc_name.as_deref(), standalone);
         }
+        let stored = self.handlers.xml_decl && (d.encoding_name.is_some() || d.version.is_some());
+        let r = self.process_xml_decl_encoding(enc, buf, &d, stored);
+        self.tracker.temp2_pool.clear();
+        r
+    }
+
+    /// The encoding part of `processXmlDecl`; `stored`: the handler's
+    /// strings are in `m_temp2Pool`.
+    fn process_xml_decl_encoding<E: Encoding>(
+        &mut self,
+        enc: &E,
+        buf: &[u8],
+        d: &crate::tok::XmlDecl,
+        stored: bool,
+    ) -> Result<bool, Stop> {
         if self.protocol_encoding_name.is_some() {
             return Ok(false);
         }
@@ -356,7 +382,16 @@ impl Parser {
             // `findEncoding` returned the parser's own encoding.
             Some(FoundEncoding::Input) => Ok(false),
             Some(FoundEncoding::Unrecognized) | None => {
-                if d.encoding_name.is_some() {
+                if let Some(p) = d.encoding_name {
+                    if !(stored && self.handlers.xml_decl) {
+                        // `poolStoreString(&parser->m_temp2Pool, ...)` of
+                        // the name for `handleUnknownEncoding`.
+                        let n = name_length(enc, buf, p);
+                        let direct = self.direct();
+                        self.tracker
+                            .store(Pool::Temp2, n, direct)
+                            .map_err(|_| Stop::Error(XmlError::NoMemory))?;
+                    }
                     // handleUnknownEncoding without a handler (module 12).
                     self.event_ptr = d.encoding_name;
                     return Err(XmlError::UnknownEncoding.into());
@@ -369,7 +404,8 @@ impl Parser {
     /// `setContext(parser, implicitContext)`: binds the `xml` prefix.
     pub(crate) fn set_implicit_context<H: Handler>(&mut self, h: &mut H) -> bool {
         let salt = self.salt;
-        let Ok(prefix) = self.dtd.lookup_prefix(&salt, b"xml") else {
+        let direct = self.direct();
+        let Ok(prefix) = self.dtd.lookup_prefix(&salt, &mut self.tracker, direct, b"xml") else {
             return false;
         };
         let mut inherited = self.inherited_bindings;

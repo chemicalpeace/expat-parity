@@ -285,6 +285,27 @@ pub fn last_heap_peak() -> usize {
     unsafe { ffi::oracle_last_heap_peak() }
 }
 
+/// The allocation tracker's live byte count
+/// (`m_alloc_tracker.bytesAllocated`) during the calling thread's last
+/// [`parse_trace`]: after `XML_ParserCreate` and the limit setters, and at
+/// the end of the parse (module 11c).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct TrackerBytes {
+    /// After creation and the limit setters.
+    pub created: u64,
+    /// At the end of the parse, before `XML_ParserFree`.
+    pub end: u64,
+}
+
+/// [`TrackerBytes`] of the calling thread's last [`parse_trace`].
+pub fn last_tracker_bytes() -> TrackerBytes {
+    let mut t = TrackerBytes::default();
+    // SAFETY: both pointers are valid, distinct out-parameters; the shim
+    // only writes two thread-local values through them.
+    unsafe { ffi::oracle_last_tracker(&mut t.created, &mut t.end) };
+    t
+}
+
 /// Errors of the oracle wrapper itself (never of the parse being traced).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OracleError {
