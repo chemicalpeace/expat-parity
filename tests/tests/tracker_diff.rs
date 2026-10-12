@@ -114,7 +114,7 @@ fn setters_match_c() {
     for (amp, thr) in cases {
         let o = at(&base(), amp, thr);
         let r = tracker::run(doc, &o).unwrap();
-        let port = r.port.clone().unwrap();
+        let port = r.port.clone();
         // The setters' results are trace lines (`limit at-...`), so equal
         // traces mean equal acceptance; `(1.0, 0)` makes both fail at the
         // first allocation of the parse (nothing read directly yet).
@@ -307,8 +307,8 @@ fn threshold_boundary_sweep() {
                 let oo = at(&o, Some(1.0), Some(thr));
                 let r = tracker::run(&doc, &oo).ok()?;
                 match tracker::relation(&r, &oo) {
-                    Ok(Some(Relation::BothNoMemory)) => Some(true),
-                    Ok(Some(Relation::PortStricter)) => Some(false),
+                    Ok(Relation::BothNoMemory) => Some(true),
+                    Ok(Relation::PortStricter) => Some(false),
                     Ok(_) => Some(result_error_code(&r.c) == Some(NO_MEMORY)),
                     Err(e) => {
                         failures.push(format!("{name} thr={thr}: {e}"));
@@ -343,7 +343,7 @@ fn threshold_boundary_sweep() {
             // count it, it is the margin of D-030.
             let oo = at(&o, Some(1.0), Some(hi));
             if let Ok(r) = tracker::run(&doc, &oo)
-                && tracker::relation(&r, &oo) == Ok(Some(Relation::PortStricter))
+                && tracker::relation(&r, &oo) == Ok(Relation::PortStricter)
             {
                 stricter += 1;
             }
@@ -378,8 +378,8 @@ fn amplification_boundary_sweep() {
                 let oo = at(&o, Some(f), Some(0));
                 match tracker::run(&doc, &oo).map(|r| (tracker::relation(&r, &oo), r)) {
                     Ok((Ok(rel), r)) => {
-                        if rel == Some(Relation::BothNoMemory)
-                            || (rel == Some(Relation::Equal)
+                        if rel == Relation::BothNoMemory
+                            || (rel == Relation::Equal
                                 && result_error_code(&r.c) == Some(NO_MEMORY))
                         {
                             c_fail += 1;
@@ -426,7 +426,7 @@ fn tracker_only_attribute() {
     let o = base();
     let out = compare("tracker-only", &doc, &o, LARGE);
     let c_code = result_error_code(&out.c);
-    let p_code = out.port.as_deref().and_then(result_error_code);
+    let p_code = result_error_code(&out.port);
     eprintln!(
         "tracker-only attribute: input {} B, C code {c_code:?} tracker end {} heap peak {}, port code {p_code:?} tracker peak {} heap peak {}, {:?}",
         doc.len(),
@@ -442,11 +442,7 @@ fn tracker_only_attribute() {
     // raised, both parse it completely and equally.
     let relaxed = at(&o, Some(1000.0), None);
     let out = compare("tracker-relaxed", &doc, &relaxed, LARGE);
-    assert!(
-        out.equal(),
-        "{:?}",
-        first_difference(&out.c, out.port.as_deref().unwrap_or_default())
-    );
+    assert!(out.equal(), "{:?}", first_difference(&out.c, &out.port));
     assert_eq!(result_error_code(&out.c), Some(0));
     assert!(out.port_tracker.end >= out.c_tracker.end);
     // A threshold above the pool block: accepted by both.
@@ -473,7 +469,7 @@ fn attribute_expansion_sizes() {
         let doc = attribute_expansion(len, refs);
         let out = compare(&format!("attr-{len}x{refs}"), &doc, &o, LARGE);
         let c = result_error_code(&out.c);
-        let p = out.port.as_deref().and_then(result_error_code);
+        let p = result_error_code(&out.port);
         eprintln!(
             "attr {len}x{refs}: C {c:?} (tracker end {}), port {p:?} (tracker peak {})",
             out.c_tracker.end, out.port_tracker.peak

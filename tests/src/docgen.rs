@@ -748,3 +748,224 @@ pub fn entity_document(r: &mut Rng) -> Vec<u8> {
     }
     doc
 }
+
+/// External entities by system identifier: (system id, bytes).
+pub type ExternalEntities = Vec<(Vec<u8>, Vec<u8>)>;
+
+/// Separates a `parse_trace` fuzz input's document from the bodies of its
+/// external entities (module 11d, step D2; [`split_external_input`]).
+pub const EXTERNAL_MARKER: &[u8] = b"\x00\xEE\xEE\x00";
+
+/// The system identifiers a document declares (`SYSTEM 'x'` or
+/// `SYSTEM "x"`, ASCII spelling; NUL bytes are skipped so the ASCII of a
+/// UTF-16 document is found too), distinct, in order of appearance.
+pub fn system_ids(doc: &[u8]) -> Vec<Vec<u8>> {
+    let squeezed: Vec<u8> = doc.iter().copied().filter(|&b| b != 0).collect();
+    let doc = squeezed.as_slice();
+    let mut out: Vec<Vec<u8>> = Vec::new();
+    let mut i = 0;
+    while let Some(p) = doc
+        .get(i..)
+        .and_then(|rest| rest.windows(6).position(|w| w == b"SYSTEM"))
+    {
+        let mut j = i + p + 6;
+        while doc
+            .get(j)
+            .is_some_and(|c| matches!(c, b' ' | b'\t' | b'\r' | b'\n'))
+        {
+            j += 1;
+        }
+        if let Some(&q) = doc.get(j).filter(|&&q| q == b'\'' || q == b'"') {
+            let start = j + 1;
+            if let Some(len) = doc
+                .get(start..)
+                .and_then(|r| r.iter().position(|&c| c == q))
+            {
+                let id = doc.get(start..start + len).unwrap_or_default().to_vec();
+                if !out.contains(&id) {
+                    out.push(id);
+                }
+                j = start + len;
+            }
+        }
+        i = j.max(i + p + 6);
+    }
+    out
+}
+
+/// Splits a fuzz document at [`EXTERNAL_MARKER`]: the document, and the
+/// entity bodies (further marker-separated segments) assigned in order to
+/// the document's system identifiers ([`system_ids`]). `None` without a
+/// marker.
+pub fn split_external_input(data: &[u8]) -> Option<(&[u8], ExternalEntities)> {
+    let m = EXTERNAL_MARKER;
+    let at = data.windows(m.len()).position(|w| w == m)?;
+    let doc = data.get(..at)?;
+    let mut bodies = Vec::new();
+    let mut rest = data.get(at + m.len()..).unwrap_or_default();
+    loop {
+        match rest.windows(m.len()).position(|w| w == m) {
+            Some(p) => {
+                bodies.push(rest.get(..p).unwrap_or_default().to_vec());
+                rest = rest.get(p + m.len()..).unwrap_or_default();
+            }
+            None => {
+                bodies.push(rest.to_vec());
+                break;
+            }
+        }
+    }
+    let entities = system_ids(doc).into_iter().zip(bodies).collect();
+    Some((doc, entities))
+}
+
+/// Joins a document and entity bodies into a fuzz document
+/// ([`split_external_input`] is the inverse for the bodies of the
+/// document's system identifiers, in order).
+pub fn join_external_input(doc: &[u8], bodies: &[Vec<u8>]) -> Vec<u8> {
+    let mut out = doc.to_vec();
+    for b in bodies {
+        out.extend_from_slice(EXTERNAL_MARKER);
+        out.extend_from_slice(b);
+    }
+    if bodies.is_empty() {
+        out.extend_from_slice(EXTERNAL_MARKER);
+    }
+    out
+}
+
+/// A random fragment of an external general entity (content).
+fn external_content(r: &mut Rng, n: usize, out: &mut String) {
+    for _ in 0..1 + r.below(4) {
+        let s = match r.below(16) {
+            0 => "text ".to_string(),
+            1 => "<a x='1'>t</a>".to_string(),
+            2 => format!("&g{};", r.below(n)),
+            3 => "&e0;".to_string(),
+            4 => "<p:q xmlns:p='urn:p'/>".to_string(),
+            5 => "<q:z/>".to_string(),
+            6 => "<b>".to_string(),
+            7 => "</b>".to_string(),
+            8 => "<![CDATA[c]]>".to_string(),
+            9 => "<?pi d?><!--c-->".to_string(),
+            10 => "&#x41;&#66;".to_string(),
+            11 => "&undeclared;".to_string(),
+            12 => "<c a='&e0;'/>".to_string(),
+            13 => "\r\n".to_string(),
+            14 => "</r>".to_string(),
+            _ => "<d xmlns='urn:x'>&g0;</d>".to_string(),
+        };
+        out.push_str(&s);
+    }
+}
+
+/// A random fragment of an external parameter entity or external subset
+/// (declarations, conditional sections, references).
+fn external_decls(r: &mut Rng, n: usize, out: &mut String) {
+    for _ in 0..1 + r.below(4) {
+        let s = match r.below(20) {
+            0 => format!("<!ENTITY e{} 'from ext'>", r.below(3)),
+            1 => "<!ENTITY % q 'x'>".to_string(),
+            2 => format!("%p{};", r.below(n)),
+            3 => "<![INCLUDE[ <!ENTITY i 'inc'> ]]>".to_string(),
+            4 => "<![IGNORE[ <!ENTITY i 'ign'> <![ nested ]]> ]]>".to_string(),
+            5 => "<!ATTLIST r a CDATA 'd' b CDATA #IMPLIED>".to_string(),
+            6 => "<!ELEMENT r ANY>".to_string(),
+            7 => format!("<!ENTITY v '%p{};'>", r.below(n)),
+            8 => "<!ENTITY w 'a%q;b'>".to_string(),
+            9 => "<!ENTITY".to_string(),
+            10 => "<![INCLUDE[".to_string(),
+            11 => "]]>".to_string(),
+            12 => "<![%q;[ <!ENTITY j 'cond'> ]]>".to_string(),
+            13 => format!("<!ENTITY g{} SYSTEM 'g{}.xml'>", r.below(n), r.below(n)),
+            14 => "<!ENTITY u SYSTEM 'u' NDATA n><!NOTATION n SYSTEM 'n'>".to_string(),
+            15 => "<!-- c --><?pi?>".to_string(),
+            16 => "<![IGNORE[ unclosed".to_string(),
+            17 => format!("<!ENTITY % p{} SYSTEM 'p{}.ent'>", r.below(n), r.below(n)),
+            18 => "<r/>".to_string(),
+            _ => "<!ELEMENT a (#PCDATA|b)*>".to_string(),
+        };
+        out.push_str(&s);
+    }
+}
+
+/// A random document with external general and parameter entities and an
+/// optional external subset, with the bodies of its entities (by system
+/// identifier; some identifiers have no body, some bodies are damaged or
+/// encoded differently). Module 11d, step D2.
+pub fn external_case(r: &mut Rng) -> (Vec<u8>, ExternalEntities) {
+    let n = 1 + r.below(3);
+    let mut doc = String::new();
+    doc.push_str(r.pick(&[
+        "",
+        "",
+        "<?xml version='1.0'?>",
+        "<?xml version='1.0' standalone='yes'?>",
+        "<?xml version='1.0' standalone='no'?>",
+    ]));
+    doc.push_str("<!DOCTYPE r");
+    if r.one_in(2) {
+        doc.push_str(" SYSTEM 'sub.dtd'");
+    }
+    doc.push_str(" [<!ENTITY e0 'int'>");
+    for k in 0..n {
+        doc.push_str(&format!("<!ENTITY g{k} SYSTEM 'g{k}.xml'>"));
+        if r.one_in(2) {
+            doc.push_str(&format!("<!ENTITY % p{k} SYSTEM 'p{k}.ent'>"));
+        }
+    }
+    for _ in 0..r.below(3) {
+        doc.push_str(&format!("%p{};", r.below(n)));
+    }
+    if r.one_in(4) {
+        doc.push_str("<!ATTLIST r xmlns:q CDATA 'urn:q'>");
+    }
+    doc.push_str("]>");
+    doc.push_str(r.pick(&["<r>", "<r xmlns='urn:d' xmlns:p='urn:p'>", "<r a='1'>"]));
+    for _ in 0..1 + r.below(3) {
+        match r.below(4) {
+            0 => doc.push('x'),
+            1 => doc.push_str("<k/>"),
+            _ => doc.push_str(&format!("&g{};", r.below(n))),
+        }
+    }
+    doc.push_str("</r>");
+    let doc = encode(r, &doc);
+    let mut entities = Vec::new();
+    for id in system_ids(&doc) {
+        if r.one_in(8) {
+            continue;
+        }
+        let general = id.ends_with(b".xml");
+        let mut text = String::new();
+        text.push_str(r.pick(&[
+            "",
+            "",
+            "",
+            "<?xml encoding='UTF-8'?>",
+            "<?xml version='1.0' encoding='ISO-8859-1'?>",
+            "<?xml version='1.0'?>",
+            "<?xml standalone='yes' encoding='UTF-8'?>",
+        ]));
+        if general && !r.one_in(6) {
+            external_content(r, n, &mut text);
+        } else {
+            external_decls(r, n, &mut text);
+        }
+        let mut body = if text.starts_with("<?xml") || r.one_in(2) {
+            let mut v = Vec::new();
+            if r.one_in(5) {
+                v.extend_from_slice(b"\xEF\xBB\xBF");
+            }
+            v.extend_from_slice(text.as_bytes());
+            v
+        } else {
+            encode(r, &text)
+        };
+        if r.one_in(6) {
+            mutate(r, &mut body);
+        }
+        entities.push((id, body));
+    }
+    (doc, entities)
+}

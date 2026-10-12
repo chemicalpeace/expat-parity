@@ -188,12 +188,12 @@ pub struct Dtd {
 /// `sizeof(PREFIX)`, `sizeof(ATTRIBUTE_ID)`, `sizeof(ELEMENT_TYPE)`: the
 /// `createSize` of a table entry, charged to the allocation tracker
 /// (D-030).
-const PREFIX_SIZE: usize = 2 * crate::heap::POINTER_SIZE;
-const ATTRIBUTE_ID_SIZE: usize = 3 * crate::heap::POINTER_SIZE;
-const ELEMENT_TYPE_SIZE: usize = 12 * crate::heap::POINTER_SIZE;
+pub(crate) const PREFIX_SIZE: usize = 2 * crate::heap::POINTER_SIZE;
+pub(crate) const ATTRIBUTE_ID_SIZE: usize = 3 * crate::heap::POINTER_SIZE;
+pub(crate) const ELEMENT_TYPE_SIZE: usize = 12 * crate::heap::POINTER_SIZE;
 /// `sizeof(ENTITY)`: eight pointers and two `int`s, then four `bool`s,
 /// rounded up to the pointer alignment.
-const ENTITY_SIZE: usize = {
+pub(crate) const ENTITY_SIZE: usize = {
     let p = crate::heap::POINTER_SIZE;
     let raw = 6 * p + 8 + 4;
     raw.div_ceil(p) * p

@@ -1,0 +1,36 @@
+# libFuzzer log, trimmed: 273 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2907502665
+INFO: Loaded 1 modules   (75108 inline 8-bit counters): 75108 [0xaaaaba24c2f0, 0xaaaaba25e854), 
+INFO: Loaded 1 PC tables (75108 PCs): 75108 [0xaaaaba25e858,0xaaaaba383e98), 
+INFO:    27040 files found in <corpus>
+INFO: seed corpus: files: 27040 min: 1b max: 11931b total: 9380307b rss: 48Mb
+#8192	pulse  cov: 9643 ft: 30057 corp: 5538/78Kb exec/s: 4096 rss: 422Mb
+#16384	pulse  cov: 14851 ft: 53818 corp: 9473/366Kb exec/s: 2730 rss: 436Mb
+#27041	INITED cov: 17040 ft: 74922 corp: 13337/4110Kb exec/s: 730 rss: 529Mb
+#32768	pulse  cov: 17040 ft: 74924 corp: 13338/4110Kb lim: 11944 exec/s: 840 rss: 630Mb
+#65536	pulse  cov: 17041 ft: 74939 corp: 13350/4117Kb lim: 11996 exec/s: 1149 rss: 686Mb
+#116748	DONE   cov: 17053 ft: 75043 corp: 13383/4149Kb lim: 12035 exec/s: 1133 rss: 686Mb
+###### Recommended dictionary. ######
+"b4" # Uses: 1708
+"\000\000\000\001" # Uses: 1247
+"C\000\000\000\000\000\000\000" # Uses: 923
+"accounting " # Uses: 912
+"\000\356\356\000" # Uses: 796
+"\377\337\000 " # Uses: 561
+"\004\000" # Uses: 363
+"\000\026" # Uses: 341
+"\001\000" # Uses: 293
+"\001\000\000\000\000\000\000\020" # Uses: 163
+"B\000\000\000\000\000\000\000" # Uses: 167
+"comment" # Uses: 158
+###### End of recommended dictionary. ######
+Done 116748 runs in 103 second(s)
+stat::number_of_executed_units: 116748
+stat::average_exec_per_sec:     1133
+stat::new_units_added:          273
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              686

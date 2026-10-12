@@ -519,7 +519,7 @@ impl Parser {
                         // If we have a parent parser or are reading an
                         // internal parameter entity, then the entity
                         // declaration is not considered "internal".
-                        let is_internal = !self.in_internal_entity();
+                        let is_internal = !(self.is_child || self.in_internal_entity());
                         if let Some(e) = self.dtd.entity_mut(r) {
                             e.public_id = None;
                             e.is_param = is_param;
@@ -720,12 +720,19 @@ impl Parser {
             }
             // Only the default handler (public API) sees these.
             Role::EntityNone | Role::NotationNone | Role::AttlistNone | Role::ElementNone => {}
-            // Conditional sections and text declarations exist only in
-            // external parameter entities and the external subset, which
-            // are read through an external entity parser (module 12).
-            _ => {
+            // Handled by `doProlog` itself (XML and text declarations,
+            // instance start, PIs, comments, ignore sections, errors).
+            Role::XmlDecl
+            | Role::TextDecl
+            | Role::InstanceStart
+            | Role::Pi
+            | Role::Comment
+            | Role::None
+            | Role::DoctypeNone
+            | Role::Error
+            | Role::IgnoreSect => {
                 let _ = t;
-                return Err(Stop::DtdNotPorted);
+                return Err(XmlError::UnexpectedState.into());
             }
         }
         Ok(())
@@ -881,9 +888,7 @@ impl Parser {
             // XmlEntityValueTok doesn't always set the last arg.
             let mut next = r.next.unwrap_or(ptr);
             *next_out = next;
-            if !self
-                .accounting
-                .diff_tolerated(r.scan, next.saturating_sub(ptr), account)
+            if !self.diff_tolerated(r.scan, next.saturating_sub(ptr), account)
             {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
@@ -914,8 +919,18 @@ impl Parser {
                         }
                         if external {
                             // Read only by the external entity reference
-                            // handler; without one it is skipped.
-                            if !self.handlers.external_entity_ref || !self.external_param_entity(h, r, true)? {
+                            // handler; without one it is skipped. Its
+                            // parser appends to the value being built (C:
+                            // the shared `dtd->entityValuePool`).
+                            let read = if self.handlers.external_entity_ref {
+                                self.pending_value = core::mem::take(out);
+                                let read = self.external_param_entity(h, r, true);
+                                *out = core::mem::take(&mut self.pending_value);
+                                read?
+                            } else {
+                                false
+                            };
+                            if !read {
                                 self.dtd.keep_processing = self.dtd.standalone;
                             }
                             ptr = next;

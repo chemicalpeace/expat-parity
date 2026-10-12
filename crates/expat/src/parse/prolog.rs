@@ -68,7 +68,7 @@ impl Parser {
     /// `initializeEncoding`: the initial encoding for the name the
     /// application gave. An unknown name goes to `handleUnknownEncoding`,
     /// which without an unknown-encoding handler (module 12) fails.
-    fn initialize_encoding(&mut self) -> Result<(), Stop> {
+    pub(crate) fn initialize_encoding(&mut self) -> Result<(), Stop> {
         match InitEncoding::new(self.protocol_encoding_name.as_deref(), self.ns) {
             Some(init) => {
                 self.enc = Enc::Init(init);
@@ -235,15 +235,27 @@ impl Parser {
                 .prolog_state
                 .token_role(Scan::Token(t), enc, buf, s, next);
             if !matches!(role, Role::InstanceStart | Role::XmlDecl | Role::TextDecl)
-                && !self
-                    .accounting
-                    .diff_tolerated(Scan::Token(t), next - s, account)
+                && !self.diff_tolerated(Scan::Token(t), next - s, account)
             {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
             let mut rescan = false;
             match role {
-                Role::XmlDecl => rescan = self.process_xml_decl(h, enc, buf, s, next)?,
+                Role::XmlDecl => rescan = self.process_xml_decl(h, enc, buf, s, next, false)?,
+                // A text declaration of an external parameter entity or
+                // the external subset.
+                Role::TextDecl => rescan = self.process_xml_decl(h, enc, buf, s, next, true)?,
+                Role::IgnoreSect => {
+                    let mut start = Some(next);
+                    self.do_ignore_section(enc, buf, &mut start, next_ptr, have_more)?;
+                    match start {
+                        Some(n) => next = n,
+                        None => {
+                            self.processor = Processor::IgnoreSection;
+                            return Ok(PrologDone::Done);
+                        }
+                    }
+                }
                 Role::InstanceStart => {
                     // Without a document type declaration this is the last
                     // chance to read the foreign DTD (`xmlparse.c`
@@ -302,36 +314,37 @@ impl Parser {
         }
     }
 
-    /// `processXmlDecl(parser, 0, s, next)` for the document entity.
-    /// Returns whether the declaration switched the parser to another
-    /// encoding.
-    fn process_xml_decl<E: Encoding, H: Handler>(
+    /// `processXmlDecl(parser, isGeneralTextEntity, s, next)`: the XML
+    /// declaration of the document entity (`general_text == false`, also
+    /// used by C for the text declaration of an external parameter entity
+    /// read inside an entity value) or a text declaration. Returns whether
+    /// the declaration switched the parser to another encoding.
+    pub(crate) fn process_xml_decl<E: Encoding, H: Handler>(
         &mut self,
         h: &mut H,
         enc: &E,
         buf: &[u8],
         s: usize,
         next: usize,
+        general_text: bool,
     ) -> Result<bool, Stop> {
-        if !self
-            .accounting
-            .diff_tolerated(Scan::Token(Tok::XmlDecl), next - s, Account::Direct)
+        if !self.diff_tolerated(Scan::Token(Tok::XmlDecl), next - s, Account::Direct)
         {
             return Err(XmlError::AmplificationLimitBreach.into());
         }
-        let d = parse_xml_decl(false, enc, self.ns, buf, s, next);
+        let d = parse_xml_decl(general_text, enc, self.ns, buf, s, next);
         if !d.ok {
             if d.bad.is_some() {
                 self.event_ptr = d.bad;
             }
-            return Err(XmlError::XmlDecl.into());
+            return Err(if general_text { XmlError::TextDecl } else { XmlError::XmlDecl }.into());
         }
         let standalone = match d.standalone {
             None => -1,
             Some(false) => 0,
             Some(true) => 1,
         };
-        if standalone == 1 {
+        if !general_text && standalone == 1 {
             self.dtd.standalone = true;
             if self.param_entity_parsing == ParamEntityParsing::UnlessStandalone {
                 self.param_entity_parsing = ParamEntityParsing::Never;

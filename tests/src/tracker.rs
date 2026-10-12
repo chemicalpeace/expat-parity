@@ -17,7 +17,7 @@
 
 use expat_oracle::{Factor, ParseOptions, TrackerBytes};
 
-use crate::port::{PortTrace, PortTracker, last_port_tracker, port_trace};
+use crate::port::{PortTracker, last_port_tracker, port_trace};
 use crate::trace::{first_difference, mask_q4, result_error_code};
 
 /// `XML_ERROR_NO_MEMORY`.
@@ -40,8 +40,8 @@ pub enum Relation {
 pub struct Run {
     /// libexpat's trace.
     pub c: Vec<u8>,
-    /// The port's trace (`None`: unported part).
-    pub port: Option<Vec<u8>>,
+    /// The port's trace.
+    pub port: Vec<u8>,
     /// libexpat's tracker counts.
     pub c_tracker: TrackerBytes,
     /// The port's tracker counts.
@@ -52,10 +52,7 @@ pub struct Run {
 pub fn run(doc: &[u8], opts: &ParseOptions) -> Result<Run, String> {
     let c = expat_oracle::parse_trace(doc, opts).map_err(|e| format!("oracle shim: {e:?}"))?;
     let c_tracker = expat_oracle::last_tracker_bytes();
-    let port = match port_trace(doc, opts) {
-        PortTrace::Trace(t) => Some(t),
-        PortTrace::DtdNotPorted => None,
-    };
+    let port = port_trace(doc, opts);
     Ok(Run {
         c,
         port,
@@ -64,25 +61,34 @@ pub fn run(doc: &[u8], opts: &ParseOptions) -> Result<Run, String> {
     })
 }
 
+/// Whether a trace shows a refusal by the allocation tracker: the parse
+/// ended with `XML_ERROR_NO_MEMORY`, or an external entity parser did
+/// (`extend 0 1 ...`; the root then reports
+/// `XML_ERROR_EXTERNAL_ENTITY_HANDLING`), or one could not be created
+/// (`extcreate`, module 11d).
+pub fn refused(trace: &[u8]) -> bool {
+    result_error_code(trace) == Some(NO_MEMORY)
+        || trace
+            .split(|&b| b == b'\n')
+            .any(|l| l.starts_with(b"extend 0 1 ") || l == b"extcreate")
+}
+
 /// Classifies a run (`Err`: the relation is violated).
-pub fn relation(r: &Run, opts: &ParseOptions) -> Result<Option<Relation>, String> {
-    let Some(port) = &r.port else {
-        return Ok(None);
-    };
-    let (c, p) = mask_q4(&r.c, port);
+pub fn relation(r: &Run, opts: &ParseOptions) -> Result<Relation, String> {
+    let (c, p) = mask_q4(&r.c, &r.port);
     let Some((line, l, rl)) = first_difference(&c, &p) else {
-        return Ok(Some(Relation::Equal));
+        return Ok(Relation::Equal);
     };
-    let c_code = result_error_code(&c);
-    let p_code = result_error_code(&p);
+    let c_code = refused(&c).then_some(NO_MEMORY).or(result_error_code(&c));
+    let p_code = refused(&p).then_some(NO_MEMORY).or(result_error_code(&p));
     match (c_code, p_code) {
-        (Some(NO_MEMORY), Some(NO_MEMORY)) => Ok(Some(Relation::BothNoMemory)),
+        (Some(NO_MEMORY), Some(NO_MEMORY)) => Ok(Relation::BothNoMemory),
         (Some(NO_MEMORY), _) => Err(format!(
             "C stops with XML_ERROR_NO_MEMORY but the port does not \
              (line {line}: C `{l}` port `{rl}`; C tracker {:?}, port {:?}; {opts:?})",
             r.c_tracker, r.port_tracker
         )),
-        (_, Some(NO_MEMORY)) => Ok(Some(Relation::PortStricter)),
+        (_, Some(NO_MEMORY)) => Ok(Relation::PortStricter),
         _ => Err(format!(
             "trace mismatch at line {line}: C `{l}` port `{rl}` ({opts:?})"
         )),
@@ -119,11 +125,10 @@ pub fn check_from(
 ) -> Result<(), String> {
     tally.runs += 1;
     match relation(base, opts)? {
-        None => return Ok(()),
-        Some(Relation::Equal) => {}
+        Relation::Equal => {}
         // The caller's options may already set tracker limits.
-        Some(Relation::BothNoMemory) => tally.c_no_memory += 1,
-        Some(Relation::PortStricter) => {
+        Relation::BothNoMemory => tally.c_no_memory += 1,
+        Relation::PortStricter => {
             if opts.limits.at_threshold.is_none() && opts.limits.at_amplification.is_none() {
                 return Err(format!(
                     "the port refuses at the default tracker limits where C accepts ({opts:?})"
@@ -138,7 +143,7 @@ pub fn check_from(
             base.port_tracker.created, base.c_tracker.created
         ));
     }
-    if relation(base, opts)? == Some(Relation::Equal) {
+    if relation(base, opts)? == Relation::Equal {
         let margin = base.port_tracker.end as i64 - base.c_tracker.end as i64;
         if margin < 0 {
             return Err(format!(
@@ -155,12 +160,12 @@ pub fn check_from(
         let r = run(doc, &o)?;
         tally.runs += 1;
         match relation(&r, &o)? {
-            Some(Relation::BothNoMemory) => tally.c_no_memory += 1,
-            Some(Relation::PortStricter) => tally.port_stricter += 1,
-            Some(Relation::Equal) if result_error_code(&r.c) == Some(NO_MEMORY) => {
+            Relation::BothNoMemory => tally.c_no_memory += 1,
+            Relation::PortStricter => tally.port_stricter += 1,
+            Relation::Equal if refused(&r.c) => {
                 tally.c_no_memory += 1;
             }
-            Some(Relation::Equal) | None => {}
+            Relation::Equal => {}
         }
     }
     Ok(())

@@ -8,23 +8,36 @@
 //! [`seeds`] produces the seed inputs the corpora are regenerated from
 //! (`docs/FUZZING.md`); it is a pure function of a fixed seed.
 
-use crate::docgen::{Rng, document, dtd_document, entity_document};
-use crate::port::{PortTrace, port_trace};
+use crate::docgen::{
+    Rng, document, dtd_document, entity_document, external_case, join_external_input,
+};
+use crate::port::port_trace;
 use crate::trace::{first_difference, is_well_formed_trace, mask_q4};
 use crate::vectors::upstream;
 use expat_oracle::BufferOp;
 
 /// The `parse_trace` check: the first two bytes select the options
-/// ([`crate::options_from_selectors`]), the rest is the document. The C
-/// trace must be well formed and, unless the port stopped at a part that is
-/// not ported yet, equal to the port's trace; then the allocation-tracker
+/// ([`crate::options_from_selectors`]), the rest is the document. A
+/// document containing [`crate::docgen::EXTERNAL_MARKER`] is split into the
+/// document and the bodies of its external entities, which the test
+/// handler then reads (`ExtHandler::Read`, module 11d;
+/// [`crate::docgen::split_external_input`]). The C trace must be well
+/// formed and equal to the port's trace; then the allocation-tracker
 /// relation must hold ([`crate::tracker::check_from`]: two more runs with
 /// tight tracker limits). Inputs shorter than two bytes pass.
 pub fn parse_trace_case(data: &[u8]) -> Result<(), String> {
     let [sel, sel2, doc @ ..] = data else {
         return Ok(());
     };
-    let opts = crate::options_from_selectors(*sel, *sel2);
+    let mut opts = crate::options_from_selectors(*sel, *sel2);
+    let doc = match crate::docgen::split_external_input(doc) {
+        Some((d, entities)) => {
+            opts.ext_handler = expat_oracle::ExtHandler::Read;
+            opts.ext_entities = entities;
+            d
+        }
+        None => doc,
+    };
     let c = expat_oracle::parse_trace(doc, &opts).map_err(|e| format!("oracle shim: {e:?}"))?;
     let c_tracker = expat_oracle::last_tracker_bytes();
     if !is_well_formed_trace(&c) {
@@ -32,10 +45,8 @@ pub fn parse_trace_case(data: &[u8]) -> Result<(), String> {
     }
     let port = port_trace(doc, &opts);
     let port_tracker = crate::port::last_port_tracker();
-    if let PortTrace::Trace(rust) = &port
-        && let (c, rust) = mask_q4(&c, rust)
-        && let Some((line, l, r)) = first_difference(&c, &rust)
-    {
+    let (cm, rust) = mask_q4(&c, &port);
+    if let Some((line, l, r)) = first_difference(&cm, &rust) {
         return Err(format!(
             "trace mismatch at line {line}: C `{l}` port `{r}` ({opts:?})"
         ));
@@ -45,10 +56,7 @@ pub fn parse_trace_case(data: &[u8]) -> Result<(), String> {
     // limits).
     let base = crate::tracker::Run {
         c,
-        port: match port {
-            PortTrace::Trace(t) => Some(t),
-            PortTrace::DtdNotPorted => None,
-        },
+        port,
         c_tracker,
         port_tracker,
     };
@@ -98,26 +106,12 @@ pub fn buffer_diff_case(data: &[u8]) -> Result<(), String> {
     };
     let c = expat_oracle::buffer_run(doc, &ops, ns, deferral);
     let r = crate::port::buffer_run(doc, &ops, ns, deferral);
-    if stopped_at_dtd(&r) {
-        // The port stopped at a document type declaration
-        // (`Stop::DtdNotPorted`, module 11): nothing to compare yet, as
-        // in `parse_trace_case`.
-        return Ok(());
-    }
     if r != c {
         return Err(format!(
             "port and C differ for {ops:?}:\nport:\n{r}\nC:\n{c}"
         ));
     }
     Ok(())
-}
-
-/// True when a [`crate::port::buffer_run`] output reports
-/// `Stop::DtdNotPorted` (error code 999) after some operation.
-fn stopped_at_dtd(port_output: &str) -> bool {
-    port_output
-        .lines()
-        .any(|l| l.split(' ').nth(1) == Some("999"))
 }
 
 /// Fixed seed of [`seeds`]; changing it changes every seed input.
@@ -191,6 +185,24 @@ pub fn seeds(target: &str) -> Option<Vec<Vec<u8>>> {
                 let doc = entity_document(&mut r);
                 let mut input = vec![r.next_u64() as u8, r.next_u64() as u8 | 0x80];
                 input.extend_from_slice(&doc);
+                out.push(input);
+            }
+            // Module 11d: documents with external entities whose bodies
+            // follow the document (`docgen::join_external_input`), mostly
+            // with parameter entity parsing on, the last 300 with small
+            // billion-laughs limits.
+            for i in 0..1800 {
+                let (doc, entities) = external_case(&mut r);
+                let pep = [0u8, 1, 2, 2][r.below(4)] << 6;
+                let sel = (r.next_u64() as u8 & 0b111) | pep;
+                let sel2 = if i < 1500 {
+                    r.next_u64() as u8 & 0x7F
+                } else {
+                    r.next_u64() as u8 | 0x80
+                };
+                let bodies: Vec<Vec<u8>> = entities.into_iter().map(|(_, b)| b).collect();
+                let mut input = vec![sel, sel2];
+                input.extend_from_slice(&join_external_input(&doc, &bodies));
                 out.push(input);
             }
             Some(out)

@@ -15,11 +15,11 @@
 //! empty element), so which handlers are "set" is part of the parser
 //! configuration ([`HandlerSet`]) rather than of the handler object.
 //!
-//! Scope (Phase 3 module 10, `docs/STATE.md`): the prolog without a
-//! document type declaration, content, attributes, namespaces, CDATA
-//! sections and the epilog. A document type declaration stops the parser
-//! with [`Stop::DtdNotPorted`] (module 11). The application-facing API
-//! (`XML_StopParser`, the default handler, external entity parsers,
+//! Scope (`docs/STATE.md`): the prolog, the document type declaration with
+//! entities and the amplification limits (module 11), external entity
+//! parsers driven by the external entity reference handler (module 11d),
+//! content, attributes, namespaces, CDATA sections and the epilog. The
+//! application-facing API (`XML_StopParser`, the default handler,
 //! unknown-encoding handlers) is module 12.
 //!
 //! ```
@@ -54,6 +54,7 @@ mod decl;
 mod dtd;
 mod entity;
 mod error;
+mod external;
 mod model;
 mod prolog;
 mod tracker;
@@ -69,6 +70,7 @@ pub use dtd::{
 };
 pub use model::{ContentModel, ContentNode, ContentQuant, ContentType, Scaffold};
 pub use error::{Stop, XmlError};
+pub use external::{ExternalEntities, ExternalEntityParser};
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -196,11 +198,14 @@ pub trait Handler {
     fn skipped_entity(&mut self, _name: &[u8], _is_param: bool) {}
     /// `XML_ExternalEntityRefHandler`: `context` is `None` for parameter
     /// entities and the external subset, otherwise C's `getContext`
-    /// string. Returns `false` for `XML_STATUS_ERROR`, which stops the
-    /// parse with `XML_ERROR_EXTERNAL_ENTITY_HANDLING`. The default
-    /// refuses.
+    /// string. `parsers` creates the external entity parser
+    /// (`XML_ExternalEntityParserCreate`) that reads the entity's bytes,
+    /// which the handler supplies: the library never fetches anything.
+    /// Returns `false` for `XML_STATUS_ERROR`, which stops the parse with
+    /// `XML_ERROR_EXTERNAL_ENTITY_HANDLING`. The default refuses.
     fn external_entity_ref(
         &mut self,
+        _parsers: &mut ExternalEntities<'_>,
         _context: Option<&[u8]>,
         _base: Option<&[u8]>,
         _system_id: Option<&[u8]>,
@@ -309,6 +314,22 @@ pub(crate) enum Enc {
 pub(crate) enum Processor {
     PrologInit,
     Prolog,
+    /// `externalEntityInitProcessor`
+    ExternalEntityInit,
+    /// `externalEntityInitProcessor2`
+    ExternalEntityInit2,
+    /// `externalEntityInitProcessor3`
+    ExternalEntityInit3,
+    /// `externalParEntInitProcessor`
+    ExternalParEntInit,
+    /// `externalParEntProcessor`
+    ExternalParEnt,
+    /// `entityValueInitProcessor`
+    EntityValueInit,
+    /// `entityValueProcessor`
+    EntityValue,
+    /// `ignoreSectionProcessor`
+    IgnoreSection,
     Content,
     CdataSection,
     Epilog,
@@ -424,8 +445,17 @@ pub struct Parser {
     /// `m_useForeignDTD` (`XML_UseForeignDTD`, public API).
     pub(crate) use_foreign_dtd: bool,
     /// `m_isParamEntity`: this parser reads an external parameter entity
-    /// (external entity parsers, public API).
+    /// (an external entity parser created with a `NULL` context).
     pub(crate) is_param_entity: bool,
+    /// `m_parentParser != NULL`: this is an external entity parser. Its
+    /// accounting and allocation tracker are the root parser's (moved in
+    /// while it runs, [`ExternalEntityParser`]).
+    pub(crate) is_child: bool,
+    /// The entity value being built when an external parameter entity
+    /// referenced inside it is read (C appends to `dtd->entityValuePool`,
+    /// which the external entity parser shares); moved into the parameter
+    /// entity parser and back.
+    pub(crate) pending_value: Vec<u8>,
     /// `m_declEntity`
     pub(crate) decl_entity: Option<EntityRef>,
     /// `m_declNotationName`
@@ -519,6 +549,8 @@ impl Parser {
             doctype_pubid: None,
             use_foreign_dtd: false,
             is_param_entity: false,
+            is_child: false,
+            pending_value: Vec::new(),
             decl_entity: None,
             decl_notation_name: None,
             decl_notation_public_id: None,
@@ -577,9 +609,9 @@ impl Parser {
     /// `XML_SetBillionLaughsAttackProtectionMaximumAmplification`
     /// (`xmlparse.c` 3099-3124): `false`, and no change, for NaN or a value
     /// below 1.0. Allowed at any time, like C. (C also refuses it on an
-    /// external entity parser; the port has none yet.)
+    /// external entity parser, and so does the port.)
     pub fn set_billion_laughs_maximum_amplification(&mut self, factor: f32) -> bool {
-        if factor.is_nan() || factor < 1.0 {
+        if self.is_child || factor.is_nan() || factor < 1.0 {
             return false;
         }
         self.accounting.maximum_amplification_factor = factor;
@@ -589,6 +621,9 @@ impl Parser {
     /// `XML_SetBillionLaughsAttackProtectionActivationThreshold`
     /// (`xmlparse.c` 3126-3148): any value, at any time.
     pub fn set_billion_laughs_activation_threshold(&mut self, bytes: u64) -> bool {
+        if self.is_child {
+            return false;
+        }
         self.accounting.activation_threshold_bytes = bytes;
         true
     }
@@ -597,12 +632,18 @@ impl Parser {
     /// `false`, and no change, for NaN or a value below 1.0. Allowed at
     /// any time, like C.
     pub fn set_alloc_tracker_maximum_amplification(&mut self, factor: f32) -> bool {
+        if self.is_child {
+            return false;
+        }
         self.tracker.t.set_maximum_amplification(factor)
     }
 
     /// `XML_SetAllocTrackerActivationThreshold` (`xmlparse.c` 3178-3200):
     /// any value, at any time.
     pub fn set_alloc_tracker_activation_threshold(&mut self, bytes: u64) -> bool {
+        if self.is_child {
+            return false;
+        }
         self.tracker.t.set_activation_threshold(bytes)
     }
 
@@ -644,6 +685,18 @@ impl Parser {
         Ok(())
     }
 
+    /// `accountingDiffTolerated` for this parser: an external entity
+    /// parser's bytes are never direct (`isDirect` needs the root parser),
+    /// they count as indirect.
+    pub(crate) fn diff_tolerated(&mut self, tok: crate::tok::Scan, bytes: usize, account: Account) -> bool {
+        let account = if self.is_child && account == Account::Direct {
+            Account::EntityExpansion
+        } else {
+            account
+        };
+        self.accounting.diff_tolerated(tok, bytes, account)
+    }
+
     /// `countBytesDirect`, the denominator of both amplification checks.
     pub(crate) fn direct(&self) -> u64 {
         self.accounting.count_bytes_direct
@@ -654,7 +707,7 @@ impl Parser {
         self.reparse_deferral_enabled = enabled;
     }
 
-    /// `XML_GetErrorCode`, or [`Stop::DtdNotPorted`].
+    /// `XML_GetErrorCode`.
     pub fn error_code(&self) -> Stop {
         self.error_code
     }
@@ -754,6 +807,11 @@ impl Parser {
     /// `startParsing`: the implicit `xml` prefix binding when namespace
     /// processing is on (the salt is always set, see [`Parser::new`]).
     fn start_parsing<H: Handler>(&mut self, h: &mut H) -> bool {
+        // The implicit context is only set for the root parser; external
+        // entity parsers inherit it (C skips `startParsing` for them).
+        if self.is_child {
+            return true;
+        }
         if self.ns {
             return self.set_implicit_context(h);
         }
@@ -1033,6 +1091,14 @@ impl Parser {
         match self.processor {
             Processor::PrologInit => self.prolog_init_processor(h, buf, start, end_ptr),
             Processor::Prolog => self.prolog_processor(h, buf, start, end_ptr),
+            Processor::ExternalEntityInit => self.external_entity_init_processor(h, buf, start, end_ptr),
+            Processor::ExternalEntityInit2 => self.external_entity_init_processor2(h, buf, start, end_ptr),
+            Processor::ExternalEntityInit3 => self.external_entity_init_processor3(h, buf, start, end_ptr),
+            Processor::ExternalParEntInit => self.external_par_ent_init_processor(h, buf, start, end_ptr),
+            Processor::ExternalParEnt => self.external_par_ent_processor(h, buf, start, end_ptr),
+            Processor::EntityValueInit => self.entity_value_init_processor(h, buf, start, end_ptr),
+            Processor::EntityValue => self.entity_value_processor(h, buf, start, end_ptr),
+            Processor::IgnoreSection => self.ignore_section_processor(h, buf, start, end_ptr),
             Processor::Content => self.content_processor(h, buf, start, end_ptr),
             Processor::CdataSection => self.cdata_section_processor(h, buf, start, end_ptr),
             Processor::Epilog => self.epilog_processor(h, buf, start, end_ptr),

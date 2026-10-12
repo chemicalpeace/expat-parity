@@ -104,21 +104,13 @@ impl XmlError {
     }
 }
 
-/// Why the parser stopped: a libexpat error, or input that needs a part of
-/// the parser that is not ported yet.
-///
-/// [`Stop::DtdNotPorted`] is the documented boundary of Phase 3 module 10
-/// (`docs/STATE.md`): the processors of the document type declaration
-/// (`doProlog`'s DTD roles, entities, the external subset) are module 11.
-/// Until then the parser stops at the doctype name of a document entity
-/// instead of guessing; the differential harness counts such documents
-/// separately, so they are never compared as if they were supported.
+/// Why the parser stopped: a libexpat error. (Until module 11d it could
+/// also stop at a part of the DTD that was not ported yet; since external
+/// entity parsers exist every document is parsed to C's result.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Stop {
     /// A libexpat error code.
     Error(XmlError),
-    /// The document has a document type declaration (module 11).
-    DtdNotPorted,
 }
 
 impl From<XmlError> for Stop {

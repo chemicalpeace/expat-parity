@@ -38,7 +38,7 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | `doProlog` DTD roles, `storeEntityValue`, `defineAttribute`, `getElementType`, `nextScaffoldPart`, `build_model`, `normalizePublicId` (`xmlparse.c`) | `expat::parse` (`decl`, `model`, `dtd`) | module 11a |
 | `processEntity`, `internalEntityProcessor`, `storeAttributeValue`, `callStoreEntityValue`, the open-entity lists | `expat::parse` (`entity`) | module 11b |
 | `MALLOC_TRACKER`, `expat_heap_increase_tolerable`, `XML_SetAllocTracker*` | `expat::parse` (`tracker`) | module 11c |
-| External entity parsers, external subset (`XML_ExternalEntityParserCreate`, `externalEntityInitProcessor*`) | `expat::parse` | module 11d / 12 |
+| External entity parsers, external subset (`XML_ExternalEntityParserCreate`, `dtdCopy`, `setContext`, `externalEntityInitProcessor*`, `externalParEnt*Processor`, `entityValue*Processor`, `ignoreSectionProcessor`/`doIgnoreSection`) | `expat::parse` (`external`) | module 11d (D-031, D-032); public API module 12 |
 
 Internal modules are reachable from tests only through the `internal-api`
 feature (`expat::internal`), see DECISIONS D-006.
@@ -199,6 +199,10 @@ literal. A C `NULL` string is written as `~`. Integers are decimal.
 | `limit <name> <0\|1>` | only with `limits` set (module 11): first lines, one per setter called, in the order `bl-amplification`, `bl-threshold`, `at-amplification`, `at-threshold`, with the setter's `XML_Bool` |
 | `textdigest <len> <fnv1a64>` | instead of `text` when `text_digest` is set: length and FNV-1a 64 (16 lower-case hex digits) of the coalesced character data |
 | `accounting <direct> <indirect>` | only with `trace_accounting`: the billion-laughs counters of the root parser (`testingAccountingGetCountBytesDirect`/`Indirect`) after parsing, just before `result` (Q-4 in DIVERGENCES.md masks it in one known C defect) |
+| `extref <context> <base> <sysid> <pubid>` | the test `XML_ExternalEntityRefHandler` (module 11d, `ext_handler` set; context `~` for parameter entities and the external subset) |
+| `extend <ok> <code> <line> <column> <byte_index>` | `ExtHandler::Read` only: status, error and position of the external entity parser that read the entity (module 11d D2) |
+| `extdepth` / `extcreate` | `ExtHandler::Read` only: the harness's nesting cap (16 children) was reached / `XML_ExternalEntityParserCreate` returned NULL; the handler fails |
+| `notstandalone` | the test `XML_NotStandaloneHandler` (module 11d) |
 | `result <ok\|error> <error_code> <line> <column> <byte_index>` | always last: return status of the last `XML_Parse` call, `XML_GetErrorCode`, `XML_GetCurrentLineNumber64`, `XML_GetCurrentColumnNumber64`, `XML_GetCurrentByteIndex64` after parsing stops |
 
 ### Why these rules

@@ -70,11 +70,25 @@ struct oracle_options {
      XML_STATUS_ERROR; 2 the same handler returning XML_STATUS_OK without
      reading anything. not_standalone: 0 no XML_SetNotStandaloneHandler; 1
      a handler that traces "notstandalone" and returns 1; 2 the same,
-     returning 0. use_foreign_dtd: 1 calls XML_UseForeignDTD(p, XML_TRUE). */
+     returning 0. use_foreign_dtd: 1 calls XML_UseForeignDTD(p, XML_TRUE).
+     ext_handler 3 (step D2): after tracing, the handler looks the system
+     identifier up in ext_data (records: u32 LE length + system id, u32 LE
+     length + bytes) and, if found, reads the bytes from memory through
+     XML_ExternalEntityParserCreate(p, context, NULL), fed like the
+     document (chunk_size, buffer_api), traces
+     "extend <ok> <code> <line> <column> <byteindex>" for the child and
+     returns its status; not found: XML_STATUS_OK without reading. Nesting
+     is capped at ORACLE_EXT_MAX_DEPTH children ("extdepth", error);
+     a NULL from XML_ExternalEntityParserCreate traces "extcreate" and
+     fails. */
   int ext_handler;
   int not_standalone;
   int use_foreign_dtd;
+  const unsigned char *ext_data;
+  size_t ext_len;
 };
+
+#define ORACLE_EXT_MAX_DEPTH 16
 
 int oracle_type_table(int id, unsigned char out[256]);
 int oracle_ucs2_naming(int which, unsigned int hi, unsigned int lo);

@@ -1,0 +1,2 @@
+Ê?<!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 '&#x20;&e2;'><!ENTITY e0 'second'><!ENTITY e1 '&unp;a
+b&e3;'><!ENTITY e2 '&e1;&#x20;&#x20;&e3;'><!ENTITY e2 '<b>x</b><![CDATA[x<y]]>'><!ENTITY e4 '&e3;'><!ENTITY e4 'second'><!ENTITY % p0 '<!ENTITY e2 "from pe">'>%p0;%p1;<!ATTLIST r a CDATA "&e4;" t NMTOKENS "  &e2; x " f CDATA #FIXED "&amp;&e0;">]><r t=' &e0;  y '><c>&e0;</c>txt&e4;</r>

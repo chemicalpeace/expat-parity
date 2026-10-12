@@ -105,14 +105,19 @@ impl Parser {
         s: usize,
         next_ptr: &mut usize,
     ) -> Result<(), Stop> {
-        // The document entity reaches content only through a token scanned
-        // in a detected encoding; an initial encoding here would need
-        // `initScanContent`, which only external entities use (module 12).
-        let Enc::Known(k) = self.enc else {
-            return Err(XmlError::UnexpectedState.into());
-        };
+        // An external entity parser (`m_parentParser`) parses content at
+        // tag level 1 (`externalEntityContentProcessor` and
+        // `contentProcessor` alike; the account makes no difference there
+        // because none of its bytes are direct).
+        let start_tag_level = i32::from(self.is_child);
         let have_more = !self.final_buffer;
-        with_known!(k, e => self.do_content(h, e, 0, buf, s, next_ptr, have_more, Account::Direct))
+        let k = match self.enc {
+            Enc::Known(k) => k,
+            // Only an external entity can reach content before its
+            // encoding is known (an empty or very short entity).
+            Enc::Init(init) => return self.content_undecided(h, init, buf, s, next_ptr, have_more, start_tag_level),
+        };
+        with_known!(k, e => self.do_content(h, e, start_tag_level, buf, s, next_ptr, have_more, Account::Direct))
     }
 
     /// `cdataSectionProcessor`.
@@ -166,9 +171,7 @@ impl Parser {
             // C starts from `next = NULL`; a scanner that does not write it
             // only returns tokens that do not use it.
             let next = r.next.unwrap_or(s);
-            if !self
-                .accounting
-                .diff_tolerated(r.scan, next.saturating_sub(s), Account::Direct)
+            if !self.diff_tolerated(r.scan, next.saturating_sub(s), Account::Direct)
             {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
@@ -296,9 +299,7 @@ impl Parser {
                 }
                 _ => next,
             };
-            if !self
-                .accounting
-                .diff_tolerated(tok, account_after.saturating_sub(s), account)
+            if !self.diff_tolerated(tok, account_after.saturating_sub(s), account)
             {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
@@ -358,7 +359,7 @@ impl Parser {
                     if let Some(ch) = predefined_entity_name(enc, bytes(buf, 0, next - m), s + m) {
                         // Replacing 4-6 characters of input by 1 is no
                         // amplification, so C ignores the verdict.
-                        let _ = self.accounting.diff_tolerated(
+                        let _ = self.diff_tolerated(
                             tok,
                             1,
                             Account::EntityExpansion,
@@ -646,9 +647,7 @@ impl Parser {
             let r = cdata_section_tok(enc, buf, s);
             // In case of XML_TOK_NONE or XML_TOK_PARTIAL.
             let next = r.next.unwrap_or(s);
-            if !self
-                .accounting
-                .diff_tolerated(r.scan, next.saturating_sub(s), account)
+            if !self.diff_tolerated(r.scan, next.saturating_sub(s), account)
             {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
@@ -1198,9 +1197,7 @@ impl Parser {
             self.charge_current(pool, out.len())?;
             let r = attribute_value_tok(enc, buf, ptr);
             let mut next = r.next.unwrap_or(ptr);
-            if !self
-                .accounting
-                .diff_tolerated(r.scan, next.saturating_sub(ptr), account)
+            if !self.diff_tolerated(r.scan, next.saturating_sub(ptr), account)
             {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
@@ -1244,7 +1241,7 @@ impl Parser {
                     if let Some(ch) = predefined_entity_name(enc, bytes(buf, 0, next - m), ptr + m)
                     {
                         // No amplification: C records without checking.
-                        let _ = self.accounting.diff_tolerated(
+                        let _ = self.diff_tolerated(
                             r.scan,
                             1,
                             Account::EntityExpansion,

@@ -1,0 +1,45 @@
+# libFuzzer log, trimmed: 408 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3143773299
+INFO: Loaded 1 modules   (75108 inline 8-bit counters): 75108 [0xaaaad608c2f0, 0xaaaad609e854), 
+INFO: Loaded 1 PC tables (75108 PCs): 75108 [0xaaaad609e858,0xaaaad61c3e98), 
+INFO:    17387 files found in <corpus>
+INFO: seed corpus: files: 17387 min: 1b max: 30663b total: 5953052b rss: 44Mb
+#8192	pulse  cov: 9716 ft: 27950 corp: 6627/194Kb exec/s: 2730 rss: 420Mb
+#16384	pulse  cov: 12817 ft: 47751 corp: 10237/1055Kb exec/s: 2730 rss: 426Mb
+#17388	INITED cov: 12854 ft: 49957 corp: 10600/2624Kb exec/s: 2484 rss: 441Mb
+#32768	pulse  cov: 12854 ft: 49957 corp: 10600/2624Kb lim: 30789 exec/s: 3640 rss: 560Mb
+#65536	pulse  cov: 12854 ft: 49959 corp: 10601/2623Kb lim: 30971 exec/s: 5041 rss: 567Mb
+#131072	pulse  cov: 12856 ft: 49962 corp: 10604/2623Kb lim: 31349 exec/s: 5461 rss: 567Mb
+#262144	pulse  cov: 12856 ft: 49972 corp: 10611/2619Kb lim: 32063 exec/s: 5825 rss: 567Mb
+#524288	pulse  cov: 12856 ft: 50007 corp: 10633/2643Kb lim: 33602 exec/s: 6241 rss: 567Mb
+#638718	DONE   cov: 12856 ft: 50017 corp: 10637/2633Kb lim: 34307 exec/s: 6323 rss: 567Mb
+###### Recommended dictionary. ######
+"id" # Uses: 9167
+"vvvvvvfvvvvvvvvv" # Uses: 5852
+"\377\377\377\377\377\377\377\001" # Uses: 6272
+"8\000" # Uses: 5479
+"xmlns:" # Uses: 5438
+"\013\000" # Uses: 4610
+"d2" # Uses: 2808
+".\000" # Uses: 2709
+"d2:" # Uses: 2690
+"\377\377\377\001" # Uses: 2134
+"b3" # Uses: 1887
+"2\000" # Uses: 1752
+"d16" # Uses: 850
+"\002\000\000\000\000\000\000\000" # Uses: 793
+":\000" # Uses: 671
+"\213\017" # Uses: 486
+"b6" # Uses: 316
+"d8" # Uses: 187
+###### End of recommended dictionary. ######
+Done 638718 runs in 101 second(s)
+stat::number_of_executed_units: 638718
+stat::average_exec_per_sec:     6323
+stat::new_units_added:          408
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              567

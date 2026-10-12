@@ -27,7 +27,7 @@ use expat_oracle::ParseOptions;
 use expat_oracle::counting_alloc;
 pub use expat_oracle::counting_alloc::CountingAlloc;
 
-use crate::port::{PortTrace, port_trace};
+use crate::port::port_trace;
 
 /// The three bounds of one comparison.
 #[derive(Debug, Clone, Copy)]
@@ -58,8 +58,8 @@ impl Bounds {
 pub struct Outcome {
     /// libexpat's trace.
     pub c: Vec<u8>,
-    /// The port's trace (`None`: the port stopped with `DtdNotPorted`).
-    pub port: Option<Vec<u8>>,
+    /// The port's trace.
+    pub port: Vec<u8>,
     /// Peak live heap of the port parse, bytes.
     pub port_peak: usize,
     /// Peak live heap of the libexpat parser, bytes.
@@ -75,13 +75,8 @@ pub struct Outcome {
 impl Outcome {
     /// True if both traces are equal (after [`crate::trace::mask_q4`]).
     pub fn equal(&self) -> bool {
-        match &self.port {
-            Some(p) => {
-                let (c, p) = crate::trace::mask_q4(&self.c, p);
-                c == p
-            }
-            None => false,
-        }
+        let (c, p) = crate::trace::mask_q4(&self.c, &self.port);
+        c == p
     }
 }
 
@@ -126,10 +121,7 @@ pub fn compare(id: &str, doc: &[u8], opts: &ParseOptions, bounds: Bounds) -> Out
     match rx.recv_timeout(bounds.timeout) {
         Ok((Ok(c), port, c_peak, port_peak, elapsed, c_tracker, port_tracker)) => Outcome {
             c,
-            port: match port {
-                PortTrace::Trace(t) => Some(t),
-                PortTrace::DtdNotPorted => None,
-            },
+            port,
             port_peak,
             c_peak,
             elapsed,

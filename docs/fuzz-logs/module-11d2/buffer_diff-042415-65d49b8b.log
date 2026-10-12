@@ -1,0 +1,46 @@
+# libFuzzer log, trimmed: 521 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3860810916
+INFO: Loaded 1 modules   (75108 inline 8-bit counters): 75108 [0xaaaae245c2f0, 0xaaaae246e854), 
+INFO: Loaded 1 PC tables (75108 PCs): 75108 [0xaaaae246e858,0xaaaae2593e98), 
+INFO:    15485 files found in <corpus>
+INFO: seed corpus: files: 15485 min: 1b max: 30189b total: 4894185b rss: 42Mb
+#8192	pulse  cov: 10195 ft: 29747 corp: 6897/219Kb exec/s: 2730 rss: 418Mb
+#15486	INITED cov: 12834 ft: 49541 corp: 10482/2540Kb exec/s: 2212 rss: 434Mb
+#16384	pulse  cov: 12834 ft: 49541 corp: 10482/2540Kb lim: 30203 exec/s: 2340 rss: 475Mb
+#32768	pulse  cov: 12834 ft: 49542 corp: 10483/2540Kb lim: 30315 exec/s: 3640 rss: 593Mb
+#65536	pulse  cov: 12834 ft: 49545 corp: 10486/2541Kb lim: 30483 exec/s: 4681 rss: 593Mb
+#131072	pulse  cov: 12834 ft: 49549 corp: 10490/2540Kb lim: 30847 exec/s: 5461 rss: 593Mb
+#262144	pulse  cov: 12839 ft: 49607 corp: 10507/2572Kb lim: 31519 exec/s: 6096 rss: 593Mb
+#524288	pulse  cov: 12840 ft: 49661 corp: 10536/2631Kb lim: 32929 exec/s: 6472 rss: 593Mb
+#658165	DONE   cov: 12842 ft: 49689 corp: 10548/2656Kb lim: 33634 exec/s: 6516 rss: 593Mb
+###### Recommended dictionary. ######
+"d0" # Uses: 10269
+"b2" # Uses: 6373
+"\000\000\000\021" # Uses: 4974
+"\000\000\000\000\000\000\000\000" # Uses: 4790
+"\001\000\000\000\000\000\000@" # Uses: 4610
+"\177\217C\222\377\373\000\000" # Uses: 4007
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\345\251\266\347\231\266\347\230\266\347\231\266\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 2926
+"\377\377\377\377\377\377\377\377" # Uses: 3625
+".\000" # Uses: 2975
+"\377\377\377\377\377\377\377\015" # Uses: 2561
+"\000\327" # Uses: 1711
+"ar" # Uses: 1367
+"xm:lla" # Uses: 1275
+"d9" # Uses: 1034
+"\015\000" # Uses: 980
+"\000\000\000\000\000\000\000\015" # Uses: 601
+"vwvvvvvvvv" # Uses: 362
+"dv" # Uses: 352
+"\026\000" # Uses: 283
+###### End of recommended dictionary. ######
+Done 658165 runs in 101 second(s)
+stat::number_of_executed_units: 658165
+stat::average_exec_per_sec:     6516
+stat::new_units_added:          521
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              593

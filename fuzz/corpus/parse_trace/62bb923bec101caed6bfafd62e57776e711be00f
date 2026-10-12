@@ -1,0 +1,7 @@
+ž±ï»¿<!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!--dtd comment--><!ENTITY Ã© "line
+break
+andcr" >
+<!ATTLIST b xmlns:q NOTATION (n1|n2)ü "line
+break
+andcr	tab" id CDAT'&#x10000;' c CDATA #IMPLIED q:a NOTATION (n1|n2) #FIXED '&#x10000;'>]>
+<b p:a='urn:p'>&ext;&ext;</b>

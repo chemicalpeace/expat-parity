@@ -7,9 +7,9 @@
 //! The port's parser and the C oracle parse the document and their
 //! canonical traces must be equal (`expat_difftest::fuzzcase::parse_trace_case`,
 //! also run over the committed corpus by `tests/tests/fuzz_corpus.rs`).
-//! Documents with a document type declaration stop the port with
-//! `Stop::DtdNotPorted` until module 11; for those only the oracle's trace
-//! is checked for well-formedness.
+//! A document containing `expat_difftest::docgen::EXTERNAL_MARKER` carries
+//! the bodies of its external entities, which the test handler reads
+//! through external entity parsers (module 11d).
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;

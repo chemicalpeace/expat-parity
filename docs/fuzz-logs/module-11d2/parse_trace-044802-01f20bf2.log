@@ -1,0 +1,36 @@
+# libFuzzer log, trimmed: 344 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 144067584
+INFO: Loaded 1 modules   (75203 inline 8-bit counters): 75203 [0xaaaadb67c430, 0xaaaadb68e9f3), 
+INFO: Loaded 1 PC tables (75203 PCs): 75203 [0xaaaadb68e9f8,0xaaaadb7b4628), 
+INFO:    13900 files found in <corpus>
+INFO: seed corpus: files: 13900 min: 1b max: 11931b total: 4694872b rss: 42Mb
+#8192	pulse  cov: 12864 ft: 43494 corp: 7957/206Kb exec/s: 2730 rss: 422Mb
+#13901	INITED cov: 17095 ft: 75218 corp: 13363/4222Kb exec/s: 604 rss: 535Mb
+#16384	pulse  cov: 17095 ft: 75219 corp: 13364/4222Kb lim: 11944 exec/s: 682 rss: 549Mb
+#32768	pulse  cov: 17103 ft: 75239 corp: 13371/4225Kb lim: 11944 exec/s: 1057 rss: 635Mb
+#65536	pulse  cov: 17115 ft: 75285 corp: 13385/4245Kb lim: 11957 exec/s: 1310 rss: 635Mb
+#127165	DONE   cov: 17123 ft: 75342 corp: 13419/4256Kb lim: 12009 exec/s: 1259 rss: 635Mb
+###### Recommended dictionary. ######
+"\002\000" # Uses: 3411
+"extend 0 1 " # Uses: 1538
+"\001\000\000\000" # Uses: 1627
+"\000\000" # Uses: 1020
+"pi atmmmmmm" # Uses: 405
+"\000\000\000-" # Uses: 391
+"P7\014\330\324Q\000\000" # Uses: 316
+"\005\000" # Uses: 313
+"\002\000\000\000\000\000\000\000" # Uses: 288
+"\007\000\000\000\000\000\000\000" # Uses: 131
+"nsend" # Uses: 94
+"accounting " # Uses: 21
+###### End of recommended dictionary. ######
+Done 127165 runs in 101 second(s)
+stat::number_of_executed_units: 127165
+stat::average_exec_per_sec:     1259
+stat::new_units_added:          344
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              635

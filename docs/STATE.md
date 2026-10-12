@@ -10,18 +10,19 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   module 11 in progress: 11a (declarations, PR #6), 11b (internal entity
   expansion and recursion, PR #7), 11b2 (billion-laughs limits, PR #8) and
   11c (allocation tracker, D-030) done; 11d step D1 (external entity and
-  not-standalone test handlers, D-031) done; D2 (external entity parsers)
-  next.
-  `Stop::DtdNotPorted` remains only where an external entity parser would
-  be needed (D-023, D-027, D-028).
+  not-standalone test handlers, D-031) and step D2 (external entity
+  parsers, D-032) done. `Stop::DtdNotPorted` is removed: every document
+  parses to C's result. Next: DTD coverage (cargo-llvm-cov), then the
+  module 11 summary. DV-1 is pending the owner's decision.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
   tables, doc, deny), test on ubuntu-latest / macos-latest / windows-latest,
   Miri, fuzz smoke (60 s per target). Green on PR #1 (modules 1-5), PR #2
   (modules 6-7), PR #3 (module 8), PR #4 (module 9), PR #5 (module 10),
-  PR #6 (module 11a), PR #7 (module 11b), PR #8 (module 11b2) and the
-  module 11c PR before merge; see the PRs for the runs. Windows needed two
+  PR #6 (module 11a), PR #7 (module 11b), PR #8 (module 11b2), PR #9
+  (module 11c), PR #10 (module 11d D1) and the module 11d D2 PR before
+  merge; see the PRs for the runs. Windows needed two
   fixes in PR #1 (D-016, `.gitattributes`).
 
 ## Blockers
@@ -71,15 +72,16 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 7 | `tok` XML decl + encoding detection (`initScan`, Q-3) | `xmltok.c`, `xmltok_ns.c` | **done** — `tok::init`, `tok::xmldecl`; D-019; Q-3 resolved (replicate) |
 | 8 | `role` prolog state machine | `xmlrole.c` | **done** — `role::PrologState`, all 51 handlers; D-020 |
 | 9 | `pool` / `hash` / `heap`: string pool, hash table, allocation accounting | `xmlparse.c` | **done** — `StringPool`, `HashTable`, `Heap`; white-box vs C (block lists, slot layout, every allocation request, failure of each attempt); D-021 |
-| 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors under 11 option sets incl. namespace triplets, generated documents, fuzzing), buffer state white-box; D-023, D-025; Q-1/Q-2 resolved (replicate, D-024). DTD roles stop with `Stop::DtdNotPorted` |
-| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables); spec `docs/DTD-SECURITY.md`, D-026, D-027. **11b done** — internal entity expansion in content, attribute values, default values, parameter entities and entity values, recursion and nesting checks (`parse::entity`, D-028); 540/540 upstream vectors compared. **11b2 done** — billion-laughs setters, bounded amplification tests, Q-4 (D-029). **11c done** — allocation tracker charged at C's allocation points, never below C (`parse::tracker`, D-030, divergence DV-1). **11d D1 done** — external entity and not-standalone handler call sites, `getContext`, foreign DTD (D-031). Next: D2 external entity parsers |
+| 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors under 11 option sets incl. namespace triplets, generated documents, fuzzing), buffer state white-box; D-023, D-025; Q-1/Q-2 resolved (replicate, D-024). DTD roles stopped with `Stop::DtdNotPorted` until module 11 |
+| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables); spec `docs/DTD-SECURITY.md`, D-026, D-027. **11b done** — internal entity expansion in content, attribute values, default values, parameter entities and entity values, recursion and nesting checks (`parse::entity`, D-028); 540/540 upstream vectors compared. **11b2 done** — billion-laughs setters, bounded amplification tests, Q-4 (D-029). **11c done** — allocation tracker charged at C's allocation points, never below C (`parse::tracker`, D-030, divergence DV-1). **11d D1 done** — external entity and not-standalone handler call sites, `getContext`, foreign DTD (D-031). **11d D2 done** — external entity parsers (`parse::external`: text declarations, conditional sections, PEs in entity values, shared DTD/tracker/accounting, D-032); `Stop::DtdNotPorted` removed. Next: DTD coverage |
 | 12 | public API `expat::Parser` (default handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers, unknown-encoding handler, `XML_GetInputContext`, entropy for the salt) | — | not started (the trace adapter and differential `parse_trace` already exist, module 10) |
 | 13 | `expat-capi` (optional) | `expat.h` | not started |
 
 Fuzz targets: `parse_trace` (differential since module 10: port vs C by
-trace, documents with a DTD are skipped until module 11), `buffer_diff`
-(module 10: buffer state after every input call, white-box; DTD documents
-skipped until module 11). Every target's corpus is committed and versioned
+trace, including DTDs and, since module 11d, external entity bodies read
+through external entity parsers; also checks the allocation-tracker
+relation), `buffer_diff` (module 10: buffer state after every input call,
+white-box). Every target's corpus is committed and versioned
 (`docs/FUZZING.md`, D-025); `tests/tests/fuzz_corpus.rs` replays the
 `parse_trace` and `buffer_diff` corpora on every CI platform. Older targets: `leaf_diff`
 (modules 1-4), `tok_diff` (modules 5-7: all 12 built-in encodings and
@@ -91,9 +93,10 @@ with allocation failures, white-box).
 
 ## Next steps
 
-1. Module 11 remainder, one PR each: external entities through a test
-   handler in oracle and port, removing `Stop::DtdNotPorted` if possible
-   (11d); DTD coverage with cargo-llvm-cov.
+1. Module 11 remainder: DTD coverage with cargo-llvm-cov (per
+   `parse/{dtd,decl,model,entity,tracker,accounting,external}.rs`), a
+   summary table of all module 11 test groups in REPORT.md, the owner's
+   decision on DV-1.
 2. Module 12: public `expat::Parser` on top of `parse::Parser`: default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt

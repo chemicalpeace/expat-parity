@@ -619,13 +619,111 @@ working copy `inject-logs/d1`):
 | J4 | The foreign DTD is not offered when there is no doctype (`prolog.rs`) | `curated_external_cases_match_c` only (generated documents always have a doctype) |
 | J5 | The referenced entity is not marked open while the context is built (`entity.rs`) | all three tests |
 
+### Module 11d step D2 (external entity parsers): child parsers versus C
+
+Ported: `XML_ExternalEntityParserCreate` (`xmlparse.c` 1680-1863) as
+`parse::ExternalEntities::create` / `ExternalEntityParser` (`parse/external.rs`,
+D-032), `dtdCopy` for general entity parsers, `setContext` (7771-7840),
+`externalEntityInitProcessor` 1-3 (text declaration, then content at tag
+level 1), `externalParEntInitProcessor` / `externalParEntProcessor`,
+`entityValueInitProcessor` / `entityValueProcessor` (a parameter entity
+referenced in an entity value), `ignoreSectionProcessor` /
+`doIgnoreSection` (conditional sections), `processXmlDecl` in its
+text-declaration mode, and the sharing of the root parser's allocation
+tracker and billion-laughs accounting (`getRootParserOf`) with every child.
+`Stop::DtdNotPorted` is gone: every document now parses to C's result.
+The oracle's test handler mode `ExtHandler::Read` (and the port's) looks
+the system identifier up in an in-memory map, reads the bytes through an
+external entity parser fed like the document and traces
+`extend <ok> <code> <line> <column> <index>`; nesting is capped at 16
+children (`extdepth`), a refused creation traces `extcreate`. **The
+library never fetches anything.** All 540 upstream vectors are compared
+in full under every option set (none stops early any more).
+
+Local run (2026-10-12, aarch64 Linux, commit 01f20bf, `--release`):
+`cargo test -p expat-difftest --test external_parser_diff -- --nocapture`:
+
+| Group (test) | Pairs / runs | C behaviour | Security policy | Known divergences |
+|---|---|---|---|---|
+| Curated cases x matrix (`curated_external_parser_cases_match_c`) | 2,025 (75 documents x 27 option sets: 3 not-standalone modes x 3 PE-parsing modes x {whole, 1-byte + namespaces, 7-byte buffer API}) | General entities (text, elements, empty, BOM only, BOM + text declaration, text declarations with/without version, encoding, standalone, Latin-1, unknown encoding, late text declaration, unclosed/mismatched/parent-closing tags, invalid and partial characters, nesting, self/mutual recursion through the context string, namespaces inherited through the context, CDATA/PI/comment, unparsed and attribute references, UTF-16), external subsets and parameter entities (declarations, text declarations, BOM, INCLUDE/IGNORE incl. nested and PE keywords, unclosed sections, stray `]]>`, incomplete declarations, PE references inside declarations, nested and recursive PEs, PEs in entity values incl. character references, text declarations and tags, standalone yes/no, foreign DTD). Results 0 (1,020), 21 (660), 22 (219), 11 (72), 16 (27), 24 (27); 1,884 child parses, 18 distinct child results (e.g. 12 recursive reference 117, 13 async entity 54, 31 text declaration 72, 29 incomplete PE 36). | Same processors, same errors and positions in parent and child; a child shares the root's tracker and accounting; nothing is read by the library. | none |
+| Pinned behaviour (`pinned_external_parser_behaviour`) | 9 | Entity content appears in place (`extend 1 0 1 22 22`); recursion through the context string: child error 12; an end tag of the parent inside the entity: 13; a text declaration without encoding: 31; subset declarations used by the document; IGNORE skipped with nested brackets; a PE in an entity value inside the subset; a character reference there is an invalid token (4) for C's prolog scan while the declaration handler still sees the value stored so far; NEVER reads nothing and skips the undeclared entity. | Same. | none |
+| Nesting cap (`nesting_cap_matches_c`) | 6 (a chain of 20 external general entities x 3 PE modes x namespaces on/off) | The handler stops at 16 nested children (`extdepth` once, 16 `extend` lines); libexpat itself has no nesting limit for external entities, only the application's handler does. | Same; the cap is the harness's, as an application would set one. | none |
+| Generated documents (`generated_external_documents_match_c`) | 6,000 (`docgen::external_case`: random DTDs with random external entity bodies, handler, not-standalone and PE modes, namespaces, chunking, buffer API) | Results 0 (2,200), 21 (3,049), 22 (606), 11 (145); 4,205 child parses. | Same. | none |
+| Billion laughs across external entities (`billion_laughs_across_external_entities`) | 10 (5 shapes x {default limits, 4 KiB threshold + factor 100}) | Default limits accept all five: general 10^5 (11,111 child parsers, 87 ms), general 4^9 (87,381, 0.71 s), parameter 10^5 (11,111), 3^10 (29,524), 4^9 (87,381, 0.29 s), because every child's bytes are indirect but their total stays below the 8 MiB activation threshold. With a 4 KiB threshold the expansion stops with 43 inside a child after 120-692 child parsers and the parent ends with 21. C heap peak 38-94 KB. | Same results, positions and accounting counters; the port's tracker ends within 13,352 bytes above C's (asserted: never below C, at most one creation bound above) independent of the number of children. | none (see the fix below) |
+| Tracker relation (`tracker_relation_across_external_parsers`) | 4,725 (75 curated + 1,500 generated documents, 3 runs each) | C refuses in 3,150 tight runs. | Port refuses in all of them; 0 port-only refusals; smallest margin 13,312 bytes. | DV-1 (margin only) |
+| External subset growth (`tracker_keeps_external_subset_growth`) | 2 + relation (6 runs) | A subset declaring 3,000 entities: C's tracker ends at 429,020 bytes (the DTD growth stays charged to the root after the subset's parser is freed); C refuses in 4 tight runs. | Port 442,372; refuses in all 4; 0 port-only. | DV-1 (margin only) |
+
+All groups: 0 mismatches, 0 relation violations; whole file 1.4 s. The
+port's heap peak in the billion-laughs group (up to 16.9 MB) is the
+in-process trace buffer (10.3 MB of trace for 87,381 children); the C
+figure counts only the parser's heap.
+
+**Found and fixed while documenting** (commit 01f20bf): freeing an
+external parameter entity parser first released only its creation
+charge, so the structures it owned (its `m_tempPool` blocks, open-entity
+structures, ...) stayed charged to the root tracker. Measured, this was
+not a constant margin but about 1 KB per child parser: 11,111 nested PE
+parsers left 12.2 MB charged (C: 7.7 KB), and 87,381 left 67 MB, so the
+port stopped with `XML_ERROR_NO_MEMORY` at the default limits where C
+succeeds. The port now also releases what the child owns itself
+(`Tracker::own_bytes`: temporary pools, tags, bindings, `m_nsAtts`,
+`m_groupConnector`; plus open-entity structures and `m_atts` growth),
+keeping only the shared DTD's growth charged, as C does. The tracker no
+longer grows with the number of child parsers (87,381 PE parsers: C
+8,028, port 21,380), and the billion-laughs test asserts it.
+
+**Injected bugs** (2026-10-12, each reverted after the run, logs in the
+working copy `inject-logs/d2`):
+
+| # | Mutation | Detected by |
+|---|---|---|
+| E1 | A PE parser's DTD is not handed back to the parent | 5 of 7 tests |
+| E2 | Child bytes counted as direct instead of indirect (`mod.rs`) | `billion_laughs_across_external_entities` |
+| E3 | `setContext` does not mark the context's entities open | 6 of 7 tests |
+| E4 | `dtdCopy` drops default attributes | curated, generated, tracker relation |
+| E5 | The child's tag level does not start at 1 | 5 of 7 tests |
+| E6 | `doIgnoreSection` does not wait for more input at a partial token | curated, generated |
+| E7 | A text declaration parsed as an XML declaration | 4 of 7 tests |
+| E8 | The child's tracker count is not returned to the root | first **not** detected; `tracker_keeps_external_subset_growth` was added and catches it |
+| E9 | `paramEntityRead` not set after a PE was read | curated, generated, tracker relation |
+| E10 | The entity-value prefix is not passed to the PE parser | 4 of 7 tests |
+| E11 | A BOM at the end of the buffer does not wait for more input | generated |
+| E12 | A PE parser's own structures are not released when it is freed (the bug fixed above) | `billion_laughs_across_external_entities` |
+| E13 | Its open-entity structures are not released | `billion_laughs_across_external_entities` |
+| E14 | Over-release: three times its own structures plus 16 KiB | tracker relation, subset growth, billion laughs |
+
+Two further E11 variants (an undecided partial character or token
+accepted at the end of an entity) were not detected; analysis showed that
+`initScan` can never return those cases there, so the branches were
+removed (`content_undecided` keeps only the cases `initScan` can return)
+instead of being tested.
+
+**Fuzzing** (`parse_trace`: inputs with `EXTERNAL_MARKER` carry entity
+bodies read through external entity parsers, 2,300 such inputs in the
+working corpus; `buffer_diff` because the parser's DTD paths changed; it
+sets no external entity handler). From the trimmed logs in
+`docs/fuzz-logs/module-11d2/` (strictly sequential slices):
+
+| Target | Commit | Slices | Seconds | Executions | Findings |
+|---|---|---|---|---|---|
+| `parse_trace` | 65d49b8 | 7 | 681 | 986,184 | none (coverage 16,789 -> 17,053 edges) |
+| `buffer_diff` | 65d49b8 | 7 | 702 | 4,596,334 | none (coverage 12,825 -> 12,856 edges) |
+| `parse_trace` | 01f20bf (after the fix above) | 6 | 607 | 795,960 | none (coverage 17,071 -> 17,177 edges) |
+
+`buffer_diff` was not re-run after 01f20bf: the fix changes only the
+freeing of external parameter entity parsers, which that target never
+creates. Merged corpora: `parse_trace` 13,869 files, `buffer_diff` 10,766
+files (docs/FUZZING.md), scanned for personal data (no hits).
+
 ## Divergences
 
 `docs/DIVERGENCES.md`. One divergence: DV-1 (module 11c, D-030), the
 allocation tracker may refuse (`XML_ERROR_NO_MEMORY`) slightly earlier
 than C, within the margin by which its charge exceeds C's count; it is
-fail-closed and was observed only with caller-tightened limits. No other
-divergence in parse results. Four C quirks found
+fail-closed and was observed only with caller-tightened limits; its
+status is **pending the owner's decision** (DIVERGENCES.md). External
+entity parsers (module 11d) keep the same margin, independent of the
+number of child parsers. No other divergence in parse results. Four C quirks found
 by the harness: Q-3 resolved as "replicate" (module 7; the input violates
 XML 1.0 §4.3.3), Q-1 and Q-2 resolved as "replicate" (module 10, D-024),
 Q-4 (module 11b2, D-029: undefined behaviour in C's epilog accounting that
@@ -641,12 +739,12 @@ comparisons start when the parser exists.
 ## Limitations
 
 - No public parser API yet (module 12): no default handler,
-  `XML_StopParser`/`XML_ResumeParser`, external entity parsers,
-  unknown-encoding handler or `XML_GetInputContext`.
-- After module 11b the port stops with `Stop::DtdNotPorted` (never a
-  guessed error) only where an external entity parser would be needed
-  (external subset or external parameter entity with a handler); all 540
-  upstream vectors are compared under every option set.
+  `XML_StopParser`/`XML_ResumeParser`, unknown-encoding handler or
+  `XML_GetInputContext`. External entity parsers exist inside
+  `expat::parse` (module 11d) but not yet behind a public API.
+- `Stop::DtdNotPorted` no longer exists (module 11d): every document
+  parses to C's result; all 540 upstream vectors are compared under every
+  option set.
 - The allocation tracker is not byte-identical to C: the port charges at
   least C's bytes, no later (D-030), so it can refuse slightly earlier
   (DV-1). The input buffer is not tracked, as in C.

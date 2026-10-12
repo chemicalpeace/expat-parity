@@ -7,7 +7,7 @@
 use std::fmt::Write as _;
 
 /// Event tags that may start a trace line.
-pub const TAGS: [&str; 21] = [
+pub const TAGS: [&str; 26] = [
     "xmldecl",
     "doctype",
     "enddoctype",
@@ -29,6 +29,11 @@ pub const TAGS: [&str; 21] = [
     "textdigest",
     "limit",
     "accounting",
+    "extref",
+    "notstandalone",
+    "extend",
+    "extdepth",
+    "extcreate",
 ];
 
 /// FNV-1a 64 offset basis (`textdigest` lines).
@@ -219,6 +224,12 @@ impl TraceWriter {
         public_id: Option<&[u8]>,
     ) {
         self.line("extref", &[context, base, system_id, public_id], &[]);
+    }
+
+    /// A line of the shim's test handlers with only integer fields
+    /// (`extend`, `extdepth`, `extcreate`; module 11d).
+    pub fn raw_line(&mut self, tag: &str, ints: &[i64]) {
+        self.line(tag, &[], ints);
     }
 
     /// The shim's test `XML_NotStandaloneHandler` (module 11d).
