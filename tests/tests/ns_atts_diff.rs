@@ -31,6 +31,8 @@ fn sizes() -> Vec<usize> {
         p *= 2;
     }
     v.push(1100);
+    v.sort_unstable();
+    v.dedup();
     v
 }
 
@@ -151,6 +153,11 @@ fn ns_atts_growth_matches_c() {
         .count()
         + 1;
     assert_eq!(duplicates, with_dup * ns_sets, "{compared} compared");
+    eprintln!(
+        "{} documents x {} option sets = {compared} comparisons, {duplicates} duplicate errors",
+        docs.len(),
+        sets.len()
+    );
 }
 
 /// Threshold sweep (amplification 1.0) on the largest tags: every
@@ -217,6 +224,7 @@ fn ns_atts_tracker_relation() {
         failures.len(),
         failures.first().map_or("", String::as_str)
     );
+    eprintln!("tracker relation: C refused {c_refusals} times, the port each time");
     assert!(c_refusals > 50, "C refused only {c_refusals} times");
 }
 

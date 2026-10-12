@@ -941,7 +941,9 @@ reproduces on aarch64 Linux with the pinned toolchain, so it is a port
 divergence in `toAscii` / pseudo-attribute parsing for unknown encodings,
 not a Windows or nightly effect. It is recorded in `docs/STATE.md` as an
 open finding; fixing it changes library behaviour and is left to a
-separate change.
+separate change. **Fixed** by PR #15 (merged as main a990a8c, D-035, section "Q-5"
+below); post-merge main CI 38240812899 green on every job, including
+`init_diff` on all three platforms.
 
 ### Module 11 summary: all test groups
 
@@ -1122,6 +1124,111 @@ encodings, `XmlParseXmlDecl` on every declaration token) 7 slices, 707 s,
 278,025 executions; `parse_trace` 6 slices, 616 s, 668,139 executions
 (built-in encodings only, where `to_utf8_until` is the old conversion). No
 crash, no mismatch.
+
+### Part 2: remaining C behaviour (PR #16)
+
+Measured against the vendored libexpat 2.9.0 by canonical trace (events,
+error code, line, column, byte index), under `diff::option_matrix` unless
+stated. No library code was changed except the duplicate check below.
+
+**`XML_UnparsedEntityDeclHandler`** (`tests/tests/unparsed_diff.rs`, 2
+tests). C behaviour: with the handler set, an `NDATA` entity is reported
+as `unparsed <name> <base> <systemId> <publicId> <notation>` and not to
+the entity declaration handler; without it, the entity declaration handler
+gets the notation; a duplicate declaration is not reported; the notation
+is not checked (non-validating); declarations after an unread parameter
+entity are skipped. 20 internal-subset documents (PUBLIC/SYSTEM, empty
+system id, undeclared notation, duplicates in both orders, references in
+content and attribute values, `NDATA` on a parameter entity, missing or
+extra names, missing space, prefixed names, non-ASCII) with and without
+the handler; an external subset and an external parameter entity read
+through the test handler, 4 documents x 7 option sets x 3
+parameter-entity modes x handler on/off. Shim: `ParseOptions::unparsed_handler`.
+Reaches `decl.rs` 487-493 (the port's call site was never compared).
+Mutation check: reporting entities named `u` to the entity handler
+instead fails the test. Policy: replicate. No divergence.
+
+**External entity bodies** (`tests/tests/external_body_diff.rs`). 76
+bodies (empty, BOM only, text declaration complete or cut, unclosed
+comment / tag / PI, partial and invalid characters, UTF-16 with and
+without BOM, a start tag where only declarations are allowed, literals,
+and 23 bodies that start with an XML declaration) read through the test
+handler in 6 documents: referenced inside an entity value literal of the
+external subset (`s.dtd`: the child starts in `entityValueInitProcessor`
+because `storeEntityValue` sets `inEntityValue`), in place of an entity
+value (`v.dtd`: an inner parameter-entity reference, so
+`externalParEntInitProcessor`, not the entity-value processor), the
+external subset itself, an external parameter entity in the internal
+subset, and an external general entity in content (once and twice); 7
+option sets (the child is fed in the same chunks) x 3 parameter-entity
+modes = 9,576 comparisons, every one equal; more than a quarter end in a
+child error by construction (asserted). C behaviour worth noting: inside
+an entity value C calls `processXmlDecl(parser, 0, ..)`, so the
+declaration is an **XML** declaration, not a text declaration: `version`
+is required (`<?xml encoding='UTF-8'?>` fails with
+`XML_ERROR_XML_DECL`, error 30, column 6 of the child) and `standalone`
+is accepted. After it, `entityValueProcessor` (`external.rs` 750-778)
+handles complete literals, an invalid byte (`XML_ERROR_INVALID_TOKEN`),
+an unclosed comment or literal (`UNCLOSED_TOKEN`), a partial character
+(`PARTIAL_CHAR`), the start of an element (`XML_ERROR_SYNTAX`) and, in
+chunked parses, a token cut by the end of a chunk (it returns for more
+input); every one of these branches was checked to run (temporary probes,
+removed) and matches C. Also reaches `external.rs` 705-706, 792-793
+(nothing scanned in a known encoding: empty value) and 819. Policy:
+replicate. No divergence.
+
+**`m_nsAtts` growth** (`tests/tests/ns_atts_diff.rs`, 3 tests). C
+behaviour: the namespaced-attribute table doubles while `(nPrefixes << 1)
+>> m_nsAttsPower` is non-zero and is reused across start tags through a
+version counter; a duplicate expanded name (two prefixes bound to one URI)
+is found only through it and reported as `XML_ERROR_DUPLICATE_ATTRIBUTE`
+at the start tag. Start tags with 1-1,100 prefixed attributes, at, below
+and above every power of two to 1,024, over 1, 3 and 17 prefixes, with no
+duplicate or a duplicate first, in the middle or last; a document whose
+start tags grow and shrink (stale entries of a reused table must not
+count) and nested tags with the same names; 9 option sets (the option
+matrix plus triplets with 64-byte chunks and the buffer API with 7-byte
+chunks): 350 documents, 3,150 comparisons, every one equal, and every duplicate document
+fails with error 8 under each namespace option set (1,036 such runs,
+asserted). The
+tracker charges the table's growth (`Tracker::ns_atts`): a threshold sweep
+(amplification 1.0, geometric grid 1 KiB-4 MiB x 9/8 plus a binary search
+for C's boundary, both namespace separators) on the 1,025- and
+513-attribute tags and the grow-and-shrink document: wherever C stops with
+`XML_ERROR_NO_MEMORY` the port stops too (module 11c relation; C refused
+in 256 of the sweep runs, the port in each). Injected
+bugs: comparing names with `==` instead of C's prefix test (triplets) and
+growing the table one step late in the tracker are both caught.
+
+**Finding (fixed here): quadratic duplicate check.** The port checked
+each prefixed attribute's expanded name against a list of all earlier
+ones (`content.rs`, storeAtts), where C uses a hash table: one start tag
+with 80,000 prefixed attributes (1 MB) took 1.48 s in the port against
+47 ms in C, 20 s at 4 MB, so input size bought quadratic CPU time (a
+denial-of-service risk C does not have). The names are now grouped by
+their SipHash in a `BTreeMap` (same duplicate rule: equal hash and the
+stored name starts with the new one): 84 ms for the same tag.
+Unprefixed attributes were not affected (they use attribute-id flags, as
+in C). Regression test `ns_duplicate_check_scales_like_c`: four times the
+attributes must take less than nine times as long (self-relative, so it
+holds on slow and instrumented builds; ratio 2.5-2.8 release / 4.0 debug after
+the fix, 15.9 before it, which fails the test). Behaviour is unchanged:
+the full suite and the new C-differential tests pass. No divergence
+number is needed (no observable output changed); listed here as a
+finding.
+
+**CI note.** In PR #15's run 38237867506 (attempt 1) the ubuntu coverage
+job aborted inside the `llvm-cov export -dump` diagnostic of
+`scripts/coverage.sh` (glibc `corrupted size vs. prev_size`, SIGABRT)
+after the reports were written; the re-run of the same commit (job
+114777514198) and post-merge main 38240812899 were green. Treated as an
+intermittent llvm-cov crash, not reproduced; the mismatch check stays as
+it is.
+
+**Not done in this PR.** OOM fault injection per allocation point
+(waits for the DV-1 parity phase-2 branch to merge, so that the port's
+allocation points are final). Suspend/resume: see "Remaining uncovered
+lines".
 
 ## Divergences
 

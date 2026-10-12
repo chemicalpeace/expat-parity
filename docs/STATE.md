@@ -18,8 +18,12 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   on every CI platform"): `crates/expat` 94.95 % lines / 95.16 % regions /
   92.27 % functions on Linux and macOS, 94.93 % / 95.13 % / 92.27 % on
   Windows, after correcting an llvm-cov artefact that had hidden 7 covered
-  lines (raw step E figure 94.86 %). DV-1
-  is pending the owner's decision. Next: module 12.
+  lines (raw step E figure 94.86 %). DV-1 parity is in progress (D-034;
+  phase 1 merged in PR #14). Q-5 fixed (PR #15, D-035). Part 2 of the
+  coverage work (PR #16): unparsed-entity handler, external entity bodies
+  incl. `entityValueProcessor`, `m_nsAtts` growth vs C; quadratic
+  namespaced duplicate check fixed. Pending: OOM fault injection per
+  allocation point (after the DV-1 phase-2 merge). Next: module 12.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
@@ -35,13 +39,10 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 
 ## Blockers
 
-None. The unknown-encoding `XmlParseXmlDecl` position finding that made
-`init_diff::xml_decl_in_every_builtin_encoding` fail intermittently
-(seeds `0x52f43d23123766f6`, port 7 / C 8, and `0xfe8d9b29cbd0ff22`, port
-9 / C 11) is fixed on branch `fix-unknown-xmldecl-position` (D-035,
-DIVERGENCES.md Q-5): the port now converts like C's `unknown_toUtf8`
-inside the data and stops where C reads past it (an out-of-bounds read in
-libexpat 2.9.0, `docs/evidence/q5`).
+None. The unknown-encoding `XmlParseXmlDecl` position finding (Q-5) that
+made `init_diff::xml_decl_in_every_builtin_encoding` fail intermittently
+is fixed and merged (PR #15, main a990a8c, D-035); post-merge main CI
+38240812899 green on every job.
 
 ## Module Definition of Done
 
