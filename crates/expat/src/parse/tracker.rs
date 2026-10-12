@@ -485,11 +485,10 @@ pub const EXPAND_SPARE: usize = 24;
 pub const OPEN_ENTITY_SIZE: usize = c_layout::OPEN_INTERNAL_ENTITY;
 /// `sizeof(ATTRIBUTE)` ([`c_layout::ATTRIBUTE`]).
 pub const ATTRIBUTE_SIZE: usize = c_layout::ATTRIBUTE;
-/// `sizeof(NS_ATT)` bound: two `unsigned long`s and a pointer, counted as
-/// three 8-byte words. Equal to C ([`c_layout::NS_ATT`]) where `unsigned
-/// long` has 8 bytes; 8 bytes more than C on Windows (4-byte `unsigned
-/// long`). An over-count, kept until the size-parity stage of D-034.
-pub const NS_ATT_SIZE: usize = 3 * 8;
+/// `sizeof(NS_ATT)` ([`c_layout::NS_ATT`]: two `unsigned long`s and a
+/// pointer; 24 bytes on 64-bit Unix, 16 on Windows x64). Before stage 6 of
+/// D-034 the port charged three 8-byte words everywhere.
+pub const NS_ATT_SIZE: usize = c_layout::NS_ATT;
 /// `sizeof(DEFAULT_ATTRIBUTE)` ([`c_layout::DEFAULT_ATTRIBUTE`]).
 pub const DEFAULT_ATTRIBUTE_SIZE: usize = c_layout::DEFAULT_ATTRIBUTE;
 /// `sizeof(NAME_AND_DEFAULT_ATTRIBUTE)`
