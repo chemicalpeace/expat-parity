@@ -507,11 +507,61 @@ impl PoolShadow {
     /// The shadow therefore needs only the length (D-034 stage 2; the unit
     /// test checks it against the character-level pool on multi-byte
     /// texts).
+    ///
+    /// Before each growth the shadow advances over the whole characters
+    /// `XmlConvert` wrote into the room left, so that after a refused
+    /// growth the current string is as long as C's (`storeEntityValue`'s
+    /// caller hands it to the entity declaration handler before returning
+    /// the error, `xmlparse.c` 5929-5958).
     pub fn append_text<H: Heap + ?Sized>(&mut self, heap: &mut H, text: &[u8]) -> Result<(), NoMemory> {
         if self.blocks.is_empty() {
             self.grow(heap)?;
         }
-        self.append_chars(heap, text.len())
+        let mut rest = text;
+        loop {
+            let room = usize::try_from(self.end() - self.ptr).unwrap_or(0);
+            if rest.len() <= room {
+                self.ptr += i64::try_from(rest.len()).map_err(|_| NoMemory)?;
+                return Ok(());
+            }
+            // The longest prefix of whole UTF-8 characters that fits.
+            let mut k = room;
+            while k > 0 && rest.get(k).is_some_and(|&b| b & 0xC0 == 0x80) {
+                k -= 1;
+            }
+            self.ptr += i64::try_from(k).map_err(|_| NoMemory)?;
+            rest = rest.get(k..).unwrap_or_default();
+            self.grow(heap)?;
+        }
+    }
+
+    /// `n` calls of `poolAppendChar` (or C's byte loops with
+    /// `if (pool->end == pool->ptr && ! poolGrow(pool))`): the same
+    /// allocations as [`PoolShadow::append_chars`], but the characters that
+    /// fit are written before each growth, so a refused growth leaves the
+    /// current string as long as C's.
+    pub fn append_chars_each<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {
+        let mut n = i64::try_from(n).map_err(|_| NoMemory)?;
+        loop {
+            let room = (self.end() - self.ptr).max(0);
+            if n <= room {
+                self.ptr += n;
+                return Ok(());
+            }
+            self.ptr += room;
+            n -= room;
+            self.grow(heap)?;
+        }
+    }
+
+    /// Whether the pool has a block in use (`poolStart(pool) != NULL`).
+    pub fn has_block(&self) -> bool {
+        !self.blocks.is_empty()
+    }
+
+    /// `poolLength`: characters of the current string.
+    pub fn current_len(&self) -> usize {
+        usize::try_from(self.ptr - self.start).unwrap_or(0)
     }
 
     /// `if (! pool->blocks) poolGrow(pool)`: a block for a pool that has
@@ -868,7 +918,15 @@ impl Tracker {
         while size < name_len.saturating_add(1) {
             let new = size.saturating_mul(2);
             if !self.t.realloc(size, new, direct) {
-                self.free_tags.push(size);
+                // The tag is on `m_tagStack` already (xmlparse.c 3764-3766)
+                // when the buffer's growth is refused (3790-3792), so
+                // `XML_ParserFree` releases it first (1874-1887).
+                self.open_tags.push(OpenTag {
+                    size,
+                    name_len,
+                    raw_len,
+                    raw_stored: false,
+                });
                 return Err(NoMemory);
             }
             size = new;

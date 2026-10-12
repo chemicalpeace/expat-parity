@@ -684,7 +684,7 @@ impl Parser {
             let r = if converted {
                 p.append_text(&mut heap, tail)
             } else {
-                p.append_chars(&mut heap, tail.len())
+                p.append_chars_each(&mut heap, tail.len())
             };
             r.map_err(|_| Stop::Error(XmlError::NoMemory))?;
             self.charged_len = out.len();
