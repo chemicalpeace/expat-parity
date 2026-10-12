@@ -2,3 +2,4 @@ dump-j8 profile=race.profdata flags=[-dump -num-threads=8] runs=1955 failures=13
 fix-dump-j8 profile=race-fix.profdata flags=[-dump -num-threads=8] runs=520 failures=2 exit-codes=[124 124] llvm=23.1.1-rust-1.99.0-stable host=aarch64-unknown-linux-gnu
 dump-j1 profile=race.profdata flags=[-dump -num-threads=1] runs=1387 failures=0 exit-codes=[] llvm=23.1.1-rust-1.99.0-stable host=aarch64-unknown-linux-gnu
 fix-dump-j1 profile=race-fix.profdata flags=[-dump -num-threads=1] runs=1403 failures=0 exit-codes=[] llvm=23.1.1-rust-1.99.0-stable host=aarch64-unknown-linux-gnu
+nodump-j8 profile=race.profdata flags=[-num-threads=8] runs=1426 failures=0 exit-codes=[] llvm=23.1.1-rust-1.99.0-stable host=aarch64-unknown-linux-gnu

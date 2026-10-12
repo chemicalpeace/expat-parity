@@ -125,4 +125,7 @@ docs/evidence/llvm-cov-dump-race/stress.sh run fix-dump-j1 100 race-fix.profdata
 ```
 
 Failure rates depend on the machine (2 cores here); the counts above are
-from one run each.
+from one run each. The last four configurations ran at the same time on
+the same machine (four concurrent `stress.sh` processes), so their run
+counts are lower than a run alone would give; `results.txt` lists the
+lines in the order they finished.
