@@ -42,9 +42,10 @@ jobs:
       - run: cargo test --workspace --all-features
       - run: cargo test -p expat --no-default-features
       # D-033: the tracker's structure sizes against this platform's C
-      # compiler, printed for the per-platform report.
-      - name: tracker sizes vs C sizeof
-        run: cargo test -p expat-difftest --test tracker_sizes -- --nocapture
+      # compiler and the DV-1 / R1 window boundaries, printed for the
+      # per-platform report (both also run in the step above).
+      - name: tracker sizes and DV-1 windows (per-platform report)
+        run: cargo test --release -p expat-difftest --test tracker_sizes --test dv1_windows -- --nocapture
 
   miri:
     name: miri (safe crate)
