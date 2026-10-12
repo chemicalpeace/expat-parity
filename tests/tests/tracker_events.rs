@@ -9,19 +9,24 @@
 //!
 //! 1. both streams are self-consistent: every event moves the running
 //!    total by its size (a refusal moves nothing), the peak is the running
-//!    maximum; C's stream ends at 0 after `XML_ParserFree` (everything C
-//!    allocates through its tracker is freed through it, child parsers
-//!    included);
-//! 2. the two streams are compared event by event after the creation
-//!    events (C reports `parserCreate`'s allocations one by one; the port
-//!    charges a creation bound as one event until stage 3 of D-034):
-//!    increase/decrease, size and refusal must be equal at every event.
+//!    maximum, and both end at 0 after `XML_ParserFree` (everything is
+//!    freed through the tracker, child parsers included);
+//! 2. the parse results (status, error code, line, column, byte index)
+//!    are equal, which covers the limit outcomes of the tightened-limit
+//!    option sets;
+//! 3. the two streams are compared event by event from the parser's
+//!    creation (C reports `parserCreate`'s allocations one by one, and so
+//!    does the port since stage 3 of D-034) through the end of the parse
+//!    and then through `XML_ParserFree` (stage 7): direction, size,
+//!    refusal, running total and peak must be equal at every event.
 //!
-//! Until every stage is merged the streams are not all equal; the test
-//! prints, per platform, how many are, and where the others first differ
-//! (by C line), and fails if fewer streams are equal than
-//! [`EQUAL_STREAMS_AT_LEAST`] (a ratchet raised by each stage), or if a
-//! stream that differs is not explained by a known remaining class.
+//! The test prints, per platform, how many streams are equal in each
+//! phase, the peaks and results that agree, where C first refused (by
+//! `xmlparse.c` line) and, for any stream that differs, where it first
+//! differs (by C line); it fails on any inconsistency or result
+//! difference, or if fewer streams are equal than
+//! [`EQUAL_STREAMS_AT_LEAST`] (a ratchet raised by each stage; now every
+//! run).
 
 use std::collections::BTreeMap;
 
@@ -30,12 +35,13 @@ use expat_difftest::port::port_trace_with_tracker_events;
 use expat_difftest::vectors::upstream;
 use expat_oracle::{ExtHandler, Factor, Limits, ParamEntityParsing, ParseOptions, TrackerEvent};
 
-/// Streams (of 5,196) that must be equal after creation at this stage
-/// (stage 4 of D-034: 3,270 of 3,420; stage 2: 3,291 of 3,420 and all
-/// 1,776 pool-boundary, public-id, chop and `xmlns:` runs added with it,
-/// every remaining first difference the raw tag name the port charges at
-/// the start tag, stage 5; see docs/REPORT.md, DV-1 parity).
-const EQUAL_STREAMS_AT_LEAST: usize = 5_196;
+/// Runs whose streams must be equal from creation through
+/// `XML_ParserFree` (all of them since stages 3 and 7 of D-034: 15,879 of
+/// 15,879 on aarch64 Linux; the stages before compared only after the
+/// creation and up to the end of the parse: stage 4 3,270 of 3,420, stage
+/// 2 3,291, stages 5 and 4b 5,196 of 5,196; see docs/REPORT.md, DV-1
+/// parity).
+const EQUAL_STREAMS_AT_LEAST: usize = 15_879;
 
 fn base() -> ParseOptions {
     ParseOptions {

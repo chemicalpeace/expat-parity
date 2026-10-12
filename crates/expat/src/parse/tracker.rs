@@ -71,7 +71,7 @@ const CREATION_DTD: usize = c_layout::DTD;
 /// What `parserCreate` charges to the tracker for a parser with its own
 /// DTD and no protocol encoding name: the parser structure (counted
 /// directly, `xmlparse.c` 1304-1395), `m_atts`, `m_dataBuf` and the DTD,
-/// each with its [`MALLOC_HEADER`]. Derived from the C layout of the
+/// each with its `MALLOC_HEADER`. Derived from the C layout of the
 /// target ([`c_layout::PARSER`], [`c_layout::DTD`]): 3,040 bytes on 64-bit
 /// Unix, 3,008 on 64-bit Windows (its parser structure is 32 bytes
 /// smaller, four `unsigned long` members). Since stage 3 of D-034 it is
