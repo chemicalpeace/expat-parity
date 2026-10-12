@@ -77,10 +77,37 @@ const BODIES: &[&[u8]] = &[
     b"\xEF\xBB\xBF'abc'",
     b"'a<b'",
     b"'abc' x",
+    // In an entity value the parser reads an XML declaration, not a text
+    // declaration (`processXmlDecl(parser, 0, ..)`): `version` is required
+    // and `standalone` allowed. After it, `entityValueProcessor` tokenizes
+    // the rest: complete, invalid, unclosed, a partial character, the start
+    // of an element, and (in chunked parses) a token cut by the buffer end.
+    b"<?xml version='1.0'?>'abc'",
+    b"<?xml version='1.0'?>abc",
+    b"<?xml version='1.0'?>'a' 'b' <!-- c -->",
+    b"<?xml version='1.0'?>\xFF",
+    b"<?xml version='1.0'?>'a'\xFF",
+    b"<?xml version='1.0'?><!--",
+    b"<?xml version='1.0'?>'abc",
+    b"<?xml version='1.0'?>\xC3",
+    b"<?xml version='1.0'?>'a'\xE4\xB8",
+    b"<?xml version='1.0'?><a",
+    b"<?xml version='1.0'?>'a'<a/>",
+    b"<?xml version='1.0' encoding='UTF-8'?>'abc'",
+    b"<?xml version='1.0' encoding='ISO-8859-1'?>'\xE9'",
+    b"<?xml version='1.0' encoding='x-unknown'?>'abc'",
+    b"<?xml version='1.0' standalone='yes'?>'abc'",
+    b"<?xml version='1.0' standalone='no'?>'abc'",
+    b"\xEF\xBB\xBF<?xml version='1.0'?>'abc'",
+    b"<?xml version='1.0'?><?xml version='1.0'?>",
+    b"<?xml version='1.0'?>&amp;%p;",
 ];
 
-/// Documents reading the body (system identifier `b`): `s.dtd` uses it in
-/// an entity value, `v.dtd` as the entity value; the external subset; an
+/// Documents reading the body (system identifier `b`): `s.dtd` references
+/// it inside an entity value literal (the child parser starts in
+/// `entityValueInitProcessor`, `inEntityValue` being set by
+/// `storeEntityValue`), `v.dtd` in place of the entity value (an inner
+/// parameter-entity reference: `externalParEntProcessor`); the external subset; an
 /// external parameter entity in the internal subset; an external general
 /// entity in content (once and twice).
 const DOCS: &[&[u8]] = &[
@@ -103,8 +130,8 @@ fn external_entity_bodies_match_c() {
                 b"s.dtd".to_vec(),
                 b"<!ENTITY % p SYSTEM 'b'><!ENTITY x '[%p;]'>".to_vec(),
             ),
-            // The parameter entity is the whole entity value: its parser
-            // starts in `entityValueInitProcessor` (`inEntityValue`).
+            // The parameter entity stands where the entity value would
+            // (`XML_ROLE_INNER_PARAM_ENTITY_REF`): not `inEntityValue`.
             (
                 b"v.dtd".to_vec(),
                 b"<!ENTITY % p SYSTEM 'b'><!ENTITY x %p;>".to_vec(),
