@@ -12,8 +12,11 @@ expect() { # file pattern count what
 expect plain.txt 'doc [01] .*mode parsebuffer: .*calls reading past the document [1-9]' 2 "plain parsebuffer: docs 0 and 1 read past the data"
 expect plain.txt 'doc 2 .*calls reading past the document 0,' 2 "plain: doc 2 (data after the declaration) never reads past it"
 case " $sans " in *" asan "*)
-  expect asan.txt '^SUMMARY: AddressSanitizer: heap-buffer-overflow .*xmltok\.c:1283:[0-9]+ in unknown_toUtf8' 4 "ASan heap-buffer-overflow in unknown_toUtf8 (xmltok.c:1283)"
-  expect asan.txt 'in XML_GetBuffer .*xmlparse\.c:2603' 4 "ASan: overflowed block allocated by XML_GetBuffer (xmlparse.c:2603)" ;; esac
+  # The column is optional: LLVM clang on Linux prints <path>/xmltok.c:1283:38,
+  # Apple clang on macOS prints the bare file and line (xmltok.c:1283). File,
+  # line and function are still required exactly.
+  expect asan.txt '^SUMMARY: AddressSanitizer: heap-buffer-overflow (.*/)?xmltok\.c:1283(:[0-9]+)? in unknown_toUtf8$' 4 "ASan heap-buffer-overflow in unknown_toUtf8 (xmltok.c:1283)"
+  expect asan.txt '^ +#1 0x[0-9a-f]+ in XML_GetBuffer (.*/)?xmlparse\.c:2603(:[0-9]+)?$' 4 "ASan: overflowed block allocated by XML_GetBuffer (xmlparse.c:2603)" ;; esac
 case " $sans " in *" msan "*)
   expect msan.txt '^SUMMARY: MemorySanitizer: use-of-uninitialized-value .*xmltok\.c:1284:[0-9]+ in unknown_toUtf8' 2 "MSan use-of-uninitialized-value in unknown_toUtf8 (xmltok.c:1284)" ;; esac
 exit $fail

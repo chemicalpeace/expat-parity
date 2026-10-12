@@ -165,6 +165,18 @@ unknown-encoding handler.
 - Re-run 2026-10-12 on main a990a8c with the same results
   (`docs/evidence/q5/rerun-main-a990a8c/`); CI job `q5-sanitizers` repeats
   it on every run (ubuntu ASan + MSan, macOS ASan; see the PR for run IDs).
+- Also reproduced in CI run 38246973844 (PR #17, merge commit 25922ca0,
+  artifacts `q5-sanitizers-Linux` / `q5-sanitizers-macOS`):
+  - Linux x86_64, Ubuntu clang 18.1.3: ASan 4 heap-buffer-overflow reports
+    at `xmltok.c:1283` in `unknown_toUtf8`, each on a block allocated at
+    `xmlparse.c:2603` (`XML_GetBuffer`); MSan 2 use-of-uninitialized-value
+    reports at `xmltok.c:1284`.
+  - macOS (Darwin arm64), Apple clang version 21.0.0 (clang-2100.1.1.101):
+    ASan, the same 4 reports at `xmltok.c:1283` / allocations at
+    `xmlparse.c:2603`. Apple clang symbolizes without a column
+    (`xmltok.c:1283` rather than `<path>/xmltok.c:1283:38`); `check.sh`
+    accepts both forms and still requires file, line and function exactly.
+    MSan is not available with Apple clang, so not run on macOS.
 - The text of `unknown_toUtf8` is identical on libexpat `master` as fetched
   on 2026-10-12 (latest commit touching `xmltok.c`: c002e805, 2026-10-04).
   That is a source comparison only; master was **not** built or tested.

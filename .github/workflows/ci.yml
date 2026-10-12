@@ -80,6 +80,10 @@ jobs:
       - run: docs/evidence/q5/build.sh
       - run: docs/evidence/q5/run.sh
       - run: docs/evidence/q5/check.sh
+      # Without MSan the checked-in msan.txt is the recorded Linux run; keep it
+      # out of this OS's artifact.
+      - if: ${{ always() && !contains(matrix.sanitizers, 'msan') }}
+        run: rm -f docs/evidence/q5/msan.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
