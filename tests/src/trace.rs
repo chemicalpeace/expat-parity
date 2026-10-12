@@ -221,6 +221,12 @@ impl TraceWriter {
         self.line("extref", &[context, base, system_id, public_id], &[]);
     }
 
+    /// A line of the shim's test handlers with only integer fields
+    /// (`extend`, `extdepth`, `extcreate`; module 11d).
+    pub fn raw_line(&mut self, tag: &str, ints: &[i64]) {
+        self.line(tag, &[], ints);
+    }
+
     /// The shim's test `XML_NotStandaloneHandler` (module 11d).
     pub fn not_standalone(&mut self) {
         self.line("notstandalone", &[], &[]);

@@ -180,6 +180,28 @@ impl AllocTracker {
             .saturating_sub((size as u64).saturating_add(MALLOC_HEADER));
     }
 
+    /// Charges the creation of an external entity parser (the same bound
+    /// as a root parser's creation, [`CREATION_CHARGE`], plus the encoding
+    /// name), checked against the root parser's limits like C's
+    /// `parserCreate` with a parent; `false` = refused, nothing charged.
+    pub fn charge_child_creation(&mut self, encoding_name_len: Option<usize>, direct: u64) -> bool {
+        let increase = CREATION_CHARGE
+            .saturating_add(encoding_name_len.map_or(0, |n| (n as u64).saturating_add(1 + MALLOC_HEADER)));
+        if !self.increase_tolerable(increase, direct) {
+            return false;
+        }
+        self.add(increase);
+        true
+    }
+
+    /// Releases what [`AllocTracker::charge_child_creation`] charged
+    /// (`XML_ParserFree` of the external entity parser).
+    pub fn release_child_creation(&mut self, encoding_name_len: Option<usize>) {
+        let charge = CREATION_CHARGE
+            .saturating_add(encoding_name_len.map_or(0, |n| (n as u64).saturating_add(1 + MALLOC_HEADER)));
+        self.bytes_allocated = self.bytes_allocated.saturating_sub(charge);
+    }
+
     /// Charges the parser creation (`CREATION_CHARGE` plus the copy of
     /// the protocol encoding name, `copyString`). Never refused: C checks
     /// nothing for a root parser's own structure.

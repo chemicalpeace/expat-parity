@@ -480,7 +480,13 @@ impl Parser {
             Some(e) => (e.base.clone(), e.system_id.clone(), e.public_id.clone()),
             None => (None, None, None),
         };
-        if !h.external_entity_ref(Some(&context), base.as_deref(), system_id.as_deref(), public_id.as_deref()) {
+        if !h.external_entity_ref(
+            &mut super::ExternalEntities::new(self),
+            Some(&context),
+            base.as_deref(),
+            system_id.as_deref(),
+            public_id.as_deref(),
+        ) {
             return Err(XmlError::ExternalEntityHandling.into());
         }
         self.tracker.temp_pool.discard();
@@ -507,7 +513,13 @@ impl Parser {
             Some(e) => (e.base.clone(), e.system_id.clone(), e.public_id.clone()),
             None => (None, None, None),
         };
-        let ok = h.external_entity_ref(None, base.as_deref(), system_id.as_deref(), public_id.as_deref());
+        let ok = h.external_entity_ref(
+            &mut super::ExternalEntities::new(self),
+            None,
+            base.as_deref(),
+            system_id.as_deref(),
+            public_id.as_deref(),
+        );
         if open {
             self.set_entity_open(r, false);
         }

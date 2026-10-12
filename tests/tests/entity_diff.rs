@@ -93,6 +93,7 @@ const ALWAYS: ParseOptions = ParseOptions {
     ext_handler: expat_oracle::ExtHandler::None,
     not_standalone: None,
     use_foreign_dtd: false,
+    ext_entities: Vec::new(),
 };
 
 /// (id, document, expected C error code with parameter entity parsing

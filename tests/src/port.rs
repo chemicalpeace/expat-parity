@@ -10,9 +10,10 @@
 use crate::diff::TraceSource;
 use crate::trace::{Status, TraceWriter};
 use expat::internal::parse::{
-    self, ContentModel, Handler, HandlerSet, ParamEntityParsing as PortPep, Parser, Stop,
+    self, ContentModel, ExternalEntities, Handler, HandlerSet, ParamEntityParsing as PortPep,
+    Parser, Stop,
 };
-use expat_oracle::{BufferOp, ExtHandler, ParamEntityParsing, ParseOptions};
+use expat_oracle::{BufferOp, EXT_MAX_DEPTH, ExtHandler, ParamEntityParsing, ParseOptions};
 
 /// The fixed hash salt of the C shim (`ORACLE_HASH_SALT` in
 /// `oracle_trace.c`).
@@ -34,6 +35,68 @@ struct Tracer {
     ext: ExtHandler,
     /// The shim's test not-standalone handler.
     not_standalone: Option<bool>,
+    /// The entities [`ExtHandler::Read`] reads, by system identifier.
+    entities: Vec<(Vec<u8>, Vec<u8>)>,
+    /// Chunk size and buffer API of the document, used for the entities too.
+    chunk_size: usize,
+    buffer_api: bool,
+    /// Nesting depth of external entity parsers.
+    depth: usize,
+}
+
+impl Tracer {
+    /// The shim's `read_external`: reads `body` through an external entity
+    /// parser and traces `extend`.
+    fn read_external(
+        &mut self,
+        parsers: &mut ExternalEntities<'_>,
+        context: Option<&[u8]>,
+        body: &[u8],
+    ) -> bool {
+        if self.depth >= EXT_MAX_DEPTH {
+            self.w.raw_line("extdepth", &[]);
+            return false;
+        }
+        let Some(mut child) = parsers.create(context, None) else {
+            self.w.raw_line("extcreate", &[]);
+            return false;
+        };
+        self.depth += 1;
+        let mut st = parse::Status::Ok;
+        let (chunk, buffer_api) = (self.chunk_size, self.buffer_api);
+        if chunk == 0 || chunk >= body.len() {
+            st = feed(&mut child, self, body, true, buffer_api);
+        } else {
+            for piece in body.chunks(chunk) {
+                st = feed(&mut child, self, piece, false, buffer_api);
+                if st != parse::Status::Ok {
+                    break;
+                }
+            }
+            if st == parse::Status::Ok {
+                st = feed(&mut child, self, b"", true, buffer_api);
+            }
+        }
+        self.depth -= 1;
+        let code = match child.error_code() {
+            Stop::Error(e) => i64::from(e.to_c()),
+            Stop::DtdNotPorted => 999,
+        };
+        let line = child.current_line_number();
+        let column = child.current_column_number();
+        let index = child.current_byte_index();
+        self.w.raw_line(
+            "extend",
+            &[
+                i64::from(st == parse::Status::Ok),
+                code,
+                i64::try_from(line).unwrap_or(i64::MAX),
+                i64::try_from(column).unwrap_or(i64::MAX),
+                index,
+            ],
+        );
+        st == parse::Status::Ok
+    }
 }
 
 impl Handler for Tracer {
@@ -72,13 +135,29 @@ impl Handler for Tracer {
     }
     fn external_entity_ref(
         &mut self,
+        parsers: &mut ExternalEntities<'_>,
         context: Option<&[u8]>,
         base: Option<&[u8]>,
         system_id: Option<&[u8]>,
         public_id: Option<&[u8]>,
     ) -> bool {
         self.w.extref(context, base, system_id, public_id);
-        self.ext == ExtHandler::Accept
+        match self.ext {
+            ExtHandler::Read => {
+                let body = system_id.and_then(|id| {
+                    self.entities
+                        .iter()
+                        .find(|(k, _)| k.as_slice() == id)
+                        .map(|(_, v)| v.clone())
+                });
+                match body {
+                    Some(body) => self.read_external(parsers, context, &body),
+                    None => true,
+                }
+            }
+            ExtHandler::Accept => true,
+            ExtHandler::None | ExtHandler::Fail => false,
+        }
     }
     fn not_standalone(&mut self) -> bool {
         self.w.not_standalone();
@@ -245,6 +324,10 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
         },
         ext: opts.ext_handler,
         not_standalone: opts.not_standalone,
+        entities: opts.ext_entities.clone(),
+        chunk_size: opts.chunk_size,
+        buffer_api: opts.buffer_api,
+        depth: 0,
     };
     // Same order as the C shim.
     if let Some(f) = opts.limits.bl_amplification {

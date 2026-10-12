@@ -26,6 +26,8 @@ pub(crate) struct OracleOptions {
     pub(crate) ext_handler: c_int,
     pub(crate) not_standalone: c_int,
     pub(crate) use_foreign_dtd: c_int,
+    pub(crate) ext_data: *const u8,
+    pub(crate) ext_len: usize,
 }
 
 /// Mirror of `struct oracle_role_state`.

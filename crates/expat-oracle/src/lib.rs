@@ -248,6 +248,9 @@ pub struct ParseOptions {
     pub not_standalone: Option<bool>,
     /// `XML_UseForeignDTD(parser, XML_TRUE)`.
     pub use_foreign_dtd: bool,
+    /// The external entities [`ExtHandler::Read`] can read, by system
+    /// identifier (in memory: nothing is ever fetched).
+    pub ext_entities: Vec<(Vec<u8>, Vec<u8>)>,
 }
 
 /// The test external entity reference handler of a parse (module 11d).
@@ -262,6 +265,30 @@ pub enum ExtHandler {
     Fail,
     /// The handler returns `XML_STATUS_OK` without reading the entity.
     Accept,
+    /// The handler reads the entity whose system identifier is in
+    /// [`ParseOptions::ext_entities`] through an external entity parser
+    /// (`XML_ExternalEntityParserCreate`), fed like the document, traces
+    /// `extend <ok> <code> <line> <column> <byte index>` and returns the
+    /// child's status; an unknown identifier is accepted without reading.
+    /// At most [`EXT_MAX_DEPTH`] nested children (`extdepth`).
+    Read,
+}
+
+/// `ORACLE_EXT_MAX_DEPTH`: nesting limit of [`ExtHandler::Read`].
+pub const EXT_MAX_DEPTH: usize = 16;
+
+/// Serializes [`ParseOptions::ext_entities`] for the shim (u32 LE length
+/// + system id, u32 LE length + bytes per record).
+fn ext_records(entities: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for (k, v) in entities {
+        for part in [k, v] {
+            let n = u32::try_from(part.len()).unwrap_or(u32::MAX);
+            out.extend_from_slice(&n.to_le_bytes());
+            out.extend_from_slice(part);
+        }
+    }
+    out
 }
 
 /// A `float` limit passed to libexpat, compared by bit pattern so the
@@ -361,6 +388,8 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
         Some(e) => Some(CString::new(e.as_bytes()).map_err(|_| OracleError::EncodingHasNul)?),
         None => None,
     };
+    // Lives until the call returns; the shim only reads it during the parse.
+    let records = ext_records(&opts.ext_entities);
     let c_opts = ffi::OracleOptions {
         encoding: encoding.as_ref().map_or(std::ptr::null(), |e| e.as_ptr()),
         ns_separator: opts.ns_separator.map_or(0, c_int::from),
@@ -388,6 +417,7 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
             ExtHandler::None => 0,
             ExtHandler::Fail => 1,
             ExtHandler::Accept => 2,
+            ExtHandler::Read => 3,
         },
         not_standalone: match opts.not_standalone {
             None => 0,
@@ -395,6 +425,8 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
             Some(false) => 2,
         },
         use_foreign_dtd: c_int::from(opts.use_foreign_dtd),
+        ext_data: records.as_ptr(),
+        ext_len: records.len(),
     };
     let mut out: *mut u8 = std::ptr::null_mut();
     let mut out_len: usize = 0;

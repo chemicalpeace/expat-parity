@@ -479,6 +479,88 @@ on_skipped(void *ud, const XML_Char *name, int is_param) {
    (libexpat's default), whose user data is the start context. */
 static ORACLE_TLS int ext_handler_mode;
 static ORACLE_TLS int not_standalone_mode;
+static ORACLE_TLS const unsigned char *ext_data;
+static ORACLE_TLS size_t ext_len;
+static ORACLE_TLS size_t ext_chunk;
+static ORACLE_TLS int ext_buffer_api;
+static ORACLE_TLS int ext_depth;
+
+static enum XML_Status feed(XML_Parser p, const unsigned char *s, size_t n,
+                            int final, int buffer_api);
+
+static unsigned long
+rd32(const unsigned char *b) {
+  return (unsigned long)b[0] | ((unsigned long)b[1] << 8)
+         | ((unsigned long)b[2] << 16) | ((unsigned long)b[3] << 24);
+}
+
+/* The in-memory entity of system identifier `id`. */
+static int
+ext_lookup(const XML_Char *id, const unsigned char **body, size_t *blen) {
+  size_t off = 0, idlen = strlen(id);
+  while (off + 4 <= ext_len) {
+    size_t klen = rd32(ext_data + off);
+    const unsigned char *key = ext_data + off + 4;
+    off += 4 + klen;
+    if (off + 4 > ext_len)
+      return 0;
+    size_t vlen = rd32(ext_data + off);
+    const unsigned char *val = ext_data + off + 4;
+    off += 4 + vlen;
+    if (off > ext_len)
+      return 0;
+    if (klen == idlen && memcmp(key, id, klen) == 0) {
+      *body = val;
+      *blen = vlen;
+      return 1;
+    }
+  }
+  return 0;
+}
+
+/* Reads one external entity from memory through an external entity
+   parser (ext_handler 3). */
+static int
+read_external(XML_Parser p, struct tracer *t, const XML_Char *context,
+              const unsigned char *body, size_t len) {
+  if (ext_depth >= ORACLE_EXT_MAX_DEPTH) {
+    end_line(begin(t, "extdepth"));
+    return XML_STATUS_ERROR;
+  }
+  XML_Parser child = XML_ExternalEntityParserCreate(p, context, NULL);
+  if (child == NULL) {
+    end_line(begin(t, "extcreate"));
+    return XML_STATUS_ERROR;
+  }
+  struct start_ctx cc;
+  cc.t = t;
+  cc.p = child;
+  XML_SetUserData(child, &cc);
+  ext_depth++;
+  enum XML_Status st = XML_STATUS_OK;
+  if (ext_chunk == 0 || ext_chunk >= len) {
+    st = feed(child, body, len, 1, ext_buffer_api);
+  } else {
+    size_t off = 0;
+    while (off < len && st == XML_STATUS_OK) {
+      size_t n = len - off < ext_chunk ? len - off : ext_chunk;
+      st = feed(child, body + off, n, 0, ext_buffer_api);
+      off += n;
+    }
+    if (st == XML_STATUS_OK)
+      st = feed(child, (const unsigned char *)"", 0, 1, ext_buffer_api);
+  }
+  ext_depth--;
+  begin(t, "extend");
+  buf_int(&t->out, st == XML_STATUS_OK);
+  buf_int(&t->out, (long long)XML_GetErrorCode(child));
+  buf_uint(&t->out, (unsigned long long)XML_GetCurrentLineNumber64(child));
+  buf_uint(&t->out, (unsigned long long)XML_GetCurrentColumnNumber64(child));
+  buf_int(&t->out, (long long)XML_GetCurrentByteIndex64(child));
+  end_line(t);
+  XML_ParserFree(child);
+  return st == XML_STATUS_OK ? XML_STATUS_OK : XML_STATUS_ERROR;
+}
 
 static int XMLCALL
 on_extref(XML_Parser p, const XML_Char *context, const XML_Char *base,
@@ -490,6 +572,13 @@ on_extref(XML_Parser p, const XML_Char *context, const XML_Char *base,
   buf_field(&t->out, system_id);
   buf_field(&t->out, public_id);
   end_line(t);
+  if (ext_handler_mode == 3) {
+    const unsigned char *body;
+    size_t blen;
+    if (system_id == NULL || ! ext_lookup(system_id, &body, &blen))
+      return XML_STATUS_OK;
+    return read_external(p, c->t, context, body, blen);
+  }
   return ext_handler_mode == 2 ? XML_STATUS_OK : XML_STATUS_ERROR;
 }
 
@@ -611,6 +700,11 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   XML_SetSkippedEntityHandler(p, on_skipped);
   ext_handler_mode = opts->ext_handler;
   not_standalone_mode = opts->not_standalone;
+  ext_data = opts->ext_data;
+  ext_len = opts->ext_len;
+  ext_chunk = opts->chunk_size;
+  ext_buffer_api = opts->buffer_api;
+  ext_depth = 0;
   if (opts->ext_handler)
     XML_SetExternalEntityRefHandler(p, on_extref);
   if (opts->not_standalone)
