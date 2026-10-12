@@ -754,6 +754,7 @@ fn billion_laughs_across_external_entities() {
         ("general", 4, 9),
         ("param", 10, 5),
         ("param", 3, 10),
+        ("param", 4, 9),
     ] {
         let mut doc = String::from("<!DOCTYPE r [");
         let mut ents = Vec::new();
@@ -804,12 +805,26 @@ fn billion_laughs_across_external_entities() {
             let code = result_code(&out.c);
             let breaches = lines_with(&out.c, "extend 0 43").len();
             summary.push(format!(
-                "{kind} fan {fan} depth {depth} threshold {threshold:?}: result {code}, children {} (breach {breaches}), {:?}, heap C {} port {}",
+                "{kind} fan {fan} depth {depth} threshold {threshold:?}: result {code}, children {} (breach {breaches}), {:?}, heap C {} port {}, tracker end C {} port {}",
                 lines_with(&out.c, "extend ").len(),
                 out.elapsed,
                 out.c_peak,
-                out.port_peak
+                out.port_peak,
+                out.c_tracker.end,
+                out.port_tracker.end
             ));
+            // The tracker does not grow with the number of child parsers:
+            // each parser's own structures are released when it is freed
+            // (a parameter entity parser keeps only the shared DTD's
+            // growth charged), so the port stays within one creation bound
+            // above C (D-030, D-032). 87,381 nested parameter entity
+            // parsers left 67 MB charged before this was fixed, a refusal
+            // at the default limits where C succeeds.
+            let (ct, pt) = (out.c_tracker.end, out.port_tracker.end);
+            assert!(
+                pt >= ct && pt - ct <= 16_384,
+                "{kind} {fan}^{depth} {threshold:?}: tracker end C {ct} port {pt}"
+            );
             if threshold.is_some() {
                 // The lowered threshold stops the expansion inside a child.
                 assert!(breaches >= 1 || code == 43, "{kind}: no amplification stop");

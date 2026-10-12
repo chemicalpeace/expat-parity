@@ -60,8 +60,8 @@ use super::accounting::Account;
 use super::dtd::{Dtd, PrefixId};
 use super::error::{Stop, XmlError};
 use super::prolog::{PrologDone, with_known};
-use super::tracker::Pool;
-use super::{Enc, Handler, Parser, Parsing, Processor};
+use super::tracker::{ATTRIBUTE_SIZE, MALLOC_HEADER, OPEN_ENTITY_SIZE, Pool};
+use super::{Enc, Handler, INIT_ATTS_SIZE, Parser, Parsing, Processor};
 use crate::tok::{Encoding, InitEncoding, Normal, Scan, Scanned, State, Tok, ignore_section_tok, init_scan};
 
 /// `CONTEXT_SEP`: separates the items of a context string.
@@ -371,8 +371,9 @@ impl Parser {
     /// back to the parent. A general entity parser's allocations are all
     /// released (C frees its DTD copy too), so the root tracker returns to
     /// its count before the creation. A parameter entity parser's DTD
-    /// growth stays (shared); the port releases only its creation charge,
-    /// keeping the child's other buffers charged (at least C's count).
+    /// growth stays (shared); the port releases its creation charge and
+    /// the structures the child owns itself (`Tracker::own_bytes`), which
+    /// C frees with the child.
     fn external_entity_parser_free(&mut self, child: &mut Parser, bytes_before: u64) {
         let mut t = child.tracker.t;
         if child.is_param_entity {
@@ -384,11 +385,27 @@ impl Parser {
             self.pending_value = core::mem::take(&mut child.pending_value);
             self.charged_len = child.charged_len;
             t.release_child_creation(child.protocol_encoding_name.as_ref().map(Vec::len));
+            t.bytes_allocated = t.bytes_allocated.saturating_sub(child.own_charged_bytes());
         } else {
             t.bytes_allocated = bytes_before;
         }
         self.tracker.t = t;
         self.accounting = child.accounting;
+    }
+
+    /// What the port charged for structures this parser owns beyond its
+    /// creation charge and C's `XML_ParserFree` releases with it: the
+    /// tracker's shadows ([`super::Tracker::own_bytes`]), the
+    /// `OPEN_INTERNAL_ENTITY` structures (free list and open lists) and
+    /// the growth of `m_atts`. The shared DTD is not included.
+    fn own_charged_bytes(&self) -> u64 {
+        let open = self.free_entities
+            + self.open_internal_entities.len()
+            + self.open_attribute_entities.len()
+            + self.open_value_entities.len();
+        let entities = (open as u64).saturating_mul(OPEN_ENTITY_SIZE as u64 + MALLOC_HEADER);
+        let atts = (self.atts.len().saturating_sub(INIT_ATTS_SIZE) as u64).saturating_mul(ATTRIBUTE_SIZE as u64);
+        self.tracker.own_bytes().saturating_add(entities).saturating_add(atts)
     }
 
     /// `setContext` (`xmlparse.c` 7771-7840): binds the prefixes of the

@@ -270,6 +270,13 @@ impl PoolShadow {
             .sum()
     }
 
+    /// Bytes charged for the blocks in use and free: each block's size
+    /// plus its `MALLOC_HEADER` (what `poolDestroy` releases).
+    pub fn charged_bytes(&self) -> u64 {
+        let blocks = (self.blocks.len() + self.free_blocks.len()) as u64;
+        (self.total_block_bytes() as u64).saturating_add(blocks.saturating_mul(MALLOC_HEADER))
+    }
+
     /// `poolGrow`.
     fn grow<H: Heap + ?Sized>(&mut self, heap: &mut H) -> Result<(), NoMemory> {
         let used = self.end() - self.start;
@@ -495,6 +502,42 @@ impl Tracker {
     pub fn store_discard(&mut self, which: Pool, len: usize, direct: u64) -> Result<(), NoMemory> {
         let (p, mut h) = self.pool(which, direct);
         p.store_discard(&mut h, len)
+    }
+
+    /// Bytes charged for the structures a parser owns itself and C's
+    /// `XML_ParserFree` releases, beyond its creation charge: `m_tempPool`,
+    /// `m_temp2Pool`, the tag stack and free tag list, the bindings,
+    /// `m_nsAtts` and `m_groupConnector`. Not included: the DTD's pools,
+    /// tables and scaffold, which an external parameter entity parser
+    /// shares with its parent (D-032).
+    pub fn own_bytes(&self) -> u64 {
+        let h = MALLOC_HEADER;
+        let sz = |n: usize| n as u64;
+        let tags = self
+            .open_tags
+            .iter()
+            .chain(self.free_tags.iter())
+            .map(|&b| sz(TAG_SIZE) + h + sz(b) + h)
+            .sum::<u64>();
+        let bindings = self
+            .binding_alloc
+            .iter()
+            .filter(|&&a| a > 0)
+            .map(|&a| sz(BINDING_SIZE) + h + sz(a) + h)
+            .sum::<u64>();
+        let ns_atts = if self.ns_atts_power == 0 {
+            0
+        } else {
+            sz((1usize << self.ns_atts_power) * NS_ATT_SIZE) + h
+        };
+        let group = if self.group_size == 0 { 0 } else { sz(self.group_size) + h };
+        self.temp_pool
+            .charged_bytes()
+            .saturating_add(self.temp2_pool.charged_bytes())
+            .saturating_add(tags)
+            .saturating_add(bindings)
+            .saturating_add(ns_atts)
+            .saturating_add(group)
     }
 
     /// The start tag of an element with a converted name of `name_len`
