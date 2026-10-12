@@ -115,8 +115,77 @@ pub fn check(doc: &[u8], opts: &ParseOptions, tally: &mut Tally) -> Result<(), S
     check_from(doc, opts, &base, tally)
 }
 
+/// Parses `doc` under `opts` with both sides recording every tracker
+/// event and requires exact parity (D-034): equal traces (so equal limit
+/// outcomes and positions) and equal event streams from the parser's
+/// creation through `XML_ParserFree` (direction, size, refusal, running
+/// total and peak at every event). Returns whether C refused an
+/// allocation.
+pub fn compare_events(doc: &[u8], opts: &ParseOptions) -> Result<bool, String> {
+    let (c_trace, c) = expat_oracle::parse_trace_with_tracker_events(doc, opts)
+        .map_err(|e| format!("oracle shim: {e:?}"))?;
+    let (p_trace, port, port_at_end) = crate::port::port_trace_with_tracker_events(doc, opts);
+    let (cm, pm) = mask_q4(&c_trace, &p_trace);
+    if let Some((line, l, r)) = first_difference(&cm, &pm) {
+        let side = match (refused(&cm), refused(&pm)) {
+            (false, true) => "the port refuses where C accepts; ",
+            (true, false) => "C refuses where the port accepts; ",
+            _ => "",
+        };
+        return Err(format!(
+            "{side}trace mismatch at line {line}: C `{l}` port `{r}` ({opts:?})"
+        ));
+    }
+    let same = |a: &expat_oracle::TrackerEvent, b: &expat::internal::parse::TrackerEvent| {
+        a.increase == b.increase
+            && a.refused == b.refused
+            && a.size == b.size
+            && a.total == b.total
+            && a.peak == b.peak
+    };
+    let k = c
+        .events
+        .iter()
+        .zip(&port)
+        .take_while(|(a, b)| same(a, b))
+        .count();
+    if k != c.events.len() || k != port.len() || c.at_end != port_at_end {
+        let show = |inc: bool, refd: bool, size: u64, total: u64, peak: u64| {
+            format!(
+                "{}{size}{} total {total} peak {peak}",
+                if inc { '+' } else { '-' },
+                if refd { " refused" } else { "" }
+            )
+        };
+        let ce = c.events.get(k).map_or("no event".into(), |e| {
+            format!(
+                "{} (xmlparse.c:{})",
+                show(e.increase, e.refused, e.size, e.total, e.peak),
+                e.line
+            )
+        });
+        let pe = port.get(k).map_or("no event".into(), |e| {
+            show(e.increase, e.refused, e.size, e.total, e.peak)
+        });
+        return Err(format!(
+            "tracker events differ at event {k} (C {} events, end of parse at {}; port {}, at {}): \
+             C {ce}, port {pe} ({opts:?})",
+            c.events.len(),
+            c.at_end,
+            port.len(),
+            port_at_end
+        ));
+    }
+    Ok(c.events.iter().any(|e| e.refused))
+}
+
 /// [`check`] with the run under the caller's options already made (the
-/// fuzz target reuses its own).
+/// fuzz target reuses its own). Exact parity (D-034): the traces must be
+/// equal (the port never refuses where C accepts, nor the reverse), the
+/// counts after creation and at the end of the parse equal, and two runs
+/// with tight limits (activation threshold at C's final count and at half
+/// of it, amplification factor 1.0) must agree event by event
+/// ([`compare_events`]).
 pub fn check_from(
     doc: &[u8],
     opts: &ParseOptions,
@@ -125,47 +194,42 @@ pub fn check_from(
 ) -> Result<(), String> {
     tally.runs += 1;
     match relation(base, opts)? {
-        Relation::Equal => {}
-        // The caller's options may already set tracker limits.
-        Relation::BothNoMemory => tally.c_no_memory += 1,
-        Relation::PortStricter => {
-            if opts.limits.at_threshold.is_none() && opts.limits.at_amplification.is_none() {
-                return Err(format!(
-                    "the port refuses at the default tracker limits where C accepts ({opts:?})"
-                ));
+        Relation::Equal => {
+            if refused(&base.c) {
+                tally.c_no_memory += 1;
             }
+        }
+        Relation::BothNoMemory => {
+            return Err(format!(
+                "C and the port both refuse but stop differently ({opts:?})"
+            ));
+        }
+        Relation::PortStricter => {
             tally.port_stricter += 1;
+            return Err(format!("the port refuses where C accepts ({opts:?})"));
         }
     }
-    if base.port_tracker.created < base.c_tracker.created {
+    if base.port_tracker.created != base.c_tracker.created {
         return Err(format!(
-            "port creation charge {} below C's {}",
+            "port creation charge {} differs from C's {}",
             base.port_tracker.created, base.c_tracker.created
         ));
     }
-    if relation(base, opts)? == Relation::Equal {
-        let margin = base.port_tracker.end as i64 - base.c_tracker.end as i64;
-        if margin < 0 {
-            return Err(format!(
-                "port tracker {} below C's {} at the end of the parse ({opts:?})",
-                base.port_tracker.end, base.c_tracker.end
-            ));
-        }
-        tally.min_margin = Some(tally.min_margin.map_or(margin, |m| m.min(margin)));
+    let margin = base.port_tracker.end as i64 - base.c_tracker.end as i64;
+    if margin != 0 {
+        return Err(format!(
+            "port tracker {} differs from C's {} at the end of the parse ({opts:?})",
+            base.port_tracker.end, base.c_tracker.end
+        ));
     }
+    tally.min_margin = Some(tally.min_margin.map_or(margin, |m| m.min(margin)));
     for threshold in [base.c_tracker.end, base.c_tracker.end / 2] {
         let mut o = opts.clone();
         o.limits.at_threshold = Some(threshold);
         o.limits.at_amplification = Some(Factor(1.0));
-        let r = run(doc, &o)?;
         tally.runs += 1;
-        match relation(&r, &o)? {
-            Relation::BothNoMemory => tally.c_no_memory += 1,
-            Relation::PortStricter => tally.port_stricter += 1,
-            Relation::Equal if refused(&r.c) => {
-                tally.c_no_memory += 1;
-            }
-            Relation::Equal => {}
+        if compare_events(doc, &o)? {
+            tally.c_no_memory += 1;
         }
     }
     Ok(())

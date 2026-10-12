@@ -11,9 +11,9 @@
 //!    total by its size (a refusal moves nothing), the peak is the running
 //!    maximum, and both end at 0 after `XML_ParserFree` (everything is
 //!    freed through the tracker, child parsers included);
-//! 2. the parse results (status, error code, line, column, byte index)
-//!    are equal, which covers the limit outcomes of the tightened-limit
-//!    option sets;
+//! 2. the traces are equal: the parse results (status, error code, line,
+//!    column, byte index), which covers the limit outcomes of the
+//!    tightened-limit option sets, and every callback before them;
 //! 3. the two streams are compared event by event from the parser's
 //!    creation (C reports `parserCreate`'s allocations one by one, and so
 //!    does the port since stage 3 of D-034) through the end of the parse
@@ -32,6 +32,7 @@ use std::collections::BTreeMap;
 
 use expat_difftest::docgen::{self, Rng};
 use expat_difftest::port::port_trace_with_tracker_events;
+use expat_difftest::trace::{first_difference as first_trace_difference, mask_q4};
 use expat_difftest::vectors::upstream;
 use expat_oracle::{ExtHandler, Factor, Limits, ParamEntityParsing, ParseOptions, TrackerEvent};
 
@@ -413,7 +414,10 @@ fn tracker_events_against_c() {
             Ok(left) => failures.push(format!("run {di}: port ends at {left}, not 0")),
             Err(e) => failures.push(format!("run {di}: port stream: {e}")),
         }
-        // 2. Limit outcome: error code and position.
+        // 2. Limit outcome: error code and position, and every callback
+        //    before it (a refusal C tolerates must not stop the port, and
+        //    what C hands a handler after a refused allocation, such as a
+        //    partly stored entity value, must be equal).
         if result_line(&c_trace) == result_line(&p_trace) {
             equal_result += 1;
         } else {
@@ -422,6 +426,10 @@ fn tracker_events_against_c() {
                 result_line(&c_trace),
                 result_line(&p_trace)
             ));
+        }
+        let (cm, pm) = mask_q4(&c_trace, &p_trace);
+        if let Some((line, l, r)) = first_trace_difference(&cm, &pm) {
+            failures.push(format!("run {di}: trace line {line}: C `{l}` port `{r}`"));
         }
         if let Some(e) = c.events.iter().find(|e| e.refused) {
             refusals += 1;
