@@ -474,6 +474,33 @@ on_skipped(void *ud, const XML_Char *name, int is_param) {
   end_line(t);
 }
 
+/* Module 11d test handlers (oracle_options.ext_handler / not_standalone).
+   The external entity reference handler's argument is the parser
+   (libexpat's default), whose user data is the start context. */
+static ORACLE_TLS int ext_handler_mode;
+static ORACLE_TLS int not_standalone_mode;
+
+static int XMLCALL
+on_extref(XML_Parser p, const XML_Char *context, const XML_Char *base,
+          const XML_Char *system_id, const XML_Char *public_id) {
+  struct start_ctx *c = XML_GetUserData(p);
+  struct tracer *t = begin(c->t, "extref");
+  buf_field(&t->out, context);
+  buf_field(&t->out, base);
+  buf_field(&t->out, system_id);
+  buf_field(&t->out, public_id);
+  end_line(t);
+  return ext_handler_mode == 2 ? XML_STATUS_OK : XML_STATUS_ERROR;
+}
+
+static int XMLCALL
+on_not_standalone(void *ud) {
+  struct start_ctx *c = ud;
+  struct tracer *t = begin(c->t, "notstandalone");
+  end_line(t);
+  return not_standalone_mode == 1;
+}
+
 static void XMLCALL
 on_xmldecl_w(void *ud, const XML_Char *v, const XML_Char *e, int s) {
   on_xmldecl(((struct start_ctx *)ud)->t, v, e, s);
@@ -582,6 +609,14 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   XML_SetAttlistDeclHandler(p, on_attlist);
   XML_SetNamespaceDeclHandler(p, on_nsstart, on_nsend);
   XML_SetSkippedEntityHandler(p, on_skipped);
+  ext_handler_mode = opts->ext_handler;
+  not_standalone_mode = opts->not_standalone;
+  if (opts->ext_handler)
+    XML_SetExternalEntityRefHandler(p, on_extref);
+  if (opts->not_standalone)
+    XML_SetNotStandaloneHandler(p, on_not_standalone);
+  if (opts->use_foreign_dtd)
+    XML_UseForeignDTD(p, XML_TRUE);
   if (opts->no_reparse_deferral)
     XML_SetReparseDeferralEnabled(p, XML_FALSE);
   if (opts->ns_triplets)

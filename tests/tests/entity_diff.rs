@@ -90,6 +90,9 @@ const ALWAYS: ParseOptions = ParseOptions {
     text_digest: false,
     trace_accounting: false,
     heap_cap: 0,
+    ext_handler: expat_oracle::ExtHandler::None,
+    not_standalone: None,
+    use_foreign_dtd: false,
 };
 
 /// (id, document, expected C error code with parameter entity parsing

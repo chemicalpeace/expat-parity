@@ -17,6 +17,7 @@
 //! C does.
 
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use super::accounting::Account;
 use super::dtd::EntityRef;
@@ -356,8 +357,10 @@ impl Parser {
     /// the replacement text of every parameter entity it references
     /// (which C only expands inside parameter entities), appended to
     /// `out`.
-    pub(crate) fn call_store_entity_value<E: Encoding>(
+    #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of callStoreEntityValue (parser, encoding, buffer bounds, output, accounting) plus the handler.
+    pub(crate) fn call_store_entity_value<E: Encoding, H: Handler>(
         &mut self,
+        h: &mut H,
         enc: &E,
         buf: &[u8],
         ptr: usize,
@@ -375,6 +378,7 @@ impl Parser {
                     let ienc = self.internal_encoding();
                     let mut next_in_entity = processed;
                     self.store_entity_value(
+                        h,
                         &ienc,
                         &text,
                         processed,
@@ -392,12 +396,133 @@ impl Parser {
                 self.close_entity(EntityType::Value);
                 Ok(())
             } else {
-                self.store_entity_value(enc, doc, next, out, account, &mut next)
+                self.store_entity_value(h, enc, doc, next, out, account, &mut next)
             };
             result?;
             if self.open_value_entities.is_empty() && next == doc.len() {
                 break;
             }
+        }
+        Ok(())
+    }
+
+    /// Sets or clears `entity->open` of `r`.
+    fn set_entity_open(&mut self, r: EntityRef, open: bool) {
+        if let Some(e) = self.dtd.entity_mut(r) {
+            e.open = open;
+        }
+    }
+
+    /// `getContext` (`xmlparse.c` 7685-7769): the default namespace
+    /// (`=uri`), every bound prefix (`prefix=uri`) in slot order of
+    /// `dtd->prefixes`, then the names of the open general entities in
+    /// slot order, separated by `CONTEXT_SEP` (form feed). C builds the
+    /// string in `m_tempPool` without finishing it; the port charges that
+    /// growth to the tracker.
+    fn get_context(&mut self) -> Result<Vec<u8>, Stop> {
+        const CONTEXT_SEP: u8 = 0x0C;
+        let strip = usize::from(self.namespace_separator != 0);
+        let uri_of = |uri: &[u8]| uri.get(..uri.len().saturating_sub(strip)).unwrap_or_default().to_vec();
+        let mut out = Vec::new();
+        let mut need_sep = false;
+        if let Some(b) = self.dtd.default_prefix.binding.and_then(|b| self.dtd.binding(b)) {
+            out.push(b'=');
+            out.extend_from_slice(&uri_of(&b.uri));
+            need_sep = true;
+        }
+        for id in self.dtd.prefixes.iter() {
+            let Some(binding) = self
+                .dtd
+                .prefixes
+                .value(id)
+                .and_then(|p| p.binding)
+                .and_then(|b| self.dtd.binding(b))
+            else {
+                continue;
+            };
+            if need_sep {
+                out.push(CONTEXT_SEP);
+            }
+            out.extend_from_slice(self.dtd.prefixes.key(id).unwrap_or_default());
+            out.push(b'=');
+            out.extend_from_slice(&uri_of(&binding.uri));
+            need_sep = true;
+        }
+        for id in self.dtd.general_entities.iter() {
+            if !self.dtd.general_entities.value(id).is_some_and(|e| e.open) {
+                continue;
+            }
+            if need_sep {
+                out.push(CONTEXT_SEP);
+            }
+            out.extend_from_slice(self.dtd.general_entities.key(id).unwrap_or_default());
+            need_sep = true;
+        }
+        // The terminating NUL is appended to the pool too.
+        let direct = self.direct();
+        let (p, mut heap) = self.tracker.pool(Pool::Temp, direct);
+        p.append(&mut heap, out.len().saturating_add(1))
+            .map_err(|_| Stop::Error(XmlError::NoMemory))?;
+        Ok(out)
+    }
+
+    /// An external general entity referenced in content with an external
+    /// entity reference handler set (`doContent`, `xmlparse.c` 3726-3740):
+    /// the handler gets the context string (with the entity marked open
+    /// while it is built), base, system and public identifier. The library
+    /// reads nothing itself.
+    pub(crate) fn external_general_entity<H: Handler>(&mut self, h: &mut H, r: EntityRef) -> Result<(), Stop> {
+        self.set_entity_open(r, true);
+        let context = self.get_context();
+        self.set_entity_open(r, false);
+        let context = context?;
+        let (base, system_id, public_id) = match self.dtd.entity(r) {
+            Some(e) => (e.base.clone(), e.system_id.clone(), e.public_id.clone()),
+            None => (None, None, None),
+        };
+        if !h.external_entity_ref(Some(&context), base.as_deref(), system_id.as_deref(), public_id.as_deref()) {
+            return Err(XmlError::ExternalEntityHandling.into());
+        }
+        self.tracker.temp_pool.discard();
+        Ok(())
+    }
+
+    /// An external parameter entity (or the external subset) handed to the
+    /// external entity reference handler with a `NULL` context
+    /// (`xmlparse.c` 5719-5726, 6384-6400, 7186-7202). `open`: the entity
+    /// is marked open during the call (references, not the external
+    /// subset). Returns `dtd->paramEntityRead` after the call: whether an
+    /// external entity parser read it.
+    pub(crate) fn external_param_entity<H: Handler>(
+        &mut self,
+        h: &mut H,
+        r: EntityRef,
+        open: bool,
+    ) -> Result<bool, Stop> {
+        self.dtd.param_entity_read = false;
+        if open {
+            self.set_entity_open(r, true);
+        }
+        let (base, system_id, public_id) = match self.dtd.entity(r) {
+            Some(e) => (e.base.clone(), e.system_id.clone(), e.public_id.clone()),
+            None => (None, None, None),
+        };
+        let ok = h.external_entity_ref(None, base.as_deref(), system_id.as_deref(), public_id.as_deref());
+        if open {
+            self.set_entity_open(r, false);
+        }
+        if !ok {
+            return Err(XmlError::ExternalEntityHandling.into());
+        }
+        Ok(self.dtd.param_entity_read)
+    }
+
+    /// The not-standalone check (`xmlparse.c` 5728-5735 and the like):
+    /// with a not-standalone handler set and a document that is not
+    /// standalone, the handler decides.
+    pub(crate) fn check_not_standalone<H: Handler>(&mut self, h: &mut H) -> Result<(), Stop> {
+        if !self.dtd.standalone && self.handlers.not_standalone && !h.not_standalone() {
+            return Err(XmlError::NotStandalone.into());
         }
         Ok(())
     }

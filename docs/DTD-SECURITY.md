@@ -226,8 +226,8 @@ an expansion `m_eventPtr` is not moved (section 3).
   a caller tighten the limits (opt-in), exactly as in C.
 - **No I/O in the library.** The core crate is `no_std` and has no file
   or network access; external entities can only be read by the caller's
-  handler (public API, module 12). Until module 12 the port has no
-  external entity handler at all, which equals C without
+  handler (`parse::Handler::external_entity_ref`, module 11d; refuses by
+  default). Without a handler set the port behaves like C without
   `XML_SetExternalEntityRefHandler`.
 - **No check is relaxed** to make a differential test pass; a mismatch is
   fixed at its root cause or recorded in DIVERGENCES.md with a

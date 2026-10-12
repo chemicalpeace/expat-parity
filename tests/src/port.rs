@@ -12,7 +12,7 @@ use crate::trace::{Status, TraceWriter};
 use expat::internal::parse::{
     self, ContentModel, Handler, HandlerSet, ParamEntityParsing as PortPep, Parser, Stop,
 };
-use expat_oracle::{BufferOp, ParamEntityParsing, ParseOptions};
+use expat_oracle::{BufferOp, ExtHandler, ParamEntityParsing, ParseOptions};
 
 /// The fixed hash salt of the C shim (`ORACLE_HASH_SALT` in
 /// `oracle_trace.c`).
@@ -30,6 +30,10 @@ pub enum PortTrace {
 
 struct Tracer {
     w: TraceWriter,
+    /// The shim's test external entity reference handler.
+    ext: ExtHandler,
+    /// The shim's test not-standalone handler.
+    not_standalone: Option<bool>,
 }
 
 impl Handler for Tracer {
@@ -65,6 +69,20 @@ impl Handler for Tracer {
     }
     fn skipped_entity(&mut self, name: &[u8], is_param: bool) {
         self.w.skipped(name, is_param);
+    }
+    fn external_entity_ref(
+        &mut self,
+        context: Option<&[u8]>,
+        base: Option<&[u8]>,
+        system_id: Option<&[u8]>,
+        public_id: Option<&[u8]>,
+    ) -> bool {
+        self.w.extref(context, base, system_id, public_id);
+        self.ext == ExtHandler::Accept
+    }
+    fn not_standalone(&mut self) -> bool {
+        self.w.not_standalone();
+        self.not_standalone == Some(true)
     }
     fn start_doctype_decl(
         &mut self,
@@ -139,6 +157,8 @@ fn traced_handlers() -> HandlerSet {
         notation_decl: true,
         element_decl: true,
         attlist_decl: true,
+        external_entity_ref: false,
+        not_standalone: false,
     }
 }
 
@@ -204,7 +224,14 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
         opts.ns_separator,
         ORACLE_HASH_SALT,
     );
-    p.set_handlers(traced_handlers());
+    p.set_handlers(HandlerSet {
+        external_entity_ref: opts.ext_handler != ExtHandler::None,
+        not_standalone: opts.not_standalone.is_some(),
+        ..traced_handlers()
+    });
+    if opts.use_foreign_dtd {
+        p.use_foreign_dtd(true);
+    }
     p.set_param_entity_parsing(match opts.param_entity_parsing {
         ParamEntityParsing::Never => PortPep::Never,
         ParamEntityParsing::UnlessStandalone => PortPep::UnlessStandalone,
@@ -216,6 +243,8 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
         } else {
             TraceWriter::new()
         },
+        ext: opts.ext_handler,
+        not_standalone: opts.not_standalone,
     };
     // Same order as the C shim.
     if let Some(f) = opts.limits.bl_amplification {

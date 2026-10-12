@@ -23,6 +23,9 @@ pub(crate) struct OracleOptions {
     pub(crate) text_digest: c_int,
     pub(crate) trace_accounting: c_int,
     pub(crate) heap_cap: usize,
+    pub(crate) ext_handler: c_int,
+    pub(crate) not_standalone: c_int,
+    pub(crate) use_foreign_dtd: c_int,
 }
 
 /// Mirror of `struct oracle_role_state`.

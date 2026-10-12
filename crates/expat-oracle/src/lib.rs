@@ -240,6 +240,28 @@ pub struct ParseOptions {
     /// taking its live heap above this many bytes (memory cap for bounded
     /// tests); see [`last_heap_peak`].
     pub heap_cap: usize,
+    /// External entity reference handler (module 11d, test handler: the
+    /// library never fetches anything).
+    pub ext_handler: ExtHandler,
+    /// `XML_SetNotStandaloneHandler` with a handler returning this value
+    /// (`None`: no handler); traced as `notstandalone`.
+    pub not_standalone: Option<bool>,
+    /// `XML_UseForeignDTD(parser, XML_TRUE)`.
+    pub use_foreign_dtd: bool,
+}
+
+/// The test external entity reference handler of a parse (module 11d).
+/// Every call is traced as `extref <context> <base> <systemId> <publicId>`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum ExtHandler {
+    /// No handler is set (libexpat's default).
+    #[default]
+    None,
+    /// The handler returns `XML_STATUS_ERROR`
+    /// (`XML_ERROR_EXTERNAL_ENTITY_HANDLING`).
+    Fail,
+    /// The handler returns `XML_STATUS_OK` without reading the entity.
+    Accept,
 }
 
 /// A `float` limit passed to libexpat, compared by bit pattern so the
@@ -362,6 +384,17 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
         text_digest: c_int::from(opts.text_digest),
         trace_accounting: c_int::from(opts.trace_accounting),
         heap_cap: opts.heap_cap,
+        ext_handler: match opts.ext_handler {
+            ExtHandler::None => 0,
+            ExtHandler::Fail => 1,
+            ExtHandler::Accept => 2,
+        },
+        not_standalone: match opts.not_standalone {
+            None => 0,
+            Some(true) => 1,
+            Some(false) => 2,
+        },
+        use_foreign_dtd: c_int::from(opts.use_foreign_dtd),
     };
     let mut out: *mut u8 = std::ptr::null_mut();
     let mut out_len: usize = 0;

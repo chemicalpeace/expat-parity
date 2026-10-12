@@ -9,8 +9,9 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 - **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-10 done;
   module 11 in progress: 11a (declarations, PR #6), 11b (internal entity
   expansion and recursion, PR #7), 11b2 (billion-laughs limits, PR #8) and
-  11c (allocation tracker, D-030) done; 11d (external entities via a test
-  handler) next.
+  11c (allocation tracker, D-030) done; 11d step D1 (external entity and
+  not-standalone test handlers, D-031) done; D2 (external entity parsers)
+  next.
   `Stop::DtdNotPorted` remains only where an external entity parser would
   be needed (D-023, D-027, D-028).
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
@@ -71,7 +72,7 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 8 | `role` prolog state machine | `xmlrole.c` | **done** — `role::PrologState`, all 51 handlers; D-020 |
 | 9 | `pool` / `hash` / `heap`: string pool, hash table, allocation accounting | `xmlparse.c` | **done** — `StringPool`, `HashTable`, `Heap`; white-box vs C (block lists, slot layout, every allocation request, failure of each attempt); D-021 |
 | 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors under 11 option sets incl. namespace triplets, generated documents, fuzzing), buffer state white-box; D-023, D-025; Q-1/Q-2 resolved (replicate, D-024). DTD roles stop with `Stop::DtdNotPorted` |
-| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables); spec `docs/DTD-SECURITY.md`, D-026, D-027. **11b done** — internal entity expansion in content, attribute values, default values, parameter entities and entity values, recursion and nesting checks (`parse::entity`, D-028); 540/540 upstream vectors compared. **11b2 done** — billion-laughs setters, bounded amplification tests, Q-4 (D-029). **11c done** — allocation tracker charged at C's allocation points, never below C (`parse::tracker`, D-030, divergence DV-1). Next: external entities via a test handler (11d) |
+| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables); spec `docs/DTD-SECURITY.md`, D-026, D-027. **11b done** — internal entity expansion in content, attribute values, default values, parameter entities and entity values, recursion and nesting checks (`parse::entity`, D-028); 540/540 upstream vectors compared. **11b2 done** — billion-laughs setters, bounded amplification tests, Q-4 (D-029). **11c done** — allocation tracker charged at C's allocation points, never below C (`parse::tracker`, D-030, divergence DV-1). **11d D1 done** — external entity and not-standalone handler call sites, `getContext`, foreign DTD (D-031). Next: D2 external entity parsers |
 | 12 | public API `expat::Parser` (default handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers, unknown-encoding handler, `XML_GetInputContext`, entropy for the salt) | — | not started (the trace adapter and differential `parse_trace` already exist, module 10) |
 | 13 | `expat-capi` (optional) | `expat.h` | not started |
 

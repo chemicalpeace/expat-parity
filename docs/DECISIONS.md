@@ -634,3 +634,22 @@ recorded in DIVERGENCES.md.
 - **Verification.** `tests/tests/tracker_diff.rs` (groups in REPORT.md,
   module 11c), the tracker relation in the `parse_trace` fuzz target
   (`expat_difftest::tracker::check_from`), injected bugs K1-K7.
+
+## D-031 External entities through test handlers (module 11d)
+
+- **What C does.** libexpat never reads an external entity itself. It
+  calls `XML_ExternalEntityRefHandler` with `getContext` (general
+  entities) or a NULL context (parameter entities, the external subset),
+  base, system and public identifier; the application may create an
+  external entity parser and feed it. Returning `XML_STATUS_ERROR` stops
+  the parse with `XML_ERROR_EXTERNAL_ENTITY_HANDLING` (21).
+- **Decision.** The differential harness uses test handlers on both sides
+  with identical, deterministic behaviour (trace the arguments, then fail
+  or accept). In step D2 the accepting handler additionally reads the
+  entity from an in-memory map keyed by system identifier, through an
+  external entity parser; no file or network access exists in the
+  library, the oracle shim or the harness. The port's `Handler` gets
+  `external_entity_ref` and `not_standalone`, refusing by default.
+- **Why.** Equal handler calls and arguments are the observable contract
+  of this part of libexpat; an in-memory resolver keeps the tests
+  hermetic and bounded.
