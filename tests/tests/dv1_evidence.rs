@@ -501,3 +501,33 @@ fn binding_one_element() {
         );
     }
 }
+
+/// Pool slack at a block boundary: an attribute value of `refs` x 395
+/// expanded characters plus `tail` literal characters.
+fn slack_doc(refs: usize, tail: usize) -> Vec<u8> {
+    let ent = if std::env::var("DV1_MB").is_ok() { format!("{}\u{e9}", "x".repeat(393)) } else { "x".repeat(395) };
+    let mut d = format!("<!DOCTYPE r [<!ENTITY ee '{ent}'>]><r v='").into_bytes();
+    for _ in 0..refs {
+        d.extend_from_slice(b"&ee;");
+    }
+    if std::env::var("DV1_MB").is_ok() { d.extend_from_slice("\u{e9}".as_bytes()); }
+    d.extend(std::iter::repeat_n(b'x', tail));
+    d.extend_from_slice(b"'/>");
+    d
+}
+
+#[test]
+fn pool_slack_boundary() {
+    let Ok(spec) = std::env::var("DV1_SLACK") else { return };
+    let mut it = spec.split(':').map(|x| x.parse::<usize>().unwrap());
+    let (refs, t0, t1) = (it.next().unwrap(), it.next().unwrap(), it.next().unwrap());
+    for tail in t0..=t1 {
+        let doc = slack_doc(refs, tail);
+        let out = compare(&format!("slack{tail}"), &doc, &base(), WIDE);
+        println!(
+            "SLACK refs {refs} tail {tail} value {} chars doc {} B | C {:?} end {:>9} | port {:?} end {:>9} peak {:>9}",
+            refs * 395 + tail, doc.len(), result_error_code(&out.c), out.c_tracker.end,
+            result_error_code(&out.port), out.port_tracker.end, out.port_tracker.peak
+        );
+    }
+}
