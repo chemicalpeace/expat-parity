@@ -715,6 +715,118 @@ freeing of external parameter entity parsers, which that target never
 creates. Merged corpora: `parse_trace` 13,869 files, `buffer_diff` 10,766
 files (docs/FUZZING.md), scanned for personal data (no hits).
 
+### Module 11 step E: coverage of the DTD code
+
+Measured with `cargo-llvm-cov 0.9.1` (toolchain 1.99.0, aarch64 Linux,
+`--release`), on the code of commit ccf66a1 (= main fdd4182 after PR #11):
+`cargo llvm-cov --no-report --release` for the `expat` unit tests and for
+every `expat-difftest` integration test target, then
+`cargo llvm-cov report --release --ignore-filename-regex
+'(tests/|crates/expat-oracle|benches/|fuzz/|vendor)'`. Not included:
+doctests, and `tok_diff::upstream_vectors_every_offset` (it exceeds the
+two-minute command limit of the measuring machine when instrumented; it
+exercises the tokenizer, not the DTD code). The report warns that 65
+functions have mismatched profile data (the same generic functions
+instantiated in different test binaries); the numbers were identical with
+and without the unit-test profile. Raw table (one run, not re-measured on
+other platforms): `docs/coverage/module-11-ccf66a1.txt`.
+
+`crates/expat` overall:
+
+| Metric | Covered | Total | % |
+|---|---|---|---|
+| Lines | 7,164 | 7,552 | 94.86 |
+| Regions | 12,787 | 13,441 | 95.13 |
+| Functions | 560 | 608 | 92.11 |
+
+(Module 10: 92.59 % lines, 93.97 % regions, 92.29 % functions.)
+
+The DTD modules:
+
+| File | Lines | Regions | Functions |
+|---|---|---|---|
+| `parse/dtd.rs` | 268 / 269 (99.63 %) | 410 / 421 (97.39 %) | 22 / 22 (100 %) |
+| `parse/decl.rs` | 704 / 744 (94.62 %) | 1,341 / 1,430 (93.78 %) | 21 / 25 (84.00 %) |
+| `parse/model.rs` | 80 / 82 (97.56 %) | 108 / 111 (97.30 %) | 5 / 5 (100 %) |
+| `parse/entity.rs` | 352 / 361 (97.51 %) | 543 / 567 (95.77 %) | 24 / 26 (92.31 %) |
+| `parse/tracker.rs` | 473 / 500 (94.60 %) | 749 / 803 (93.28 %) | 52 / 58 (89.66 %) |
+| `parse/accounting.rs` | 34 / 36 (94.44 %) | 37 / 39 (94.87 %) | 3 / 3 (100 %) |
+| `parse/external.rs` | 565 / 614 (92.02 %) | 1,008 / 1,124 (89.68 %) | 25 / 26 (96.15 %) |
+
+For reference: `parse/content.rs` 94.82 %, `parse/prolog.rs` 95.07 %,
+`parse/mod.rs` 81.51 % lines.
+
+Notable uncovered areas (from `--show-missing-lines`):
+
+- **Suspend and abort** (`Parsing::Suspended` / `Finished`, `reenter`) in
+  `content.rs`, `prolog.rs`, `external.rs`: reachable only through
+  `XML_StopParser` / `XML_ResumeParser`, which are module 12.
+- **Allocation refusals at single points**: the `NoMemory` returns of
+  `dtdCopy` (attribute ids, element types, default attributes, entities),
+  `setContext` (temporary pool, prefix lookup, bindings), the child
+  creation, `storeEntityValue`, `processEntity`'s `OPEN_INTERNAL_ENTITY`,
+  and the tracker's tag, binding, `m_nsAtts`, scaffold and group-connector
+  refusals. The tracker relation and the threshold sweeps reach refusals
+  in aggregate, but not each point.
+- **`m_nsAtts` growth** (`Tracker::ns_atts` realloc beyond 8 slots, and
+  the `m_nsAtts` term of `Tracker::own_bytes`, which an external parameter
+  entity parser never has).
+- **`XML_UnparsedEntityDeclHandler`** (`decl.rs` 487-493): the harness
+  traces unparsed entities through `XML_EntityDeclHandler` only, so the
+  port's call site of the unparsed-entity handler is not compared.
+- **Error branches of the external processors**: invalid, partial and
+  partial-character tokens right after a text declaration in
+  `entityValueInitProcessor` and `externalParEntInitProcessor`, an
+  amplification breach inside an IGNORE section, the undecided-encoding
+  paths of an entity whose encoding is detected late.
+- **Defensive guards**: `XML_ERROR_UNEXPECTED_STATE` returns in `decl.rs`
+  and `entity.rs` and `external.rs`, `None` branches of entity lookups,
+  the input-length overflow guard of `XML_Parse`; the default no-op bodies
+  of the `Handler` trait and getters such as `id_attribute_index` in
+  `mod.rs` (the harness overrides every handler).
+
+### Module 11 summary: all test groups
+
+One row per test group of module 11 (details, counts and injected bugs in
+the module sections above). "Same" in the policy column means the port's
+behaviour and defaults are C's (D-026).
+
+| Step | Group (test) | C behaviour | Security policy | Known divergences |
+|---|---|---|---|---|
+| 11a | Upstream vectors, generated DTDs, attribute definitions, deep models (`parse_diff`) | All `doProlog` declaration roles; error codes 2, 4, 8, 10, 11, 14-18, 27, 28, 30, 32 reached; content models nested to 20,000 groups. | Same; no early stop remains (11d). | none |
+| 11a | Repeated attribute definitions (`repeated_attribute_definitions_match_c`) | First definition wins (`defaultAttForName`). | Same. | none |
+| 11b | Content, attribute values, default values (`entity_diff` `content-*`, `attr-*`, `default-*`) | Replacement text tokenised in place; external entities in attributes 16, unparsed 15, undeclared 11. | Same; expansion bounded only by the amplification limit. | none |
+| 11b | Parameter entities (`pe-*`) | Expanded only when PE parsing is not NEVER; PE in an internal-subset entity value 10; 29, 24. | Default NEVER. | none |
+| 11b | Recursion, nesting, deep chains and cycles | 12 at the closing reference, 13 for broken nesting; iterative expansion, 10,000 open entities on the heap. | Same; bounded inputs. | none |
+| 11b | Generated entity graphs (6,000) | Random declarations and references in every context. | Same. | none |
+| 11b2 | Setters, default limits, custom limits, threshold and amplification sweeps, quadratic blow-up, breach positions (`amplification_diff`) | 100.0 / 8 MiB defaults; 43 at exactly C's token, position and counters. | Same defaults, same setter validation. | none |
+| 11b2 | Q-4 (`q4_epilog_name_at_end_of_buffer`) | C adds `NULL - s` to the direct counter (undefined behaviour), then error 9. | Port counts 0 bytes. | Q-4 (counter only, masked) |
+| 11c | Setters, creation charge, upstream vectors, generated documents, sweeps, tracker-only attribute, attribute sizes, content control (`tracker_diff`) | 100.0 / 64 MiB; 3,040 bytes after creation; error 1 when the tracked total breaches; the input buffer is not tracked. | Whenever C refuses, the port refuses; at the defaults the port never refused a document C accepts in any test. | DV-1: the port can refuse within a 11,764-13,352-byte margin earlier (only seen with tightened limits); **pending owner decision** |
+| 11d D1 | Curated, pinned, generated (`external_diff`) | Handler called at C's sites with C's arguments; 21 / 22 errors; foreign DTD. | Library reads nothing. | none |
+| 11d D2 | Curated (2,025), pinned, nesting cap, generated (6,000) (`external_parser_diff`) | Child parsers: text declarations, conditional sections, PEs in entity values, recursion through the context. | Same; nothing read by the library. | none |
+| 11d D2 | Billion laughs across external entities | 87,381 nested external parsers accepted at the defaults; 43 inside a child with a 4 KiB threshold. | Same (security note in DTD-SECURITY.md: only the handler can cap external parsers). | none (tracker margin asserted) |
+| 11d D2 | Tracker relation, subset growth | DTD growth from the subset stays charged to the root. | As 11c. | DV-1 margin only |
+| all | Fuzzing (`parse_trace`, `buffer_diff`) | Port vs C by trace, incl. DTDs, limits, tracker relation, external entity bodies. | — | none found |
+
+**Remaining gaps** (module 11):
+
+1. DV-1 is **pending the owner's decision** (DIVERGENCES.md); the code
+   is unchanged.
+2. Suspend / resume, the default handler, the unknown-encoding handler and
+   `XML_GetInputContext` are module 12; their branches in the DTD code are
+   uncovered. External entity parsers exist inside `expat::parse` but have
+   no public API yet.
+3. The `encoding` argument of `XML_ExternalEntityParserCreate` is never
+   exercised (both test handlers pass NULL).
+4. `XML_UnparsedEntityDeclHandler` is not compared.
+5. Allocation refusals are compared in aggregate (relation, sweeps), not
+   at each allocation point; `m_nsAtts` growth is uncovered.
+6. libexpat does not cap the number or depth of external entity parsers;
+   the port replicates that (an application must cap them in its handler).
+7. Coverage: 94.86 % lines for `crates/expat`, below the Phase 4 target of
+   95 %; measured on one platform, without doctests.
+8. Out of scope: `XML_UNICODE` builds (D-002).
+
 ## Divergences
 
 `docs/DIVERGENCES.md`. One divergence: DV-1 (module 11c, D-030), the
