@@ -110,6 +110,17 @@ pub trait Encoding {
     /// `XmlUtf8Convert`: converts from the start of `from` into `to`.
     fn to_utf8(&self, from: &[u8], to: &mut [u8]) -> Converted;
 
+    /// `XmlUtf8Convert(enc, &from, lim, ...)` on `buf[from..]` with C's
+    /// `fromLim` at `lim`, for callers whose `lim` can fall inside a
+    /// multi-byte sequence (`toAscii` in `XmlParseXmlDecl`, which steps by
+    /// `minBytesPerChar` and so starts at every byte). The built-in
+    /// converters stop at `lim` like [`Encoding::to_utf8`] on
+    /// `buf[from..lim]`; `unknown_toUtf8` hands the converter the whole
+    /// sequence, reading past `lim` (see [`Unknown`]).
+    fn to_utf8_until(&self, buf: &[u8], from: usize, lim: usize, to: &mut [u8]) -> Converted {
+        self.to_utf8(buf.get(from..lim).unwrap_or_default(), to)
+    }
+
     /// `XmlUtf16Convert`: converts from the start of `from` into `to`.
     fn to_utf16(&self, from: &[u8], to: &mut [u16]) -> Converted;
 }

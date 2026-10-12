@@ -1,0 +1,38 @@
+# libFuzzer log, trimmed: 305 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3885842884
+INFO: Loaded 1 modules   (75293 inline 8-bit counters): 75293 [0xaaaada91c970, 0xaaaada92ef8d), 
+INFO: Loaded 1 PC tables (75293 PCs): 75293 [0xaaaada92ef90,0xaaaadaa55160), 
+INFO:    14597 files found in <corpus>
+INFO: seed corpus: files: 14597 min: 1b max: 11931b total: 5254489b rss: 43Mb
+#8192	pulse  cov: 12667 ft: 42456 corp: 7806/192Kb exec/s: 2730 rss: 423Mb
+#14598	INITED cov: 17195 ft: 76027 corp: 13604/4470Kb exec/s: 442 rss: 527Mb
+#16384	pulse  cov: 17195 ft: 76027 corp: 13604/4470Kb lim: 11944 exec/s: 481 rss: 527Mb
+#32768	pulse  cov: 17195 ft: 76035 corp: 13608/4478Kb lim: 11944 exec/s: 744 rss: 674Mb
+#65536	pulse  cov: 17198 ft: 76058 corp: 13622/4479Kb lim: 11957 exec/s: 923 rss: 674Mb
+#110115	DONE   cov: 17202 ft: 76097 corp: 13640/4499Kb lim: 11996 exec/s: 1090 rss: 674Mb
+###### Recommended dictionary. ######
+"xmldecl" # Uses: 1684
+"3\000\000\000" # Uses: 1290
+"accounting " # Uses: 885
+"\377\377\377\377" # Uses: 915
+"\377\377\377\011" # Uses: 813
+"\000\000\000\000\000\000\000\000" # Uses: 777
+"\377\377\377\000" # Uses: 750
+"xmldecl 1.0" # Uses: 441
+"\011\000\000\000" # Uses: 226
+"\000\356\356\000" # Uses: 228
+"\317\313\212\244\324Q\000\000" # Uses: 132
+"start" # Uses: 135
+"extend 0 1 " # Uses: 37
+"x0lns:" # Uses: 44
+###### End of recommended dictionary. ######
+Done 110115 runs in 101 second(s)
+stat::number_of_executed_units: 110115
+stat::average_exec_per_sec:     1090
+stat::new_units_added:          305
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              674

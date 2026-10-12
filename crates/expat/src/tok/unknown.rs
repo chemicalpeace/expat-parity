@@ -220,23 +220,43 @@ impl<C: Converter> Encoding for Unknown<C> {
         false
     }
 
-    /// `unknown_toUtf8`. A multi-byte sequence that is not complete in
-    /// `from` stops the conversion with
-    /// [`ConvertResult::InputIncomplete`] (C passes the pointer to the
-    /// converter and reads past the end; the parser never gives it such
-    /// input).
+    /// `unknown_toUtf8` on all of `from`.
     fn to_utf8(&self, from: &[u8], to: &mut [u8]) -> Converted {
+        self.to_utf8_until(from, 0, from.len(), to)
+    }
+
+    /// `unknown_toUtf8` from `buf[from]` with C's `fromLim` at `lim`. As in
+    /// C, the loop stops only when the position equals `lim` exactly, and a
+    /// lead byte's whole sequence goes to the converter even when it
+    /// extends past `lim` (C `*fromP += type - (BT_LEAD2 - 2)`, after which
+    /// the position never equals `lim` and conversion goes on until the
+    /// output is full). `toAscii` in `XmlParseXmlDecl` relies on this: it
+    /// starts at every byte of the declaration, including trailing bytes
+    /// that the map makes lead bytes. Where C would read past the end of
+    /// `buf` (a sequence not complete in `buf`), the port stops with
+    /// [`ConvertResult::InputIncomplete`] instead (docs/DIVERGENCES.md, Q-5).
+    fn to_utf8_until(&self, buf: &[u8], from: usize, lim: usize, to: &mut [u8]) -> Converted {
         let mut out = Out::new(to);
+        // Positions relative to `from`; a `lim` before `from` is never
+        // reached, as in C.
+        let buf = buf.get(from..).unwrap_or_default();
+        let lim = lim.checked_sub(from);
         let mut f = 0;
-        while let Some(&b) = from.get(f) {
+        loop {
+            if Some(f) == lim {
+                return done(ConvertResult::Completed, f, out.n);
+            }
+            let Some(&b) = buf.get(f) else {
+                return done(ConvertResult::InputIncomplete, f, out.n);
+            };
             let [n, b1, b2, b3] = self.utf8.get(usize::from(b)).copied().unwrap_or_default();
-            let mut buf = [b1, b2, b3, 0];
+            let mut seq = [b1, b2, b3, 0];
             let (n, step) = if n == 0 {
-                let Some(c) = self.convert_at(from, f) else {
+                let Some(c) = self.convert_at(buf, f) else {
                     return done(ConvertResult::InputIncomplete, f, out.n);
                 };
-                buf = [0; 4];
-                let n = u32::try_from(c).map_or(0, |c| utf8_encode(c, &mut buf));
+                seq = [0; 4];
+                let n = u32::try_from(c).map_or(0, |c| utf8_encode(c, &mut seq));
                 (n, self.lead_len(b).unwrap_or(1))
             } else {
                 (usize::from(n), 1)
@@ -244,12 +264,11 @@ impl<C: Converter> Encoding for Unknown<C> {
             if n > out.room() {
                 return done(ConvertResult::OutputExhausted, f, out.n);
             }
-            for &x in buf.iter().take(n) {
+            for &x in seq.iter().take(n) {
                 out.push(x);
             }
             f = f.saturating_add(step);
         }
-        done(ConvertResult::Completed, f, out.n)
     }
 
     /// `unknown_toUtf16`. An incomplete final sequence is handled as in

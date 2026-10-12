@@ -1,0 +1,33 @@
+# after the fix: library fb35448e (branch head 020a0618), aarch64 Linux: copy docs/evidence/q5/repro_xmldecl_unknown.rs to tests/examples/, cargo run -q --release -p expat-difftest --example repro_xmldecl_unknown
+# first block: port-only case <?xml \xC3\xA9?>< (C would read past the buffer, Q-5)
+more to_ascii 6: 73
+more to_ascii 7: -1
+Some(7)
+seed 0x52f43d23123766f6 doc "<?xml é?><a/>" decl end 10
+  byte 6 0xc3 map -2
+  byte 7 0xa9 map -4
+  byte 8 0x3f map 63
+  byte 9 0x3e map 62
+  ns=false gte=false: port ok=false bad=Some(8) | C ok=false bad=Some(8)
+  ns=false gte=true: port ok=false bad=Some(8) | C ok=false bad=Some(8)
+  ns=true gte=false: port ok=false bad=Some(8) | C ok=false bad=Some(8)
+  ns=true gte=true: port ok=false bad=Some(8) | C ok=false bad=Some(8)
+  to_ascii(6, end 8) port 73 
+  to_ascii(7, end 8) port 97 
+seed 0xfe8d9b29cbd0ff22 doc "<?xml noé ?><a/>" decl end 13
+  byte 6 0x6e map 110
+  byte 7 0x6f map 111
+  byte 8 0xc3 map -3
+  byte 9 0xa9 map -4
+  byte 10 0x20 map 32
+  byte 11 0x3f map 63
+  byte 12 0x3e map 62
+  ns=false gte=false: port ok=false bad=Some(11) | C ok=false bad=Some(11)
+  ns=false gte=true: port ok=false bad=Some(11) | C ok=false bad=Some(11)
+  ns=true gte=false: port ok=false bad=Some(11) | C ok=false bad=Some(11)
+  ns=true gte=true: port ok=false bad=Some(11) | C ok=false bad=Some(11)
+  to_ascii(6, end 11) port 110 
+  to_ascii(7, end 11) port 111 
+  to_ascii(8, end 11) port 85 
+  to_ascii(9, end 11) port 60 
+  to_ascii(10, end 11) port 32 

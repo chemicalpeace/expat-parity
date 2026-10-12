@@ -146,8 +146,11 @@ fn utf16(enc: Utf16, s: &str) -> Vec<u8> {
 }
 
 proptest! {
+    // 4,000 cases by default; long local runs set PROPTEST_CASES (and
+    // PROPTEST_RNG_SEED for a reproducible stream), e.g. the 100,000-case
+    // runs of docs/REPORT.md (Q-5).
     #![proptest_config(ProptestConfig {
-        cases: 4_000,
+        cases: std::env::var("PROPTEST_CASES").ok().and_then(|v| v.parse().ok()).unwrap_or(4_000),
         failure_persistence: None,
         ..ProptestConfig::default()
     })]
