@@ -1241,10 +1241,16 @@ found later on branch `q5-verification` (PR #17, open, not merged): a
 data race in `llvm-cov report -dump`; its fix (`-dump -num-threads=1` in
 `scripts/coverage.sh`) lives on that branch, not on this one.
 
+**Fuzzing** (with the duplicate-check fix, `docs/fuzz-logs/part2`):
+`parse_trace` 7 slices, 677 s, 783,495 executions (committed corpus plus
+40 working-corpus seeds of start tags with two prefixes bound to one
+URI, with and without triplets); `buffer_diff` 7 slices, 672 s, 4,296,352
+executions. No crash, no mismatch. aarch64 Linux only.
+
 **Not done here.** OOM fault injection per allocation point
 (waits for the DV-1 parity phase-2 branch, PR #16, to merge, so that the
 port's allocation points are final). Committed `parse_trace` corpus
-seeds for namespaced duplicate attributes (the fuzz runs below used 40
+seeds for namespaced duplicate attributes (the fuzz runs above used 40
 such seeds in the working corpus only; the corpus merge was not done). Suspend/resume: see "Remaining uncovered
 lines".
 

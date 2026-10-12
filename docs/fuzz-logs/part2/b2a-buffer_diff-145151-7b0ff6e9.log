@@ -1,0 +1,55 @@
+# libFuzzer log, trimmed: 473 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1395230049
+INFO: Loaded 1 modules   (75875 inline 8-bit counters): 75875 [0xaaaabb1dcef0, 0xaaaabb1ef753), 
+INFO: Loaded 1 PC tables (75875 PCs): 75875 [0xaaaabb1ef758,0xaaaabb317d88), 
+INFO:    10766 files found in <corpus>
+INFO: seed corpus: files: 10766 min: 1b max: 30663b total: 2872060b rss: 40Mb
+#8192	pulse  cov: 11593 ft: 36101 corp: 8130/361Kb exec/s: 2730 rss: 419Mb
+#10767	INITED cov: 12890 ft: 50125 corp: 10657/2732Kb exec/s: 2153 rss: 424Mb
+#16384	pulse  cov: 12890 ft: 50125 corp: 10657/2732Kb lim: 30705 exec/s: 2730 rss: 491Mb
+Loaded 1024/10774 files from <corpus>
+Loaded 2048/10774 files from <corpus>
+Loaded 4096/10774 files from <corpus>
+Loaded 8192/10774 files from <corpus>
+#32768	pulse  cov: 12890 ft: 50125 corp: 10657/2732Kb lim: 30775 exec/s: 4096 rss: 567Mb
+#65536	pulse  cov: 12890 ft: 50126 corp: 10658/2731Kb lim: 30971 exec/s: 5461 rss: 579Mb
+#131072	pulse  cov: 12890 ft: 50135 corp: 10662/2731Kb lim: 31321 exec/s: 5242 rss: 579Mb
+#262144	pulse  cov: 12892 ft: 50172 corp: 10669/2735Kb lim: 32007 exec/s: 5825 rss: 579Mb
+#524288	pulse  cov: 12893 ft: 50201 corp: 10682/2736Kb lim: 33287 exec/s: 6241 rss: 579Mb
+#602135	DONE   cov: 12893 ft: 50211 corp: 10688/2735Kb lim: 33632 exec/s: 6272 rss: 579Mb
+###### Recommended dictionary. ######
+"\3771" # Uses: 7076
+"\3700\304\306dR\000\000" # Uses: 5627
+"a7" # Uses: 4973
+"Wvvvvvvvvv" # Uses: 3563
+"\377\377" # Uses: 3308
+"d1" # Uses: 3107
+"\377\377\377\377\377\377\377\000" # Uses: 2842
+"\000\000\000\005" # Uses: 2629
+"a5" # Uses: 2437
+"d6" # Uses: 2435
+"+\000\000\000\000\000\000\000" # Uses: 2034
+"\002\000\000\000\000\000\000\000" # Uses: 1680
+"b7" # Uses: 1624
+"d0" # Uses: 1572
+"TUUUUUU\005" # Uses: 1337
+"\005\000\000\000" # Uses: 1360
+"\000\000\000)" # Uses: 1186
+"\000\000\000\000\000\000\000\000" # Uses: 959
+"\001\377" # Uses: 866
+"\377\377\377\377\377\377\377?" # Uses: 856
+"\017\000" # Uses: 461
+"2\000" # Uses: 282
+"k15" # Uses: 24
+"d8" # Uses: 12
+###### End of recommended dictionary. ######
+Done 602135 runs in 96 second(s)
+stat::number_of_executed_units: 602135
+stat::average_exec_per_sec:     6272
+stat::new_units_added:          473
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              579

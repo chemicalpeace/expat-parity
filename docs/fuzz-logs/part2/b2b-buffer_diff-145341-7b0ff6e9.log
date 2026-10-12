@@ -1,0 +1,55 @@
+# libFuzzer log, trimmed: 522 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3299040149
+INFO: Loaded 1 modules   (75875 inline 8-bit counters): 75875 [0xaaaac82ccef0, 0xaaaac82df753), 
+INFO: Loaded 1 PC tables (75875 PCs): 75875 [0xaaaac82df758,0xaaaac8407d88), 
+INFO:    11235 files found in <corpus>
+INFO: seed corpus: files: 11235 min: 1b max: 30663b total: 3110133b rss: 40Mb
+#8192	pulse  cov: 11465 ft: 34921 corp: 7908/328Kb exec/s: 2730 rss: 422Mb
+#11236	INITED cov: 12893 ft: 50211 corp: 10657/2713Kb exec/s: 1872 rss: 428Mb
+#16384	pulse  cov: 12893 ft: 50211 corp: 10657/2713Kb lim: 30240 exec/s: 2730 rss: 485Mb
+#32768	pulse  cov: 12893 ft: 50216 corp: 10658/2714Kb lim: 30310 exec/s: 4096 rss: 518Mb
+#65536	pulse  cov: 12893 ft: 50220 corp: 10661/2713Kb lim: 30464 exec/s: 5041 rss: 518Mb
+#131072	pulse  cov: 12893 ft: 50224 corp: 10664/2710Kb lim: 30842 exec/s: 5461 rss: 518Mb
+#262144	pulse  cov: 12894 ft: 50239 corp: 10674/2722Kb lim: 31584 exec/s: 5957 rss: 518Mb
+#524288	pulse  cov: 12896 ft: 50352 corp: 10695/2754Kb lim: 32999 exec/s: 6472 rss: 518Mb
+#631746	DONE   cov: 12896 ft: 50368 corp: 10705/2751Kb lim: 33419 exec/s: 6580 rss: 518Mb
+###### Recommended dictionary. ######
+"s\000\000\000" # Uses: 7699
+"e0" # Uses: 5056
+"bb" # Uses: 4292
+"\000\000\000\000\000\000\000\000" # Uses: 3699
+"\000\000\000\000" # Uses: 3523
+"XH\000\000" # Uses: 3498
+"b5" # Uses: 2948
+")\000" # Uses: 1990
+"b2" # Uses: 1896
+"vwvvvvvv" # Uses: 1777
+";>" # Uses: 1688
+"p:" # Uses: 1493
+"\001\000\000\000\000\000\000g" # Uses: 1406
+"vvZvvvvvvv" # Uses: 1330
+"Zvvvvvvv" # Uses: 1264
+"d1" # Uses: 1188
+"<<" # Uses: 1193
+"Zv" # Uses: 1123
+"ar" # Uses: 967
+"Zvvvvvvvvv" # Uses: 874
+"\377\377\376\357" # Uses: 684
+"a6" # Uses: 672
+"\377\000" # Uses: 310
+"id" # Uses: 84
+"vZvvvvvvvv" # Uses: 55
+"\377W" # Uses: 47
+"\377\377\377O" # Uses: 56
+"2a\000\000" # Uses: 27
+###### End of recommended dictionary. ######
+Done 631746 runs in 96 second(s)
+stat::number_of_executed_units: 631746
+stat::average_exec_per_sec:     6580
+stat::new_units_added:          522
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              518
