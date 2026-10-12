@@ -1,0 +1,49 @@
+# libFuzzer log, trimmed: 412 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=105 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 279890911
+INFO: Loaded 1 modules   (75293 inline 8-bit counters): 75293 [0xaaaac3cac970, 0xaaaac3cbef8d), 
+INFO: Loaded 1 PC tables (75293 PCs): 75293 [0xaaaac3cbef90,0xaaaac3de5160), 
+INFO:    13869 files found in <corpus>
+INFO: seed corpus: files: 13869 min: 1b max: 11931b total: 4860711b rss: 43Mb
+#8192	pulse  cov: 13413 ft: 44938 corp: 8090/216Kb exec/s: 2730 rss: 424Mb
+#13870	INITED cov: 17175 ft: 75792 corp: 13590/4439Kb exec/s: 478 rss: 525Mb
+#16384	pulse  cov: 17175 ft: 75792 corp: 13590/4437Kb lim: 11944 exec/s: 564 rss: 525Mb
+Loaded 1024/13888 files from <corpus>
+Loaded 2048/13888 files from <corpus>
+Loaded 4096/13888 files from <corpus>
+#32768	pulse  cov: 17177 ft: 75812 corp: 13597/4452Kb lim: 11944 exec/s: 936 rss: 662Mb
+#65536	pulse  cov: 17178 ft: 75830 corp: 13606/4451Kb lim: 11970 exec/s: 1129 rss: 662Mb
+#131072	pulse  cov: 17186 ft: 75869 corp: 13630/4459Kb lim: 12009 exec/s: 1351 rss: 662Mb
+#143517	DONE   cov: 17186 ft: 75880 corp: 13635/4464Kb lim: 12022 exec/s: 1353 rss: 662Mb
+###### Recommended dictionary. ######
+"\000\356\356\000" # Uses: 1370
+"text a&b<2<" # Uses: 1239
+"\001\000\000\000" # Uses: 1358
+"\017\000\000\000\000\000\000\000" # Uses: 1321
+"accounting " # Uses: 832
+"\001\000\000\000\000\000\000\000" # Uses: 777
+"\010\000\000\000\000\000\000\000" # Uses: 657
+"\025\000\000\000\000\000\000\000" # Uses: 605
+"\032\000\000\000\000\000\000\000" # Uses: 397
+"\006\000\000\000" # Uses: 259
+"entity e0 0" # Uses: 217
+"\000\000" # Uses: 164
+"oYYY" # Uses: 161
+"\000\012" # Uses: 151
+"\001\000\0006" # Uses: 127
+"\000\000\000\000\000\000\000\000" # Uses: 136
+"\377\377\377\377\377\377\377?" # Uses: 108
+"\000\000\000\000\000\000\000\024" # Uses: 86
+"\006\000" # Uses: 35
+"\000\000\000\000" # Uses: 27
+"&\000\000\000" # Uses: 1
+###### End of recommended dictionary. ######
+Done 143517 runs in 106 second(s)
+stat::number_of_executed_units: 143517
+stat::average_exec_per_sec:     1353
+stat::new_units_added:          412
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              662
