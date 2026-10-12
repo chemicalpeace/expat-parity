@@ -20,8 +20,10 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   Windows, after correcting an llvm-cov artefact that had hidden 7 covered
   lines (raw step E figure 94.86 %). DV-1 (tracker refusing earlier than
   C) is removed by exact per-allocation parity (D-034 stages 1-8, branch
-  `dv1-parity-events`): equal tracker streams and traces on aarch64 Linux;
-  per-platform CI results in REPORT.md "DV-1 parity, stages 2-8". Next:
+  `dv1-parity-events`, PR #16): equal tracker streams, traces, W1/W2/R1
+  boundaries and structure sizes on aarch64 Linux, x86_64 Linux, aarch64
+  macOS and x86_64 Windows, CI run 38245716778; REPORT.md "DV-1
+  parity, stages 2-8". Next:
   module 12.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).

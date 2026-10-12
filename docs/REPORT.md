@@ -1168,7 +1168,7 @@ Results on aarch64 Linux (local, release, at the merge of `main`):
 | `tracker_diff` | generated 4,500 runs (C refused 2,818), upstream 6,480 (3,680), boundary sweep 108 | port-only refusals 0, end margin 0 |
 | `external_parser_diff` tracker relation | 4,725 runs (C refused 3,150) | port-only refusals 0, margin 0 |
 | `dv1_windows` | W1, W2, R1 bisected | same boundary for C and port (width 0) |
-| `tracker_sizes` | 16 sizes | all equal to C's |
+| `tracker_sizes` | 22 sizes and offsets | all equal to C's |
 
 Fuzzing at e1a4e6e (`fuzz-slice7.sh`, logs `docs/fuzz-logs/dv1-parity`):
 `parse_trace` 7 slices, 658 s, 543,076 executions; `buffer_diff` 7
@@ -1176,7 +1176,82 @@ slices, 637 s, 3,531,508 executions; no findings. (The working corpora
 were lost in a sandbox reset before they could be merged; the committed
 corpora are unchanged.)
 
-Per platform: filled in from the pull request's CI run below.
+Fuzzing again on the merge with `main` (`a62e8b0`, which brought PR #15's
+tokenizer change; `fuzz-slice7.sh`, logs `docs/fuzz-logs/dv1-merged`):
+`parse_trace` 6 slices, 617 s, 609,475 executions; `buffer_diff` 6
+slices, 606 s, 3,891,592 executions; no findings (every slice exit
+status 0, no artifact). One further `buffer_diff` slice was cut short when
+the local disk filled up and is not counted.
+
+Per platform, from the pull request's CI run 38245716778 (head
+`a62e8b0`; step "tracker sizes, events and DV-1 windows",
+`cargo test --release ... -- --nocapture`). Test, coverage, lint and fuzz
+smoke jobs passed on all three platforms; the Miri job did not finish
+(still running after 80 minutes, against 1-3 minutes on `main`), see
+"Miri and the pool shadow test" below.
+
+| Check | x86_64 Linux | aarch64 macOS | x86_64 Windows (MSVC target) |
+|---|---|---|---|
+| `tracker_events`: equal streams creation → end of parse / → `XML_ParserFree` | 15,966 / 15,966 of 15,966 | 15,966 / 15,966 of 15,966 | 15,966 / 15,966 of 15,966 |
+| equal peaks / equal results | 15,966 / 15,966 | 15,966 / 15,966 | 15,966 / 15,966 |
+| runs with a refusal in C | 5,160 | 5,160 | 5,141 |
+| `tracker_stages` | 12 / 12 pass | 12 / 12 pass | 12 / 12 pass |
+| W1 boundary (C, port), width | 330,746, 330,746, 0 | 330,746, 330,746, 0 | 330,745, 330,745, 0 |
+| W1 end count (C = port) | 67,117,916 | 67,117,916 | 67,117,884 |
+| W2 boundary (tail, C, port), width | 367, 367, 0 | 367, 367, 0 | 367, 367, 0 |
+| W2 end count at tail 366 (C = port) | 33,563,484 | 33,563,484 | 33,563,452 |
+| R1 boundary (C, port), width | 188,323, 188,323, 0 | 188,323, 188,323, 0 | 188,323, 188,323, 0 |
+| R1 end count (C = port) | 68,765,848 | 68,765,848 | 68,765,816 |
+| `tracker_sizes` | 22 / 22 equal | 22 / 22 equal | 22 / 22 equal |
+
+`tracker_sizes` (C's `sizeof`/`offsetof` from the vendored `xmlparse.c`
+built by the oracle for the platform; port from `parse::c_layout`):
+
+| Structure | x86_64 Linux | aarch64 macOS | x86_64 Windows |
+|---|---|---|---|
+| TAG, BINDING, PREFIX, ENTITY, CONTENT_SCAFFOLD | 96, 56, 16, 64, 32 | same | same |
+| offsetof(BLOCK, s), ATTRIBUTE_ID, DEFAULT_ATTRIBUTE, NAME_AND_DEFAULT_ATTRIBUTE | 12, 24, 24, 24 | same | same |
+| NS_ATT | 24 | 24 | **16** |
+| ELEMENT_TYPE, OPEN_INTERNAL_ENTITY, ATTRIBUTE, NAMED *, malloc header, int | 88, 48, 32, 8, 8, 4 | same | same |
+| `struct XML_ParserStruct` | 1,104 | 1,104 | **1,072** |
+| DTD | 368 | 368 | 368 |
+| offsetof(XML_ParserStruct, m_position) | 808 | 808 | **800** |
+| ACCOUNTING, MALLOC_TRACKER, ENTITY_STATS | 40, 40, 24 | same | **32, 32, 16** |
+
+Every value is equal between C and the port on each platform. The
+Windows differences are C's own: the 32 bytes of `XML_ParserStruct` are
+the four `unsigned long` members (`m_nsAttsVersion`, visible in the
+`m_position` offset, and the `debugLevel` of `ACCOUNTING`,
+`MALLOC_TRACKER`, `ENTITY_STATS`), 4 bytes instead of 8 plus alignment,
+8 bytes each; `NS_ATT` holds two `unsigned long`s. The Windows test job
+builds for `x86_64-pc-windows-msvc`, where the `cc` crate compiles the
+oracle with MSVC; run 38245716778 did not print the compiler, so
+`tracker_sizes` now prints the C compiler's identity from its predefined
+macros and fails on an MSVC target unless the compiler is MSVC-ABI
+(`expat_oracle::c_compiler`; aarch64 Linux locally: `gcc 14.2.0`). The
+lower Windows end counts in `dv1_windows` are exactly those 32 bytes of
+the parser structure (W1's boundary moves by one unit for the same
+reason), and `tracker_events` runs fixed thresholds, so C itself refuses
+in 19 fewer runs on Windows; C and the port agree run by run on every
+platform. (That the W1 unit shift and the 19 runs come from the smaller C
+structures is inferred from the 32-byte end counts and the fixed
+thresholds; no other difference was measured.)
+
+Miri and the pool shadow test. The Miri job of run 38245716778 sat in
+`cargo +nightly miri test -p expat --all-features` for over 80 minutes
+(`main`: 1-3 minutes). Cause: `parse::tracker::tests::
+shadow_allocates_exactly_like_the_string_pool` (stage 2) runs 6,000 steps
+on random texts of up to 12,000 characters, and Miri interprets every
+character. Locally (aarch64, Miri for the host and for
+`x86_64-unknown-linux-gnu`) it was still running after 2.5 and 3.5
+minutes; the first 64 steps took 212 s and the first 33 steps 112 s
+(about 3.4 s a step, so hours for 6,000). Natively the
+test keeps its 6,000 steps; under Miri it runs the first 33 steps of the
+same sequence, which already make the first block, its doublings from
+1,036 to 16,396 bytes and a second first block that grows, and it asserts
+at least five block growths (natively the full run adds seven more
+requests, at steps 38 to 3,003). With that, the CI command passes
+locally (aarch64): 49 unit tests and 16 doctests, 252 s wall time.
 
 ## Divergences
 

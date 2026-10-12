@@ -34,14 +34,23 @@ XML 1.0 specifications or to libexpat's own documentation.
   refuses where C accepts, when C refuses where the port accepts, or when
   both refuse but stop differently (`tests/src/tracker.rs`,
   `compare_events`).
-- **Status per platform:** see `docs/REPORT.md`, "DV-1 parity, stages
-  2-8". aarch64 Linux (local, `e1a4e6e` and the merge with `main`):
-  15,966 of 15,966 `tracker_events` streams equal, W1/W2/R1 width 0,
-  the committed `parse_trace` corpus (13,869 inputs) and seeds pass the
-  exact relation. The CI platforms (x86_64 Linux, aarch64 macOS, x86_64
-  Windows) are recorded there from the PR's CI run; DV-1 is closed on a
+- **Status per platform: closed on all four measured platforms** (details
+  in `docs/REPORT.md`, "DV-1 parity, stages 2-8"). DV-1 is closed on a
   platform only when all of `tracker_events`, `tracker_stages`,
-  `dv1_windows` and `tracker_sizes` pass on it.
+  `dv1_windows` and `tracker_sizes` pass on it:
+
+  | Platform | Source | `tracker_events` equal streams | `tracker_stages` | W1 / W2 / R1 width | `tracker_sizes` |
+  |---|---|---|---|---|---|
+  | aarch64 Linux | local, `e1a4e6e` and the merge with `main` | 15,966 / 15,966 | 12 pass | 0 / 0 / 0 | all equal |
+  | x86_64 Linux | CI run 38245716778 (`a62e8b0`) | 15,966 / 15,966 | 12 pass | 0 / 0 / 0 | 22 / 22 equal |
+  | aarch64 macOS | CI run 38245716778 | 15,966 / 15,966 | 12 pass | 0 / 0 / 0 | 22 / 22 equal |
+  | x86_64 Windows (MSVC target) | CI run 38245716778 | 15,966 / 15,966 | 12 pass | 0 / 0 / 0 | 22 / 22 equal |
+
+  The platforms differ from each other only where C does: on 64-bit
+  Windows `unsigned long` is 4 bytes, so C's parser structure is 1,072
+  bytes instead of 1,104 and every C end count in `dv1_windows` is 32
+  bytes lower; the port reproduces both on each platform (no difference
+  between C and the port was measured on any of them).
 - **Known remaining differences (none reachable by a document through
   the current API):** `copy_for_child` copies an external entity's base
   once per entity where C copies it once per run of entities sharing the

@@ -1,0 +1,46 @@
+# libFuzzer log, trimmed: 502 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2185140500
+INFO: Loaded 1 modules   (77899 inline 8-bit counters): 77899 [0xaaaad05bd510, 0xaaaad05d055b), 
+INFO: Loaded 1 PC tables (77899 PCs): 77899 [0xaaaad05d0560,0xaaaad0700a10), 
+INFO:    10766 files found in <corpus>
+INFO: seed corpus: files: 10766 min: 1b max: 30663b total: 2872060b rss: 40Mb
+#8192	pulse  cov: 11666 ft: 36247 corp: 8130/361Kb exec/s: 2730 rss: 420Mb
+#10767	INITED cov: 12963 ft: 50264 corp: 10644/2689Kb exec/s: 2153 rss: 424Mb
+#16384	pulse  cov: 12963 ft: 50265 corp: 10645/2694Kb lim: 30691 exec/s: 2730 rss: 483Mb
+Loaded 1024/10772 files from <corpus>
+Loaded 2048/10772 files from <corpus>
+Loaded 4096/10772 files from <corpus>
+Loaded 8192/10772 files from <corpus>
+#32768	pulse  cov: 12963 ft: 50265 corp: 10645/2694Kb lim: 30817 exec/s: 4096 rss: 583Mb
+#65536	pulse  cov: 12963 ft: 50268 corp: 10648/2694Kb lim: 30985 exec/s: 5041 rss: 583Mb
+#131072	pulse  cov: 12963 ft: 50277 corp: 10653/2711Kb lim: 31307 exec/s: 5698 rss: 583Mb
+#262144	pulse  cov: 12963 ft: 50279 corp: 10655/2708Kb lim: 31937 exec/s: 6096 rss: 583Mb
+#524288	pulse  cov: 12963 ft: 50319 corp: 10669/2718Kb lim: 33467 exec/s: 6393 rss: 583Mb
+#652469	DONE   cov: 12963 ft: 50336 corp: 10681/2726Kb lim: 34157 exec/s: 6460 rss: 583Mb
+###### Recommended dictionary. ######
+"\377\377\377\377\377\377\377\377" # Uses: 8340
+"\001\000\000\000" # Uses: 8232
+"-\000" # Uses: 7116
+"\377Q" # Uses: 4661
+"\006\000" # Uses: 4543
+"vvwvvvvvvv" # Uses: 4298
+"$\000\000\000\000\000\000\000" # Uses: 4400
+"Zvvvvvvvvv" # Uses: 3917
+"\014\000" # Uses: 3847
+"\377\377\377\377\377\377\001#" # Uses: 3394
+"xmlns:" # Uses: 2007
+"d9" # Uses: 616
+"vZvvvvvvvv" # Uses: 229
+"Wvvvvvvvvv" # Uses: 142
+"+\000\000\000" # Uses: 71
+###### End of recommended dictionary. ######
+Done 652469 runs in 101 second(s)
+stat::number_of_executed_units: 652469
+stat::average_exec_per_sec:     6460
+stat::new_units_added:          502
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              583
