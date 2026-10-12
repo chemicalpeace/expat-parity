@@ -27,7 +27,9 @@ use expat_oracle::{ExtHandler, ParamEntityParsing, ParseOptions, parse_trace};
 fn check(failures: &mut Vec<String>, id: &str, doc: &[u8], o: &ParseOptions) -> Vec<u8> {
     let c = parse_trace(doc, o).expect("oracle");
     match port_trace(doc, o) {
-        PortTrace::DtdNotPorted => failures.push(format!("{id} {o:?}: port stopped (DtdNotPorted)")),
+        PortTrace::DtdNotPorted => {
+            failures.push(format!("{id} {o:?}: port stopped (DtdNotPorted)"))
+        }
         PortTrace::Trace(t) => {
             if let Some((line, l, r)) = first_difference(&c, &t) {
                 failures.push(format!("{id} {o:?}: line {line}: C `{l}` port `{r}`"));
@@ -38,7 +40,10 @@ fn check(failures: &mut Vec<String>, id: &str, doc: &[u8], o: &ParseOptions) -> 
 }
 
 fn assert_clean(what: &str, pairs: usize, failures: &[String]) {
-    eprintln!("{what}: {pairs} pairs compared, {} mismatches", failures.len());
+    eprintln!(
+        "{what}: {pairs} pairs compared, {} mismatches",
+        failures.len()
+    );
     for f in failures.iter().take(20) {
         eprintln!("{f}");
     }
@@ -75,9 +80,10 @@ fn matrix() -> Vec<ParseOptions> {
     for ext in [ExtHandler::None, ExtHandler::Fail, ExtHandler::Accept] {
         for not_standalone in [None, Some(true), Some(false)] {
             for pep in PEPS {
-                for (i, (chunk, buffer_api, ns)) in [(0, false, None), (1, false, Some(b'|')), (7, true, None)]
-                    .into_iter()
-                    .enumerate()
+                for (i, (chunk, buffer_api, ns)) in
+                    [(0, false, None), (1, false, Some(b'|')), (7, true, None)]
+                        .into_iter()
+                        .enumerate()
                 {
                     v.push(ParseOptions {
                         ext_handler: ext,
@@ -99,10 +105,19 @@ fn matrix() -> Vec<ParseOptions> {
 /// (id, document). External entities of every kind and position.
 const CASES: &[(&str, &str)] = &[
     ("no-dtd", "<r>x</r>"),
-    ("internal-subset-only", "<!DOCTYPE r [<!ENTITY e 'v'>]><r>&e;</r>"),
+    (
+        "internal-subset-only",
+        "<!DOCTYPE r [<!ENTITY e 'v'>]><r>&e;</r>",
+    ),
     ("external-subset", "<!DOCTYPE r SYSTEM 'r.dtd'><r/>"),
-    ("external-subset-public", "<!DOCTYPE r PUBLIC '-//T//X' 'r.dtd'><r/>"),
-    ("external-subset-and-internal", "<!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e 'v'>]><r>&e;</r>"),
+    (
+        "external-subset-public",
+        "<!DOCTYPE r PUBLIC '-//T//X' 'r.dtd'><r/>",
+    ),
+    (
+        "external-subset-and-internal",
+        "<!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e 'v'>]><r>&e;</r>",
+    ),
     (
         "external-subset-standalone",
         "<?xml version='1.0' standalone='yes'?><!DOCTYPE r SYSTEM 'r.dtd'><r/>",
@@ -111,7 +126,10 @@ const CASES: &[(&str, &str)] = &[
         "external-subset-not-standalone",
         "<?xml version='1.0' standalone='no'?><!DOCTYPE r SYSTEM 'r.dtd'><r/>",
     ),
-    ("content-external", "<!DOCTYPE r [<!ENTITY x SYSTEM 'x.xml'>]><r>a&x;b</r>"),
+    (
+        "content-external",
+        "<!DOCTYPE r [<!ENTITY x SYSTEM 'x.xml'>]><r>a&x;b</r>",
+    ),
     (
         "content-external-public",
         "<!DOCTYPE r [<!ENTITY x PUBLIC '-//P//E' 'x.xml'>]><r>&x;&x;</r>",
@@ -213,7 +231,13 @@ fn pinned_external_behaviour() {
         param_entity_parsing: ParamEntityParsing::Always,
         ..ParseOptions::default()
     };
-    let doc = |id: &str| CASES.iter().find(|c| c.0 == id).map(|c| c.1.as_bytes()).unwrap();
+    let doc = |id: &str| {
+        CASES
+            .iter()
+            .find(|c| c.0 == id)
+            .map(|c| c.1.as_bytes())
+            .unwrap()
+    };
     let mut failures = Vec::new();
     let mut pin = |id: &str, o: ParseOptions, want_code: i64, want_lines: &[&str]| {
         let c = check(&mut failures, id, doc(id), &o);
@@ -224,7 +248,12 @@ fn pinned_external_behaviour() {
         }
     };
     // No handler: nothing is read and nothing fails.
-    pin("content-external", always(ExtHandler::None, None, None), 0, &[]);
+    pin(
+        "content-external",
+        always(ExtHandler::None, None, None),
+        0,
+        &[],
+    );
     // A failing handler stops the parse with 21.
     pin(
         "content-external",
@@ -246,7 +275,9 @@ fn pinned_external_behaviour() {
         "namespaces-context",
         always(ExtHandler::Accept, Some(b'|'), None),
         0,
-        &["extref =urn:d%0Cb=urn:b%0Cxml=http://www.w3.org/XML/1998/namespace%0Cc=urn:c%0Ca=urn:a%0Cx ~ x.xml ~"],
+        &[
+            "extref =urn:d%0Cb=urn:b%0Cxml=http://www.w3.org/XML/1998/namespace%0Cc=urn:c%0Ca=urn:a%0Cx ~ x.xml ~",
+        ],
     );
     // Open entities: every open general entity, in slot order.
     pin(
@@ -308,6 +339,9 @@ fn generated_documents_with_handlers_match_c() {
     assert_clean("generated documents with handlers", pairs, &failures);
     assert!(extref > 300, "the generator must reach the handler");
     for code in [0, 21, 22] {
-        assert!(codes.contains_key(&code), "generator never produced error code {code}");
+        assert!(
+            codes.contains_key(&code),
+            "generator never produced error code {code}"
+        );
     }
 }
