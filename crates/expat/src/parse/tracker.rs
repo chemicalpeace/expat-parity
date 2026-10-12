@@ -180,7 +180,7 @@ impl AllocTracker {
             .saturating_sub((size as u64).saturating_add(MALLOC_HEADER));
     }
 
-    /// Charges the parser creation ([`CREATION_CHARGE`] plus the copy of
+    /// Charges the parser creation (`CREATION_CHARGE` plus the copy of
     /// the protocol encoding name, `copyString`). Never refused: C checks
     /// nothing for a root parser's own structure.
     pub fn charge_creation(&mut self, encoding_name_len: Option<usize>) {
@@ -294,7 +294,7 @@ impl PoolShadow {
     }
 
     /// Appends `len` characters to the current string, growing like C
-    /// (with [`POOL_SLACK`]).
+    /// (with `POOL_SLACK`).
     pub fn append<H: Heap + ?Sized>(&mut self, heap: &mut H, len: usize) -> Result<(), NoMemory> {
         let len = i64::try_from(len).map_err(|_| NoMemory)?;
         if self.blocks.is_empty() {
