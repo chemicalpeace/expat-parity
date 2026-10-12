@@ -2,11 +2,13 @@
 //! (decision D-034, DV-1 option B), each on documents aimed at that fix:
 //! the C and port tracker streams must be equal event by event (direction,
 //! size, refusal, running total, peak) from the parser's creation through
-//! `XML_ParserFree`, both must end at 0, and the parse results (error code
-//! and position) must be equal. `tracker_events.rs` runs the broad corpus;
+//! `XML_ParserFree`, both must end at 0, and the traces must be equal (the
+//! parse results, error code and position, and every callback before
+//! them). `tracker_events.rs` runs the broad corpus;
 //! these tests name the stage a regression belongs to.
 
 use expat_difftest::port::port_trace_with_tracker_events;
+use expat_difftest::trace::{first_difference, mask_q4};
 use expat_oracle::{ExtHandler, Factor, Limits, ParamEntityParsing, ParseOptions, TrackerEvent};
 
 type Entities = Vec<(Vec<u8>, Vec<u8>)>;
@@ -43,6 +45,10 @@ fn assert_equal_streams(what: &str, doc: &[u8], o: &ParseOptions) -> Vec<Tracker
         result_line(&p_trace),
         "{what}: parse results differ"
     );
+    let (cm, pm) = mask_q4(&c_trace, &p_trace);
+    if let Some((line, l, r)) = first_difference(&cm, &pm) {
+        panic!("{what}: traces differ at line {line}: C `{l}` port `{r}`");
+    }
     assert_eq!(
         c.at_end, port_at_end,
         "{what}: event counts to the end of the parse differ"
@@ -364,4 +370,149 @@ fn stage7_partial_dtd_copy_released() {
         at_copy > 0,
         "stage 7: no refusal during the child's DTD copy"
     );
+}
+
+/// Activation thresholds `from..to` one byte apart, amplification 1.0.
+fn fine_sweep(o: &ParseOptions, from: u64, to: u64) -> impl Iterator<Item = ParseOptions> + '_ {
+    (from..to).map(move |t| ParseOptions {
+        limits: Limits {
+            at_amplification: Some(Factor(1.0)),
+            at_threshold: Some(t),
+            ..Limits::NONE
+        },
+        ..o.clone()
+    })
+}
+
+/// Refusals C tolerates: `getAttributeId` does not check the `lookup` of
+/// an `xmlns:` prefix (`xmlparse.c` 7650-7652), so when the tracker
+/// refuses that `PREFIX` (or the table's growth) the attribute id keeps a
+/// NULL prefix with `xmlns` set and the parse goes on; `storeAtts` then
+/// treats the attribute as an unprefixed one (4262, 4295) and `dtdCopy`
+/// copies `xmlns` only with a prefix (8011). The port stopped with
+/// `XML_ERROR_NO_MEMORY` there (found by the tightened fuzz check: the
+/// port refused where C accepted).
+#[test]
+fn refusal_of_an_xmlns_prefix_is_tolerated() {
+    let ns = ParseOptions {
+        ns_separator: Some(b':'),
+        ..base()
+    };
+    let comment = format!("<!--{}-->", "c".repeat(30_000));
+    let docs = [
+        // In a DTD the next allocation (the attribute's
+        // `defaultAttForName` entry, 32 bytes) is refused too.
+        "<!DOCTYPE p:e [<!ATTLIST q:e a CDATA #IMPLIED xmlns:z CDATA #REQUIRED>]>".to_string(),
+        // In a start tag (`storeAtts` creates the attribute id) the parse
+        // goes on: `xmlns:z` is then an ordinary attribute and binds
+        // nothing, so `z:x` has an unbound prefix.
+        "<r xmlns:z='urn:z' z:x='1'/>".to_string(),
+        format!("<r xmlns:z='urn:z'>{comment}<z:x/></r>"),
+        "<r xmlns:z='urn:z'><s xmlns:z='urn:y'/></r>".to_string(),
+    ];
+    let (mut tolerated, mut continued) = (0, 0);
+    for doc in &docs {
+        // Thresholds one byte apart with amplification 2.0: the refusal
+        // falls on each allocation of the declarations in turn.
+        for t in 5_000..8_000 {
+            let o = ParseOptions {
+                limits: Limits {
+                    at_amplification: Some(Factor(2.0)),
+                    at_threshold: Some(t),
+                    ..Limits::NONE
+                },
+                ..ns.clone()
+            };
+            let ev = assert_equal_streams("xmlns prefix refusal", doc.as_bytes(), &o);
+            let (c_trace, _) =
+                expat_oracle::parse_trace_with_tracker_events(doc.as_bytes(), &o).expect("oracle");
+            let c_trace = String::from_utf8_lossy(&c_trace).into_owned();
+            // A refused `PREFIX` (24 bytes) or prefix table (520 bytes at
+            // 8260) that C went on from.
+            if ev
+                .iter()
+                .any(|e| e.refused && ((e.size == 24 && e.line == 8331) || e.line == 8260))
+                && !result_line(c_trace.as_bytes()).starts_with("result error 1 ")
+            {
+                tolerated += 1;
+                if c_trace.lines().any(|l| l.starts_with("start ")) {
+                    continued += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        tolerated > 0,
+        "no run where C tolerated a refused xmlns prefix"
+    );
+    assert!(
+        continued > 0,
+        "no run where C reached the content after the refusal"
+    );
+}
+
+/// What C hands the entity declaration handler after a refused
+/// allocation: `XML_ROLE_ENTITY_VALUE` reports `dtd->entityValuePool`
+/// before returning `storeEntityValue`'s error (`xmlparse.c` 5935-5958):
+/// NULL when the pool's first block was refused (7126-7129), otherwise the
+/// characters written before the refused growth (`poolAppend` writes the
+/// whole characters that fit; `poolAppendChars` for a character reference
+/// writes nothing when it cannot grow).
+/// The port reported an empty value and the whole last token.
+#[test]
+fn refused_entity_value_reports_what_c_stored() {
+    let (mut null_values, mut partial_values) = (0, 0);
+    for piece in [
+        "x",
+        "\u{e9}",
+        "\u{20ac}",
+        "\u{1f600}",
+        "&#x20AC;",
+        "&#233;",
+        "ab&#x1F600;c\u{e9}",
+    ] {
+        let value = piece.repeat(700);
+        let text = format!("<!DOCTYPE r [<!ENTITY e '{value}'>]><r/>");
+        for doc in [text.clone().into_bytes(), utf16le(&text)] {
+            for o in threshold_sweep(&base()).step_by(3) {
+                let ev = assert_equal_streams("entity value refusal", &doc, &o);
+                let (c_trace, _) =
+                    expat_oracle::parse_trace_with_tracker_events(&doc, &o).expect("oracle");
+                let c_trace = String::from_utf8_lossy(&c_trace).into_owned();
+                if !ev.iter().any(|e| e.refused) {
+                    continue;
+                }
+                if c_trace.contains("entity e 0 ~ ") {
+                    null_values += 1;
+                } else if c_trace.lines().any(|l| l.starts_with("entity e 0 ")) {
+                    partial_values += 1;
+                }
+            }
+        }
+    }
+    assert!(null_values > 0, "no run with a NULL entity value");
+    assert!(
+        partial_values > 0,
+        "no run with a partly stored entity value"
+    );
+}
+
+/// A start tag whose buffer cannot grow is on `m_tagStack` already
+/// (`xmlparse.c` 3764-3766, 3790-3792), so `XML_ParserFree` releases it
+/// before its parent (1874-1887); the port put it on the free list.
+#[test]
+fn refused_tag_buffer_growth_released_first() {
+    let mut refused = 0;
+    for len in [40, 80, 200] {
+        let text = format!("<a><{0}>x</{0}></a>", "b".repeat(len));
+        for doc in [text.clone().into_bytes(), utf16le(&text)] {
+            for o in fine_sweep(&base(), 3_100, 7_000).step_by(2) {
+                let ev = assert_equal_streams("tag buffer refusal", &doc, &o);
+                if ev.iter().any(|e| e.refused && e.line == 3790) {
+                    refused += 1;
+                }
+            }
+        }
+    }
+    assert!(refused > 0, "no refused tag buffer growth");
 }

@@ -385,15 +385,28 @@ impl Parser {
                     // Every token's characters are charged by now (also
                     // when an error stopped the value).
                     debug_assert!(result.is_err() || self.charged_len == text.len());
+                    // C hands the handler what `dtd->entityValuePool` holds
+                    // even when storing stopped with an error (xmlparse.c
+                    // 5935-5958): after a refused growth that is the part
+                    // written before it, and NULL when the pool never got
+                    // its first block (7126-7129).
+                    let (has_block, pool_len) = {
+                        let direct = self.direct();
+                        let (p, _) = self.tracker.pool(Pool::EntityValue, direct);
+                        (p.has_block(), p.current_len())
+                    };
+                    if result.is_err() {
+                        text.truncate(pool_len);
+                    }
                     self.finish_current(Pool::EntityValue, false, self.decl_entity.is_some())?;
                     if let Some(r) = self.decl_entity {
                         if i32::try_from(text.len()).is_err() {
                             return Err(XmlError::NoMemory.into());
                         }
-                        let text: alloc::sync::Arc<[u8]> = text.into();
+                        let text: Option<alloc::sync::Arc<[u8]>> = has_block.then(|| text.into());
                         let mut info = None;
                         if let Some(e) = self.dtd.entity_mut(r) {
-                            e.text = Some(text.clone());
+                            e.text = text.clone();
                             info = Some(e.is_param);
                         }
                         if self.handlers.entity_decl
@@ -404,7 +417,7 @@ impl Parser {
                             h.entity_decl(
                                 &name,
                                 is_param,
-                                Some(&text),
+                                text.as_deref(),
                                 self.cur_base.as_deref(),
                                 None,
                                 None,

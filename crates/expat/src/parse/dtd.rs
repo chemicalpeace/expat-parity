@@ -553,7 +553,21 @@ impl Dtd {
         let prefix = if name == b"xmlns" {
             Some((PrefixId::Default, true))
         } else if let Some(rest) = name.strip_prefix(b"xmlns:") {
-            Some((self.lookup_xmlns_prefix(salt, tr, direct, rest)?, true))
+            // C does not check this lookup (xmlparse.c 7650-7652): when the
+            // tracker refuses the prefix entry (or the table's growth), the
+            // id keeps `prefix == NULL` with `xmlns` set and the parse goes
+            // on; `storeAtts` then treats the attribute as an unprefixed
+            // one (4262, 4295) and `dtdCopy` copies `xmlns` only with a
+            // prefix (8011). The port records the same state (D-034).
+            match self.lookup_xmlns_prefix(salt, tr, direct, rest) {
+                Ok(p) => Some((p, true)),
+                Err(NoMemory) => {
+                    if let Some(v) = self.attribute_ids.value_mut(id) {
+                        v.xmlns = true;
+                    }
+                    return Ok(id);
+                }
+            }
         } else if let Some(colon) = name.iter().position(|&c| c == b':') {
             // Attributes without a prefix are *not* in the default namespace.
             Some((self.lookup_prefix(salt, tr, direct, name.get(..colon).unwrap_or_default())?, false))
