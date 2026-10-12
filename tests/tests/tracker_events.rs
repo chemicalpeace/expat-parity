@@ -34,11 +34,12 @@ use expat_oracle::{ParamEntityParsing, ParseOptions, TrackerEvent};
 /// (the parser structure, `m_atts`, `m_dataBuf`, the DTD).
 const C_CREATION_LINES: [u32; 4] = [1395, 1405, 1410, 7865];
 
-/// Streams (of 3,420) that must be equal after creation at this stage
-/// (stage 4 of D-034: 3,270; stage 2: 3,291, every remaining first
+/// Streams (of 4,620) that must be equal after creation at this stage
+/// (stage 4 of D-034: 3,270 of 3,420; stage 2: 3,291 of 3,420 and all
+/// 1,200 pool-boundary runs added with it, every remaining first
 /// difference the raw tag name the port charges at the start tag, stage 5;
 /// see docs/REPORT.md, DV-1 parity).
-const EQUAL_STREAMS_AT_LEAST: usize = 3_291;
+const EQUAL_STREAMS_AT_LEAST: usize = 4_491;
 
 fn base() -> ParseOptions {
     ParseOptions {
@@ -69,6 +70,40 @@ fn corpus() -> Vec<Vec<u8>> {
             1 => docgen::dtd_document(&mut r),
             _ => docgen::entity_document(&mut r),
         });
+    }
+    docs.extend(boundary_docs());
+    docs
+}
+
+/// Multi-byte characters (2, 3 and 4 bytes in UTF-8, as literals and as
+/// character references) placed so that they straddle the end of the first
+/// 1,024-character pool block, in each kind of string C converts into a
+/// pool (attribute values, normalised or not, comments, processing
+/// instructions, entity values, public ids), in UTF-8 and UTF-16 (D-034
+/// stage 2: where `XmlConvert` stops decides when a pool grows).
+fn boundary_docs() -> Vec<Vec<u8>> {
+    let mut docs = Vec::new();
+    for ch in ["\u{e9}", "\u{20ac}", "\u{1f600}", "&#xe9;", "&#x1f600;"] {
+        for fill in 1016..1026 {
+            let body = format!("{}{ch}{ch}tail", "x".repeat(fill));
+            let texts = [
+                format!("<r a='{body}'/>"),
+                format!("<r a=' {body} '><!--{body}--><?pi {body}?></r>"),
+                format!(
+                    "<!DOCTYPE r [<!ATTLIST r a NMTOKENS '  {body}  '><!ENTITY e '{body}'>]><r b='&e;'/>"
+                ),
+                format!("<!DOCTYPE r PUBLIC '  -//{body}//  ' 's'><r/>"),
+            ];
+            for t in texts {
+                docs.push(t.clone().into_bytes());
+                // UTF-16LE with a byte order mark.
+                let mut u16 = vec![0xFF, 0xFE];
+                for c in t.encode_utf16() {
+                    u16.extend_from_slice(&c.to_le_bytes());
+                }
+                docs.push(u16);
+            }
+        }
     }
     docs
 }
