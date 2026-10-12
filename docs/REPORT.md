@@ -980,9 +980,30 @@ behaviour and defaults are C's (D-026).
    no public API yet.
 3. The `encoding` argument of `XML_ExternalEntityParserCreate` is never
    exercised (both test handlers pass NULL).
-4. `XML_UnparsedEntityDeclHandler` is not compared.
+4. `XML_UnparsedEntityDeclHandler` is compared on this branch (PR #18;
+   Part 2, "`XML_UnparsedEntityDeclHandler`", `unparsed_diff.rs`): with
+   `ParseOptions::unparsed_handler` the shim and the port both trace
+   `unparsed <name> <base> <systemId> <publicId> <notation>`, compared by
+   canonical trace with the handler on and off, for 20 hand-written
+   internal-subset documents under the option matrix (7 sets) and 4
+   documents with an external subset or external parameter entity read
+   through the test handler (7 option sets x 3 parameter-entity modes).
+   Limits: only these hand-written documents set the handler; the
+   generated tests and the fuzz targets leave it unset, so there
+   unparsed entities still reach the entity declaration handler.
 5. Allocation refusals are compared in aggregate (relation, sweeps), not
-   at each allocation point; `m_nsAtts` growth is uncovered.
+   at each allocation point (per-point fault injection: Part 2, "Not done
+   here"). `m_nsAtts` growth is compared on this branch (PR #18; Part 2,
+   "`m_nsAtts` growth", `ns_atts_diff.rs`): 350 documents (1-1,100
+   prefixed attributes around each power of two to 1,024, with and
+   without a duplicate expanded name, a grow-and-shrink and a nested
+   document) x 9 option sets = 3,150 trace comparisons; the tracker's
+   charge for the table's growth is checked one way by a threshold sweep
+   on 9 of these documents with both namespace separators (wherever C
+   stops with `XML_ERROR_NO_MEMORY`, the port stops too). Limits: the
+   table's size is not observed directly, only its effect on the trace
+   and on tracker refusals; a refusal at the table's own reallocation is
+   not injected.
 6. libexpat does not cap the number or depth of external entity parsers;
    the port replicates that (an application must cap them in its handler).
 7. Coverage (CI, full suite, corrected for an llvm-cov artefact, PR #13's
