@@ -262,6 +262,34 @@ fn sweep_documents() -> Vec<(&'static str, Vec<u8>)> {
     }
     misc.extend_from_slice(b"</r>");
     v.push(("comments and PIs", misc));
+    // Targeted documents (added after injected bugs K4 and K7 went
+    // undetected by the documents above): one new binding per nesting
+    // level (`addBinding`), and many distinct attribute names with defaults
+    // on several element types (`defineAttribute`'s arrays, attribute ids).
+    let mut scopes = Vec::new();
+    for i in 0..600 {
+        scopes.extend_from_slice(
+            format!("<p{i}:e xmlns:p{i}='urn:{}{i}'>", "n".repeat(50)).as_bytes(),
+        );
+    }
+    for i in (0..600).rev() {
+        scopes.extend_from_slice(format!("</p{i}:e>").as_bytes());
+    }
+    v.push(("nested namespace scopes", scopes));
+    let mut names = b"<!DOCTYPE e [".to_vec();
+    for k in 0..8 {
+        names.extend_from_slice(format!("<!ATTLIST e{k}").as_bytes());
+        for j in 0..60 {
+            names.extend_from_slice(format!(" a{k}x{j} CDATA 'v{j}'").as_bytes());
+        }
+        names.push(b'>');
+    }
+    names.extend_from_slice(b"]><e>");
+    for k in 0..8 {
+        names.extend_from_slice(format!("<e{k} a{k}x0='w'/>").as_bytes());
+    }
+    names.extend_from_slice(b"</e>");
+    v.push(("distinct attribute names", names));
     v
 }
 
@@ -331,6 +359,10 @@ fn threshold_boundary_sweep() {
         failures[0]
     );
     assert!(boundary_hits > 50);
+    // Every sweep document and option set: at C's exact passing threshold
+    // the port still refuses (the creation charge alone is 16 KiB above
+    // C's), the documented divergence under tightened limits.
+    assert_eq!(stricter, sweep_documents().len() * option_sets().len());
 }
 
 /// With the threshold at 0, the amplification factor decides: every
