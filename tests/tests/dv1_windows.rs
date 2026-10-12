@@ -9,10 +9,11 @@
 //!   entity referenced 85,000 times in one attribute. C accepts from pad
 //!   330,746; the port's creation charge (16,384 against C's 3,040) makes
 //!   it refuse up to pad 330,878.
-//! - **W2** (pool slack): 84,947 references and `tail` literal characters,
-//!   no padding. C fills its 32 MiB pool block to the last byte; the port's
-//!   `POOL_SLACK` of 4 makes it double the block to 64 MiB for tails
-//!   363-366.
+//! - **W2** (pool slack, closed by stage 2 of D-034): 84,947 references and
+//!   `tail` literal characters, no padding. C fills its 32 MiB pool block to
+//!   the last byte; the port's former `POOL_SLACK` of 4 made it double the
+//!   block to 64 MiB for tails 363-366. Since stage 2 the port's pool model
+//!   is exact and both refuse from the same tail.
 //! - **R1** (reverse violation, fixed by D-034): the W1 document with 10,000
 //!   attribute defaults on an unused element type. With `BINDING` and
 //!   `NAME_AND_DEFAULT_ATTRIBUTE` 8 bytes below C's `sizeof`, the port
@@ -225,9 +226,10 @@ fn w1_creation_charge() {
     );
 }
 
-/// W2: the pool-slack window (DV-1), pinned open until step 2 of D-034.
-/// The tail grows the expanded value, so documents become refused as it
-/// grows: C accepts up to the tail that fills its 32 MiB block exactly.
+/// W2: the pool-slack window (DV-1), closed by stage 2 of D-034 (exact
+/// pool model). The tail grows the expanded value, so documents become
+/// refused as it grows: C accepts up to the tail that fills its 32 MiB
+/// block exactly, and so does the port.
 #[test]
 fn w2_pool_slack() {
     let doc = |tail| slack_doc(84_947, tail);
@@ -246,11 +248,10 @@ fn w2_pool_slack() {
         p_refuses_from <= c_refuses_from,
         "W2: the port accepts what C refuses"
     );
-    // C's last accepted tail fills the block exactly; the port's 4-character
-    // slack doubles the block 4 tails earlier.
+    // C's last accepted tail fills the block exactly; so does the port's
+    // (it doubled the block 4 tails earlier while it had `POOL_SLACK`).
     assert_eq!(
-        c_refuses_from - p_refuses_from,
-        4,
-        "W2: DV-1 slack window changed; update the stage pin"
+        c_refuses_from, p_refuses_from,
+        "W2: the pool-slack window must stay closed"
     );
 }

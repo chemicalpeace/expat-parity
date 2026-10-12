@@ -666,18 +666,34 @@ impl Parser {
         self.tracker.t.events.take().unwrap_or_default()
     }
 
-    /// Charges the growth of the current string of pool `pool` to `len`
-    /// characters (C appends to the pool as it goes; the port charges after
-    /// each token, before the next amplification check).
-    pub(crate) fn charge_current(&mut self, pool: tracker::Pool, len: usize) -> Result<(), Stop> {
-        if len > self.charged_len {
+    /// Charges the characters of `out` (the current string of pool
+    /// `pool`) not charged yet: converted by `poolAppend` (`converted`,
+    /// whole characters per block) or appended by `poolAppendChar`. C
+    /// appends to the pool as it goes; the port charges after each token,
+    /// before the next amplification check, with that token's mode.
+    pub(crate) fn charge_current(&mut self, pool: tracker::Pool, out: &[u8], converted: bool) -> Result<(), Stop> {
+        if out.len() > self.charged_len {
             let direct = self.direct();
+            let tail = out.get(self.charged_len..).unwrap_or_default();
             let (p, mut heap) = self.tracker.pool(pool, direct);
-            p.append(&mut heap, len - self.charged_len)
-                .map_err(|_| Stop::Error(XmlError::NoMemory))?;
-            self.charged_len = len;
+            let r = if converted {
+                p.append_text(&mut heap, tail)
+            } else {
+                p.append_chars(&mut heap, tail.len())
+            };
+            r.map_err(|_| Stop::Error(XmlError::NoMemory))?;
+            self.charged_len = out.len();
         }
         Ok(())
+    }
+
+    /// `poolChop` of the current string of pool `pool` (a trailing space
+    /// already charged).
+    pub(crate) fn chop_current(&mut self, pool: tracker::Pool) {
+        let direct = self.direct();
+        let (p, _) = self.tracker.pool(pool, direct);
+        p.chop();
+        self.charged_len = self.charged_len.saturating_sub(1);
     }
 
     /// Ends the current string of pool `pool`: its NUL (if `nul`), then
@@ -687,7 +703,7 @@ impl Parser {
         let (p, mut heap) = self.tracker.pool(pool, direct);
         self.charged_len = 0;
         if nul {
-            p.append(&mut heap, 1).map_err(|_| Stop::Error(XmlError::NoMemory))?;
+            p.append_chars(&mut heap, 1).map_err(|_| Stop::Error(XmlError::NoMemory))?;
         }
         if keep {
             p.finish();

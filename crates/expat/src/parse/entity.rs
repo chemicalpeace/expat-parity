@@ -342,12 +342,15 @@ impl Parser {
                 break;
             }
         }
+        let pool = if in_prolog { Pool::Dtd } else { Pool::Temp };
+        // Every token's characters are charged by now.
+        debug_assert_eq!(self.charged_len, out.len());
         if !is_cdata && out.last() == Some(&0x20) {
             out.pop();
+            // `poolChop`: the NUL takes the space's place.
+            self.chop_current(pool);
         }
         // `poolAppendChar(pool, '\0')`, then the caller's `poolFinish`.
-        let pool = if in_prolog { Pool::Dtd } else { Pool::Temp };
-        self.charge_current(pool, out.len())?;
         self.finish_current(pool, true, true)?;
         Ok(out)
     }
@@ -461,7 +464,7 @@ impl Parser {
         // The terminating NUL is appended to the pool too.
         let direct = self.direct();
         let (p, mut heap) = self.tracker.pool(Pool::Temp, direct);
-        p.append(&mut heap, out.len().saturating_add(1))
+        p.append_chars(&mut heap, out.len().saturating_add(1))
             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
         Ok(out)
     }

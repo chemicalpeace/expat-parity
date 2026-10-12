@@ -69,13 +69,6 @@ pub const CREATION_CHARGE: u64 = 16_384;
 /// `INIT_BLOCK_SIZE` of the string pools.
 const INIT_BLOCK_SIZE: i64 = 1024;
 
-/// Characters a pool string is assumed to need beyond its final length:
-/// C converts into the pool with `XmlConvert`, which stops up to three
-/// bytes before the end of a block when the next UTF-8 character does not
-/// fit, and `storeAttributeValue` may append a trailing space that it
-/// chops afterwards. Growing a little earlier than C can only make the
-/// simulated pool larger.
-const POOL_SLACK: i64 = 4;
 
 /// One change of the tracker's count, for the per-event comparison with
 /// libexpat's tracker (D-034): what `expat_heap_stat` reports in C.
@@ -383,18 +376,50 @@ impl PoolShadow {
         Ok(())
     }
 
-    /// Appends `len` characters to the current string, growing like C
-    /// (with `POOL_SLACK`).
-    pub fn append<H: Heap + ?Sized>(&mut self, heap: &mut H, len: usize) -> Result<(), NoMemory> {
-        let len = i64::try_from(len).map_err(|_| NoMemory)?;
+    /// `poolAppend` of a converted text (`text` is the UTF-8 the pool
+    /// receives): `XmlConvert` writes whole characters only and stops at
+    /// the first one that does not fit (up to three bytes before the end of
+    /// a block), then the pool grows; an empty pool grows first even for an
+    /// empty text (`! pool->ptr`). Exact where `XmlConvert` stops (D-034
+    /// stage 2; `POOL_SLACK` before).
+    pub fn append_text<H: Heap + ?Sized>(&mut self, heap: &mut H, text: &[u8]) -> Result<(), NoMemory> {
         if self.blocks.is_empty() {
             self.grow(heap)?;
         }
-        while self.end() - self.ptr < len + POOL_SLACK {
+        let mut rest = text;
+        loop {
+            let room = usize::try_from(self.end() - self.ptr).unwrap_or(0);
+            if rest.len() <= room {
+                self.ptr += i64::try_from(rest.len()).map_err(|_| NoMemory)?;
+                return Ok(());
+            }
+            // The longest prefix of whole characters that fits.
+            let mut k = room;
+            while k > 0 && rest.get(k).is_some_and(|&b| b & 0xC0 == 0x80) {
+                k -= 1;
+            }
+            self.ptr += i64::try_from(k).map_err(|_| NoMemory)?;
+            rest = rest.get(k..).unwrap_or_default();
             self.grow(heap)?;
         }
-        self.ptr += len;
+    }
+
+    /// `poolAppendChars` (`poolGrowUntil`, then the copy) of `n`
+    /// characters; the same allocations as `n` calls of `poolAppendChar`.
+    pub fn append_chars<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {
+        let n = i64::try_from(n).map_err(|_| NoMemory)?;
+        while self.end() - self.ptr < n {
+            self.grow(heap)?;
+        }
+        self.ptr += n;
         Ok(())
+    }
+
+    /// `poolChop`: drops the last character of the current string.
+    pub fn chop(&mut self) {
+        if self.ptr > self.start {
+            self.ptr -= 1;
+        }
     }
 
     /// `poolFinish`.
@@ -407,19 +432,46 @@ impl PoolShadow {
         self.ptr = self.start;
     }
 
-    /// Appends a string of `len` characters plus its NUL and finishes it
-    /// (`poolStoreString` + `poolFinish`, `poolCopyString`).
-    pub fn store<H: Heap + ?Sized>(&mut self, heap: &mut H, len: usize) -> Result<(), NoMemory> {
-        self.append(heap, len.saturating_add(1))?;
+    /// `poolStoreString` + `poolFinish`: the converted `text`, then its NUL.
+    pub fn store_text<H: Heap + ?Sized>(&mut self, heap: &mut H, text: &[u8]) -> Result<(), NoMemory> {
+        self.append_text(heap, text)?;
+        self.append_chars(heap, 1)?;
         self.finish();
         Ok(())
     }
 
-    /// Appends a string of `len` characters plus its NUL and discards it
-    /// (`poolStoreString` of a name that is then found in a table).
-    pub fn store_discard<H: Heap + ?Sized>(&mut self, heap: &mut H, len: usize) -> Result<(), NoMemory> {
-        self.append(heap, len.saturating_add(1))?;
+    /// `poolStoreString` + `poolDiscard` (a name looked up in a table and
+    /// found there, or not kept).
+    pub fn store_text_discard<H: Heap + ?Sized>(&mut self, heap: &mut H, text: &[u8]) -> Result<(), NoMemory> {
+        self.append_text(heap, text)?;
+        self.append_chars(heap, 1)?;
         self.discard();
+        Ok(())
+    }
+
+    /// `poolCopyString`: `n` characters and a NUL, finished.
+    pub fn copy<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {
+        self.append_chars(heap, n.saturating_add(1))?;
+        self.finish();
+        Ok(())
+    }
+
+    /// `poolCopyStringNoFinish` (or `n` characters and a NUL appended one
+    /// by one) + `poolDiscard`.
+    pub fn copy_discard<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {
+        self.append_chars(heap, n.saturating_add(1))?;
+        self.discard();
+        Ok(())
+    }
+
+    /// `poolCopyStringN`: `n` characters without a NUL, finished; an empty
+    /// pool grows first even for `n == 0`.
+    pub fn copy_n<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {
+        if self.blocks.is_empty() {
+            self.grow(heap)?;
+        }
+        self.append_chars(heap, n)?;
+        self.finish();
         Ok(())
     }
 
@@ -580,16 +632,28 @@ impl Tracker {
         )
     }
 
-    /// Stores and finishes a string of `len` characters in `which`.
-    pub fn store(&mut self, which: Pool, len: usize, direct: u64) -> Result<(), NoMemory> {
+    /// `poolStoreString` + `poolFinish` of the converted `text` in `which`.
+    pub fn store_text(&mut self, which: Pool, text: &[u8], direct: u64) -> Result<(), NoMemory> {
         let (p, mut h) = self.pool(which, direct);
-        p.store(&mut h, len)
+        p.store_text(&mut h, text)
     }
 
-    /// Stores and discards a string of `len` characters in `which`.
-    pub fn store_discard(&mut self, which: Pool, len: usize, direct: u64) -> Result<(), NoMemory> {
+    /// `poolStoreString` + `poolDiscard` of the converted `text` in `which`.
+    pub fn store_text_discard(&mut self, which: Pool, text: &[u8], direct: u64) -> Result<(), NoMemory> {
         let (p, mut h) = self.pool(which, direct);
-        p.store_discard(&mut h, len)
+        p.store_text_discard(&mut h, text)
+    }
+
+    /// `poolCopyString` of `n` characters in `which`.
+    pub fn copy(&mut self, which: Pool, n: usize, direct: u64) -> Result<(), NoMemory> {
+        let (p, mut h) = self.pool(which, direct);
+        p.copy(&mut h, n)
+    }
+
+    /// `n` characters and a NUL appended to `which`, then discarded.
+    pub fn copy_discard(&mut self, which: Pool, n: usize, direct: u64) -> Result<(), NoMemory> {
+        let (p, mut h) = self.pool(which, direct);
+        p.copy_discard(&mut h, n)
     }
 
     /// Bytes charged for the structures a parser owns itself and C's
@@ -871,10 +935,13 @@ mod tests {
     }
 
     #[test]
-    fn shadow_grows_like_the_string_pool() -> Result<(), NoMemory> {
-        // Strings appended in one piece (the shadow's only operation) with
-        // finish, discard and clear in a deterministic mix: the shadow must
-        // request at least the pool's bytes at every step.
+    fn shadow_allocates_exactly_like_the_string_pool() -> Result<(), NoMemory> {
+        // Every pool operation the shadow replays, on random texts with
+        // one- to four-byte characters (UTF-8 and Latin-1 input) and in a
+        // deterministic mix with finish, discard, chop and clear: the
+        // shadow's allocation requests must be the real pool's (D-021's
+        // port of C's pool), request by request (D-034 stage 2).
+        use crate::tok::Normal;
         let mut seed: u32 = 12345;
         let mut next = || {
             seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12345);
@@ -884,48 +951,83 @@ mod tests {
         let mut shadow = PoolShadow::default();
         let mut hp = Rec::default();
         let mut hs = Rec::default();
-        let total = |r: &Rec| -> i64 {
-            r.0.iter()
-                .map(|&(k, a, b)| match k {
-                    'm' => b as i64,
-                    'r' => b as i64 - a as i64,
-                    _ => -(a as i64),
-                })
-                .sum()
-        };
-        for _ in 0..3000 {
-            let op = next() % 10;
-            let len = match next() % 4 {
+        for step in 0..6000 {
+            let op = next() % 14;
+            let chars = match next() % 4 {
                 0 => (next() % 8) as usize,
                 1 => (next() % 600) as usize,
                 2 => (next() % 3000) as usize,
-                _ => (next() % 20_000) as usize,
+                _ => (next() % 12_000) as usize,
             };
-            let s = alloc::vec![b'x'; len];
+            // A UTF-8 text and a Latin-1 input with its UTF-8 conversion.
+            let mut text = alloc::vec::Vec::new();
+            let mut latin1 = alloc::vec::Vec::new();
+            let mut latin1_utf8 = alloc::vec::Vec::new();
+            for _ in 0..chars {
+                let c = match next() % 8 {
+                    0 => 0xE9,
+                    1 => 0x20AC,
+                    2 => 0x1_F600,
+                    _ => 0x61 + next() % 26,
+                };
+                let mut b = [0u8; 4];
+                text.extend_from_slice(char::from_u32(c).unwrap_or('x').encode_utf8(&mut b).as_bytes());
+                let l = if c < 0x100 { c as u8 } else { 0xFC };
+                latin1.push(l);
+                latin1_utf8.extend_from_slice(char::from(l).encode_utf8(&mut b).as_bytes());
+            }
             match op {
-                0..=5 => {
-                    pool.append_chars(&mut hp, &s)?;
+                0..=3 => {
+                    pool.store_string(&mut hp, &Normal::Utf8, &text)?;
+                    pool.finish();
+                    shadow.store_text(&mut hs, &text)?;
+                }
+                4 => {
+                    pool.store_string(&mut hp, &Normal::Latin1, &latin1)?;
+                    pool.discard();
+                    shadow.store_text_discard(&mut hs, &latin1_utf8)?;
+                }
+                5 => {
+                    pool.append(&mut hp, &Normal::Utf8, &text)?;
+                    shadow.append_text(&mut hs, &text)?;
+                }
+                6 => {
+                    let ascii = alloc::vec![b'y'; chars];
+                    pool.copy_string(&mut hp, &ascii)?;
+                    shadow.copy(&mut hs, chars)?;
+                }
+                7 => {
+                    let ascii = alloc::vec![b'y'; chars];
+                    pool.copy_string_no_finish(&mut hp, &ascii)?;
+                    pool.discard();
+                    shadow.copy_discard(&mut hs, chars)?;
+                }
+                8 => {
+                    let ascii = alloc::vec![b'y'; chars];
+                    pool.copy_string_n(&mut hp, &ascii)?;
+                    shadow.copy_n(&mut hs, chars)?;
+                }
+                9 => {
+                    let ascii = alloc::vec![b'z'; chars % 5];
+                    pool.append_chars(&mut hp, &ascii)?;
+                    shadow.append_chars(&mut hs, chars % 5)?;
+                }
+                10 => {
+                    pool.chop();
+                    shadow.chop();
+                }
+                11 => {
                     pool.append_char(&mut hp, 0)?;
                     pool.finish();
-                    shadow.store(&mut hs, len)?;
-                }
-                6 | 7 => {
-                    pool.append_chars(&mut hp, &s)?;
-                    pool.append_char(&mut hp, 0)?;
-                    pool.discard();
-                    shadow.store_discard(&mut hs, len)?;
+                    shadow.append_chars(&mut hs, 1)?;
+                    shadow.finish();
                 }
                 _ => {
                     pool.clear();
                     shadow.clear();
                 }
             }
-            assert!(
-                total(&hs) >= total(&hp),
-                "shadow {} < pool {}",
-                total(&hs),
-                total(&hp)
-            );
+            assert_eq!(hs.0, hp.0, "step {step} op {op}");
         }
         Ok(())
     }

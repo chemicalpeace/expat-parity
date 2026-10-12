@@ -366,10 +366,10 @@ impl Parser {
             let direct = self.direct();
             let no_mem = |_| Stop::Error(XmlError::NoMemory);
             if let Some(n) = &enc_name {
-                self.tracker.store(Pool::Temp2, n.len(), direct).map_err(no_mem)?;
+                self.tracker.store_text(Pool::Temp2, n, direct).map_err(no_mem)?;
             }
             if let Some(v) = &version {
-                self.tracker.store(Pool::Temp2, v.len(), direct).map_err(no_mem)?;
+                self.tracker.store_text(Pool::Temp2, v, direct).map_err(no_mem)?;
             }
             h.xml_decl(version.as_deref(), enc_name.as_deref(), standalone);
         }
@@ -412,9 +412,10 @@ impl Parser {
                         // `poolStoreString(&parser->m_temp2Pool, ...)` of
                         // the name for `handleUnknownEncoding`.
                         let n = name_length(enc, buf, p);
+                        let name = to_utf8(enc, buf.get(p..p + n).unwrap_or_default());
                         let direct = self.direct();
                         self.tracker
-                            .store(Pool::Temp2, n, direct)
+                            .store_text(Pool::Temp2, &name, direct)
                             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
                     }
                     // handleUnknownEncoding without a handler (module 12).

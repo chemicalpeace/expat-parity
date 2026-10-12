@@ -151,7 +151,7 @@ impl Dtd {
         // Copy the prefix table.
         for id in self.prefixes.iter() {
             let name = self.prefixes.key(id).unwrap_or_default();
-            tr.store(Pool::Dtd, name.len(), direct)?;
+            tr.copy(Pool::Dtd, name.len(), direct)?;
             n.prefixes
                 .lookup_or_insert(salt, &mut tr.heap(direct), name, super::dtd::PREFIX_SIZE, Prefix::default)?;
         }
@@ -170,9 +170,10 @@ impl Dtd {
             let old = self.attribute_ids.value(id).copied().unwrap_or_default();
             {
                 let (p, mut h) = tr.pool(Pool::Dtd, direct);
-                p.append(&mut h, 1)?;
-                p.append(&mut h, name.len() + 1)?;
-                p.finish();
+                // `poolAppendChar(&(newDtd->pool), '\0')`, then
+                // `poolCopyString`.
+                p.append_chars(&mut h, 1)?;
+                p.copy(&mut h, name.len())?;
             }
             let (nid, _) = n.attribute_ids.lookup_or_insert(
                 salt,
@@ -198,7 +199,7 @@ impl Dtd {
         for id in self.element_types.iter() {
             let name = self.element_types.key(id).unwrap_or_default();
             let Some(old) = self.element_types.value(id) else { continue };
-            tr.store(Pool::Dtd, name.len(), direct)?;
+            tr.copy(Pool::Dtd, name.len(), direct)?;
             let (nid, _) = n.element_types.lookup_or_insert(
                 salt,
                 &mut tr.heap(direct),
@@ -221,7 +222,7 @@ impl Dtd {
             for (i, d) in old.default_atts.iter().enumerate() {
                 let Some(att) = map_att(&n, d.id) else { continue };
                 if let Some(v) = &d.value {
-                    tr.store(Pool::Dtd, v.len(), direct)?;
+                    tr.copy(Pool::Dtd, v.len(), direct)?;
                 }
                 if let alloc::collections::btree_map::Entry::Vacant(e) = for_name.entry(att) {
                     table.insert(&mut tr.heap(direct), NAME_AND_DEFAULT_ATTRIBUTE_SIZE)?;
@@ -252,7 +253,7 @@ impl Dtd {
             for id in old_table.iter() {
                 let name = old_table.key(id).unwrap_or_default();
                 let Some(e) = old_table.value(id) else { continue };
-                tr.store(Pool::Dtd, name.len(), direct)?;
+                tr.copy(Pool::Dtd, name.len(), direct)?;
                 let (nid, _) = new_table.lookup_or_insert(
                     salt,
                     &mut tr.heap(direct),
@@ -261,24 +262,23 @@ impl Dtd {
                     Entity::default,
                 )?;
                 if let Some(sys) = &e.system_id {
-                    tr.store(Pool::Dtd, sys.len(), direct)?;
+                    tr.copy(Pool::Dtd, sys.len(), direct)?;
                     // C copies a base once per run of entities sharing the
                     // same pointer; the port copies it every time (at
                     // least C's bytes).
                     if let Some(b) = &e.base {
-                        tr.store(Pool::Dtd, b.len(), direct)?;
+                        tr.copy(Pool::Dtd, b.len(), direct)?;
                     }
                     if let Some(p) = &e.public_id {
-                        tr.store(Pool::Dtd, p.len(), direct)?;
+                        tr.copy(Pool::Dtd, p.len(), direct)?;
                     }
                 } else {
                     // `poolCopyStringN`: the text without a NUL.
                     let (p, mut h) = tr.pool(Pool::Dtd, direct);
-                    p.append(&mut h, e.text.as_ref().map_or(0, |t| t.len()))?;
-                    p.finish();
+                    p.copy_n(&mut h, e.text.as_ref().map_or(0, |t| t.len()))?;
                 }
                 if let Some(nt) = &e.notation {
-                    tr.store(Pool::Dtd, nt.len(), direct)?;
+                    tr.copy(Pool::Dtd, nt.len(), direct)?;
                 }
                 if let Some(ne) = new_table.value_mut(nid) {
                     *ne = Entity {
@@ -436,7 +436,7 @@ impl Parser {
             let c = context.get(s).copied();
             let direct = self.direct();
             if c.is_none() || c == Some(CONTEXT_SEP) {
-                if self.tracker.store_discard(Pool::Temp, temp.len(), direct).is_err() {
+                if self.tracker.copy_discard(Pool::Temp, temp.len(), direct).is_err() {
                     return false;
                 }
                 if let Some(id) = self.dtd.general_entities.find(&salt, &temp)
@@ -453,7 +453,7 @@ impl Parser {
                 let prefix = if temp.is_empty() {
                     PrefixId::Default
                 } else {
-                    if self.tracker.store_discard(Pool::Temp, temp.len(), direct).is_err() {
+                    if self.tracker.copy_discard(Pool::Temp, temp.len(), direct).is_err() {
                         return false;
                     }
                     match self.dtd.lookup_prefix(&salt, &mut self.tracker, direct, &temp) {
@@ -468,7 +468,7 @@ impl Parser {
                 }
                 let uri = context.get(s + 1..j).unwrap_or_default();
                 let direct = self.direct();
-                if self.tracker.store_discard(Pool::Temp, uri.len(), direct).is_err() {
+                if self.tracker.copy_discard(Pool::Temp, uri.len(), direct).is_err() {
                     return false;
                 }
                 let mut inherited = self.inherited_bindings;
