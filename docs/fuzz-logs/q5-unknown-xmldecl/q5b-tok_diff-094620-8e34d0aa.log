@@ -1,0 +1,49 @@
+# libFuzzer log, trimmed: 457 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/tok_diff -artifact_prefix=<fuzz>/artifacts/tok_diff/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1460004913
+INFO: Loaded 1 modules   (84631 inline 8-bit counters): 84631 [0xaaaabec956a0, 0xaaaabecaa137), 
+INFO: Loaded 1 PC tables (84631 PCs): 84631 [0xaaaabecaa138,0xaaaabedf4aa8), 
+INFO:     8564 files found in <corpus>
+INFO: seed corpus: files: 8564 min: 1b max: 2239b total: 2187418b rss: 40Mb
+#4096	pulse  cov: 9589 ft: 38563 corp: 4012/178Kb exec/s: 819 rss: 419Mb
+#8192	pulse  cov: 10221 ft: 50892 corp: 7879/1410Kb exec/s: 390 rss: 635Mb
+#8565	INITED cov: 10231 ft: 52114 corp: 8241/2031Kb exec/s: 356 rss: 857Mb
+#16384	pulse  cov: 10245 ft: 52164 corp: 8271/2035Kb lim: 2250 exec/s: 390 rss: 1013Mb
+#32768	pulse  cov: 10282 ft: 52304 corp: 8358/2069Kb lim: 2250 exec/s: 385 rss: 1013Mb
+#39550	DONE   cov: 10290 ft: 52370 corp: 8393/2077Kb lim: 2250 exec/s: 391 rss: 1013Mb
+###### Recommended dictionary. ######
+"\265\332\000\000" # Uses: 474
+"\001\000\000\013" # Uses: 271
+"\376\377\000\000" # Uses: 260
+"\001\000\000\003" # Uses: 209
+"\000\000\000\003" # Uses: 145
+"\370\377\377\377\377\377\377\177" # Uses: 145
+"2\000" # Uses: 160
+"\005\000\000\000\000\000\000\000" # Uses: 143
+"8\000\000\000\000\000\000\000" # Uses: 107
+"\377\355" # Uses: 108
+"S\006\000\000\000\000\000\000" # Uses: 100
+"y\000\000\000\000\000\000\000" # Uses: 82
+"t\000" # Uses: 97
+"\005\000" # Uses: 96
+"\377\377" # Uses: 61
+"/\000\000\000" # Uses: 63
+"\376\377\377\234" # Uses: 56
+"\205\004\000\000\000\000\000\000" # Uses: 36
+"\020\377\377\377\377\377\377\377" # Uses: 31
+"\377\377\377\010" # Uses: 38
+"\000\000\000\000" # Uses: 25
+"\347\000\000\000" # Uses: 21
+"\377\377\377\377\377\377\377\203" # Uses: 10
+"\371\377\377\377\377\377\377\177" # Uses: 2
+"\377\377\377\377\377\377\377\377" # Uses: 0
+###### End of recommended dictionary. ######
+Done 39550 runs in 101 second(s)
+stat::number_of_executed_units: 39550
+stat::average_exec_per_sec:     391
+stat::new_units_added:          457
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              1013
