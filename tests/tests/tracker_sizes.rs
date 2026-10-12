@@ -1,12 +1,12 @@
 //! Every structure size the port's allocation tracker charges against the
 //! C compiler's `sizeof` / `offsetof` of the same structure in the vendored
 //! `xmlparse.c`, built by the oracle for the platform the test runs on
-//! (decision D-033; runs in the `test` job of every CI platform).
+//! (decision D-034; runs in the `test` job of every CI platform).
 //!
 //! A size below C's lets the port accept documents C refuses at the
 //! default limits (docs/DIVERGENCES.md R1): it always fails. A size above
 //! C's is allowed only for the over-counts listed in [`KNOWN_OVER_COUNTS`],
-//! which the size-parity stage of D-033 removes.
+//! which the size-parity stage of D-034 removes.
 
 use expat::internal::parse::TRACKER_SIZES;
 

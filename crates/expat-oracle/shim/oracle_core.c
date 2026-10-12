@@ -818,7 +818,7 @@ oracle_tracker_bytes(const void *parser) {
   return (unsigned long long)p->m_alloc_tracker.bytesAllocated;
 }
 
-/* ---- C structure sizes charged by the tracker (D-033) ------------------- */
+/* ---- C structure sizes charged by the tracker (D-034) ------------------- */
 
 /* sizeof / offsetof of the structures whose allocations the port's tracker
  * charges, taken by the C compiler from the vendored xmlparse.c, in the

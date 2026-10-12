@@ -187,7 +187,7 @@ and FNV-1a hash), so traces stay small.
   (33,563,484 bytes tracked when the next doubling is refused), so C
   reports error 1 at the default limits; 84,000 references are accepted.
 
-### What the port does (D-030, D-033)
+### What the port does (D-030, D-034)
 
 - The port charges its tracker (`parse::tracker`) at C's allocation points
   or earlier: C's sizes for the pools (`PoolShadow` replays `poolGrow` on
@@ -205,13 +205,13 @@ and FNV-1a hash), so traces stay small.
 - Relation: whenever C refuses through its tracker, the port must refuse.
   This was violated until 2026-10-12 by two structure sizes 8 bytes below
   C's (DIVERGENCES.md R1: 10,000 attribute defaults, ~687 KB, C refuses
-  at the default limits, the port accepted); fixed by D-033 and pinned by
+  at the default limits, the port accepted); fixed by D-034 and pinned by
   `tests/tests/dv1_windows.rs`.
 - The port may still refuse where C does not (DV-1, fail-closed): within
   the creation-bound margin (11,764-13,352 bytes) and, through the pool
   shadow's 4-character slack, by a whole pool block (up to 32 MiB). At
   the default limits both are reachable with documents of 340-690 KB
-  (W1, W2 in DIVERGENCES.md). D-033 removes them in stages with a
+  (W1, W2 in DIVERGENCES.md). D-034 removes them in stages with a
   per-allocation-event comparison against the oracle.
 
 ## 6. Error codes and positions relevant to the DTD

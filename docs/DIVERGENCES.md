@@ -8,7 +8,7 @@ The C library is the oracle; a divergence is accepted only when the C
 behaviour is a bug relative to the XML 1.0 (Fifth Edition) / Namespaces in
 XML 1.0 specifications or to libexpat's own documentation.
 
-### DV-1 Allocation tracker: the port can refuse earlier than C (module 11c, D-030, D-033)
+### DV-1 Allocation tracker: the port can refuse earlier than C (module 11c, D-030, D-034)
 
 - Cause: the port cannot count libexpat's allocations (it does not
   allocate C's structures), so it charges at least C's bytes at C's
@@ -20,7 +20,9 @@ XML 1.0 specifications or to libexpat's own documentation.
 - The margin has these components (measured on 64-bit Linux through the
   oracle, `docs/REPORT.md` DV-1 section):
   - the creation bound `CREATION_CHARGE` = 16,384 bytes against C's
-    3,040 (root parser, 64-bit) minus the C allocations the port does not
+    3,040 (root parser, 64-bit Linux and macOS; C's
+    tracker is 32 bytes lower on Windows x64, so the margin is 32 bytes
+    larger there) minus the C allocations the port does not
     replay one by one (measured: the namespace implicit context's pool
     block, 1,044 bytes, `m_atts` growth, the XML declaration strings);
     measured 11,764-13,352 bytes;
@@ -38,7 +40,7 @@ XML 1.0 specifications or to libexpat's own documentation.
     the margin is **one whole pool block** (up to 32 MiB at the default
     limits), not a few kilobytes.
 - Reproducers at the default limits (100.0, 64 MiB), in
-  `tests/tests/dv1_windows.rs` (permanent regressions, D-033):
+  `tests/tests/dv1_windows.rs` (permanent regressions, D-034):
   - **W1 (creation charge):** `pad` spaces + `<!DOCTYPE r [<!ENTITY ee '`
     395 x `x` `'>]><r v='` + 85,000 x `&ee;` + `'/>`. For pad
     330,746-330,878 (documents of 671,180-671,312 bytes, 133 documents)
@@ -69,7 +71,7 @@ XML 1.0 specifications or to libexpat's own documentation.
   the number of children (87,381 nested parameter entity parsers: C
   8,028, port 21,380 bytes at the end;
   `external_parser_diff.rs::billion_laughs_across_external_entities`).
-- **Status: being removed (owner decision 2026-10-12, D-033: option B,
+- **Status: being removed (owner decision 2026-10-12, D-034: option B,
   exact per-allocation parity, in stages).** Until every stage is merged,
   W1 and W2 remain and `dv1_windows.rs` pins them as "C accepts, port
   refuses". Rollback rule: if a parity stage ever produces C-refuses /
@@ -81,7 +83,7 @@ XML 1.0 specifications or to libexpat's own documentation.
   `upstream_vectors_tracker_relation` (no refusal at default limits where
   C accepts, on those corpora).
 
-### R1 Reverse violation: the port accepted documents C refuses (found and fixed 2026-10-12, D-033)
+### R1 Reverse violation: the port accepted documents C refuses (found and fixed 2026-10-12, D-034)
 
 - **This was a security defect, not an accepted divergence.** Two
   structure sizes were charged below C's `sizeof` on 64-bit targets:
@@ -99,7 +101,7 @@ XML 1.0 specifications or to libexpat's own documentation.
 - Why the tests missed it: their documents were small, so the
   16 KiB creation bound covered the deficit; the relation was only
   checked at the end of the parse, never per event.
-- Fix (D-033): every tracked structure size is computed from C's field
+- Fix (D-034): every tracked structure size is computed from C's field
   list with the target's C layout (`parse::c_layout`) and compared with
   the C compiler's `sizeof` on every CI platform
   (`tests/tests/tracker_sizes.rs`, an under-count always fails). Now C and

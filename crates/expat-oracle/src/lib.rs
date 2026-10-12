@@ -358,7 +358,7 @@ pub fn last_tracker_bytes() -> TrackerBytes {
 /// The C structures whose `sizeof` (`offsetof(BLOCK, s)` for
 /// `BLOCK_HEADER`, `sizeof(size_t) + EXPAT_MALLOC_PADDING` for
 /// `MALLOC_HEADER`, `sizeof(NAMED *)` for `NAMED_PTR`) [`c_sizes`]
-/// returns, in its order (D-033).
+/// returns, in its order (D-034).
 pub const ORACLE_C_SIZE_NAMES: [&str; 16] = [
     "TAG",
     "BINDING",
