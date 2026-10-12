@@ -1,0 +1,3 @@
+î<?xml version='1.0' standalone='no'?><!--before--><!DOCTYPE doc [<!ATTLIST a p:a IDREFS "urn:q" q:a ENTITIES #FIXED "&#x10000;" c NOTATION (n1|n2) #IMPLIED>
+<!ENTITY p:x "&ext;">
+<!--dtd comment-->]><doc><?pi?><doc a='1' id='urn:p'>&unp;&unp;</doc></doc>

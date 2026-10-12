@@ -1,0 +1,5 @@
+ƒ-<?xml version='1.0' encoding='ISO-8859-1'?>
+<!DOCTYPE doc [<!----><?dtdpi x?><!ELEMENT b (a*|doc?)>%extpe;%undeclared;
+]>
+<a><doc c='&e1;'>&e1;<a><?pi?>&e9;<doc/></a></doc><a>&e9;<?pi?>a&amp;b
+</a></a>

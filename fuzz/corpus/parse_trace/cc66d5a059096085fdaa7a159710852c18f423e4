@@ -1,0 +1,3 @@
+Gh<!--before--><!DOCTYPE doc [<!ENTITY unp SYSTEM "sys.ent">
+<!ELEMENT a ANY>
+<!ATTLIST q:e b NOTATION (n1|n2) #FIXED '&#x10000;' c IDREFS '&#65;&#xPUBLIC '  sp/doc>

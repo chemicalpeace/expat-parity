@@ -1,0 +1,2 @@
+ÄJ<!DOCTYPE doc [<!ENTITY e2 SYSTEM 'u.gif' NDATA undeclared><!ELEMENT a ANY><!ELEMENT b ANY><!NOTATION n1 PUBLIC 'p' 'viewer'>
+] ><doc p:a='&undeclared;' xmlns:p='&lt;'>&e9;</doc>

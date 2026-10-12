@@ -1,0 +1,1 @@
+πο»Ώ<!DOCTYPE r [<!ENTITY e0 'text '><!ENTITY e1 '&e3;<i a="&amp;">t</i>'><!ENTITY e2 ''><!ENTITY e3 '&e0;<![CDATA[x<y]]><?pi d?>&#x10FFFF;'><!ENTITY % p0 '<!ELEMENT r ANY>'><!ENTITY % p1 '<!ENTITY &#37; p3 "&#37;p2;">'>]><r t=' &e0;  y '>&e1;txt</r>

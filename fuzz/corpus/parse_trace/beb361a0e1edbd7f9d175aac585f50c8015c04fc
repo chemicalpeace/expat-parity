@@ -1,1 +1,0 @@
-Éú<!DOCTYPE r [<!ENTITY e0 '	'><!ENTITY e0 'second'><!ENTITY e1 '&#10;'><!ENTITY e2 '<?pi d?>	'><!ENTITY % p0 '&#37;p1;'><!ENTITY % p1 '<!ATTLIST r d CDATA "&e0;">'><!ENTITY % p2 '&#37;p1;'>]><r>txttxt&e2;txt</r>

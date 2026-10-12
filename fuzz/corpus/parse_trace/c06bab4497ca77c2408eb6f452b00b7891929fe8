@@ -1,0 +1,10 @@
+€¯<?xml version='1.0'?><!DOCTYPE doc [<!ENTITY e2 "" >
+<!ELEMENT a (#PCDATA|a|a|b)*>
+%pe2;<!ATTLIST _u xmlns:p ( x | y ) #FIXED "a|b" p:a IDREF "line
+break
+andcr	tab">
+<!ENTITY amp PUBLIC "a'b" "sys2.ent">
+<!ELEMENT b (#PCDATA)*>
+<!ATTLIST b xmlns:q ENTITY #REQUIRED xml:lang IDREF "http://www.w3.org/XML/1998/namespace">
+<!ATTLIST q:e xmlns IDREFS "a|b" xmlns:q (x|y|z) #REQUIRED>
+<!ENTITY % pe2 PUBLIC 'bad{char}' 'sys2.ent' >] ><a><!--c-->&e9;<doc/>&e9;</a>

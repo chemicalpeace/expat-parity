@@ -1,0 +1,2 @@
+…Ê<?xml version='1.0' encoding='ISO-8859-1'?><!DOCTYPE r [<!ENTITY e0 ''><!ENTITY e1 ''><!ENTITY e2 '&#38;#38;éa
+b'><!ENTITY e3 'é&e4;&#38;#60;&#65;'><!ENTITY e4 '&e5; sp  ace &e5;'><!ENTITY e5 '&e3;x sp  ace &e5;'><!ENTITY e5 'second'><!ATTLIST r a CDATA "&e3;" t NMTOKENS "  &e5; x " f CDATA #FIXED "&amp;&e3;">]><r t=' &e0;  y '>txt<c>&e0;</c></r>

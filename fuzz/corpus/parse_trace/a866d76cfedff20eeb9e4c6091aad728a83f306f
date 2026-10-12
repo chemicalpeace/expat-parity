@@ -1,0 +1,9 @@
+Ê@<?xml version='1.0'?><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ATTLIST a c ( x | y ) 'a&amp;b' xmlns:p IDREFS #IMPLIED q:a CDATA "&undeclared;"><!ENTITY % pe2 "&e2;&e2;"><?dtdpi x?>
+<!ELEMENT Ã© (#PCDATA)>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11'>
+<!ENTITY ext SYSTEM "sys.ent" >
+%extpe;
+<!ATTLIST doc>
+<!ENTITY % pe2 "<!ATTLIST doc pa CDATA 'pe default'>" >
+<!ELEMENT a EMPTY>]>
+<doc p:a='&e1;' a='1'></doc>

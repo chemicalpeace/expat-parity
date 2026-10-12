@@ -1,0 +1,4 @@
+¡<?xs version='1.0'?><!--b+fore--><!DOCTYPE doc PUBLIC '' 'doc.dtd' [<!ATTLIST doc q:a IDREF #REQUIRED><!--dtd comment-->
+<!ELEMENT q:e (#PCDATA|a)*>
+<!ATTLIST a xmlla ENTITYZvvvvvvv>
+<!ENTITY unp i?>&e0;<doc/>&e3;</b>

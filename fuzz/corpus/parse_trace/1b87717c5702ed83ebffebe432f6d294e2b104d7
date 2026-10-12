@@ -1,0 +1,3 @@
+ê <?xml version='1.0' standalone='yes'?><!--before--><!DOCTYPE doc [<!NOTATION n1 PUBLIC 'p' 'viewer'><!---->
+<!ELEMENT doc (a)>
+] ><doc id='&ext;'>&e1;<!--c-->&e3;&lt;&#60;&#x3C;</doc>

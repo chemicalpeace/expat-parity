@@ -1,0 +1,6 @@
+Iè<?xml version='1.0'?><!--before--><!DOCTYPE a [<!ATTLIST a xmlns ENTITIES "a|b">
+<!ATTLIST b xmlns:q CDATA 'line
+break
+andcr	tab' q:a NMTOKENS #FIXED ' x  y '><!NOTATION n1 SYSTEM 'viewer'><!ELEMENT a (#PCDATA|b)*>
+	
+<!ELEMENT a (#PCDATA)>	]><doc>&e3;&e9;</doc>

@@ -1,5 +1,0 @@
-ʀ﻿<?xml version='1.0' standalone='no'?>
-<!DOCTYPE a [%pe1;
-
-<!ATTLIST a  a (x|y|z) "&unp;" xmlns:q ( x | y ) #REQUIRED>
-<!ELEMENT a ((é?,a,b) , (a? , q:e)+ , q:e , doc?)*><!ENTITY><?pi?></b>

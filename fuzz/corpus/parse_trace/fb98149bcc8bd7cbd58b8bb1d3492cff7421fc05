@@ -1,0 +1,1 @@
+Žë<?xml version='1.0'?><!DOCTYPE r [<!ENTITY e0 '&#38;#38;'><!ENTITY e1 ''><!ENTITY e1 'second'><!ENTITY e2 '<b/>x'><!ENTITY e3 '<?pi d?>'><!ENTITY e3 'second'>]><r t=' &e0;  y '>&e1;txt</r>

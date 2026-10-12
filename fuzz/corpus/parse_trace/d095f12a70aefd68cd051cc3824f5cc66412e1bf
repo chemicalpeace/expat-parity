@@ -1,0 +1,8 @@
+±<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE a [<!ENTITY unp "line
+break
+andcr">
+<!ATTLIST b xmlns:p IDREF "&undeclared;" c IDREFS #REQUIRED xmlns ( x | y ) " x  y ">
+%pe1;<!---->
+
+<!---->%pe1;%pe1;]><b id='1'><![CDATA[&e1;]]>&ext;</b>

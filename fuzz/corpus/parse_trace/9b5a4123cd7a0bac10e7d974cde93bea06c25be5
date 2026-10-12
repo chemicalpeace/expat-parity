@@ -1,0 +1,6 @@
+Á<?xml version='1.0' standalone='no'?><!DOCTYPE a PUBLIC "a'b" 'doc.dtd' [<!ENTITY % pe1 "<!ENTITY e1 '&#37;pe1;'>" >
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9'><!ELEMENT p:e EMPTY><!ATTLIST q:e b ENTITIES '&e1;'>
+<!--dtd comment-->
+
+
+<!ELEMENT n-1 ((a*|_u|Ã©)|_u?)>]><b></b>

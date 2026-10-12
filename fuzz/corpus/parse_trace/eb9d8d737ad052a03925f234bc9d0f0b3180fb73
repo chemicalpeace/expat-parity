@@ -1,0 +1,1 @@
+ê0<?xml version='1.0'?><!DOCTYPE r [<!ENTITY e0 'é&e1;é'><!ENTITY e1 '&e2;&e2;&e2;'><!ENTITY e2 ''><!ENTITY e2 'second'><!ENTITY % p0 '<!ELEMENT r ANY>'><!ENTITY % p1 '<!ENTITY'><!ATTLIST r a CDATA "&e1;" t NMTOKENS "  &e0; x " f CDATA #FIXED "&amp;&e1;">]><r t=' &e0;  y '><c>&e0;</c>&e0;</r>

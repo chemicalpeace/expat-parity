@@ -1,0 +1,2 @@
+y‰<?xml version='1.0' standalone='yes'?><!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ENTITY e1 SYSTEM 'sys.ent' >
+<!ENTITY % pe2 "<!ELEMENT z ANY>" ><!ELEMENT n-1 (#PCDATA|n-1|n-1|b)*><!ATTLIST doc d0

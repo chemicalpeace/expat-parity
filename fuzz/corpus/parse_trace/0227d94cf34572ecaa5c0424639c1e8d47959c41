@@ -1,0 +1,7 @@
+-¨<!--before--><!DOCTYPE doc PUBLIC "  spaced 
+  id  " 'doc.dtd' [<?dtdpi x?><!ATTLIST a xml:lang NMTOKEN #FIXED '&#x10000;' xmlns:p CDATA '1' q:a ( x | y ) '&e1;'>
+<!ATTLIST a xmlns:q ENTITIES #FIXED "line
+break
+andcr	tab" p:a ENTITY #IMPLIED a ID #REQUIRED><!ENTITY ext PUBLIC "-//X//DTD x//EN" 'sys2.ent'><!ELEMENT a (#PCDATA)*><!ENTITY % pe1 ']]>'>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1'>
+]><doc xmlns:p='&e1;' c=' x &e2; '><b>&undeclared;</b><!--c--></doc>

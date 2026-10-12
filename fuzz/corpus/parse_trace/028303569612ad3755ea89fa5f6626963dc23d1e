@@ -1,0 +1,6 @@
+ô<?xml version='1.0'?>
+<!DOCTYPE a PUBLIC '-//X//DTD x//EN' 'doc.dtd' [<!ATTLIST q:e xmlns ID #FIXED 'a|b' xmlns:q IDREF '1'>
+<?dtdpi x?><!ENTITY e3 "a&amp;b" >
+<!ELEMENT doc (p:e , doc*)?>
+
+]><b a='urn:p'>&e9;<b x='y'/></b>

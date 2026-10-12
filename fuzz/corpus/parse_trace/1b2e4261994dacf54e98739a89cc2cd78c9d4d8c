@@ -1,0 +1,8 @@
+uS<?xml version='1.0' standalone='no'?><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ENTITY % pe3 PUBLIC '  spaced 
+  id  ' 'sys2.ent' ><!ATTLIST _u xmlns:p IDREFS #IMPLIED b ENTITIES #FIXED 'urn:q' a ENTITIES #IMPLIED>
+<!NOTATION n1 PUBLIC ''>
+<!NOTATION n1 PUBLIC 'p' 'viewer'>
+
+<!ATTLIST a xmlns:p ( x | y ) #FIXED 'a|b'>%undeclared;<!ELEMENT b (_u?|a|é)>
+<!ENTITY lt '&ext;' ><!ELEMENT b ((a,(doc?|a?|é?)?)+,(a,(b,p:e+,a+,doc)?,b?,(p:e* , a+ , a?)+)*,((a,a?,a+,q:e)+|p:e?)+)>
+] ><doc p:a='1'><a/>&ext;</doc>

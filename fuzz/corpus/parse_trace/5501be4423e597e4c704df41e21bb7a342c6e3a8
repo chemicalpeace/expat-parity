@@ -1,0 +1,3 @@
+еп»ї<?xml version='1.0'?><!DOCTYPE doc [<!ATTLIST b xmlns:p NMTOKEN #FIXED "" xml:lang ( x | y ) "x&e2;y" id NMTOKENS #FIXED 'urn:p'><!ATTLIST doc>
+]>
+<doc a='&e1;' xmlns:p='&e1;'><!--c-->&undeclared;</doc>

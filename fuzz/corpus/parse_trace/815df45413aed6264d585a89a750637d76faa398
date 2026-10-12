@@ -1,0 +1,6 @@
+L
+<!DOCTYPE a [<!ELEMENT a (b+|b*)+>
+<!ELEMENT a %pe1;>
+
+<!ENTITY e1 SYSTEM 'sys.ent'>
+<!ENTITY p:x '&#38;#38;'>	

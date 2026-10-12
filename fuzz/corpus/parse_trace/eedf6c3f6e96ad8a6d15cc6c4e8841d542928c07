@@ -1,0 +1,3 @@
+é<?xml version='1.0' standalone='no'?><!DOCTYPE doc SYSTEM 'ddtd' [<!ELEMENT q:e (n-1|n-1)*>
+<!ATTLIST a p:a IDREFS "http://www.w3.org/XML/1998/namespace" q:a CDATA #FIXED "" xmlns:q NMTOKEN #REQUIRED><!ELEMENT b (#PCDATA|b)*><!ATTLIST q:e xmlns:p IDREF #REQUIRED a NMTOKENS #FIXED ' x  y ' q:a NMTOKEN #FIXED '1'>
+]><doc a='&undeclared;'></doc>

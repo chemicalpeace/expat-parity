@@ -1,7 +1,0 @@
-*o<?xml version='1.0' encoding='UTF-8'?>
-<!DOCTYPE p:e PUBLIC "a'b" 'doc.dtd' [<!ENTITY é '&#60;b/&#62;' >
-<!ENTITY e2 SYSTEM "sys.ent" >
-<?ttdpi ƒ?><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12'>%undeclared;
-<!ENTITY % pe2 SYSTEM "sys.ent"><!ENTITY % extpe "&#60;b/&#62;" ><!ENTITY % pe3 PUBLIC "a'b" "sys2.ent" >
-<!ATTLIST b xmlns NMTOKENS "x&e2;y"><!ELEMENT b (n-1?|doc*|p:e+|p:e+)>]>
-<a><![CD&e1;</a>

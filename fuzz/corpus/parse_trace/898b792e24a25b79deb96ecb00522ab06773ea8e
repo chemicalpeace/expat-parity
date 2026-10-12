@@ -1,0 +1,7 @@
+b﻿<!DOCTYPE a PUBLIC '-//X//DTD x//EN' 'doc.dtd' [<!NOTATION n1 SYSTEM 'viewer'>
+%pe1;<!ELEMENT n-1 (a?,b+,é)?>
+%extpe;<!ELEMENT b EMPTY><!ELEMENT b (((p:e+)*|b|p:e*))>
+
+<!--dtd comment--><?dtdpi x?>
+<!NOTATION n><!ENTITY % pe3 PUBLIC 'bad{char}' "sys2.ent"><!ELEMENT a EMPTY>] ><doc a='&undeclared;' id='&e1;'>
+</doc>

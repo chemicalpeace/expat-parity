@@ -1,0 +1,9 @@
+¶á<?xml version='1.0' encoding='UTF-8'?><!--before--><!DOCTYPE doc [<!ELEMENT _u (b?)>
+<!ATTLIST q:e q:a IDREFS 'http://www.w3.org/XML/1998/namespace' q:a ENTITIES #REQUIRED><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1'><!NOTATION n2 PUBLIC '  spaced 
+  id  '><!NOTATION n1 PUBLIC "  spaced 
+  id  ">%pe2;<!ATTLIST doc xmlns NMTOKEN "urn:q" p:a (x|y|z) "&lt;" xml:lang CDATA ''>
+<!ATTLIST _u xmlns:p NMTOKEN #IMPLIED id NMTOKENS #IMPLIED>
+<!ATTLIST a xmlns (x|y|z) #FIXED "1" id CDATA 'urn:p'>
+<!ENTITY % pe1 '&#37;pe1;' ><!ENTITY amp PUBLIC '-//X//DTD x//EN' 'sys2.ent' >
+]>
+<a id='&ext;' a='1'><doc c='1'><?pi?><!--c--><b x='y'/></doc><a/>&ext;	</a>

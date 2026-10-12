@@ -1,0 +1,2 @@
+F;<?xml version='1.0' encoding='UTF-8'?><!--before--><!DOCTYPE p:e [<!ATTLIST a b CDATA #IMPLIED xmlns:q ENTITIES #REQUIRED><!ELEMENT b EMPTY>
+<!ATTLIST p:e xmlns:q NOTATION (n1|n2) #REQUIRED xmlns:q ENTITIES '&undeclared;'>] ><doc xmlns:p='&e1;' id='&e1;'>&e3;&#13;</doc>

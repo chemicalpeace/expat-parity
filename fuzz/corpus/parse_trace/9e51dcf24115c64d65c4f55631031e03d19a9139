@@ -1,0 +1,8 @@
+„G<!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ENTITY % pe1 PUBLIC '' "sys2.ent"><!NOTATION n2 SYSTEM 'viewer'><!ATTLIST doc xmlns CDATA #IMPLIED p:a CDATA 'http://www.w3.org/XML/1998/namespace' xmlns:q NOTATION (n1|n2) #REQUIRED><!ENTITY % pe3 "]]>" >
+<!ATTLIST n-1 b ( x | y ) #REQUIRED p:a NMTOKENS #IMPLIED c ID #IMPLIED>
+<!ENTITY amp SYSTEM "sys.ent">
+<!ATTLIST a xmlns:q ENTITIES "&e1;">
+<!ATTLIST a id CDATA 'a&amp;b' xml:lang ENTITIES ' x  y '> 
+<?dtdpi x?>
+<!ELEMENT _u (#PCDATA)><!ENTITY e1 "&#0;"><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1'>]>
+<doc xmlns:p=' x &e2; ' c='&lt;'></doc>

@@ -1,6 +1,0 @@
-мл
-<!DOCTYPE doc SYSTEM 'doc.dtd' [<!ELEMENT p:e (#PCDATA)> %pe1; 
-<!ELEMENT b (#PCDATA)>
-<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v'><!--dtd comment--><!ATTLIST doc xmlns:q NOTATION (n1|,,,,,,,,,,,,,,$,,,,,,,,,,,,,,,,,,,,,,,,,,,) "line
-break
-andcr	tab">] ><doc p:a='&e0;'>&lt;&#60;&#x3C;&e2;<doc/></doc>

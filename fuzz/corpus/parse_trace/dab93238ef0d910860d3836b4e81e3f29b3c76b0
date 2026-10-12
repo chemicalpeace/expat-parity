@@ -1,0 +1,2 @@
+1ºï»¿<!DOCTYPE a [<!ATTLIST b b ENTITIES #IMPLIED>
+] ><doc p:a=' x &e2; ' id='&e1;'>&e3;<b x='y'/>&e1;</doc>

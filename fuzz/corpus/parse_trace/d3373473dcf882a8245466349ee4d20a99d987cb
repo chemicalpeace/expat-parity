@@ -1,0 +1,3 @@
+Kg<!--before--><!DOCTYPE p:e [<!--dtd comment-->
+<!ELEMENT a (#PCDATA)>%pe1;
+<!ELEMENT b (b?)+>] ><b xmlns:p=' x &e2; ' c=' x &e2; '>&ext;</b>

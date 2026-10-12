@@ -1,0 +1,4 @@
+«Â
+<_u p:a = 'a&amp;b'	p:a = "http://www.w3.org/XML/1998/namespace" a = "line
+break
+andcr	tab"><a /><![CDATA[a]b]]></_u>

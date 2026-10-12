@@ -1,0 +1,61 @@
+# libFuzzer log, trimmed: 600 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 639736361
+INFO: Loaded 1 modules   (70189 inline 8-bit counters): 70189 [0xaaaad09fa470, 0xaaaad0a0b69d), 
+INFO: Loaded 1 PC tables (70189 PCs): 70189 [0xaaaad0a0b6a0,0xaaaad0b1d970), 
+INFO:    13979 files found in <corpus>
+INFO: seed corpus: files: 13979 min: 1b max: 12104b total: 4437851b rss: 42Mb
+#8192	pulse  cov: 12469 ft: 41472 corp: 7233/177Kb exec/s: 4096 rss: 419Mb
+#13980	INITED cov: 15032 ft: 67393 corp: 11825/3386Kb exec/s: 873 rss: 505Mb
+#16384	pulse  cov: 15032 ft: 67394 corp: 11826/3387Kb lim: 11944 exec/s: 963 rss: 505Mb
+#32768	pulse  cov: 15032 ft: 67409 corp: 11839/3385Kb lim: 11944 exec/s: 1560 rss: 631Mb
+#65536	pulse  cov: 15032 ft: 67452 corp: 11866/3401Kb lim: 11970 exec/s: 2048 rss: 631Mb
+#131072	pulse  cov: 15033 ft: 67514 corp: 11908/3420Kb lim: 11996 exec/s: 1747 rss: 631Mb
+#171131	DONE   cov: 15033 ft: 67581 corp: 11937/3434Kb lim: 11996 exec/s: 1782 rss: 631Mb
+###### Recommended dictionary. ######
+"\377\377\377\377\377\377\377\377" # Uses: 1100
+"\000\010" # Uses: 975
+"\024\000\000\000\000\000\000\000" # Uses: 900
+"\376\377\377\377\377\377\377\377" # Uses: 800
+"\005\000" # Uses: 798
+"ca" # Uses: 654
+"\377\377\377\003" # Uses: 659
+"\000\000\000\017\377\274\2550" # Uses: 575
+"\030\000\000\000\000\000\000\000" # Uses: 582
+"d1" # Uses: 538
+"skipped pe1" # Uses: 438
+"\001\000\000\002" # Uses: 458
+"\000\000\001u" # Uses: 380
+"limit at-am" # Uses: 356
+"do_" # Uses: 357
+"\377\377\017\000" # Uses: 347
+"CD" # Uses: 354
+"\001\000\000\000\000\000\000\006" # Uses: 308
+"nsend" # Uses: 336
+"\000\012" # Uses: 290
+"\001\000\000\000\000\000\000\000" # Uses: 262
+"\000\000" # Uses: 202
+"\000\000\000\006" # Uses: 200
+"attr" # Uses: 175
+"accounting " # Uses: 165
+"comment" # Uses: 173
+"\000\000\000\000\000\000\000\000" # Uses: 182
+"1\000\000\000" # Uses: 177
+"\001\000" # Uses: 156
+"\002\000\000\000\000\000\000\000" # Uses: 108
+"\377\020\000\000" # Uses: 104
+"\377\377\377\377" # Uses: 85
+"\377\377\020\000" # Uses: 86
+"\001\000\000\000\000\000\000\024" # Uses: 54
+"\377\000" # Uses: 40
+"xmldecl" # Uses: 12
+###### End of recommended dictionary. ######
+Done 171131 runs in 96 second(s)
+stat::number_of_executed_units: 171131
+stat::average_exec_per_sec:     1782
+stat::new_units_added:          600
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              631
