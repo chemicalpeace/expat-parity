@@ -62,8 +62,10 @@ jobs:
       # Full suite (both commands of the test job, no test skipped), pinned
       # stable toolchain, instrumented release build.
       - run: scripts/coverage.sh coverage-out/stable
-      # The same plus the doctests: cargo-llvm-cov --doctests needs nightly.
-      - run: scripts/coverage.sh coverage-out/nightly-doctests --doctests
+      # The same plus the doctests (cargo-llvm-cov --doctests needs nightly),
+      # and the same runs on nightly without doctests as the control.
+      - run: scripts/coverage.sh coverage-out/nightly nightly
+      - run: scripts/coverage.sh coverage-out/nightly-doctests nightly-doctests
       - uses: actions/upload-artifact@v4
         if: always()
         with:

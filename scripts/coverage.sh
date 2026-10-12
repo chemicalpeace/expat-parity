@@ -7,28 +7,35 @@
 #   <run>-summary.json        the same as JSON (--summary-only)
 #   <run>.lcov                lcov export
 #   <run>-missing-lines.txt   the table plus the uncovered lines per file
-#   <run>-mismatch.txt        llvm-cov's "mismatched data" warning with the
-#                             function list (llvm-cov -dump hash-mismatch lines)
+#   <run>-warnings.txt        llvm-cov's warnings (e.g. "N functions have
+#                             mismatched data")
+#   <run>-mismatch.txt        stable toolchain only: every mismatched
+#                             function (llvm-cov -dump "hash-mismatch" lines)
 #
 # Runs: "all-features" = `cargo test --workspace --all-features`;
 #       "full"         = all-features plus `cargo test -p expat --no-default-features`.
 #
-# Usage: scripts/coverage.sh OUT_DIR [--doctests]
-#   --doctests uses the nightly toolchain (cargo-llvm-cov's --doctests is
-#   nightly-only) and adds the doctests to both runs.
+# Usage: scripts/coverage.sh OUT_DIR [stable|nightly|nightly-doctests]
+#   stable (default): the pinned toolchain of rust-toolchain.toml.
+#   nightly: the same runs on nightly (control for nightly-doctests).
+#   nightly-doctests: nightly plus the doctests (cargo-llvm-cov --doctests
+#   needs nightly).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-out=${1:?usage: scripts/coverage.sh OUT_DIR [--doctests]}
+out=${1:?usage: scripts/coverage.sh OUT_DIR [stable|nightly|nightly-doctests]}
+mode=${2:-stable}
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
 
 tc=()
 doc=()
-if [ "${2:-}" = "--doctests" ]; then
-  tc=(+nightly)
-  doc=(--doctests)
-fi
+case $mode in
+  stable) ;;
+  nightly) tc=(+nightly) ;;
+  nightly-doctests) tc=(+nightly); doc=(--doctests) ;;
+  *) echo "unknown mode $mode" >&2; exit 2 ;;
+esac
 
 # Same filter as docs/REPORT.md module 11 step E, written for / and \ paths:
 # the harness crate (tests/), the C oracle, benches, fuzz targets, vendored C.
@@ -38,24 +45,22 @@ cov() { cargo ${tc[@]+"${tc[@]}"} llvm-cov "$@"; }
 
 report() {
   local run=$1
-  cov report --release ${doc[@]+"${doc[@]}"} --ignore-filename-regex "$ignore" \
-    > "$out/$run-summary.txt"
-  cov report --release ${doc[@]+"${doc[@]}"} --ignore-filename-regex "$ignore" \
-    --show-missing-lines > "$out/$run-missing-lines.txt"
-  cov report --release ${doc[@]+"${doc[@]}"} --ignore-filename-regex "$ignore" \
-    --json --summary-only --output-path "$out/$run-summary.json"
-  cov report --release ${doc[@]+"${doc[@]}"} --ignore-filename-regex "$ignore" \
-    --lcov --output-path "$out/$run.lcov"
-  # -dump makes llvm-cov list every hash mismatch on stderr.
-  LLVM_COV_FLAGS=-dump cov report --release ${doc[@]+"${doc[@]}"} \
-    --ignore-filename-regex "$ignore" > /dev/null 2> "$out/$run-dump.txt"
-  { grep -E '^warning: ' "$out/$run-dump.txt" || echo 'no warnings'
-    grep -E '^hash-mismatch: ' "$out/$run-dump.txt" || true
-  } > "$out/$run-mismatch.txt"
-  rm "$out/$run-dump.txt"
-  echo "== $run"
+  local args=(--release ${doc[@]+"${doc[@]}"} --ignore-filename-regex "$ignore")
+  cov report "${args[@]}" > "$out/$run-summary.txt" 2> "$out/$run-warnings.txt"
+  cov report "${args[@]}" --show-missing-lines > "$out/$run-missing-lines.txt"
+  cov report "${args[@]}" --json --summary-only --output-path "$out/$run-summary.json"
+  cov report "${args[@]}" --lcov --output-path "$out/$run.lcov"
+  if [ "$mode" = stable ]; then
+    # -dump makes llvm-cov list every hash mismatch on stderr. (The nightly
+    # llvm-cov of 2026-10-11 aborts in -dump, so this is stable only.)
+    LLVM_COV_FLAGS=-dump cov report "${args[@]}" > /dev/null 2> "$out/$run-dump.txt"
+    # grep exits 1 when there is no mismatch at all; 2 (a real error) fails.
+    grep -E '^hash-mismatch: ' "$out/$run-dump.txt" > "$out/$run-mismatch.txt" || [ $? -eq 1 ]
+    rm "$out/$run-dump.txt"
+  fi
+  echo "== $mode $run"
   tail -n 1 "$out/$run-summary.txt"
-  head -n 1 "$out/$run-mismatch.txt"
+  cat "$out/$run-warnings.txt"
 }
 
 {
