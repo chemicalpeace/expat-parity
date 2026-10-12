@@ -32,9 +32,11 @@ use super::Encoding;
 /// C `char`, i.e. sign-extended (D-017); converted declaration characters
 /// never produce a byte that makes this matter.
 pub fn to_ascii<E: Encoding>(enc: &E, buf: &[u8], ptr: usize, end: usize) -> i32 {
-    let from = buf.get(ptr..end).unwrap_or_default();
     let mut out = [0u8; 1];
-    if enc.to_utf8(from, &mut out).written == 0 {
+    // `XmlUtf8Convert(enc, &ptr, end, ...)`: with an unknown encoding a
+    // lead byte just before `end` is converted with the bytes after it
+    // (Q-5).
+    if enc.to_utf8_until(buf, ptr, end, &mut out).written == 0 {
         -1
     } else {
         let [b] = out;
