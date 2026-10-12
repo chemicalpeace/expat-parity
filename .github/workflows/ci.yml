@@ -55,17 +55,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup component add llvm-tools-preview
-      - run: rustup toolchain install nightly --profile minimal -c llvm-tools-preview
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov@0.9.1
       # Full suite (both commands of the test job, no test skipped), pinned
-      # stable toolchain, instrumented release build.
+      # stable toolchain, instrumented release build. Doctests are not in
+      # this job: cargo-llvm-cov --doctests needs nightly, and nightly
+      # coverage is not usable at present (docs/REPORT.md, "Coverage on every
+      # CI platform"); `scripts/coverage.sh DIR nightly-doctests` and
+      # `... nightly` measure them by hand.
       - run: scripts/coverage.sh coverage-out/stable
-      # The same plus the doctests (cargo-llvm-cov --doctests needs nightly),
-      # and the same runs on nightly without doctests as the control.
-      - run: scripts/coverage.sh coverage-out/nightly nightly
-      - run: scripts/coverage.sh coverage-out/nightly-doctests nightly-doctests
       - uses: actions/upload-artifact@v4
         if: always()
         with:

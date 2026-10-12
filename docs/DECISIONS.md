@@ -684,3 +684,31 @@ recorded in DIVERGENCES.md.
 - **Verification.** `tests/tests/external_parser_diff.rs` (groups in
   REPORT.md), the `parse_trace` fuzz target with external entity bodies,
   injected bugs E1-E14.
+
+## D-033 Coverage is measured in CI on every platform, corrected for an llvm-cov artefact (PR #13)
+
+- **Problem.** Module 11 step E measured coverage once, locally, without
+  `tok_diff::upstream_vectors_every_offset` and without doctests. Reports
+  of several test binaries together also lose counts: llvm-cov registers
+  a zero-count dummy record (hash 0) of a function some binary links
+  unused when no profile hash of that name has bit 60 clear, and then
+  skips the real record of later binaries (REPORT.md, "Coverage on every
+  CI platform").
+- **Decision.** A `coverage` job on the `test` matrix (ubuntu, macOS,
+  Windows) runs `scripts/coverage.sh`: cargo-llvm-cov 0.9.1, pinned stable
+  toolchain, `--release`, both commands of the `test` job, no test
+  skipped, no coverage exclusion beyond the step E report filter (harness,
+  oracle, benches, fuzz, vendored C). Each run is reported raw and
+  corrected; `scripts/coverage_fix_profdata.py` adds a hash-1 record for
+  every profile name whose hashes all have bit 60 set, so the dummy
+  lookups end in `hash_mismatch` and are dropped. The corrected report is
+  the quoted figure. Doctests are not measured in CI: they need nightly,
+  whose coverage was unusable when this was set up; the script keeps
+  `nightly` and `nightly-doctests` modes for a manual re-check.
+- **Why.** The figure must not depend on the platform or on the order in
+  which llvm-cov loads binaries; with the correction Linux and macOS
+  produce identical line sets. The correction only lets llvm-cov use
+  counts the profile already has; it adds no test and hides no code.
+- **Verification.** Locally the corrected line set equals the union of
+  the per-binary reports; CI run 38220630479 (raw and corrected per
+  platform in `docs/coverage/ci-2f6a37a-*.txt`).
