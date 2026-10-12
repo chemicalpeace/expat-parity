@@ -36,12 +36,12 @@ use expat_difftest::vectors::upstream;
 use expat_oracle::{ExtHandler, Factor, Limits, ParamEntityParsing, ParseOptions, TrackerEvent};
 
 /// Runs whose streams must be equal from creation through
-/// `XML_ParserFree` (all of them since stages 3 and 7 of D-034: 15,879 of
-/// 15,879 on aarch64 Linux; the stages before compared only after the
+/// `XML_ParserFree` (all of them since stages 3 and 7 of D-034: 15,966 of
+/// 15,966 on aarch64 Linux; the stages before compared only after the
 /// creation and up to the end of the parse: stage 4 3,270 of 3,420, stage
 /// 2 3,291, stages 5 and 4b 5,196 of 5,196; see docs/REPORT.md, DV-1
 /// parity).
-const EQUAL_STREAMS_AT_LEAST: usize = 15_879;
+const EQUAL_STREAMS_AT_LEAST: usize = 15_966;
 
 fn base() -> ParseOptions {
     ParseOptions {
@@ -302,6 +302,21 @@ fn boundary_docs() -> Vec<Vec<u8>> {
         ] {
             docs.push(t.into_bytes());
         }
+    }
+    // Element type names from 15 to 70 characters, nested and left open at
+    // a chunk boundary (UTF-8 and UTF-16): `storeRawNames` copies the raw
+    // name into the tag buffer after each `doContent` that leaves the tag
+    // open, and `doContent` doubles the buffer while it is smaller than the
+    // name and its NUL (stage 5).
+    for len in [15, 16, 31, 32, 33, 47, 63, 64, 70] {
+        let n = "n".repeat(len);
+        let t = format!("<{n}><{n}b><{n}c a='1'>text</{n}c></{n}b></{n}>");
+        docs.push(t.clone().into_bytes());
+        let mut u16 = vec![0xFF, 0xFE];
+        for c in t.encode_utf16() {
+            u16.extend_from_slice(&c.to_le_bytes());
+        }
+        docs.push(u16);
     }
     docs
 }

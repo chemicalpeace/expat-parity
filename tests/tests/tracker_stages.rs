@@ -297,7 +297,7 @@ fn stage7_release_streams() {
         ),
         ent("p.ent", "<!ENTITY e 'from p'><!ELEMENT q ANY>"),
     ];
-    let doc = b"<!DOCTYPE r SYSTEM 's.dtd' [<!ENTITY a SYSTEM 'a.xml'><!ENTITY b SYSTEM 'b.xml'><!ENTITY c SYSTEM 'c.xml'>]><r xmlns:p='urn:p' b='&e;'>&a;</r>";
+    let doc = b"<!DOCTYPE r SYSTEM 's.dtd' [<!ELEMENT r (a|b|q)*><!ELEMENT a (#PCDATA|q)*><!ENTITY a SYSTEM 'a.xml'><!ENTITY b SYSTEM 'b.xml'><!ENTITY c SYSTEM 'c.xml'>]><r xmlns:p='urn:p' b='&e;'>&a;</r>";
     assert_equal_streams("stage 7 nested", doc, &read_options(ents.clone()));
     let o = ParseOptions {
         ns_separator: Some(b'|'),
@@ -331,4 +331,37 @@ fn stage7_partial_dtd_copy_released() {
         refused += usize::from(ev.iter().any(|e| e.refused));
     }
     assert!(refused > 0, "stage 7: no refusal in the sweep");
+    // Default values long enough that copying each into the child's
+    // `dtd->pool` takes a new block: the sweep refuses at the second and
+    // third value, after the first attribute's `defaultAttForName` entry
+    // (and table) were allocated, which `XML_ParserFree` must release.
+    let v = |c: &str| c.repeat(1500);
+    let doc = format!(
+        "<!DOCTYPE r [<!ATTLIST e a CDATA '{}' b CDATA '{}' c CDATA '{}'><!ENTITY x SYSTEM 'x.xml'>]><r>&x;</r>",
+        v("a"),
+        v("b"),
+        v("c")
+    );
+    let o = read_options(vec![ent("x.xml", "<e/>")]);
+    let mut at_copy = 0;
+    for o in (3_000..40_000).step_by(40).map(|t| ParseOptions {
+        limits: Limits {
+            at_amplification: Some(Factor(1.0)),
+            at_threshold: Some(t),
+            ..Limits::NONE
+        },
+        ..o.clone()
+    }) {
+        let ev = assert_equal_streams("stage 7 partial default values", doc.as_bytes(), &o);
+        // A refusal after the child parser's creation (its DTD, 7865).
+        if let Some(k) = ev.iter().position(|e| e.refused)
+            && ev[..k].iter().filter(|e| e.line == 7865).count() == 2
+        {
+            at_copy += 1;
+        }
+    }
+    assert!(
+        at_copy > 0,
+        "stage 7: no refusal during the child's DTD copy"
+    );
 }
