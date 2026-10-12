@@ -1,0 +1,4 @@
+warning: 3 functions have mismatched data
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+Stack dump without symbol names (ensure you have llvm-symbolizer in your PATH or set the environment var `LLVM_SYMBOLIZER_PATH` to point to it):
+0  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffffb15ceeb0 
