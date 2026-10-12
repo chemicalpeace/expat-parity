@@ -8,80 +8,52 @@ The C library is the oracle; a divergence is accepted only when the C
 behaviour is a bug relative to the XML 1.0 (Fifth Edition) / Namespaces in
 XML 1.0 specifications or to libexpat's own documentation.
 
-### DV-1 Allocation tracker: the port can refuse earlier than C (module 11c, D-030, D-034)
+### DV-1 Allocation tracker: the port could refuse earlier than C — removed by exact parity (D-034)
 
-- Cause: the port cannot count libexpat's allocations (it does not
-  allocate C's structures), so it charges at least C's bytes at C's
-  allocation points or earlier (D-030). Its total exceeds C's by a margin
-  `Δ(k) = N_port(k) − N_C(k)` at allocation event `k`. A document is
-  refused by the port only when, at some event, the port's new total
-  reaches the activation threshold with an amplification above the
-  maximum while C's stays below at every event of its own parse.
-- The margin has these components (measured on 64-bit Linux through the
-  oracle, `docs/REPORT.md` DV-1 section):
-  - the creation bound `CREATION_CHARGE` = 16,384 bytes against C's
-    3,040 (root parser, 64-bit Linux and macOS; C's
-    tracker is 32 bytes lower on Windows x64, so the margin is 32 bytes
-    larger there) minus the C allocations the port does not
-    replay one by one (measured: the namespace implicit context's pool
-    block, 1,044 bytes, `m_atts` growth, the XML declaration strings);
-    measured 11,764-13,352 bytes;
-  - `ELEMENT_TYPE` charged as 96 bytes against C's 88: +8 bytes per
-    element type, unbounded (grows with the number of element types);
-  - `NS_ATT` charged as 24 bytes against C's 16 on Windows (4-byte
-    `unsigned long`): +8 bytes per slot of `m_nsAtts` there;
-  - the raw tag name charged together with the converted name when the
-    tag opens (`Tracker::open_tag`); C stores it later and only when the
-    input buffer moves (`storeRawNames`): grows with name length x depth;
-  - **`POOL_SLACK` = 4**: a pool string is grown when fewer than
-    `len + 4` characters are free, where C's `XmlConvert` fills a block to
-    its last byte. When a string ends in the last four characters of a
-    block that C fills exactly, the port doubles the block and C does not:
-    the margin is **one whole pool block** (up to 32 MiB at the default
-    limits), not a few kilobytes.
-- Reproducers at the default limits (100.0, 64 MiB), in
-  `tests/tests/dv1_windows.rs` (permanent regressions, D-034):
-  - **W1 (creation charge):** `pad` spaces + `<!DOCTYPE r [<!ENTITY ee '`
-    395 x `x` `'>]><r v='` + 85,000 x `&ee;` + `'/>`. For pad
-    330,746-330,878 (documents of 671,180-671,312 bytes, 133 documents)
-    C accepts (its last pool doubling reaches 67,117,916 bytes, amplification
-    100.00) and the port refuses (33,576,836 + 33,554,432 = 67,131,268 >
-    100 x direct). With 10,000 attribute defaults on an unused element type
-    the same window lies at pad 188,323-188,456.
-  - **W2 (pool slack):** 84,947 x `&ee;` + `tail` x `x`, no padding. For
-    tail 363-366 (documents of 340,585-340,588 bytes) C fills its 32 MiB
-    block exactly (33,554,431 characters and the NUL; end 33,563,484) and
-    accepts; the port doubles to 64 MiB (amplification 197) and refuses.
-  - With caller-tightened limits the window is easy to reach: at C's exact
-    passing threshold the port refuses in 36 of 36 sweep cases
-    (`tracker_diff.rs::threshold_boundary_sweep`, amplification 1.0).
-- Justification: fail-closed security behaviour; the refusal is the same
-  error C's tracker gives (`XML_ERROR_NO_MEMORY`), and the allocation
-  tracker is a resource limit, not part of XML 1.0 well-formedness.
-- The opposite direction (C refuses, the port accepts) is a security
-  defect, not a divergence: it was found (R1 below) and fixed, and is
-  tested by `tracker_sizes.rs` (every structure size >= C's `sizeof`),
-  `dv1_windows.rs`, the corpus relations in `tracker_diff.rs` and the
-  tracker relation of the `parse_trace` fuzz target.
-- External entity parsers (module 11d step D2, D-032): every child
-  charges the root's tracker. A general entity parser's charge is fully
-  released when it is freed; a parameter entity parser keeps the shared
-  DTD's growth charged (as in C) and releases its own structures. The
-  creation-bound part of the margin stays 13,312-13,352 bytes whatever
-  the number of children (87,381 nested parameter entity parsers: C
-  8,028, port 21,380 bytes at the end;
-  `external_parser_diff.rs::billion_laughs_across_external_entities`).
-- **Status: being removed (owner decision 2026-10-12, D-034: option B,
-  exact per-allocation parity, in stages).** Until every stage is merged,
-  W1 and W2 remain and `dv1_windows.rs` pins them as "C accepts, port
-  refuses". Rollback rule: if a parity stage ever produces C-refuses /
-  port-accepts, `CREATION_CHARGE` returns to 16,384 and `POOL_SLACK` to 4
-  (the size fixes stay).
-- Regression tests: `tests/tests/dv1_windows.rs` (W1, W2, R1),
-  `tracker_diff.rs::threshold_boundary_sweep` (36/36),
-  `generated_documents_tracker_relation` and
-  `upstream_vectors_tracker_relation` (no refusal at default limits where
-  C accepts, on those corpora).
+- **What it was (module 11c, D-030).** The port charged at least C's
+  bytes at C's allocation points or earlier, so it could refuse
+  (`XML_ERROR_NO_MEMORY`) where C did not: a creation upper bound of
+  16,384 bytes against C's 3,040 (W1, a 133-document window of
+  671 KB documents at the default limits), a pool slack of 4 characters
+  that could cost a whole pool block (W2, 340 KB documents), per-element
+  and per-slot over-counts (`ELEMENT_TYPE`, `NS_ATT` on Windows), the raw
+  tag name charged too early. Two sizes below C's (R1, below) showed that
+  the "at least C's bytes" premise did not even hold.
+- **What replaced it (owner decision 2026-10-12, option B).** The port's
+  tracker now replays C's allocations event by event (D-034, stages 1-8):
+  sizes from C's field lists checked against the C compiler on every CI
+  platform, an exact pool model, creation and `XML_ParserFree` as C's
+  individual allocations, every C allocation the creation bound used to
+  cover, the raw tag name at `storeRawNames`, and the refusal paths at
+  C's state (C tolerates a refused `xmlns:` prefix, hands the entity
+  declaration handler a partly stored value, keeps a tag whose buffer
+  could not grow on the tag stack). The tests require equal streams
+  (direction, size, refusal, running total, peak at every event) from
+  creation through `XML_ParserFree`, equal traces and equal limit
+  outcomes; the fuzz targets' tracker relation fails when the port
+  refuses where C accepts, when C refuses where the port accepts, or when
+  both refuse but stop differently (`tests/src/tracker.rs`,
+  `compare_events`).
+- **Status per platform:** see `docs/REPORT.md`, "DV-1 parity, stages
+  2-8". aarch64 Linux (local, `e1a4e6e` and the merge with `main`):
+  15,966 of 15,966 `tracker_events` streams equal, W1/W2/R1 width 0,
+  the committed `parse_trace` corpus (13,869 inputs) and seeds pass the
+  exact relation. The CI platforms (x86_64 Linux, aarch64 macOS, x86_64
+  Windows) are recorded there from the PR's CI run; DV-1 is closed on a
+  platform only when all of `tracker_events`, `tracker_stages`,
+  `dv1_windows` and `tracker_sizes` pass on it.
+- **Known remaining differences (none reachable by a document through
+  the current API):** `copy_for_child` copies an external entity's base
+  once per entity where C copies it once per run of entities sharing the
+  same base pointer (an over-count, fail-closed; bases are always NULL
+  until a base setter exists, module 12); `m_unknownEncodingMem` is not
+  modelled (no unknown-encoding handler before module 12); the encoding
+  name argument of `XML_ExternalEntityParserCreate` is charged like C's
+  `copyString` but no test passes one (the harness's handlers pass NULL).
+- Regression tests: `tests/tests/dv1_windows.rs` (W1, W2, R1 boundaries
+  bisected per platform, now equal), `tracker_events.rs`,
+  `tracker_stages.rs` (one named test per stage and per refusal path),
+  `tracker_sizes.rs`, `tracker_diff.rs`, `fuzz_corpus.rs`.
 
 ### R1 Reverse violation: the port accepted documents C refuses (found and fixed 2026-10-12, D-034)
 

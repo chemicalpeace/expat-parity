@@ -1123,15 +1123,67 @@ encodings, `XmlParseXmlDecl` on every declaration token) 7 slices, 707 s,
 (built-in encodings only, where `to_utf8_until` is the old conversion). No
 crash, no mismatch.
 
+### DV-1 parity, stages 2-8 (D-034): exact tracker parity
+
+The port's tracker now replays C's allocations event by event (stages
+2-7: pool model, creation, untracked C allocations, raw tag names,
+`ELEMENT_TYPE`/`NS_ATT`, `XML_ParserFree`). Stage 8 came from making the
+relation exact: with "port refuses, C accepts" counted as a failure and
+the tight runs compared event by event, the committed `parse_trace`
+corpus failed (408 inputs at first). Root causes, each fixed at C's
+state without fake charges or looser limits:
+
+| Class (first difference) | Example | C (`xmlparse.c`) | Port before | Fix (b699b1a) |
+|---|---|---|---|---|
+| Port refuses, C accepts, all with namespaces (192 inputs) | seed `0108d5df…`, UTF-16LE, threshold 7,070: events equal through `+24 refused` at 8331, then C reports `notation n2`, `result error 4`, the port `result error 1` | `getAttributeId` does not check the `lookup` of an `xmlns:` prefix (7650-7652): the id keeps a NULL prefix with `xmlns` set and the parse goes on; `storeAtts` treats the attribute as unprefixed (4262, 4295), `dtdCopy` copies `xmlns` only with a prefix (8011) | returned `XML_ERROR_NO_MEMORY` at the refusal | same state: `xmlns` set, no prefix, parse goes on |
+| Entity value after a refused allocation (210 inputs) | `<!ENTITY foo '…'>`, first `entityValuePool` block refused: C `entity foo 0 ~`, port `entity foo 0 ` (empty); refused growth inside a value: C's value ends at the last whole character written | `XML_ROLE_ENTITY_VALUE` calls the handler with `poolStart`/`poolLength` before returning the error (5935-5958): NULL without a first block (7126-7129), otherwise what `poolAppend` wrote (whole characters, `utf8_toUtf8`'s trim); `poolAppendChars` (character references) writes nothing on failure | empty value; the whole last token | value NULL without a block; `PoolShadow::append_text` advances over the whole characters written before each growth and the value is cut to the pool's length |
+| Release order after a refused tag buffer growth (6 inputs) | `<a>` then a long start tag, `+32 refused` at 3790: C frees the new tag first (`-40`, `-104` at 1885/1887), the port its parent | the tag is on `m_tagStack` (3764-3766) before its buffer grows (3790-3792), so `XML_ParserFree` (1874-1887) releases it first | put it on the free list | the tag stays the innermost open tag |
+
+Named regressions (`tracker_stages.rs`):
+`refusal_of_an_xmlns_prefix_is_tolerated` (threshold sweeps one byte
+apart; C reaches the content after the refusal and reports the unbound
+prefix), `refused_entity_value_reports_what_c_stored` (1- to 4-byte
+characters and character references, UTF-8 and UTF-16LE; NULL and partial
+values both occur), `refused_tag_buffer_growth_released_first`.
+`assert_equal_streams` and `tracker_events` now compare whole traces, not
+only the result lines (the entity values were invisible to them).
+
+Injected bugs (mutations and logs in the working notes,
+`inject-logs/blocker`): B1 a refused `xmlns:` prefix fatal again: caught
+by `refusal_of_an_xmlns_prefix_is_tolerated` and `fuzz_corpus` (corpus
+and seeds); B2 NULL entity value reported as empty: caught by
+`tracker_stages` (2 tests), `fuzz_corpus` and `tracker_events`; B3 value
+not cut to the pool: `refused_entity_value_reports_what_c_stored`,
+`fuzz_corpus`; B4 `append_text` without the partial fill: the same two;
+B5 refused tag back on the free list:
+`refused_tag_buffer_growth_released_first`, `fuzz_corpus`.
+
+Results on aarch64 Linux (local, release, at the merge of `main`):
+
+| Check | Runs | Result |
+|---|---|---|
+| `tracker_events` (creation through `XML_ParserFree`, whole traces) | 15,966 runs, 5,160 with a refusal in C | 15,966 equal streams, equal peaks and traces |
+| `tracker_stages` | 12 named tests | pass |
+| `fuzz_corpus` under the exact relation | `parse_trace` 13,869 inputs (3 runs each: caller's options, threshold at C's end and half, events compared), `buffer_diff` 10,766, seeds | pass |
+| `tracker_diff` | generated 4,500 runs (C refused 2,818), upstream 6,480 (3,680), boundary sweep 108 | port-only refusals 0, end margin 0 |
+| `external_parser_diff` tracker relation | 4,725 runs (C refused 3,150) | port-only refusals 0, margin 0 |
+| `dv1_windows` | W1, W2, R1 bisected | same boundary for C and port (width 0) |
+| `tracker_sizes` | 16 sizes | all equal to C's |
+
+Fuzzing at e1a4e6e (`fuzz-slice7.sh`, logs `docs/fuzz-logs/dv1-parity`):
+`parse_trace` 7 slices, 658 s, 543,076 executions; `buffer_diff` 7
+slices, 637 s, 3,531,508 executions; no findings. (The working corpora
+were lost in a sandbox reset before they could be merged; the committed
+corpora are unchanged.)
+
+Per platform: filled in from the pull request's CI run below.
+
 ## Divergences
 
-`docs/DIVERGENCES.md`. One divergence: DV-1 (module 11c, D-030), the
-allocation tracker may refuse (`XML_ERROR_NO_MEMORY`) slightly earlier
-than C, within the margin by which its charge exceeds C's count; it is
-fail-closed and was observed only with caller-tightened limits; its
-status is **pending the owner's decision** (DIVERGENCES.md). External
-entity parsers (module 11d) keep the same margin, independent of the
-number of child parsers. No other divergence in parse results. Five C quirks found
+`docs/DIVERGENCES.md`. DV-1 (module 11c, D-030: the allocation tracker
+could refuse slightly earlier than C) is removed by exact parity (D-034,
+section above; per-platform status there); R1 (the reverse direction)
+was a defect and is fixed. No divergence in parse results. Five C quirks found
 by the harness: Q-3 resolved as "replicate" (module 7; the input violates
 XML 1.0 §4.3.3), Q-1 and Q-2 resolved as "replicate" (module 10, D-024),
 Q-4 (module 11b2, D-029: undefined behaviour in C's epilog accounting that
@@ -1156,9 +1208,11 @@ comparisons start when the parser exists.
 - `Stop::DtdNotPorted` no longer exists (module 11d): every document
   parses to C's result; all 540 upstream vectors are compared under every
   option set.
-- The allocation tracker is not byte-identical to C: the port charges at
-  least C's bytes, no later (D-030), so it can refuse slightly earlier
-  (DV-1). The input buffer is not tracked, as in C.
+- The allocation tracker replays C's allocations event by event (D-034);
+  not modelled: `m_unknownEncodingMem` (no unknown-encoding handler yet)
+  and the once-per-run base copy of `copyEntityTable` (bases are NULL
+  without a base setter); the child encoding-name charge is untested. The
+  input buffer is not tracked, as in C.
 - D-017: on targets where C `char` is unsigned (aarch64 Linux) C's
   `utf8_toUtf16` zero-extends stray bytes that the port sign-extends; the
   parser never passes such bytes to the converter, and the tokenizer

@@ -11,25 +11,24 @@
 //! `total / countBytesDirect` exceeds the maximum amplification (100.0).
 //!
 //! The port does not allocate the C data structures, so it cannot count
-//! C's allocations directly. Instead it *charges* the tracker, at the same
-//! point of the parse or earlier, at least the bytes C allocates (decision
-//! D-030, `docs/DTD-SECURITY.md` section 5):
+//! C's allocations directly. Instead it *charges* the tracker with C's
+//! allocations, one event per C `MALLOC`, `REALLOC` and `FREE`, at the
+//! same point of the parse and with this target's C sizes (decision
+//! D-034, replacing D-030's upper bound; `docs/DTD-SECURITY.md` section 5):
 //!
-//! - exactly C's sizes where the port keeps C's structure: the attribute
-//!   array, the hash tables (through [`Heap`]),
-//!   the string pools (simulated by [`PoolShadow`], which replays C's block
-//!   strategy on lengths only), tag buffers and their free list, namespace
-//!   bindings, open-entity records, default-attribute arrays and their
-//!   per-element hash tables, the content-model scaffold;
-//! - an upper bound for the parser creation and for the small fixed
-//!   allocations (data buffer, group connector, XML declaration strings):
-//!   [`CREATION_CHARGE`].
+//! - the parser's creation and `XML_ParserFree` as C's individual
+//!   allocations ([`CREATION_CHARGE`] is their sum);
+//! - the attribute array and the hash tables (through [`Heap`]);
+//! - the string pools (simulated by [`PoolShadow`], which replays C's block
+//!   strategy on lengths and where `XmlConvert` stops before a growth),
+//!   tag buffers and their free list, namespace bindings, open-entity
+//!   records, default-attribute arrays and their per-element hash tables,
+//!   the content-model scaffold, external entity parsers.
 //!
-//! Charging earlier or more than C makes the port at least as strict: the
-//! amplification `total / direct` can only be higher at any point of the
-//! parse, because both sides count the same direct bytes
-//! ([`super::Accounting`]). The differential tests check that the port
-//! fails with `XML_ERROR_NO_MEMORY` whenever C does (`tracker_diff.rs`).
+//! The differential tests compare the two event streams event by event
+//! (direction, size, refusal, running total, peak) from creation through
+//! `XML_ParserFree` (`tracker_events.rs`, `tracker_stages.rs`), and the
+//! fuzz targets require the same traces and events under tight limits.
 //!
 //! ```
 //! # #[cfg(feature = "internal-api")] {

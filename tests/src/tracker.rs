@@ -1,19 +1,18 @@
 //! The allocation-tracker relation between the port and libexpat
-//! (module 11c, decision D-030).
+//! (module 11c; exact since decision D-034).
 //!
-//! The port charges its tracker at least the bytes libexpat allocates, at
-//! the same point of the parse or earlier, so it must be at least as
-//! strict: whenever libexpat stops with `XML_ERROR_NO_MEMORY` because its
-//! tracker refused an allocation, the port must stop with
-//! `XML_ERROR_NO_MEMORY` too. The port may stop earlier or where libexpat
-//! does not (it is allowed to be stricter); then its result line must say
-//! `XML_ERROR_NO_MEMORY` and everything else must be C's.
+//! The port replays libexpat's tracker allocation by allocation, so the
+//! relation is equality: the same traces (callbacks, limit outcomes and
+//! positions), the same counts after creation and at the end of the
+//! parse, and with tight limits the same tracker events from creation
+//! through `XML_ParserFree` ([`compare_events`]). The port refusing where
+//! libexpat accepts is a failure, like the reverse.
 //!
 //! [`check`] runs one document three ways: with the caller's options
-//! (traces equal, and the port's final count at least C's), then with the
-//! tracker limits set tight at C's own final count (`at-threshold` = that
-//! count, `at-amplification` = 1.0), and at half of it, where libexpat
-//! usually fails, so the port must fail there too.
+//! (traces and counts equal), then with the tracker limits set tight at
+//! C's own final count (`at-threshold` = that count, `at-amplification` =
+//! 1.0) and at half of it, where libexpat usually refuses; both tight runs
+//! are compared event by event.
 
 use expat_oracle::{Factor, ParseOptions, TrackerBytes};
 
@@ -30,7 +29,8 @@ pub enum Relation {
     Equal,
     /// libexpat stopped with `XML_ERROR_NO_MEMORY` and so did the port.
     BothNoMemory,
-    /// Only the port stopped with `XML_ERROR_NO_MEMORY` (stricter than C).
+    /// Only the port stopped with `XML_ERROR_NO_MEMORY` (a failure of
+    /// [`check_from`] since D-034).
     PortStricter,
 }
 
@@ -103,9 +103,11 @@ pub struct Tally {
     /// Tight runs where libexpat failed with `XML_ERROR_NO_MEMORY` (the
     /// port had to fail too).
     pub c_no_memory: usize,
-    /// Tight runs where only the port failed.
+    /// Runs where only the port failed (each is also reported as an
+    /// error by [`check_from`], so this stays 0 when it passes).
     pub port_stricter: usize,
-    /// Smallest margin `port.end - C.end` over the base runs.
+    /// Smallest margin `port.end - C.end` over the base runs (0 when
+    /// [`check_from`] passes).
     pub min_margin: Option<i64>,
 }
 
