@@ -399,6 +399,15 @@ impl PoolShadow {
         self.append_chars(heap, text.len())
     }
 
+    /// `if (! pool->blocks) poolGrow(pool)`: a block for a pool that has
+    /// none in use.
+    pub fn ensure_block<H: Heap + ?Sized>(&mut self, heap: &mut H) -> Result<(), NoMemory> {
+        if self.blocks.is_empty() {
+            self.grow(heap)?;
+        }
+        Ok(())
+    }
+
     /// `poolAppendChars` (`poolGrowUntil`, then the copy) of `n`
     /// characters; the same allocations as `n` calls of `poolAppendChar`.
     pub fn append_chars<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {

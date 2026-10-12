@@ -39,7 +39,7 @@ const C_CREATION_LINES: [u32; 4] = [1395, 1405, 1410, 7865];
 /// 1,776 pool-boundary, public-id, chop and `xmlns:` runs added with it,
 /// every remaining first difference the raw tag name the port charges at
 /// the start tag, stage 5; see docs/REPORT.md, DV-1 parity).
-const EQUAL_STREAMS_AT_LEAST: usize = 5_067;
+const EQUAL_STREAMS_AT_LEAST: usize = 5_196;
 
 fn base() -> ParseOptions {
     ParseOptions {

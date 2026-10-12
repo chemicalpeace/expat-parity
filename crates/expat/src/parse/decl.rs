@@ -885,6 +885,15 @@ impl Parser {
     ) -> Result<(), Stop> {
         let m = E::MINBPC;
         let mut ptr = ptr;
+        // C gives `dtd->entityValuePool` a block before anything else, so
+        // that an empty value is not NULL (`xmlparse.c` 7126-7129; D-034
+        // stage 4: the port grew it at the first character).
+        {
+            let direct = self.direct();
+            let (p, mut heap) = self.tracker.pool(Pool::EntityValue, direct);
+            p.ensure_block(&mut heap)
+                .map_err(|_| Stop::Error(XmlError::NoMemory))?;
+        }
         // Nothing to tokenize.
         if ptr >= buf.len() {
             return Ok(());
