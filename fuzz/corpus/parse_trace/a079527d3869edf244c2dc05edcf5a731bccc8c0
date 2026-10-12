@@ -1,1 +1,0 @@
->#<!DOCTYPE r [<!ENTITY e0 'é<b>x</b>	 sp  ace '><!ENTITY e0 'second'><!ENTITY % p0 '<!ATTLIST r d CDATA "&e0;">'><!ENTITY % p1 '<!-- c -->'><!ENTITY % p2 '"x">'>]><r><c>&e0;</c>&e0;&e0;</r>

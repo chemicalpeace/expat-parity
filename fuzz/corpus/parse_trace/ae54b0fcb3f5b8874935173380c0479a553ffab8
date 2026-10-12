@@ -1,1 +1,0 @@
-LF<?xml version='1.0' standalone='yes'?><!DOCTYPE r [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 '&unp;&un;'><!ENTITY % p0 '<?pi?>'><!ATTLIST r a CDATA "&e0;" t NMTOKENS "  &e0; x " f CDATA #FIXED "&amp;&e0;">]><r s="v&e0;w">&e0;txt&e0;</r>

@@ -1,0 +1,2 @@
+b×ï»¿<!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ATTLIST p:e b (x|y|z) "&ext;" xmlns:p NMTOKENS #FIXED 'viewer'><!ELEMENT q:e ((a+|doc|n-1)*,a?,a)>
+<!ATTLIST a id (x|y|z) #FKXED "urn:aq">] ><doc></doc>

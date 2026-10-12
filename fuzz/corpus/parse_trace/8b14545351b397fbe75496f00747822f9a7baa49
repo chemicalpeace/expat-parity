@@ -1,0 +1,5 @@
+JÉ<!DOCTYPE r [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 '&#38;#60;e <![CDATA[x<y]]>'><!ENTITY e1 '	&unp;'><!ENTITY e2 '
+
+&#38;#38;'><!ENTITY e2 '
+
+&#38;#38;'><!ENTITY e3 '<b>&#10;&#x10FFFF;]]>'><!ENTITY e4 ''><!ENT<!ENTITY e3 '<b>&#10;&#x10FFFF;]]>'><!ENTITY e4 ''><!ENTITY e5 ''þÿÿÿ>]><r>&e2;</r>

@@ -1,0 +1,5 @@
+€u<?xml version='1.0' standalone='no'?><!--before--><!DOCTYPE doc [%pe2;
+<!ELEMENT a (#PCDATA)*><!ATTLIST doc xmlns:q (x|y|z) "&ext;" c ENTITIES '&#65;&#x42;&#32;'>
+<!ATTLIST b id NOTATION (n1|n2) #IMPLIED p:a ENTITY #IMPLIED q:a ( x | y ) 'urn:q'>
+<!ELEMENT q:e (#PCDATA)*>
+<!ATTLIST é xmlns:p ENTITY "http://www.w3.orgÿÿÿÿÿÿÿÿ/XML/1998/namespace" xmlns:p IDREF #n:q' a IDREFS;</doc>

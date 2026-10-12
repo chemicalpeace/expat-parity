@@ -25,8 +25,9 @@ generated-document tests.
 
 ```sh
 cargo run -p expat-difftest --bin fuzz_seeds -- /tmp/seeds
-# parse_trace: 9820 seeds   (540 upstream vectors x 8 selector pairs + 2,000 generated documents
-#                            + 2,000 documents with a DTD (11a) + 1,500 entity documents (11b))
+# parse_trace: 10320 seeds   (540 upstream vectors x 8 selector pairs + 2,000 generated documents
+#                            + 2,000 documents with a DTD (11a) + 1,500 entity documents (11b)
+#                            + 500 entity documents with small billion-laughs limits (11b2))
 # buffer_diff: 4040 seeds   (540 upstream vectors + 2,000 generated documents + 1,000 documents
 #                            with a DTD + 500 entity documents, each with an operation header)
 ```
@@ -78,6 +79,11 @@ to 11,036 files (14,108 edges); `buffer_diff` 9,674 + 15,515 + 4,040 =
 29,229 inputs to 10,208 files (12,551 edges). Before committing, both
 merged corpora were searched for personal data (names, e-mail addresses,
 local paths); no hits.
+
+Module 11b2 merge (2026-10-12): `parse_trace` committed corpus (11,036) +
+working corpus (14,646) + 10,320 seeds (now including 500 entity documents
+with small billion-laughs limits) = 36,002 inputs to 11,174 files (14,355
+edges); scanned for personal data, no hits. `buffer_diff` unchanged.
 
 ## Run logs
 

@@ -553,3 +553,32 @@ recorded in DIVERGENCES.md.
   record avoids a `MALLOC` of `sizeof(OPEN_INTERNAL_ENTITY)`, which matters
   for the allocation tracker (11c). The count lets the tracker charge
   exactly the allocations C makes.
+
+## D-029 Billion-laughs limits: setters, bounded tests, Q-4 (module 11b2)
+
+- **Setters.** `Parser::set_billion_laughs_maximum_amplification` and
+  `set_billion_laughs_activation_threshold` mirror
+  `XML_SetBillionLaughsAttackProtection*` (`xmlparse.c` 3099-3148): NaN
+  and values below 1.0 are refused, any threshold is accepted, both may be
+  called at any time. The refusal on non-root parsers needs external
+  entity parsers (11d / module 12) and is tested there.
+- **Defaults stay C's** (100.0, 8 MiB; D-026). No limit is relaxed for a
+  test: the tests set limits only through the same setters as C.
+- **Harness options.** The oracle gained `limits` (all four setters; the
+  allocation tracker pair is used from 11c), `trace_accounting` (the
+  direct/indirect counters are compared, not only outcomes),
+  `text_digest` (character data as length + FNV-1a 64, so traces of
+  multi-megabyte expansions stay small) and `heap_cap` (capped
+  `XML_ParserCreate_MM` allocator). The fuzz target's second selector byte
+  uses bit 7 for small limits (factor 1-4, threshold 0-480 bytes) with the
+  counters traced.
+- **Bounded tests.** Every amplification comparison is bounded in input
+  size, wall-clock time and memory (`expat_difftest::bounded`; table in
+  DTD-SECURITY.md). The counting allocator needs `unsafe`, so it lives in
+  `expat-oracle` (D-011).
+- **Q-4.** libexpat's `epilogProcessor` adds `NULL - s` to the direct
+  counter for a name at the end of the buffer (undefined behaviour; the
+  parse ends with error 9 regardless). The port counts 0 bytes for that
+  token; the harness masks the counter line only in that exact situation
+  (DIVERGENCES.md Q-4). Replicating an address-dependent value is
+  impossible and would not be meaningful.

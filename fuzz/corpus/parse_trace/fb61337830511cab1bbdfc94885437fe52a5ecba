@@ -1,2 +1,0 @@
-³z<!DOCTYPE r [<!ENTITY e0 '&#10;>&#10;'><!ENTITY e2 ''><!ENTITY e2 'second'><!ENTITY e3 '&e4;&e4;'><!ENTITY e4 'a
-b'><!ENTITY % p0 '<!ATTLIST r d CDATA "&e0;">'><!ENTITY % p1 '<!ENTIT6 "from pe">'><!ATTLIST r a CDATA "&e3;" t NMTOKENS "  &e2; x " f CDATA #FIXED "&amp;&e0;">]><r>&e1;</r>

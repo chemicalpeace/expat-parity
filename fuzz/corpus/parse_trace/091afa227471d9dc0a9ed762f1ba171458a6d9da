@@ -1,0 +1,5 @@
+<!DOCTYPE t0 [
+   <!ENTITY a '<t1></t1>'>
+   <!ENTITY b '<t2>two</t2>'>
+   <!ENTITY c '<t3>thret3>'>
+   <!&a;&b;&c;&d;</t0>

@@ -1,0 +1,1 @@
+s§<?xml version='1.0' standalone='yes'?><!DOCTYPE r [<!ENTITY e0 '&e2;'><!ENTITY e1 'text  sp  ace '><!ENTITY e2 '&e3;&e3;'><!ENTITY e2 'second'><!ENTITY e3 ' sp  ace &e2;&e3;'><!ATTLIST r a CDATA "&e0;" t NMTOKENS "  &e2; x " f CDATA #FIXED "&amp;&e3;">]><r s="v&e2;w" t=' &e0;  y '>&e3;txt&e2;</r>

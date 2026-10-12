@@ -1,7 +1,0 @@
-<!DOCTYPE doc [
-  <!ATTLIST c
-    a2  (a|b|c)   'a'
-    a1  (foo|bar) #IMPLIED
-    a3  NMTOKEN   #IMPLIED
-    a4  NMTOKE #IMPLIED
-   נננ33333333333    #IMPt</doc>

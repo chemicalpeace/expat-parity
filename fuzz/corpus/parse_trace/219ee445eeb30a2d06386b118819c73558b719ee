@@ -1,0 +1,10 @@
+nõ<?xml version='1.0'?><!DOCTYPE doc [<!ENTITY e3 SYSTEM "sys.ent" ><!ELEMENT p:e (#PCDATA)>
+
+<!NOTATION n1 PUBLIC 'p' 'viewer'>
+<!ELEMENT p:e EMPTY>
+<!ATTLIST _u c IDREFS #IMPLIED q:a ENTITIES #IMPLIED><!ELEMENT p:e (#PCDATA)>
+
+<!NOTATION n1 PUBLIC 'p' 'viewer'>
+<!ELEMENT p:e EM'v17' d18 CDATA 'v18'>
+<!ATTLIST docJ33333333333333330000000033300000000000000000000000000000000 d0 CDATA 'v0' d1 CDA' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13' d1N" 'sys2.ent'>
+] ><a><a/>&ext;<?pi?>&e1;</a>

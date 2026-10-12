@@ -1,0 +1,4 @@
+<!DOCTYPE doc [
+<!ELEMENT doc (chapter)>
+<!ELEMENT chapter (#PCDATA)>
+tpter></doc>

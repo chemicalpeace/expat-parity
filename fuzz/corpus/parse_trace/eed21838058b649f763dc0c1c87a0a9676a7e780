@@ -1,3 +1,0 @@
-�﻿<?xml version='1.0' standalone='yes'?>
-<!DOCTYPE doc [<!ENTITY é SYSTEM 'u.gif' NDATA n2><!ATTLIST a p:a NOTATION (n1|n2) #REQUIRED xmlns ENTITIES #REQUIRED a (x|y|z) 'urn:q'>
-<!ELEMENT q:

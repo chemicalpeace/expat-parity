@@ -1,0 +1,4 @@
+?<!DOCTYPE p:e [<!ATTLIST doc q:a ENTITIES #FIXED 'http://www.w3.org/XML/1998/namespace' xmlls:p NOTATION (n1|n2) "1"><!ATTLIST _u q:a NMTOKEN #IMPLIED>
+<!ELEMENT p:e (b*,(doc* , _u+ , q:e?))+>
+]>
+<doc xmlns:p='&lt;'><b x='y'/>&e9;</doc>

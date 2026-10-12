@@ -1,6 +1,0 @@
-<!DOCTYPE r [
-<!ENTITY % comment "<!--1-->">
-<!ENTITY % comment2 "&#37;commment;">
-%comment2;
-]>
-<r/>

@@ -1,6 +1,0 @@
-G‚
-<!DOCTYPE p:e PUBLIC "  spaced 
-  iD  " 'doc.dtd' [
-<!ELEMENT p:e ( 
-  iD  
-<!ELEMENT n-1 (#PCDATA|a|a)*><!ENTITY lt SYSTEM 'u.gif' NDATA n2 

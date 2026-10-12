@@ -1,5 +1,0 @@
-°_<?xml version='1.0'?><!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ATTLIST doc p:a ENTITIES '&undeclared;'><!NOTATION n2 PUBLIC "a'b">%pe2;
-<!ENTITY % extpe "<!ENTITY e9 'nine'>" ><!ATTLIST b a (x|y|z) #REQUIRED>
-
-<!ENTITY lt PUBLIC "a'b" 'Éys2.ent'>
-<!ELEMENT q:e  d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA

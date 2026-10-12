@@ -1,0 +1,4 @@
+�0<!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ELEMENT b (doc? , ((n-1?|é*)+ , doc*)? ,doc+ , p:e*)*>
+<?dtdpi x?><!ATTLIST _u p:a IDREFS #FIXED " x  y " c IDREFS #REQUIRED a ENTITY #REQUIRED>%extpe;
+<!ATTLIST é id ENTITIES "a b" xmlns:q IDREF #REQUIRED><!ATTLIST b a (x|y|z) "&ext;" p:a IDREFS '&e1;'><!---->
+<!ELEMENT ATA)>

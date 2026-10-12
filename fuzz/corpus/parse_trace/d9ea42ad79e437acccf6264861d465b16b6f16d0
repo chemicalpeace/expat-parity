@@ -1,6 +1,0 @@
-@<!DOCTYPE a [
-  <!ENTITY e1 '<!--e1--<'>
-  <!ENTITY e2 '<!--e2 head-->&e1;<!--e2 tail-->'>
-  <!ENTITY e3 '<!--e3 head-->&e2;<!--e3 tail-->'>
-]>
-<a><!--start-->&e3;<!--end--></a>

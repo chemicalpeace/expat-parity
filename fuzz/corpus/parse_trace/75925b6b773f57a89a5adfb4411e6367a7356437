@@ -1,7 +1,0 @@
-6v﻿
-<!DOCTYPE a [%pe1;
-<!ATTLIST a xmlns ENTITIES "urn:q" xmlns:p NMTOKENS #IMPLIED>
-<!ATTLIST n-1 xmlns:p ( x | y ) #FIXED "&#x10000;" xmlns:p ENTITY "&unp;">
-
-<!ENTITY lt PUBLI- C/"/X//DTD x//EN" 'sys2.ent' >%undeclared;
-<!ATTLIST doc d0  CDATA 'v2'>] ><a id='&undeclared;' p:a='1'>text</a>

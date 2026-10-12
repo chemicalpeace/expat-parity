@@ -67,5 +67,42 @@ are resolved as "replicate" (Q-1/Q-2: D-024, module 10; Q-3: D-019, module 7).
   (detection on 1 byte, 2 bytes and the whole document, against C) and the
   chunk-dependence pin below.
 
+### Q-4 Accounting of a name cut off by the end of the buffer in the epilog — resolved: do not replicate (undefined behaviour in C)
+
+- Reproducer: `<r/>junk` (any chunking) with the accounting counters
+  traced: C `accounting 18446462600611882832 0` (an address-dependent
+  value that changes from run to run), port `accounting 4 0`; both
+  `result error 9 1 4 4`.
+- Cause: `epilogProcessor` (`xmlparse.c` 6610-6627) starts every token
+  with `const char *next = NULL` and calls
+  `accountingDiffTolerated(parser, tok, s, next, ...)` before looking at
+  the token. For a name that reaches the end of the available input,
+  `XmlPrologTok` returns `-XML_TOK_NAME` without writing `next`
+  (`xmltok_impl.c` 1257, `return -tok;`), and `accountingDiffTolerated`
+  only skips `XML_TOK_INVALID`, `XML_TOK_PARTIAL`, `XML_TOK_PARTIAL_CHAR`
+  and `XML_TOK_NONE` (9020-9026). It computes `NULL - s` (undefined
+  behaviour) and adds that negative difference to `countBytesDirect`,
+  which wraps to about 2^64 minus the buffer address. The token is then
+  rejected with `XML_ERROR_JUNK_AFTER_DOC_ELEMENT` (9); the parser is
+  finished, so no later amplification check reads the corrupted counter.
+  The overflow guard (9046-9048) would only turn this into error 43 if the
+  counter exceeded the buffer address, which does not happen.
+- Observable: only through `testingAccountingGetCountBytesDirect` and the
+  `EXPAT_ACCOUNTING_DEBUG` output; the result, error code and position are
+  equal.
+- Decision (module 11b2, D-029): **do not replicate**. Undefined behaviour
+  and an address-dependent value cannot be reproduced meaningfully; the
+  port counts 0 bytes for the rejected token (its `next` defaults to the
+  token start). The harness masks the `accounting` line of both traces
+  exactly in this case (C result 9 and a direct counter >= 2^62,
+  `expat_difftest::trace::mask_q4`); every other line is compared.
+- Found by: the `parse_trace` corpus replay after the fuzz selector gained
+  the accounting option (seven corpus inputs in UTF-8, UTF-16, US-ASCII
+  and ISO-8859-1, all with junk after the root element).
+- Regression test: `tests/tests/amplification_diff.rs::q4_epilog_name_at_end_of_buffer`.
+- Upstream: worth reporting to libexpat (an `if (tok < 0) next = end;`
+  or skipping negative tokens in `accountingDiffTolerated` would fix it);
+  not reported from this project.
+
 The exact set of chunk-dependent upstream vectors is pinned by
 `tests/tests/upstream_vectors.rs::oracle_chunk_dependence_is_exactly_the_known_set`.

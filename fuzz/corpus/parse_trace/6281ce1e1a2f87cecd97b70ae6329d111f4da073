@@ -1,0 +1,1 @@
+¿÷<!DOCTYPE r [<!ENTITY e0 '<i/><!--c--><b>x</b>'><!ENTITY e0 'second'><!ENTITY e1 '<!--c--></b>'><!ENTITY e1 'second'><!ENTITY e2 '<b>y</b>&e0;&amp;x'><!ENTITY e2 'second'><!ENTITY % p0 '<!ELEMENT r ANY>'><!ENTITY % p1 '<!ENTITY e0 "from pe">'>%p1;%p1;]><r><c>&e0;</c>&e2;txt</r>
