@@ -29,6 +29,21 @@ use expat_difftest::port::port_trace;
 use expat_oracle::{ExtHandler, ParamEntityParsing, ParseOptions, parse_trace};
 use std::fmt::Write as _;
 
+/// In-memory external entities: (system identifier, bytes).
+type Entities = Vec<(Vec<u8>, Vec<u8>)>;
+
+/// A pinned C result: context, body, `encodingName`, parent protocol
+/// encoding and scheme, the parent's error code, the first child's
+/// `extend` line.
+type Pin = (
+    Ctx,
+    &'static str,
+    Option<&'static str>,
+    (Option<&'static str>, Scheme),
+    i64,
+    &'static str,
+);
+
 /// How the bytes of an entity body or a document are produced from text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Scheme {
@@ -115,7 +130,7 @@ impl Ctx {
     /// The in-memory entities: `ent` (the entity under test) and, for
     /// [`Ctx::Value`], the external subset `sub`, written in the scheme
     /// the `encodingName` argument (which applies to every child) reads.
-    fn entities(self, ext: Option<&str>, body: Vec<u8>) -> Vec<(Vec<u8>, Vec<u8>)> {
+    fn entities(self, ext: Option<&str>, body: Vec<u8>) -> Entities {
         let mut v = vec![(b"ent".to_vec(), body)];
         if self == Ctx::Value {
             let scheme = match ext {
@@ -624,7 +639,7 @@ fn configuration_matrix() {
 #[test]
 fn nested_children() {
     let mut run = Run::new();
-    let cases: Vec<(&str, &str, Vec<(Vec<u8>, Vec<u8>)>)> = vec![
+    let cases: Vec<(&str, &str, Entities)> = vec![
         (
             "G-in-G",
             "<!DOCTYPE d [<!ENTITY a SYSTEM \"a\"><!ENTITY b SYSTEM \"b\">]><d>&a;</d>",
@@ -704,7 +719,7 @@ fn c_behaviour_pins() {
     // `extend` line or "" when no child is created)
     const P8: (Option<&str>, Scheme) = (None, Scheme::Utf8);
     const PLAT: (Option<&str>, Scheme) = (Some("ISO-8859-1"), Scheme::Latin1);
-    let pins: [(Ctx, &str, Option<&str>, (Option<&str>, Scheme), i64, &str); 24] = [
+    let pins: [Pin; 24] = [
         // An external parameter entity read inside an entity value: its
         // text declaration goes through processXmlDecl(parser, 0, ...)
         // (entityValueInitProcessor), i.e. the XML declaration rules:
