@@ -592,9 +592,8 @@ impl Parser {
     }
 
     /// `doContent` while the encoding of an external entity is still the
-    /// initial one: `initScanContent` returned no token (too few bytes:
-    /// XML_TOK_NONE or XML_TOK_PARTIAL), so only these cases of
-    /// `doContent` apply.
+    /// initial one: the entity is empty (`initScanContent` returned
+    /// XML_TOK_NONE), the only case of `doContent` that applies.
     #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of doContent.
     pub(crate) fn content_undecided<H: Handler>(
         &mut self,
@@ -630,15 +629,10 @@ impl Parser {
                 }
                 Err(XmlError::NoElements.into())
             }
-            Scan::Partial => {
-                if have_more {
-                    *next_ptr = s;
-                    return Ok(());
-                }
-                Err(XmlError::UnclosedToken.into())
-            }
             // `initScan` leaves the encoding undecided only with
-            // XML_TOK_NONE or XML_TOK_PARTIAL.
+            // XML_TOK_NONE or XML_TOK_PARTIAL, and a partial token never
+            // gets here: `externalEntityInitProcessor2` either waits for
+            // more input or reports it.
             _ => Err(XmlError::UnexpectedState.into()),
         }
     }

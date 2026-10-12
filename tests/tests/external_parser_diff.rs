@@ -324,6 +324,11 @@ const CASES: &[Case] = &[
         ],
     ),
     (
+        "g-bom-textdecl",
+        "<!DOCTYPE r [<!ENTITY g SYSTEM 'g.xml'>]><r>&g;</r>",
+        &[("g.xml", "\u{FEFF}<?xml encoding='UTF-8'?><a/>")],
+    ),
+    (
         "g-utf16",
         "<!DOCTYPE r [<!ENTITY g SYSTEM 'g.xml'>]><r>&g;</r>",
         &[("g.xml", "u16:<a>u16</a>")],
