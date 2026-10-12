@@ -84,6 +84,9 @@ struct oracle_options {
   int ext_handler;
   int not_standalone;
   int use_foreign_dtd;
+  /* 1: XML_SetUnparsedEntityDeclHandler with a handler that traces
+     "unparsed <name> <base> <systemId> <publicId> <notation>". */
+  int unparsed_handler;
   const unsigned char *ext_data;
   size_t ext_len;
 };

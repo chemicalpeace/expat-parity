@@ -248,6 +248,10 @@ pub struct ParseOptions {
     pub not_standalone: Option<bool>,
     /// `XML_UseForeignDTD(parser, XML_TRUE)`.
     pub use_foreign_dtd: bool,
+    /// `XML_SetUnparsedEntityDeclHandler` with a handler that traces
+    /// `unparsed <name> <base> <systemId> <publicId> <notation>` (without
+    /// it, unparsed entities reach the entity declaration handler).
+    pub unparsed_handler: bool,
     /// The external entities [`ExtHandler::Read`] can read, by system
     /// identifier (in memory: nothing is ever fetched).
     pub ext_entities: Vec<(Vec<u8>, Vec<u8>)>,
@@ -459,6 +463,7 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
             Some(false) => 2,
         },
         use_foreign_dtd: c_int::from(opts.use_foreign_dtd),
+        unparsed_handler: c_int::from(opts.unparsed_handler),
         ext_data: records.as_ptr(),
         ext_len: records.len(),
     };

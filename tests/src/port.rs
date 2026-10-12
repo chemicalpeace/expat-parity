@@ -176,6 +176,16 @@ impl Handler for Tracer {
         self.w
             .entity(name, is_param, value, base, sysid, pubid, notation);
     }
+    fn unparsed_entity_decl(
+        &mut self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+        notation: &[u8],
+    ) {
+        self.w.unparsed(name, base, sysid, pubid, notation);
+    }
     fn notation_decl(
         &mut self,
         name: &[u8],
@@ -218,8 +228,8 @@ fn traced_handlers() -> HandlerSet {
         start_doctype_decl: true,
         end_doctype_decl: true,
         entity_decl: true,
-        // The shim sets no unparsed-entity handler, so unparsed entities
-        // reach the entity declaration handler.
+        // Set by `ParseOptions::unparsed_handler` (like the shim); without
+        // it unparsed entities reach the entity declaration handler.
         unparsed_entity_decl: false,
         notation_decl: true,
         element_decl: true,
@@ -294,6 +304,7 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
     p.set_handlers(HandlerSet {
         external_entity_ref: opts.ext_handler != ExtHandler::None,
         not_standalone: opts.not_standalone.is_some(),
+        unparsed_entity_decl: opts.unparsed_handler,
         ..traced_handlers()
     });
     if opts.use_foreign_dtd {

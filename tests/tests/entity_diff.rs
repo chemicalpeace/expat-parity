@@ -87,6 +87,7 @@ const ALWAYS: ParseOptions = ParseOptions {
     ext_handler: expat_oracle::ExtHandler::None,
     not_standalone: None,
     use_foreign_dtd: false,
+    unparsed_handler: false,
     ext_entities: Vec::new(),
 };
 
