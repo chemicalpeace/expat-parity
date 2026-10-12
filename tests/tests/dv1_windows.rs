@@ -19,8 +19,14 @@
 //!   accepted documents of 686,993-687,658 bytes that C refuses with
 //!   `XML_ERROR_NO_MEMORY`.
 //!
-//! Every case asserts the security relation (the port never accepts what C
-//! refuses) and the exact outcome on each side at the current stage.
+//! C's boundary depends on the platform (its creation allocations differ:
+//! 3,040 bytes on 64-bit Linux and macOS, 32 fewer on Windows x64), so the
+//! tests find both boundaries by bisection on each platform and assert:
+//! the port never accepts a document C refuses (on both sides of each
+//! boundary), and the width of the window where only C accepts equals the
+//! margin between the two trackers at the deciding allocation divided by
+//! the maximum amplification (100), within one document. The boundaries
+//! and widths are printed for the per-platform report.
 
 use std::time::Duration;
 
@@ -92,59 +98,159 @@ fn accepted(side: &str, code: Option<u32>, name: &str) -> bool {
     }
 }
 
-/// Runs `doc` on both sides and checks the expected outcomes.
-fn check(name: &str, doc: &[u8], c_expected: bool, port_expected: bool) {
+/// Both sides' outcomes for one document.
+struct Run {
+    c: bool,
+    port: bool,
+    c_end: u64,
+    port_end: u64,
+}
+
+fn run(name: &str, doc: &[u8]) -> Run {
     let out = compare(name, doc, &base(), WINDOW);
     let c = accepted("C", result_error_code(&out.c), name);
-    let p = accepted("port", result_error_code(&out.port), name);
-    println!(
-        "WINDOW {name:<16} doc {:>7} B | C {} end {:>9} | port {} end {:>9} peak {:>9}",
-        doc.len(),
-        if c { "accepts" } else { "refuses" },
-        out.c_tracker.end,
-        if p { "accepts" } else { "refuses" },
-        out.port_tracker.end,
-        out.port_tracker.peak
-    );
-    assert!(c || !p, "{name}: the port accepts a document C refuses");
-    assert_eq!(
-        (c, p),
-        (c_expected, port_expected),
-        "{name}: (C, port) accepted"
-    );
-    if c && p {
+    let port = accepted("port", result_error_code(&out.port), name);
+    assert!(c || !port, "{name}: the port accepts a document C refuses");
+    if c && port {
         assert!(out.equal(), "{name}: traces differ");
+    }
+    Run {
+        c,
+        port,
+        c_end: out.c_tracker.end,
+        port_end: out.port_tracker.end,
     }
 }
 
-/// R1: C refuses at both ends of the former reverse window; the port must
-/// refuse too.
+/// The smallest `x` in `lo..=hi` for which `side` of `doc(x)` has outcome
+/// `!at_lo`, given that the outcome is monotone in `x` and `at_lo` at `lo`.
+fn boundary(
+    lo: usize,
+    hi: usize,
+    doc: &dyn Fn(usize) -> Vec<u8>,
+    side: fn(&Run) -> bool,
+    name: &str,
+) -> usize {
+    let at_lo = side(&run(name, &doc(lo)));
+    assert_ne!(
+        at_lo,
+        side(&run(name, &doc(hi))),
+        "{name}: no boundary in {lo}..={hi}"
+    );
+    let (mut a, mut b) = (lo, hi);
+    while b - a > 1 {
+        let m = a + (b - a) / 2;
+        if side(&run(name, &doc(m))) == at_lo {
+            a = m;
+        } else {
+            b = m;
+        }
+    }
+    b
+}
+
+fn platform() -> String {
+    format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
+}
+
+/// A family whose documents become acceptable as `x` grows (more direct
+/// input): returns (C's first accepted x, the port's first accepted x).
+/// Checks the security relation around both boundaries and that the window
+/// width matches the margin between the trackers at the deciding pool
+/// doubling (both sides' last event is that doubling, so the margin is the
+/// difference of their end counts on a document both accept).
+fn accept_window(
+    name: &str,
+    lo: usize,
+    hi: usize,
+    doc: &dyn Fn(usize) -> Vec<u8>,
+) -> (usize, usize) {
+    let c_from = boundary(lo, hi, doc, |r| r.c, name);
+    let p_from = boundary(lo, hi, doc, |r| r.port, name);
+    let below = run(name, &doc(c_from - 1));
+    assert!(
+        !below.c && !below.port,
+        "{name}: below C's boundary both must refuse"
+    );
+    let both = run(name, &doc(p_from.max(c_from)));
+    assert!(
+        both.c && both.port,
+        "{name}: above both boundaries both must accept"
+    );
+    let margin = both.port_end as i64 - both.c_end as i64;
+    let width = p_from as i64 - c_from as i64;
+    println!(
+        "WINDOW {} {name}: C accepts from {c_from}, port from {p_from}; width {width}; tracker margin at the deciding doubling {margin} (C end {}, port end {})",
+        platform(),
+        both.c_end,
+        both.port_end
+    );
+    assert!(width >= 0, "{name}: the port accepts below C's boundary");
+    // One document more of direct input raises 100 x direct by 100 bytes.
+    assert!(
+        (width - margin / 100).abs() <= 1,
+        "{name}: window width {width} does not match the margin {margin}"
+    );
+    (c_from, p_from)
+}
+
+/// R1: C refuses at both ends of the former reverse window (686,993 and
+/// 687,658 bytes on 64-bit Linux); the port must refuse at least as far.
+/// Before D-033 the port accepted from 66,640 bytes of margin below C.
 #[test]
 fn r1_attribute_defaults() {
-    check("R1 pad 187657", &window_doc(187_657, 10_000), false, false);
-    check("R1 pad 188000", &window_doc(188_000, 10_000), false, false);
-    check("R1 pad 188322", &window_doc(188_322, 10_000), false, false);
-    // Above C's edge the port's creation charge still refuses (the W1
-    // window shifted by the defaults' bytes) until pad 188,457.
-    check("R1 pad 188323", &window_doc(188_323, 10_000), true, false);
-    check("R1 pad 188456", &window_doc(188_456, 10_000), true, false);
-    check("R1 pad 188457", &window_doc(188_457, 10_000), true, true);
+    let (c_from, p_from) = accept_window("R1", 187_000, 190_000, &|pad| window_doc(pad, 10_000));
+    assert!(p_from >= c_from);
+    // The former reverse window lies wholly where C refuses.
+    for pad in [187_657, 188_000, c_from - 1] {
+        let r = run("R1", &window_doc(pad, 10_000));
+        assert!(!r.c && !r.port, "R1 pad {pad}: both must refuse");
+    }
+    // Pinned at the current stage of D-033: the creation-charge window
+    // (W1 shape) is still open, the reverse one is closed.
+    assert!(
+        p_from > c_from,
+        "R1: DV-1 window closed; update the stage pin"
+    );
 }
 
-/// W1: the creation-charge window (DV-1).
+/// W1: the creation-charge window (DV-1), pinned open until step 3 of
+/// D-033.
 #[test]
 fn w1_creation_charge() {
-    check("W1 pad 330745", &window_doc(330_745, 0), false, false);
-    check("W1 pad 330746", &window_doc(330_746, 0), true, false);
-    check("W1 pad 330878", &window_doc(330_878, 0), true, false);
-    check("W1 pad 330879", &window_doc(330_879, 0), true, true);
+    let (c_from, p_from) = accept_window("W1", 330_000, 332_000, &|pad| window_doc(pad, 0));
+    assert!(
+        p_from > c_from,
+        "W1: DV-1 window closed; update the stage pin"
+    );
 }
 
-/// W2: the pool-slack window (DV-1).
+/// W2: the pool-slack window (DV-1), pinned open until step 2 of D-033.
+/// The tail grows the expanded value, so documents become refused as it
+/// grows: C accepts up to the tail that fills its 32 MiB block exactly.
 #[test]
 fn w2_pool_slack() {
-    check("W2 tail 362", &slack_doc(84_947, 362), true, true);
-    check("W2 tail 363", &slack_doc(84_947, 363), true, false);
-    check("W2 tail 366", &slack_doc(84_947, 366), true, false);
-    check("W2 tail 367", &slack_doc(84_947, 367), false, false);
+    let doc = |tail| slack_doc(84_947, tail);
+    let c_refuses_from = boundary(300, 420, &doc, |r| r.c, "W2");
+    let p_refuses_from = boundary(300, 420, &doc, |r| r.port, "W2");
+    let last = run("W2", &doc(c_refuses_from - 1));
+    println!(
+        "WINDOW {} W2: C refuses from tail {c_refuses_from}, port from tail {p_refuses_from}; width {}; C end at tail {} {}, port {}",
+        platform(),
+        c_refuses_from - p_refuses_from,
+        c_refuses_from - 1,
+        last.c_end,
+        last.port_end
+    );
+    assert!(
+        p_refuses_from <= c_refuses_from,
+        "W2: the port accepts what C refuses"
+    );
+    // C's last accepted tail fills the block exactly; the port's 4-character
+    // slack doubles the block 4 tails earlier.
+    assert_eq!(
+        c_refuses_from - p_refuses_from,
+        4,
+        "W2: DV-1 slack window changed; update the stage pin"
+    );
 }
