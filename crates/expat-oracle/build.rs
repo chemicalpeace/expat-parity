@@ -23,6 +23,7 @@ fn main() {
         "shim/oracle_internals.c",
         "shim/oracle_role.c",
         "shim/oracle_core.c",
+        "shim/oracle_xmlparse.c",
     ] {
         println!("cargo:rerun-if-changed={f}");
     }
@@ -31,7 +32,8 @@ fn main() {
     build
         .include("shim")
         .include(lib)
-        .file(format!("{lib}/xmlparse.c"))
+        // xmlparse.c through the event-capture shim (D-033).
+        .file("shim/oracle_xmlparse.c")
         .file(format!("{lib}/xmlrole.c"))
         .file(format!("{lib}/xmltok.c"))
         .file(format!("{lib}/xcs.c"))
