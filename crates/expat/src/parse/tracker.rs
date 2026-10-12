@@ -58,12 +58,12 @@ pub const ALLOC_ACTIVATION_THRESHOLD_DEFAULT: u64 = 67_108_864;
 
 /// Charged when the parser is created: an upper bound of what
 /// `parserCreate` allocates (the parser structure, `m_atts`, `m_dataBuf`,
-/// the DTD, the implicit namespace context; 3,040 bytes on 64-bit Linux,
-/// measured through the oracle) plus the small fixed allocations C makes
-/// later that the port does not replay one by one (`m_groupConnector`'s
-/// first 32 bytes, the XML declaration's version and encoding in
-/// `m_temp2Pool`, `m_unknownEncodingMem`). `tracker_diff.rs` checks it
-/// against C's count after creation on every CI platform.
+/// the DTD; 3,040 bytes on 64-bit Linux, measured through the oracle).
+/// Everything C allocates after creation is replayed allocation by
+/// allocation (since stage 4 of D-034 also the implicit namespace
+/// context's `m_tempPool` block); the excess over C's creation is the
+/// margin stage 3 removes. `tracker_diff.rs` checks it against C's count
+/// after creation on every CI platform.
 pub const CREATION_CHARGE: u64 = 16_384;
 
 /// `INIT_BLOCK_SIZE` of the string pools.

@@ -35,9 +35,10 @@ use expat_oracle::{ParamEntityParsing, ParseOptions, TrackerEvent};
 const C_CREATION_LINES: [u32; 4] = [1395, 1405, 1410, 7865];
 
 /// Streams (of 3,420) that must be equal after creation at this stage
-/// (measured on 64-bit Linux, macOS and Windows; see docs/REPORT.md, DV-1
-/// parity).
-const EQUAL_STREAMS_AT_LEAST: usize = 1_838;
+/// (stage 4 of D-034: 3,270, every remaining first difference a pool
+/// growth the port makes early because of `POOL_SLACK`, stage 2; see
+/// docs/REPORT.md, DV-1 parity).
+const EQUAL_STREAMS_AT_LEAST: usize = 3_270;
 
 fn base() -> ParseOptions {
     ParseOptions {

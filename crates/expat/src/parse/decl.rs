@@ -93,7 +93,7 @@ impl Parser {
         let salt = self.salt;
         let direct = self.direct();
         self.dtd
-            .element_type(&salt, &mut self.tracker, direct, self.ns, &name)
+            .element_type(&salt, &mut self.tracker, direct, &name)
             .map_err(|_| XmlError::NoMemory.into())
     }
 
@@ -207,9 +207,9 @@ impl Parser {
             Role::DoctypePublicId | Role::EntityPublicId => {
                 if role == Role::DoctypePublicId {
                     self.use_foreign_dtd = false;
-                    let (r, _) = self
+                    let r = self
                         .dtd
-                        .declare_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct, true, EXTERNAL_SUBSET_NAME)
+                        .external_subset_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct)
                         .map_err(no_mem)?;
                     self.decl_entity = Some(r);
                     self.dtd.has_param_entity_refs = true;
@@ -425,9 +425,9 @@ impl Parser {
                         self.check_not_standalone(h)?;
                     }
                     if self.decl_entity.is_none() {
-                        let (r, _) = self
+                        let r = self
                             .dtd
-                            .declare_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct, true, EXTERNAL_SUBSET_NAME)
+                            .external_subset_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct)
                             .map_err(no_mem)?;
                         if let Some(e) = self.dtd.entity_mut(r) {
                             e.public_id = None;
@@ -757,9 +757,9 @@ impl Parser {
     pub(crate) fn read_external_subset<H: Handler>(&mut self, h: &mut H) -> Result<(), Stop> {
         let salt = self.salt;
         let direct = self.direct();
-        let (r, _) = self
+        let r = self
             .dtd
-            .declare_entity(&salt, &mut self.tracker, direct, true, EXTERNAL_SUBSET_NAME)
+            .external_subset_entity(&salt, &mut self.tracker, direct)
             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
         if self.use_foreign_dtd {
             let base = self.cur_base.clone();

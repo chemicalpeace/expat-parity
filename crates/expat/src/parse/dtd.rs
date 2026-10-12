@@ -310,13 +310,12 @@ impl Dtd {
     }
 
     /// `getElementType`: the element type `name`, created (with
-    /// `setElementTypePrefix` when namespace processing is on) if new.
+    /// `setElementTypePrefix`, whatever the namespace mode) if new.
     pub fn element_type(
         &mut self,
         salt: &SipKey,
         tr: &mut Tracker,
         direct: u64,
-        ns: bool,
         name: &[u8],
     ) -> Result<EntryId, NoMemory> {
         // `poolStoreString(&dtd->pool, ...)`, discarded for a known name.
@@ -330,9 +329,11 @@ impl Dtd {
         )?;
         if l == Lookup::Inserted {
             tr.store(Pool::Dtd, name.len(), direct)?;
-            if ns {
-                self.set_element_type_prefix(salt, tr, direct, id, name)?;
-            }
+            // Unconditional in C's `getElementType`, also without namespace
+            // processing (only `storeAtts` reads the prefix, and only with
+            // it); its `dtd->pool` string and `dtd->prefixes` entry are
+            // charged either way (D-034 stage 4).
+            self.set_element_type_prefix(salt, tr, direct, id, name)?;
         }
         Ok(id)
     }
@@ -364,6 +365,25 @@ impl Dtd {
             EntityRef::General(id)
         };
         Ok((r, l == Lookup::Inserted))
+    }
+
+    /// `lookup(parser, &dtd->paramEntities, externalSubsetName,
+    /// sizeof(ENTITY))`: the external subset's entity, whose name is C's
+    /// static `"#"` (no copy into `dtd->pool`, unlike [`Dtd::declare_entity`]).
+    pub fn external_subset_entity(
+        &mut self,
+        salt: &SipKey,
+        tr: &mut Tracker,
+        direct: u64,
+    ) -> Result<EntityRef, NoMemory> {
+        let (id, _) = self.param_entities.lookup_or_insert(
+            salt,
+            &mut tr.heap(direct),
+            super::decl::EXTERNAL_SUBSET_NAME,
+            ENTITY_SIZE,
+            Entity::default,
+        )?;
+        Ok(EntityRef::Param(id))
     }
 
     /// The entity `r`.

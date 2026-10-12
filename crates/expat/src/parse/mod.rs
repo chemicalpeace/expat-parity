@@ -818,14 +818,14 @@ impl Parser {
 
     /// `startParsing`: the implicit `xml` prefix binding when namespace
     /// processing is on (the salt is always set, see [`Parser::new`]).
-    fn start_parsing<H: Handler>(&mut self, h: &mut H) -> bool {
+    fn start_parsing(&mut self) -> bool {
         // The implicit context is only set for the root parser; external
         // entity parsers inherit it (C skips `startParsing` for them).
         if self.is_child {
             return true;
         }
         if self.ns {
-            return self.set_implicit_context(h);
+            return self.set_implicit_context();
         }
         true
     }
@@ -846,7 +846,7 @@ impl Parser {
                 return Status::Error;
             }
             Parsing::Initialized => {
-                if !self.start_parsing(h) {
+                if !self.start_parsing() {
                     self.error_code = XmlError::NoMemory.into();
                     return Status::Error;
                 }
@@ -977,7 +977,7 @@ impl Parser {
                     self.error_code = XmlError::NoBuffer.into();
                     return Status::Error;
                 }
-                if !self.start_parsing(h) {
+                if !self.start_parsing() {
                     self.error_code = XmlError::NoMemory.into();
                     return Status::Error;
                 }

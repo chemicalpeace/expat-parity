@@ -425,7 +425,7 @@ impl Parser {
     /// `setContext` (`xmlparse.c` 7771-7840): binds the prefixes of the
     /// context string (`prefix=uri`, `=uri` for the default namespace) as
     /// inherited bindings and marks the named general entities open.
-    fn set_context(&mut self, context: &[u8]) -> bool {
+    pub(crate) fn set_context(&mut self, context: &[u8]) -> bool {
         let salt = self.salt;
         let len = context.len();
         // `s` scans, `ctx` is the start of the current item, `temp` is
