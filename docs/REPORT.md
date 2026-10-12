@@ -20,8 +20,9 @@ prolog/DTD state machine); module 9 is the string pool and hash table of
 `xmlparse.c` with C's allocation behaviour; module 10 is the parser core of
 `xmlparse.c` for documents without a document type declaration (buffer,
 prolog, content, attributes, namespaces, CDATA, epilog, positions). No
-public parser API exists yet (module 12); the DTD, entities and the
-amplification limits are module 11.
+public parser API exists yet (module 12); module 11 (in progress) is the
+DTD: 11a declarations and 11b internal entity expansion and recursion are
+done.
 
 ## Verification infrastructure
 
@@ -361,6 +362,88 @@ and 22,392 `buffer_diff` inputs, exit status 0. The merged corpora
 9,674 files (32,718 inputs, 12,256 edges); both are replayed by
 `tests/tests/fuzz_corpus.rs` on every CI platform.
 
+### Module 11b (internal entity expansion and recursion): entities versus C
+
+Ported: `processEntity`, `internalEntityProcessor` and the three open-entity
+lists of `xmlparse.c` (content / parameter entities, attribute values,
+entity values; `parse/entity.rs`), the event pointers of open entities
+(`internalEventPtr`/`internalEventEndPtr`, D-028), expansion of internal
+general entities in content, attribute values and default attribute values,
+of internal parameter entities between declarations and inside entity
+values, and every recursion and nesting check of those paths. With this,
+all 540 upstream vectors are compared under every option set.
+`Stop::DtdNotPorted` remains only where C would call an external entity
+reference handler with an external entity parser (external subset,
+external parameter entities with a handler) — module 11d / 12.
+
+Local run (2026-10-12, aarch64 Linux, commit 263d94d, `--release`):
+`cargo test -p expat-difftest --test parse_diff -- --nocapture` →
+`upstream: 540 of 540 vectors compared under every option set`,
+`upstream: 5940 pairs equal to C, 0 stopped at a DTD`,
+`generated dtd: 9000 pairs equal to C, 0 stopped at a DTD`,
+`generated: 7500 pairs equal to C`; and
+`cargo test -p expat-difftest --test entity_diff -- --nocapture` →
+`curated entity cases: 1014 pairs compared, 0 mismatches` (78 documents x
+13 option sets: the pinned `ALWAYS` run plus every parameter-entity-parsing
+mode whole and chunked at 1 and 7 bytes, and with namespaces through the
+buffer API in 3-byte pieces),
+`deep chains: 30 pairs compared, 0 mismatches`,
+`deep cycles: 3 pairs compared, 0 mismatches`,
+`generated entity documents: 6000 pairs compared, 0 mismatches` (result
+codes reached: `{0: 1317, 2: 203, 3: 45, 4: 2156, 5: 277, 6: 3, 11: 363,
+12: 510, 13: 54, 14: 919, 15: 64, 16: 38, 18: 1, 30: 50}`; the test
+asserts that 0, 4, 11, 12 and 13 are reached). Every compared pair includes
+the error code, line, column and byte index.
+
+**Test groups** (`tests/tests/entity_diff.rs`; each curated case pins
+C's error code under `XML_PARAM_ENTITY_PARSING_ALWAYS`, the port is
+compared under every option set):
+
+| Group | Cases | C behaviour (pinned codes) | Security policy | Known divergences |
+|---|---|---|---|---|
+| Content (`content-*`) | 20 | Replacement text is tokenised as content in the internal UTF-8 encoding and reported as if inline: markup, comments, PIs, CDATA, character and predefined references, CR normalisation, nested entities; first declaration wins. Errors: undeclared entity in replacement text 11, unparsed entity 15, bad markup 4/5/7, bad character reference 14. Error positions are those of the outermost reference in the document (DTD-SECURITY.md section 3). | Same as C (D-026): expansion is on, bounded only by the amplification limit (step B). | none |
+| Attribute values (`attr-*`) | 13 | Replacement text is normalised (`appendAttributeValue`); `<` in it is 4, undeclared 11, external entity 16, unparsed 15, bad character reference 14, duplicate attribute after expansion 8. | Same as C; external entities are never read in attribute values. | none |
+| Default attribute values (`default-*`) | 8 | Normalised once at declaration time (`XML_ACCOUNT_NONE`), applied by `storeAtts`; undeclared reference 11. | Same as C. | none |
+| Parameter entities (`pe-*`) | 18 | Expanded between declarations and inside entity values of a PE only when parameter entity parsing is not `NEVER`; in an internal-subset entity value a PE reference is 10; a PE ending inside markup 29; an entity declared in a PE referenced from a standalone document 24; bad markup 4/5; undeclared 11. | Default `NEVER` like C (D-026); no external PE is read without a handler (none exists before step D). | none |
+| Recursion (`rec-*`) | 15 | Direct and indirect recursion in content, attribute values, default values, PEs and entity values: 12 at the reference that closes the cycle, when it is expanded (declaration alone is no error); one case where the self-reference is never expanded is 0. | Same as C. | none |
+| Nesting (`async-*`) | 4 | An element or PE opened in an entity must close in it: 13. | Same as C. | none |
+| Deep chains | 5 contexts x depth 1/100/10,000 x 2 | Accepted by C; expansion is iterative in C (2.7.0+) and in the port, so 10,000 open entities cost heap, not stack. | Inputs < 600 KB, expansion < 50 KB. | none |
+| Deep cycles | 3 | A cycle closed after 5,000 entities (content, attribute, PE): 12. | Bounded as above. | none |
+| Generated entity graphs | 6,000 | Random declarations/references over all contexts, a fraction damaged, random option set. | Seeded generator (deterministic). | none |
+
+**Injected bugs** (2026-10-12, each reverted after the run; output in the
+format of `cargo test -p expat-difftest --test entity_diff --test parse_diff`):
+
+| # | Mutation | Detected by |
+|---|---|---|
+| I1 | Recursion check removed in content (`doContent`, `content.rs`) | `deep_recursion_cycle_matches_c`: `cycle-content` C `result error 12 1 122798 122798`, port `result error 43 ...` (the port ran into the amplification limit instead); 104 generated mismatches |
+| I2 | `XML_ERROR_ASYNC_ENTITY` check when an entity completes removed (`internal_entity_processor`) | `generated_entity_documents_match_c`: 2 mismatches (`gen-296` C `result error 13 1 262 524`, port `result error 7 ...`). The curated `async-*` cases hit the other check sites only; the generator covers this one. |
+| I3 | `entity->open` not cleared when an entity is closed | 100 curated mismatches (`content-markup` C `start a 2`, port `result error 12 1 82 82`) |
+| I4 | Event pointer of the open entity ignored (document pointer moved inside expansions) | 254 curated mismatches (`content-undeclared-in-entity` C `result error 11 1 35 35`, port `result error 11 1 0 0`) |
+| I5 | PE reference in an internal-subset entity value accepted (`XML_ERROR_PARAM_ENTITY_REF` dropped) | 26 curated mismatches (`pe-nested` C `entity p 1  ~ ~ ~ ~`, port `entity p 1 %25q; ~ ~ ~ ~`) |
+| I6 | Recursion check removed in attribute values (`appendAttributeValue`) | `cycle-attr` C `result error 12 ...`, port `result error 43 ...`; 65 curated mismatches (`rec-attr-direct`) |
+
+(An earlier set of injected bugs run during development was not recorded
+with its output; the table above was re-run and is the one reported.)
+
+**Fuzzing** (aarch64 Linux, `cargo-fuzz` 0.13, AddressSanitizer, flags
+`-max_len=65536 -rss_limit_mb=2048`; one slice at commit e077074e, the
+rest at 263d94d; strictly sequential slices under a lock; working corpora
+started from the committed corpora plus the entity seeds, 1,500 for
+`parse_trace` and 500 for `buffer_diff`), from the trimmed logs in
+`docs/fuzz-logs/module-11b/`:
+
+| Target | Slices | Seconds (sum of `Done ... in N second(s)`) | Executions (sum of `stat::number_of_executed_units`) | Findings |
+|---|---|---|---|---|
+| `parse_trace` | 7 | 673 | 2,099,284 | none |
+| `buffer_diff` | 7 | 672 | 4,836,238 | none |
+
+Merged corpora (`-merge=1` of committed corpus, working corpus and seeds,
+`docs/FUZZING.md`): `parse_trace` 36,840 inputs to 11,036 files (14,108
+edges), `buffer_diff` 29,229 inputs to 10,208 files (12,551 edges); both
+scanned for personal data before commit (no hits) and replayed by
+`tests/tests/fuzz_corpus.rs` on every CI platform.
+
 ## Divergences
 
 `docs/DIVERGENCES.md`. No divergences yet. Three C quirks found by the
@@ -380,11 +463,10 @@ comparisons start when the parser exists.
 - No public parser API yet (module 12): no default handler,
   `XML_StopParser`/`XML_ResumeParser`, external entity parsers,
   unknown-encoding handler or `XML_GetInputContext`.
-- After module 11a the port stops with `Stop::DtdNotPorted` (never a
-  guessed error) only when a declared internal entity is expanded
-  (module 11b) or where an external entity parser would be needed
-  (module 12); 46 of the 540 upstream vectors are not yet compared under
-  every option set.
+- After module 11b the port stops with `Stop::DtdNotPorted` (never a
+  guessed error) only where an external entity parser would be needed
+  (external subset or external parameter entity with a handler); all 540
+  upstream vectors are compared under every option set.
 - The allocation tracker's byte counts (`XML_SetAllocTrackerMaximumAmplification`)
   are replicated for the hash tables only; whether every parser structure is
   replicated is decided in module 11 (D-021, D-023). Without a failing

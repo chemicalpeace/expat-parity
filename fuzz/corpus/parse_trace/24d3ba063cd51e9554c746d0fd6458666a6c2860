@@ -1,0 +1,2 @@
+<!DOCTYPE doc [
+<!ELEMENT doc (c|a)|b+</doc>ˆ

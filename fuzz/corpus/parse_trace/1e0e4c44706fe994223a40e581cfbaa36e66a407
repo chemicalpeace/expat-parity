@@ -1,0 +1,1 @@
+5Ëï»¿<!DOCTYPE r SYSTEM 'r.d<td' [<!ENTITY e0 '&e1;&#13;&#10;'><!ENTITY e0 'second'><!ENTITY e1 ''><!ATTLIST r a CDATA "&e0;" t NMTOKENS "  &e0; x " f CDATA #FIXED "&amp;&e1;">]><r>txt&e1;txt&e1;</r>

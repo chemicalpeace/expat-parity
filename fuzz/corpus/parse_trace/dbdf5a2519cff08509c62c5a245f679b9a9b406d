@@ -1,6 +1,0 @@
-Ã<?xml version='1.0' standalone='no'?><!DOCTYPE a PUBLIC "-//X//DTD x//EN" 'doc.dtd' [<!ATTLIST a q:a (x|y|z) #FIXED 'http://www.w3.org/XML/1998/namespace' xmlns:p NMTOKEN #FIXED ''><!ELEMENT a (b|_u|q:e)*><!ATTLIST n-1 a NMTOKEN 'x&e2;y' id NOTATION (n1|n2) "http://www.w3.org/2000/xmlns/">
-<!ATTLIST q:e q:a CDATA '&undeclared;' xmlns NMTOKEN #IMPLIED p:a NOTATION (n1|n2) #FIXED " x  y "><!ATTLIST doc id IDREF #IMPLIED xml:lang CDATA #REQUIRED a ID '&e1;'> 
-<!ATTLIST b a ( x | y ) #IMPLIED>
-<!ATTLIST b:att xmlns:p (x|y|z) '&undeclared;' xmlns:q ENTITIES ' x  y ' xmlns:q IDREFS #IMPLIED><!ATTLIST p:e xml:lang ID #REQUIRED xmlns NOTATION (n1|n2) #IMPLIED>
-
-<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3'> %pe1; %pe2;]><doc>&e9;<doc xmlns:p='&lt;'>café ? ?café ? ?&lt;&#60;&#x3C;</doc>&e2;<doc p:a='&undeclared;'><!--c--></doc></doc>

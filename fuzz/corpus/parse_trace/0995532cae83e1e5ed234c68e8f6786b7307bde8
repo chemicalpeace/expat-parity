@@ -1,4 +1,0 @@
-î{<?xml version='1.0' encoding='UTF-8'?><!DOCTYPE p:e SYSTEM 'doc.dtd' [<!ELEMENT n-1 (#PCDATA|p:e|q:e)*>
-<!--dtd comment--><!ENTITY % pe3 PUBLIC '' "sys2.ent"><!ATTLIST n-1 xmlns NOTATION (n1|n2) #REQUIRED xmlns ENTITIES "urn:q" xmlns NOTATION (n1|n2) #IMPLIED>
-<!NOTATION n1 SYSTEM 'viewer'><!---->
-<!ATTLIST _u xmlns:q IDREFS 'a&amp;b' a CDATA #REQUIRED xmlns ENTITIES #FIXED 'a&amp;b'>]><b c='&undeclared;' c='&e1;'><!--c-->&e2;<?pi?></b>

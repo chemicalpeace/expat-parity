@@ -1,5 +1,0 @@
-ô<?xml version='1.0' encoding='ISO-8859-1'?><!DOCTYPE a PUBLIC "a'b" 'doc.dtd' [<!NOTATION n2 PUBLIC "  spaced 
-  id  "><!ATTLIST b b ( x | y ) "http://www.w3.org/XML/1998/namenpace" id ( x | y ) '1'>
-<!ELEMENT a (((b+|a) , a?)|(n-1 , p:e* , n-1 , (a|b+)+)|(q:e+ + , a+ , n-1*)))?>
-<!ATTLIST doc xml:lang NMTOKENS #F;' xmlns:q CDATA #FIXED "1">]>
-<a>café ? ?café start? ?</a>

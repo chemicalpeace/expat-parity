@@ -1,0 +1,44 @@
+# libFuzzer log, trimmed: 448 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=/tmp/xr/fuzz/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2912366575
+INFO: Loaded 1 modules   (64805 inline 8-bit counters): 64805 [0xaaaabb2b7960, 0xaaaabb2c7685), 
+INFO: Loaded 1 PC tables (64805 PCs): 64805 [0xaaaabb2c7688,0xaaaabb3c48d8), 
+INFO:    15930 files found in <corpus>
+INFO: seed corpus: files: 15930 min: 1b max: 11360b total: 4913385b rss: 42Mb
+#8192	pulse  cov: 11678 ft: 35701 corp: 6782/169Kb exec/s: 4096 rss: 296Mb
+#15931	INITED cov: 14092 ft: 59152 corp: 10956/2728Kb exec/s: 1448 rss: 490Mb
+#16384	pulse  cov: 14092 ft: 59152 corp: 10956/2728Kb lim: 11345 exec/s: 1489 rss: 490Mb
+#32768	pulse  cov: 14092 ft: 59153 corp: 10957/2731Kb lim: 11384 exec/s: 2340 rss: 566Mb
+#65536	pulse  cov: 14092 ft: 59170 corp: 10962/2731Kb lim: 11488 exec/s: 2621 rss: 577Mb
+#131072	pulse  cov: 14094 ft: 59183 corp: 10973/2737Kb lim: 11618 exec/s: 2912 rss: 577Mb
+#262144	pulse  cov: 14097 ft: 59240 corp: 11003/2791Kb lim: 11904 exec/s: 2849 rss: 577Mb
+#272420	DONE   cov: 14097 ft: 59243 corp: 11006/2794Kb lim: 11930 exec/s: 2837 rss: 577Mb
+###### Recommended dictionary. ######
+"NO" # Uses: 4940
+"attlist" # Uses: 2101
+"\377\377\377\377" # Uses: 1993
+"e4" # Uses: 1782
+"b2" # Uses: 1434
+"\001\000\000\000\000\000\003\026" # Uses: 1271
+"b8" # Uses: 1243
+"a2" # Uses: 1123
+"start" # Uses: 1009
+"\005\000\000\000\000\000\000\000" # Uses: 874
+"fo_" # Uses: 764
+"d8" # Uses: 537
+"\005\000\000\000" # Uses: 487
+"d1" # Uses: 515
+"notation" # Uses: 471
+"EN" # Uses: 344
+"element" # Uses: 357
+"\377\377\377\022" # Uses: 309
+###### End of recommended dictionary. ######
+Done 272420 runs in 96 second(s)
+stat::number_of_executed_units: 272420
+stat::average_exec_per_sec:     2837
+stat::new_units_added:          448
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              577

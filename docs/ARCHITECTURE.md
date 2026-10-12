@@ -36,7 +36,8 @@ Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
 | `MALLOC`/`REALLOC`/`FREE` accounting (`expat_malloc` & co., `xmlparse.c`) | `expat::heap` | see STATE.md |
 | `XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, `callProcessor`, prolog without DTD, `processXmlDecl`, content, `storeAtts`, namespaces, CDATA, epilog, position getters, accounting (`xmlparse.c`) | `expat::parse` (`mod`, `prolog`, `content`, `dtd`, `accounting`, `error`) | see STATE.md |
 | `doProlog` DTD roles, `storeEntityValue`, `defineAttribute`, `getElementType`, `nextScaffoldPart`, `build_model`, `normalizePublicId` (`xmlparse.c`) | `expat::parse` (`decl`, `model`, `dtd`) | module 11a |
-| `processEntity`, `internalEntityProcessor`, entity expansion, external subset (rest of `xmlparse.c`) | `expat::parse` (`entity`) | module 11b / 12 |
+| `processEntity`, `internalEntityProcessor`, `storeAttributeValue`, `callStoreEntityValue`, the open-entity lists | `expat::parse` (`entity`) | module 11b |
+| External entity parsers, external subset (`XML_ExternalEntityParserCreate`, `externalEntityInitProcessor*`) | `expat::parse` | module 11d / 12 |
 
 Internal modules are reachable from tests only through the `internal-api`
 feature (`expat::internal`), see DECISIONS D-006.
@@ -211,6 +212,20 @@ literal. A C `NULL` string is written as `~`. Integers are decimal.
 The C implementation of this spec is `crates/expat-oracle/shim/oracle_trace.c`;
 the Rust implementation is `tests/src/trace.rs`. Both are tested against
 hand-written expected traces.
+
+## Entity expansion (module 11b)
+
+Expansion is iterative, as in C since 2.7.0: a reference pushes an
+`OpenEntity` on one of three lists (content and parameter entities,
+attribute values, entity values) and returns; the replacement text is
+consumed by the loop that owns the list (`Processor::InternalEntity` in
+the processor loop for content and PEs; the loops of
+`store_attribute_value` and `call_store_entity_value`). Nesting depth costs
+one `OpenEntity` of heap per level and no stack. `Entity::open` stays set
+until the entity and everything opened inside it are closed, which is how
+direct and indirect recursion are detected. Event pointers inside an
+expansion belong to the open entity (D-028). Verification:
+`tests/tests/entity_diff.rs` (REPORT.md, module 11b).
 
 ## Safety and resource limits
 

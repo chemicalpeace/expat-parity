@@ -1,6 +1,0 @@
-Î<?xml version='1.0'?><!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ATTLIST a xmlns ID #FIXED "" a ID #FIXED "a|b">
-<!ATTLIST a xmlns:p IDREF #REQUIRED xmlns:q CDATA #REQUIRED p:a ID "&lt;">
-
-%pe2;%undeclared;
-<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDx?>]>
-<doc><!--c--></doc>

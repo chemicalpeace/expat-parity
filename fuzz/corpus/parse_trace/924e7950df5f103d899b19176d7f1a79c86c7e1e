@@ -1,0 +1,6 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc
+    a1  (ab|c)   'a'
+    a2  (foo|bar) #IMP
+   PLIED
+    a8 

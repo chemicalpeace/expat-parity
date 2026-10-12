@@ -1,6 +1,0 @@
-Âdï»¿<?xml version='1.0'?>
-<!DOCTYPE p:e SYSTEM 'doc.dtd' [	<!--dtd comment--><!ELEMENT b (n-1|q:e?)*><!ENTITY % pe2 "<!ENTITY e1 '&#37;pe1;'>" ><!ATTLIST a id ( x | y ) #REQUIRED id CDATA "http://www.w3.org/2000/xmlns/c"><!ENTITY % pe2 ''><!ELEMENT doc (q:e+ , p:e)*>
-<!ATTLIST doc>
-<!--dtd comment--><!ATTLIST q:e b ( x | y ) #FIXED '' id ENTITIES #IMPLIED xmlns:q NMTOK E#NIMPLIED>
-<!--dtd comment--><!ATTLIST b c IDREF #FIXED "a&amp;b" a (x|y|z) #I
-<doc/></b>

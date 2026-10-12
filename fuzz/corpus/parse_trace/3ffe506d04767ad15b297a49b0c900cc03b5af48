@@ -1,2 +1,0 @@
-|H<!--before--><!DOCTYPE a SYSTEM 'doc.dtd' [<!ENTITY é SYSTEM 'sys.ent' >
-<!ATTLIST n-1 xmlns NMTOKENS #FIXED '' xmlns:p NMTOKENS #IMPLIED id CDATA "x&e2;y"><!ELEMENT b (#PCDATA|doc|a)*>] ><a id='&ext;'>café ☃ 𝄞<!--c--><a p:a='urn:p'>&e1;&e9;<!--c--></a><doc a='urn:p'>&e9;&unp;<doc/><!--c--></doc></a>

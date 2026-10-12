@@ -1,0 +1,51 @@
+# libFuzzer log, trimmed: 569 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=/tmp/xr/fuzz/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2000140014
+INFO: Loaded 1 modules   (64805 inline 8-bit counters): 64805 [0xaaaadba87960, 0xaaaadba97685), 
+INFO: Loaded 1 PC tables (64805 PCs): 64805 [0xaaaadba97688,0xaaaadbb948d8), 
+INFO:    15368 files found in <corpus>
+INFO: seed corpus: files: 15368 min: 1b max: 11360b total: 4666054b rss: 42Mb
+#8192	pulse  cov: 11892 ft: 36642 corp: 6907/180Kb exec/s: 4096 rss: 297Mb
+#15369	INITED cov: 14087 ft: 59043 corp: 10938/2728Kb exec/s: 1397 rss: 478Mb
+#16384	pulse  cov: 14087 ft: 59043 corp: 10938/2728Kb lim: 11345 exec/s: 1489 rss: 478Mb
+#32768	pulse  cov: 14088 ft: 59048 corp: 10942/2727Kb lim: 11371 exec/s: 2184 rss: 567Mb
+#65536	pulse  cov: 14089 ft: 59052 corp: 10945/2725Kb lim: 11462 exec/s: 2621 rss: 569Mb
+#131072	pulse  cov: 14089 ft: 59107 corp: 10959/2744Kb lim: 11657 exec/s: 3048 rss: 569Mb
+#262144	pulse  cov: 14091 ft: 59136 corp: 10973/2752Kb lim: 11995 exec/s: 3404 rss: 569Mb
+#318301	DONE   cov: 14092 ft: 59152 corp: 10980/2760Kb lim: 12099 exec/s: 3315 rss: 569Mb
+###### Recommended dictionary. ######
+"NO" # Uses: 3926
+"\001\000\000\000\000\000\000I" # Uses: 2683
+"\000\000\000\000" # Uses: 2565
+"e1" # Uses: 2248
+"\014\000" # Uses: 2068
+"\000\013" # Uses: 1843
+"\001\000\000\001" # Uses: 1755
+"\377\377\377\022" # Uses: 1254
+"attr" # Uses: 1188
+"\000)" # Uses: 893
+"\357\377\377\377" # Uses: 930
+"element" # Uses: 721
+"\007\000" # Uses: 600
+"skipped" # Uses: 560
+"cd" # Uses: 474
+"text" # Uses: 417
+"doctype" # Uses: 422
+"\000\000" # Uses: 386
+"A5" # Uses: 366
+"\001\000\000\000\000\000\000s" # Uses: 285
+"e3" # Uses: 186
+"d5" # Uses: 115
+"xmldecl" # Uses: 67
+"\015\000\000\000\000\000\000\000" # Uses: 72
+"\377\377\377;" # Uses: 44
+###### End of recommended dictionary. ######
+Done 318301 runs in 96 second(s)
+stat::number_of_executed_units: 318301
+stat::average_exec_per_sec:     3315
+stat::new_units_added:          569
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              569

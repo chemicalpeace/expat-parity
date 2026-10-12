@@ -1,9 +1,0 @@
-ù“<?xml version='1.0'?>
-<!DOCTYPE a PUBLIC "a'b" 'doc.dtd' [<!---->
-<!NOTATION n1 SYSTEM 'viewer'>
-<?dtdpi x?>
-<!ATTLIST b p:a CDATA #IMPLIED>
-<!ATTLIST a id ENTITY #FIX| ML/e' q:a NMTOKEN #REQUIRED p:a NOTATION (n1|n2) #IMPLIED>
-
-
-]>

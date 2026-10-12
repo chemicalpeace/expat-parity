@@ -1,4 +1,0 @@
-ÖBï»¿<!DOCTYPE doc [<!ELEMENT _u (#PCDATA)><!NOTATION n1 PUBLIC '  spaced 
-  id  '><!ATTLIST n-1 c NOTATION (n|n2) 'http://www.w3.org/XML/1998/namespace'><!ATTLIST b xmlns:p ( x | y ) #FIXED "ur:q" xmlns:q NOTATION (n1|n2) 'urn:q'>
-<!ENTITY % peext'>
-<!NOTATION n2 PUBLIC 'p' 'viewer'><!ENTITY % pe3 "&e2;&e

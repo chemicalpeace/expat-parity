@@ -1,0 +1,2 @@
+;‘<!--before--><!DOCTYPE doc PUBLIC "-//X//DTD x//EN" 'doc.dtd' [<!ELEMENT _u (#PCDATA|a|a)*>
+<!ELEMENT b ((n-1 , q:e+))*

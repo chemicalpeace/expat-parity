@@ -1,0 +1,4 @@
+¡<?xml version='1.0'?><!--before--><!DOCTYPE doc PUBLIC '' 'doc.dtd' [<!ATTLIST doc q:a IDREF #REQUIRED><!--dtent-->
+<!ELEMENT q:e (#PCDATA|a)*>
+<!ATTLIST a  >
+<!ATTLIST p:e xmlns:q NOTATKON (n1|n2) #REQUIRED>%undecl¦red;<!ATTb b5a='&lt;'><?pi?>

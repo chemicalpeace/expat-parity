@@ -1,6 +1,0 @@
-<!DOCTYPE d [
-<!ENTITY % element_d '<!ELEMENT d (#PCDATA)*>'>
-%element_d;
-<!ENTITY % e1 ']><d/>'><!ENTITY % e2 '&#37;e1;'>
-
-%e2;

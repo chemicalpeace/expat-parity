@@ -1,0 +1,4 @@
+ай<!--before--><!DOCTYPE a SYSTEM 'doc.dtd' [<!ATTLIST q:e q:a ID #IMPLIED> %pe1; 
+
+<!ENTITY % pe1 '<!ELEMENT z ANY>' ><!ATTLIST a xmlns IDREF #IMPLIED xmlns NMTOKEN "1" b ID #REQUIRED><!ENTITY amp "&e1
+<doc xmlns:p=' x &e2; '></doc>

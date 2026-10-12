@@ -1,5 +1,0 @@
-;‘<!--before--><!DOCTYPE doc PUBLIC "-//X//DTD x//EN" 'doc.dtd' [<!ELEMENT _u (#PCDATA|a|a)*>
-<!ELEMENT b ((n-1 , q:e+))*>
-<!ENTITY % ex
-%pe1;%und;
-<!NOTATION n2 PUBLIC "bad{char}ö>] ><b><!--c--></b>

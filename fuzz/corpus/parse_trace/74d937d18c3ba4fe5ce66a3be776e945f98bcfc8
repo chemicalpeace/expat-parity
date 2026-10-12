@@ -1,0 +1,4 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc identifier CDATA 'expected' iden ID #REQUIRED>
+]>
+<doc/>

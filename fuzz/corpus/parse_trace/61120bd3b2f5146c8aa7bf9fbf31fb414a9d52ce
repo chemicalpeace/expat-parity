@@ -1,0 +1,1 @@
+,¾<!DOCTYPE r [<!ENTITY e0 ''><!ENTITY e0 'second'><!ENTITY e1 '&e3;&#65;x'><!ENTITY e1 'second'><!ENTITY e2 '&e3;'><!ENTITY e3 ''><!ENTITY e4 '&e2;]]>&#65;'><!ENTITY % p0 '<!ATTLIST r d CDATA "&e0;">'><!ENTITY % p1 '<!ENTITY &#37; p4 "&#37;p2;">'><!ENTITY % p2 '&#37;p2;'><!ATTLIST r a CDATA "&e4;" t NMTOKENS "  &e4; x " f CDATA #FIXED "&amp;&e4;">]><r>&e3;txt&e4;<c>&e0;</c></r>

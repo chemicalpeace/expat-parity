@@ -1,0 +1,3 @@
+;›<!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 '<i>'><!ENTITY e1 'a
+ba
+b&e3;'><!ENTITY e2 ''><!ENTITY e3 '&#x10FFFF;text &e1;'><!ENTITY e4 ''><!ENTITY % p0 '"x">'><!ENTITY % p1 '<!ENTITY e6 "from pe">'>%p0;%p0;]><r s="v&e2;w">txt&e4;</r>

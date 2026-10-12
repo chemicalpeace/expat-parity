@@ -1,8 +1,0 @@
-M﻿<!DOCTYPE doc [
-<!ATTLIST doc d1 CDATA 'v0'><!ELEMENT _u ANY>
-<!ENTITY é PUBLIC '  space 
-i  dd  ' 'sys2.ent'>
-<!--dtd comment--><!ELEMENT a (#PCDATA|a|EN*>
-<!ATTLIST doc TA 'v2' d3 CDATA 'v3' d4 >
-<!ENTITY  'sys2.ent' > %pe1; ]>
-<b a='&e1;' xmlns:p='1'></b>

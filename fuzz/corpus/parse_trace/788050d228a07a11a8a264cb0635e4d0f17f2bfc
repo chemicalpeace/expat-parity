@@ -1,5 +1,0 @@
-óÚ<!DOCTYPE p:e PUBLIC '' 'doc.dtd' [<!ATTLIST a p:a ENTITY #REQUIRED id CDATA 'a&amp;b' xml:lang NMTOKEN "a|b">%pe2;
-<!----><!ATTLIST doc>
-<!ENTITY a PUBLIC 'x'>
-]>
-<doc></doc>

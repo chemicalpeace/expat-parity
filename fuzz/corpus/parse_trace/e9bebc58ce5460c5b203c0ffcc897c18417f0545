@@ -1,0 +1,2 @@
+ˆi<!DOCTYPE r [<!ENTITY e0 ''><!ENTITY e1 ''><!ENTITY e2 '&#x10FFFF; sp  ace &e1;a
+b'><!ENTITY e2 'second'><!ENTITY % p0 '<!ELEMENT r ANY>'><!ENTITY % p1 '<!ENTITY e1 "from pe">'><!ENTITY % p2 '<!ATTLIST r d CDATA "&e0;">'>%p1;<!ATTLIST r a CDATA "&e0;" t NMTOKENS "  &e2; x " f CDATA #FIXED "&amp;&e2;">]><r s="v&e2;w" t=' &e0;  y '>&e1;</r>

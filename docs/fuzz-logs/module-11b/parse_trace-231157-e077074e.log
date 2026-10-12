@@ -1,0 +1,51 @@
+# libFuzzer log, trimmed: 610 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=/tmp/xr/fuzz/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3981010492
+INFO: Loaded 1 modules   (64805 inline 8-bit counters): 64805 [0xaaaae4ad7960, 0xaaaae4ae7685), 
+INFO: Loaded 1 PC tables (64805 PCs): 64805 [0xaaaae4ae7688,0xaaaae4be48d8), 
+INFO:    12147 files found in <corpus>
+INFO: seed corpus: files: 12147 min: 1b max: 11360b total: 3197386b rss: 40Mb
+#8192	pulse  cov: 12825 ft: 43778 corp: 8026/315Kb exec/s: 4096 rss: 304Mb
+#12148	INITED cov: 14026 ft: 58045 corp: 10707/2556Kb exec/s: 1518 rss: 449Mb
+#16384	pulse  cov: 14026 ft: 58047 corp: 10708/2558Kb lim: 11373 exec/s: 1820 rss: 471Mb
+Loaded 1024/12159 files from <corpus>
+#32768	pulse  cov: 14026 ft: 58047 corp: 10708/2556Kb lim: 11425 exec/s: 2978 rss: 558Mb
+#65536	pulse  cov: 14028 ft: 58057 corp: 10713/2557Kb lim: 11464 exec/s: 2621 rss: 558Mb
+#131072	pulse  cov: 14040 ft: 58086 corp: 10731/2570Kb lim: 11581 exec/s: 3196 rss: 558Mb
+#262144	pulse  cov: 14045 ft: 58121 corp: 10750/2578Kb lim: 11828 exec/s: 3360 rss: 558Mb
+#310840	DONE   cov: 14046 ft: 58133 corp: 10756/2579Kb lim: 11945 exec/s: 3237 rss: 558Mb
+###### Recommended dictionary. ######
+"id" # Uses: 4449
+"\004\000\000\000\000\000\000\000" # Uses: 3483
+"xmldecl" # Uses: 2228
+"element" # Uses: 1833
+"e2" # Uses: 1519
+"xmlns:" # Uses: 1356
+"notation" # Uses: 1276
+"\376\377\377\377\377\377\377\377" # Uses: 1212
+"\017\000" # Uses: 1057
+"\000\000\000\027" # Uses: 887
+"a4" # Uses: 785
+"do_\303\277" # Uses: 774
+"\001\000\000\000" # Uses: 771
+"\002\252\252\252\252\252\252\252" # Uses: 740
+"\001\014" # Uses: 725
+"doctype" # Uses: 523
+"\020\000" # Uses: 482
+"Cy\015\3455\224\327\000" # Uses: 435
+"\000\000\000h" # Uses: 358
+"\000\000\000\000\000\000\000\004" # Uses: 283
+"\375\377\377\377" # Uses: 279
+"\001\000\000\000\000\000\000\000" # Uses: 110
+"A5" # Uses: 63
+"\377\377\377\377\377\377\377\377" # Uses: 32
+###### End of recommended dictionary. ######
+Done 310840 runs in 96 second(s)
+stat::number_of_executed_units: 310840
+stat::average_exec_per_sec:     3237
+stat::new_units_added:          610
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              558

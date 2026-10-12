@@ -1,4 +1,0 @@
-̕<!DOCTYPE p:e SYSTEM 'doc.dtd' [ <!ATTLIST q:e xml:lang NOTATION (n1|n2) "&#x10000;" q:a CDATA #FIXED "1">
-<!ATTLIST a b ID #FIXED 'x'>	
-<!NOTATION n2 SYSTEM 'viewer'><!ELEMENT b EMPTY><!--dtd comment--><!ENTITY e1 "" ><!ATTLIST doc xmlns:q ENTITIES #REQUIRED a ENTITY #IMPLIED><!ENTITY e1 "&#60;b/&#62;" ><!ENTITY e3 "<!ELEMENT q ANY>" ><?dtdpi x?>
-<!ENTITY % pe2 "%pe2;" >]>t;' a='1'></doc>

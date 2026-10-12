@@ -1,9 +1,0 @@
-n<!--before--><!DOCTYPE doc PUBLIC "  spaced 
-  id  " 'doc.dtd' [<!ENTITY unp "&e3;" ><!ENTITY lt PUBLIC "a'b" "sys2.ent" >
-<!ENTITY é '&#37;pe1;' ><!ENTITY ext "&#37;pe1;">
-
-
-<!ATTLIST q:e id ID #REQUIRED id NMTOKENS #FIXED 'a&amp;b'><!ELEMENT n-1 ANY><!ENTITY ext "&#37;pe1;">
-<!ENTITY % pe1 '  ' ><!NOTATION n1 PUBLIC 'p' 'viewer'>
-<!ENTITY e2 "<!ELEMENT q ANY>" ><!ATTLIST _u id IDREF #FIXED "a|b">
-]><a a='&ext;' id='1'><!--c--></a>

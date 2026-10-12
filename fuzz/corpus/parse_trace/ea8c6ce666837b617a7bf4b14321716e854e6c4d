@@ -1,0 +1,3 @@
+‡+<?xml version='1.0' standalone='yes'?><!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 '&e1;&e1;a
+ba
+b'><!ENTITY e1 ''><!ENTITY e1 'second'><!ENTITY % p0 '<!ENTITY e1 "from pe">'><!ENTITY % p1 '<!ENTITY'><!ATTLIST r a CDATA "&e0;" t NMTOKENS "  &e1; x " f CDATA #FIXED "&amp;&e1;">]><r s="v&e0;w">txt&e1;txt</r>

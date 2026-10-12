@@ -1,0 +1,6 @@
+
+þ<?xml version='1.0' standalone='yes'?><!DOCTYPE p:e [<!ELEMENT b (b,a*,n-1,_u+)?>
+<?dtdpi IST q:e xmlns:q NOTATION (n1|n2) #REQUIRED><?dtdpi x?>
+<!ATTLIST doc xmlxmlns:q NOTATION (n1|n2) #REQUIRED><?dtdpi x?>
+<!ATTLIST doc xmlns:p CDATA '1' q:a ( x | y ) '&#65;&#x42;&#32;' xmlns:p NOTATION (n1|n2' #REQUIRED>
+<!ATTLIST p:e q:a ( x | y ) "&extTTLIST _u xml:lang CDATAa>

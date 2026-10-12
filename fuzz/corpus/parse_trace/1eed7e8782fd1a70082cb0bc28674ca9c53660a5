@@ -1,7 +1,0 @@
-��﻿<?xml version='1.0' standalone='no'?><!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ELEMENT b (p:e , é* , (a+|(b)*|_u|(é* , _u*)?) , é,x|y)>
-<!--dtd comment--><!ENTITY p:x PUBLIC "bad{char}" "sys2.ent">
-
-
-<!NOTATION n1 PUBLIC 'p' 'viewer'>
-<!ELEMENT _u (#PCDATA|_u)*>
-<!ATTLIST a xmlns ID "a b" c IDREFS <a>&e9;</a>

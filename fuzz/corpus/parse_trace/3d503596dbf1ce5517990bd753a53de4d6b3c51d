@@ -1,5 +1,0 @@
-”ï»¿<?xml version='1.0' standalone='yes'?><!DOCTYPE a PUBLIC "" 'doc.dtd' [<!ENTITY % pe1 '&#60;b/&#62;' >
-<!ENTITY unp SYSTEM 'u.gif' NDATA n1 >
-<!ENTITY % pe3 SYSTEM 'sys.ent'>
-%undeclared;%extpe;
-<!ELEMENT p:e (b|doc|(b?)+<!--c--><?pi?></doc>

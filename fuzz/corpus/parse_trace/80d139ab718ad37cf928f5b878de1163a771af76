@@ -1,0 +1,1 @@
+Æò<?xml version='1.0'?><!DOCTYPE r [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 '&e2;'><!ENTITY e1 '&e2;&#10;]]>'><!ENTITY e2 ''><!ENTITY e2 'second'><!ATTLIST r a CDATA "&e1;" t NMTOKENS "  &e2; x " f CDATA #FIXED "&amp;&e1;">]><r>&e0;&e0;&e2;<c>&e0;</c></r>

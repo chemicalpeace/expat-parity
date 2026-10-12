@@ -1,0 +1,4 @@
+o<?xml version='1.0' encoding='UTF-8'?><!DOCTYPE a SYSTEM 'doc.dtd' [<!ATTLIST doc xml:lang (x|y|z) #FIXED " x  y " b CDATA '&unp;'>
+<!ATTLIST doc>
+ %pe1; 
+<!ATTLIST b xmlns:p NOTATION (n1|n2) #IMPLIED p:a ID #IMPLIED xmlns:p ID/></b>

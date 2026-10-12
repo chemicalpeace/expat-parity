@@ -1,0 +1,2 @@
+ще<?xml version='1.0' standalone='yes'?><!DOCTYPE r [<!ENTITY e0 '&e2;
+'><!ENTITY e1 '&#65;text '><!ENTITY e1 'second'><!ENTITY e2 ''><!ENTITY e3 'text '><!ENTITY % p0 '<!ELEMENT r ANY>'><!ATTLIST r a CDATA "&e0;" t NMTOKENS "  &e1; x " f CDATA #FIXED "&amp;&e2;">]><r>&e0;</r>

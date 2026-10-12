@@ -1,7 +1,0 @@
-s<?xml version='1.0' encoding='UTF-8'?>
-<!DOCTYPE p:e [<!ENTITY é '&#60;b/&#62;' ><!ELEMENT b (p:e|n-1+|n-1)*>
-<!ENTITY % pe2 "&#x10000;☃">
-%extpe;<!ATTLIST b xmlns CDATA #FIXED '&#65;&#x42;&#32;' a CDATA #REQUIRED xml:lang CDATA '&lt;&gt;&quot;&apos;'>
-<!ENTITY % pe1 "&e3;">
-<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13'><!ELEMENT n-1 (p:e?|n-1|(b|q:e+|q:e+)|q:e+)*>
-<!ENTITY e2 '<a/>'>] ><b c='urn:p' c='&ext;'><b c='1'>&e9;&e2;<?pi?></b>a&amp;b	</b>

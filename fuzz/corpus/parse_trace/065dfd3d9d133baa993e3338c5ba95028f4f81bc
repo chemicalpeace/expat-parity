@@ -1,0 +1,7 @@
+-K<?xml version='1.0'?><!--before--><!DOCTYPE doc PUBLIC "a'b" 'doc.dtd' [<!ENTITY e3 SYSTEM 'u.gif' NDATA undeclared>
+<!NOTATION n1 PUBLIC "">
+<!ATTLIST p:e xmlns:p ENTITIES #FIXED "ndcr	tab" xmlns:q CDATA #IMPLIED xmlns:q ENTITY #IMPLIED><!ATTLIST b xmlns NMTOKENÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿDATA "&lt;&gt;&quot;&apos;"><!NOTATION n2 PUBLIC 'p' 'viewer'>
+
+<!ATTLIST é xmlns:p ( x | y ) #FIXED '&#65;&#x42;&#32;'><!NOTATION n2 PUBLIC ''>
+%extpe;	<!ENTITY amp "&ext;"><!ENTITY p:x SYSTEM 'sys.ent' >]>
+<a>&#13;</a>
