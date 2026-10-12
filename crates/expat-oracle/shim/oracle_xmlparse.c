@@ -1,6 +1,6 @@
 /* Build shim (not part of upstream): the translation unit of the full
  * parser's xmlparse.c, with the allocation tracker's event capture
- * (decision D-033).
+ * (decision D-034).
  *
  * The vendored xmlparse.c is included unmodified. Two of its library calls
  * are routed through this shim, for this translation unit only:

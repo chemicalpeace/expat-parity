@@ -390,7 +390,7 @@ pub fn c_sizes() -> Vec<(&'static str, usize)> {
 }
 
 /// One event of libexpat's allocation tracker (`expat_malloc`,
-/// `expat_realloc`, `expat_free`; D-033), as `expat_heap_stat` reports it
+/// `expat_realloc`, `expat_free`; D-034), as `expat_heap_stat` reports it
 /// with `EXPAT_MALLOC_DEBUG=2`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TrackerEvent {
@@ -446,7 +446,8 @@ pub fn parse_trace_with_tracker_events(
         slice
             .iter()
             .map(|e| TrackerEvent {
-                increase: e.op as u8 == b'+',
+                // Byte view of the C char, neutral to its signedness (c_char is u8 on aarch64, i8 on x86_64).
+                increase: u8::from_ne_bytes(e.op.to_ne_bytes()) == b'+',
                 refused: e.refused != 0,
                 size: e.size,
                 total: e.total,

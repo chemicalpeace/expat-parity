@@ -32,7 +32,7 @@ fn main() {
     build
         .include("shim")
         .include(lib)
-        // xmlparse.c through the event-capture shim (D-033).
+        // xmlparse.c through the event-capture shim (D-034).
         .file("shim/oracle_xmlparse.c")
         .file(format!("{lib}/xmlrole.c"))
         .file(format!("{lib}/xmltok.c"))

@@ -203,7 +203,7 @@ void oracle_last_tracker(unsigned long long *created, unsigned long long *end);
 size_t oracle_c_sizes(size_t *out, size_t n);
 
 /* Allocation tracker events of the full parser (shim/oracle_xmlparse.c,
-   D-033): every granted malloc / realloc / free of the tracker, and every
+   D-034): every granted malloc / realloc / free of the tracker, and every
    refusal, of parsers created on the calling thread while a capture is on.
    `size` is the reported change (header included for malloc and free, the
    size difference for realloc), `total` the live count after the event
