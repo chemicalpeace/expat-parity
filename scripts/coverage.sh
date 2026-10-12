@@ -12,6 +12,12 @@
 #   <run>-mismatch.txt        stable toolchain only: every mismatched
 #                             function (llvm-cov -dump "hash-mismatch" lines)
 #
+# Each run is reported twice: "<run>-raw-*" is cargo-llvm-cov's report as it
+# comes; "<run>-*" adds the profile records of scripts/coverage_fix_profdata.py,
+# which stop llvm-cov from dropping the counts of functions that some test
+# binary links without using (see that script). The corrected report is the
+# one docs/REPORT.md quotes.
+#
 # Runs: "all-features" = `cargo test --workspace --all-features`;
 #       "full"         = all-features plus `cargo test -p expat --no-default-features`.
 #
@@ -43,6 +49,14 @@ ignore='(tests[/\\]|crates[/\\]expat-oracle|benches[/\\]|fuzz[/\\]|vendor)'
 
 cov() { cargo ${tc[@]+"${tc[@]}"} llvm-cov "$@"; }
 
+host=$(rustc ${tc[@]+"${tc[@]}"} -vV | sed -n 's/^host: //p')
+bin="$(rustc ${tc[@]+"${tc[@]}"} --print sysroot)/lib/rustlib/$host/bin"
+profdata_tool="$bin/llvm-profdata"
+[ -x "$profdata_tool" ] || profdata_tool="$bin/llvm-profdata.exe"
+fix=target/llvm-cov-target/hash-fix.profraw
+py=python3
+"$py" -c 1 2>/dev/null || py=python
+
 report() {
   local run=$1
   local args=(--release ${doc[@]+"${doc[@]}"} --ignore-filename-regex "$ignore")
@@ -69,8 +83,19 @@ report() {
   rustc ${tc[@]+"${tc[@]}"} -vV
 } > "$out/versions.txt"
 
+corrected() {
+  local run=$1
+  report "$run-raw"
+  local profiles=(target/llvm-cov-target/*.profdata)
+  [ ${#profiles[@]} -eq 1 ] || { echo "expected one .profdata: ${profiles[*]}" >&2; exit 1; }
+  "$py" scripts/coverage_fix_profdata.py "$profdata_tool" "${profiles[0]}" "$fix" \
+    | tee "$out/$run-fix.txt"
+  report "$run"
+  rm "$fix"
+}
+
 cov clean --workspace
 cov --no-report --release ${doc[@]+"${doc[@]}"} --workspace --all-features
-report all-features
+corrected all-features
 cov --no-report --release ${doc[@]+"${doc[@]}"} -p expat --no-default-features
-report full
+corrected full
