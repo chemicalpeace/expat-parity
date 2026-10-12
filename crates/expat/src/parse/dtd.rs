@@ -185,19 +185,17 @@ pub struct Dtd {
     pub free_bindings: Vec<BindingId>,
 }
 
-/// `sizeof(PREFIX)`, `sizeof(ATTRIBUTE_ID)`, `sizeof(ELEMENT_TYPE)`: the
-/// `createSize` of a table entry, charged to the allocation tracker
-/// (D-030).
-pub(crate) const PREFIX_SIZE: usize = 2 * crate::heap::POINTER_SIZE;
-pub(crate) const ATTRIBUTE_ID_SIZE: usize = 3 * crate::heap::POINTER_SIZE;
+/// `sizeof(PREFIX)`, `sizeof(ATTRIBUTE_ID)`: the `createSize` of a table
+/// entry, charged to the allocation tracker (D-030), from the C layout
+/// ([`super::c_layout`]).
+pub(crate) const PREFIX_SIZE: usize = super::c_layout::PREFIX;
+pub(crate) const ATTRIBUTE_ID_SIZE: usize = super::c_layout::ATTRIBUTE_ID;
+/// `sizeof(ELEMENT_TYPE)` bound: twelve pointer-sized words, 8 bytes more
+/// than C's 88 on 64-bit targets ([`super::c_layout::ELEMENT_TYPE`]). An
+/// over-count, kept until the size-parity stage of D-034.
 pub(crate) const ELEMENT_TYPE_SIZE: usize = 12 * crate::heap::POINTER_SIZE;
-/// `sizeof(ENTITY)`: eight pointers and two `int`s, then four `bool`s,
-/// rounded up to the pointer alignment.
-pub(crate) const ENTITY_SIZE: usize = {
-    let p = crate::heap::POINTER_SIZE;
-    let raw = 6 * p + 8 + 4;
-    raw.div_ceil(p) * p
-};
+/// `sizeof(ENTITY)` ([`super::c_layout::ENTITY`]).
+pub(crate) const ENTITY_SIZE: usize = super::c_layout::ENTITY;
 
 impl Default for Dtd {
     fn default() -> Self {

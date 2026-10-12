@@ -620,17 +620,22 @@ recorded in DIVERGENCES.md.
   direct bytes (`parse::accounting`), so the port's ratio is never lower
   at any point of the parse.
 - **Consequence (divergence DV-1).** The port's total is above C's by a
-  margin (measured 11,764-13,352 bytes in the tests, dominated by the
-  creation bound). A document whose C total ends within that margin below
-  the refusal point is refused by the port only. With limits tightened by
-  the caller this is easy to reach (at C's exact passing threshold the
-  port refuses in 36/36 sweep cases); at the default limits it needs a
-  tracked total of at least 64 MiB within ~13 KB of 100 times the direct
-  input, and no test or fuzz input has reached it. It is fail-closed (the
-  error is `XML_ERROR_NO_MEMORY`, as from C's tracker) and recorded in
-  DIVERGENCES.md. This is the one exception to "no stricter behaviour"
-  in D-026, accepted because the alternative (byte-exact replication) is
-  not achievable with the port's data structures.
+  margin. It is not only the creation bound (11,764-13,352 bytes): the
+  pool shadow's `POOL_SLACK` can add a whole pool block (up to 32 MiB at
+  the default limits), and `ELEMENT_TYPE` and, on Windows, `NS_ATT` are
+  charged 8 bytes above C per entry. At the default limits the port
+  refuses documents C accepts in two measured windows (W1, 671,180-671,312
+  bytes; W2, 340,585-340,588 bytes; DIVERGENCES.md DV-1). It is
+  fail-closed (`XML_ERROR_NO_MEMORY`, as from C's tracker).
+- **Correction (2026-10-12, D-034).** The claim "at least C's bytes" did
+  not hold: `BINDING` and `NAME_AND_DEFAULT_ATTRIBUTE` were charged 8 bytes
+  below C's `sizeof` on 64-bit targets, so the port accepted documents C
+  refuses at the default limits (DIVERGENCES.md R1). The sizes now come
+  from C's field lists with the target's layout rules and are compared
+  with the C compiler on every CI platform. The relation "port >= C" was
+  only ever tested at the end of the parse, not at every allocation
+  event; D-034 replaces this decision's "upper bound" approach by exact
+  per-event parity in stages.
 - **Verification.** `tests/tests/tracker_diff.rs` (groups in REPORT.md,
   module 11c), the tracker relation in the `parse_trace` fuzz target
   (`expat_difftest::tracker::check_from`), injected bugs K1-K7.
@@ -712,3 +717,44 @@ recorded in DIVERGENCES.md.
 - **Verification.** Locally the corrected line set equals the union of
   the per-binary reports; CI run 38220630479 (raw and corrected per
   platform in `docs/coverage/ci-2f6a37a-*.txt`).
+
+## D-034 Allocation tracker: exact parity with C, in stages (DV-1, R1; owner decision 2026-10-12)
+
+- **Finding.** Two structure sizes were below C's `sizeof` (R1, a
+  reverse violation of D-030) and DV-1 was wider than documented (the
+  pool-slack window W2 costs a whole pool block). Both were invisible to
+  tests that compared only the final tracker counts of small documents.
+- **Decision (owner, option B).** The port's tracker is brought to C's
+  exact count, allocation event by allocation event, in separate commits,
+  each merged only on green CI on every platform:
+  1. sizes: every tracked structure size computed from C's field list
+     with the target's C layout (`parse::c_layout`, core::ffi types) and
+     compared with the C compiler's `sizeof`/`offsetof` on every CI
+     platform (`tests/tests/tracker_sizes.rs`); under-counts fixed
+     (`BINDING` 56, `NAME_AND_DEFAULT_ATTRIBUTE` 24); over-counts
+     (`ELEMENT_TYPE` 96 vs 88, `NS_ATT` on Windows 24 vs 16) kept until
+     step 6;
+  2. `POOL_SLACK` 0 with an exact model of where `XmlConvert` stops at a
+     block boundary;
+  3. the creation charge equal to C's creation allocations (3,040 bytes
+     on 64-bit Linux), per platform from the oracle where it differs;
+  4. every C allocation the port does not yet shadow, one by one;
+  5. the raw tag name charged when C stores it (`storeRawNames`);
+  6. `ELEMENT_TYPE` (and `NS_ATT`) size parity.
+- **Gate for steps 2-6.** The oracle emits C's tracker events (malloc,
+  realloc, free: size, `xmlparse.c` line, running `bytesAllocated`, peak)
+  and the port emits the matching stream; the tests require equal running
+  totals at every event, equal peaks, equal release behaviour (nested
+  external parsers included) and equal limit outcomes (error code and
+  position). W1, W2 and R1 stay as permanent regressions
+  (`tests/tests/dv1_windows.rs`).
+- **Never looser.** The port must never accept a document C refuses. If a
+  stage shows C-refuses / port-accepts, or the reverse, and the cause is
+  not fixed in the same stage, `CREATION_CHARGE` returns to 16,384 and
+  `POOL_SLACK` to 4 (one line each); the size fixes stay.
+- **Why derive rather than hard-code.** The library cannot link the C
+  oracle (it is safe Rust without a C build), so the sizes are computed
+  in Rust from the same field lists; the oracle comparison in CI makes a
+  mismatch on any platform a test failure instead of a silent
+  under-count.
+

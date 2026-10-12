@@ -968,8 +968,8 @@ behaviour and defaults are C's (D-026).
 
 **Remaining gaps** (module 11):
 
-1. DV-1 is **pending the owner's decision** (DIVERGENCES.md); the code
-   is unchanged.
+1. DV-1: owner decision 2026-10-12 is exact parity in stages (D-034);
+   phase 1 (sizes, R1 fix) below, W1/W2 remain until the later stages.
 2. Suspend / resume, the default handler, the unknown-encoding handler and
    `XML_GetInputContext` are module 12; their branches in the DTD code are
    uncovered. External entity parsers exist inside `expat::parse` but have
@@ -987,6 +987,52 @@ behaviour and defaults are C's (D-026).
    are not measured (nightly coverage unusable; on nightly they add no
    covered line).
 8. Out of scope: `XML_UNICODE` builds (D-002).
+
+### DV-1 parity, phase 1 (D-034): structure sizes and the reverse violation R1
+
+What was wrong: `BINDING` (48 vs C's 56) and `NAME_AND_DEFAULT_ATTRIBUTE`
+(16 vs 24) were charged below C's `sizeof`, so the port accepted
+documents C refuses at the default limits (DIVERGENCES.md R1). DV-1 was
+wider than documented: besides the creation bound (W1) the pool slack can
+cost a whole pool block (W2).
+
+| Group (test) | Inputs | C behaviour | Port behaviour | Divergence |
+|---|---|---|---|---|
+| Sizes (`tracker_sizes`) | 16 structures and quantities: TAG, BINDING, PREFIX, ENTITY, CONTENT_SCAFFOLD, offsetof(BLOCK, s), ATTRIBUTE_ID, DEFAULT_ATTRIBUTE, NAME_AND_DEFAULT_ATTRIBUTE, NS_ATT, ELEMENT_TYPE, OPEN_INTERNAL_ENTITY, ATTRIBUTE, NAMED *, malloc header, int | `sizeof`/`offsetof` from the vendored `xmlparse.c` built for the CI platform (oracle). 64-bit Linux: 96, 56, 16, 64, 32, 12, 24, 24, 24, 24, 88, 48, 32, 8, 8, 4. | Computed from C's field lists (`parse::c_layout`): equal for 15; ELEMENT_TYPE 96 (known over-count, step 6 of D-034). An under-count fails on every platform. | ELEMENT_TYPE +8 (and NS_ATT +8 on Windows), fail-closed |
+| R1 (`dv1_windows::r1_attribute_defaults`) | W1 document with 10,000 ATTLIST defaults, pads 187,657, 188,000, 188,322, 188,323, 188,456, 188,457 | Refuses the first three (end 35,211,416), accepts from 188,323. | Refuses the first five (end 35,224,776), accepts from 188,457. Before the fix it accepted all six. | none in the C-refuses direction; DV-1 W1 shape for 188,323-188,456 |
+| W1 (`dv1_windows::w1_creation_charge`) | pads 330,745, 330,746, 330,878, 330,879 | Refuses at 330,745, accepts from 330,746 (end 67,117,916). | Refuses up to 330,878 (end 33,576,836), accepts at 330,879. | DV-1 (W1), pinned until step 3 |
+| W2 (`dv1_windows::w2_pool_slack`) | 84,947 references + tail 362, 363, 366, 367 | Accepts 362-366 (end 33,563,484), refuses 367. | Accepts 362, refuses 363-367. | DV-1 (W2), pinned until step 2 |
+
+Per platform (CI run 38223508229 at 4e3c255, `tracker sizes and DV-1
+windows` step; the test bisects both boundaries on each platform):
+
+| Platform | Sizes | W1: C / port accept from pad (width; margin) | R1: C / port (width; margin) | W2: C / port refuse from tail (width) |
+|---|---|---|---|---|
+| ubuntu-latest x86_64 | 15 equal, ELEMENT_TYPE 96 vs 88 | 330,746 / 330,879 (133; 13,352) | 188,323 / 188,457 (134; 13,360) | 367 / 363 (4) |
+| macos-latest aarch64 | as Linux | 330,746 / 330,879 (133; 13,352) | 188,323 / 188,457 (134; 13,360) | 367 / 363 (4) |
+| windows-latest x86_64 | 14 equal, ELEMENT_TYPE 96 vs 88, NS_ATT 24 vs 16 | 330,745 / 330,879 (134; 13,384) | 188,323 / 188,457 (134; 13,392) | 367 / 363 (4) |
+
+C's tracker is 32 bytes lower on Windows x64 at the same point (W1 end
+67,117,884 vs 67,117,916; the creation allocations differ by platform,
+measured per event in the next stage), so C's W1 boundary is one
+document lower there. The first CI run (38222937126) failed on Windows
+because the test then hard-coded Linux's pads; it now bisects per
+platform.
+
+Fuzzing at 4e3c255 (`fuzz-slice5.sh`, logs kept in the working notes):
+`parse_trace` 7 slices, 707 s, 899,500 executions; `buffer_diff` 7
+slices, 711 s, 4,582,373 executions; no findings. Differential suites at
+6d1e645 (release, aarch64 Linux): tracker_diff 9/9, external_parser_diff
+7/7, amplification_diff 8/8, entity_diff 4/4, parse_diff 9/9,
+upstream_vectors 5/5, buffer_diff 3/3, workspace all passed.
+
+Injected bugs (logs: `inject-logs/phase1` in the working notes, not in the
+repository): P1 `BINDING_SIZE` back to 6 words: caught by `tracker_sizes`
+(not by `dv1_windows`, whose documents declare no namespaces); P2
+`NAME_AND_DEFAULT_ATTRIBUTE_SIZE` back to 2 words: caught by both
+(`R1 pad 187657: the port accepts a document C refuses`); P3
+`ELEMENT_TYPE_SIZE` 10 words, P4 `NS_ATT_SIZE` 16, P5 one pointer removed
+from the `TAG` field list: caught by `tracker_sizes`.
 
 ## Divergences
 

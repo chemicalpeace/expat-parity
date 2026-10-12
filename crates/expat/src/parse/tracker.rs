@@ -41,13 +41,14 @@
 //! # }
 //! ```
 
+use super::c_layout;
 use crate::heap::{BLOCK_HEADER_SIZE, Heap, NoMemory, POINTER_SIZE};
 
 /// `sizeof(size_t) + EXPAT_MALLOC_PADDING`: the tracker's header per
 /// allocation. `EXPAT_MALLOC_ALIGNMENT` is `sizeof(union { long long l;
 /// void *p; })`, 8 on every supported target, and the padding fills the
 /// header up to it.
-pub const MALLOC_HEADER: u64 = 8;
+pub const MALLOC_HEADER: u64 = c_layout::MALLOC_HEADER as u64;
 
 /// `EXPAT_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION_DEFAULT`.
 pub const ALLOC_MAXIMUM_AMPLIFICATION_DEFAULT: f32 = 100.0;
@@ -410,31 +411,59 @@ impl TableShadow {
     }
 }
 
-/// `sizeof(TAG)` bound: a parent pointer, the raw name pointer and length,
-/// `TAG_NAME` (three pointers, three ints), the buffer pointers and the
-/// bindings pointer: at most twelve pointer-sized words.
-pub const TAG_SIZE: usize = 12 * POINTER_SIZE;
+/// `sizeof(TAG)` ([`c_layout::TAG`]).
+pub const TAG_SIZE: usize = c_layout::TAG;
 /// `INIT_TAG_BUF_SIZE`
 pub const INIT_TAG_BUF_SIZE: usize = 32;
-/// `sizeof(BINDING)` bound: five pointers and two ints.
-pub const BINDING_SIZE: usize = 6 * POINTER_SIZE;
+/// `sizeof(BINDING)` ([`c_layout::BINDING`]: five pointers and two
+/// `size_t`; 56 bytes on 64-bit targets). Before D-034 the port charged
+/// six pointers, 8 bytes less than C per binding (DIVERGENCES.md R1).
+pub const BINDING_SIZE: usize = c_layout::BINDING;
 /// `EXPAND_SPARE`
 pub const EXPAND_SPARE: usize = 24;
-/// `sizeof(OPEN_INTERNAL_ENTITY)` bound: four pointers, an int, a bool and
-/// an enum.
-pub const OPEN_ENTITY_SIZE: usize = 6 * POINTER_SIZE;
-/// `sizeof(ATTRIBUTE)`: three pointers and a char, padded.
-pub const ATTRIBUTE_SIZE: usize = 4 * POINTER_SIZE;
-/// `sizeof(NS_ATT)` bound: two `unsigned long`s and a pointer.
+/// `sizeof(OPEN_INTERNAL_ENTITY)` ([`c_layout::OPEN_INTERNAL_ENTITY`]).
+pub const OPEN_ENTITY_SIZE: usize = c_layout::OPEN_INTERNAL_ENTITY;
+/// `sizeof(ATTRIBUTE)` ([`c_layout::ATTRIBUTE`]).
+pub const ATTRIBUTE_SIZE: usize = c_layout::ATTRIBUTE;
+/// `sizeof(NS_ATT)` bound: two `unsigned long`s and a pointer, counted as
+/// three 8-byte words. Equal to C ([`c_layout::NS_ATT`]) where `unsigned
+/// long` has 8 bytes; 8 bytes more than C on Windows (4-byte `unsigned
+/// long`). An over-count, kept until the size-parity stage of D-034.
 pub const NS_ATT_SIZE: usize = 3 * 8;
-/// `sizeof(DEFAULT_ATTRIBUTE)`: two pointers and a bool, padded.
-pub const DEFAULT_ATTRIBUTE_SIZE: usize = 3 * POINTER_SIZE;
-/// `sizeof(NAME_AND_DEFAULT_ATTRIBUTE)` bound: a name pointer and an index.
-pub const NAME_AND_DEFAULT_ATTRIBUTE_SIZE: usize = 2 * POINTER_SIZE;
-/// `sizeof(CONTENT_SCAFFOLD)` bound: two enums, a name pointer, four ints.
-pub const CONTENT_SCAFFOLD_SIZE: usize = 4 * POINTER_SIZE;
+/// `sizeof(DEFAULT_ATTRIBUTE)` ([`c_layout::DEFAULT_ATTRIBUTE`]).
+pub const DEFAULT_ATTRIBUTE_SIZE: usize = c_layout::DEFAULT_ATTRIBUTE;
+/// `sizeof(NAME_AND_DEFAULT_ATTRIBUTE)`
+/// ([`c_layout::NAME_AND_DEFAULT_ATTRIBUTE`]: a pointer, `size_t attIndex`
+/// and `bool initialized`; 24 bytes on 64-bit targets). Before D-034 the
+/// port charged two pointers, 8 bytes less than C per entry
+/// (DIVERGENCES.md R1).
+pub const NAME_AND_DEFAULT_ATTRIBUTE_SIZE: usize = c_layout::NAME_AND_DEFAULT_ATTRIBUTE;
+/// `sizeof(CONTENT_SCAFFOLD)` ([`c_layout::CONTENT_SCAFFOLD`]).
+pub const CONTENT_SCAFFOLD_SIZE: usize = c_layout::CONTENT_SCAFFOLD;
 /// `INIT_SCAFFOLD_ELEMENTS`
 pub const INIT_SCAFFOLD_ELEMENTS: usize = 32;
+
+/// Every structure size the tracker charges, by C name, for the
+/// comparison with the C compiler's `sizeof` / `offsetof`
+/// (`tests/tests/tracker_sizes.rs`, on every CI platform).
+pub const TRACKER_SIZES: &[(&str, usize)] = &[
+    ("TAG", TAG_SIZE),
+    ("BINDING", BINDING_SIZE),
+    ("PREFIX", super::dtd::PREFIX_SIZE),
+    ("ENTITY", super::dtd::ENTITY_SIZE),
+    ("CONTENT_SCAFFOLD", CONTENT_SCAFFOLD_SIZE),
+    ("BLOCK_HEADER", BLOCK_HEADER_SIZE),
+    ("ATTRIBUTE_ID", super::dtd::ATTRIBUTE_ID_SIZE),
+    ("DEFAULT_ATTRIBUTE", DEFAULT_ATTRIBUTE_SIZE),
+    ("NAME_AND_DEFAULT_ATTRIBUTE", NAME_AND_DEFAULT_ATTRIBUTE_SIZE),
+    ("NS_ATT", NS_ATT_SIZE),
+    ("ELEMENT_TYPE", super::dtd::ELEMENT_TYPE_SIZE),
+    ("OPEN_INTERNAL_ENTITY", OPEN_ENTITY_SIZE),
+    ("ATTRIBUTE", ATTRIBUTE_SIZE),
+    ("NAMED_PTR", POINTER_SIZE),
+    ("MALLOC_HEADER", MALLOC_HEADER as usize),
+    ("INT", core::mem::size_of::<i32>()),
+];
 
 /// The tracker with the shadows of C's structures whose allocations depend
 /// on the input.

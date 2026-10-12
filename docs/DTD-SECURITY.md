@@ -187,27 +187,32 @@ and FNV-1a hash), so traces stay small.
   (33,563,484 bytes tracked when the next doubling is refused), so C
   reports error 1 at the default limits; 84,000 references are accepted.
 
-### What the port does (D-030)
+### What the port does (D-030, D-034)
 
 - The port charges its tracker (`parse::tracker`) at C's allocation points
-  or earlier, at least C's bytes: exactly C's sizes for the pools
-  (`PoolShadow` replays `poolGrow` on lengths), hash tables, tags,
-  bindings, attribute arrays, open-entity records, default-attribute
-  arrays and the scaffold; an upper bound of 16 KiB for the parser
-  creation and the small fixed allocations (C: 3,040-3,059 bytes).
+  or earlier: C's sizes for the pools (`PoolShadow` replays `poolGrow` on
+  lengths), hash tables, tags, bindings, attribute arrays, open-entity
+  records, default-attribute arrays and the scaffold, with every
+  structure size computed from C's field list for the target
+  (`parse::c_layout`) and compared with the C compiler's `sizeof` on every
+  CI platform (`tests/tests/tracker_sizes.rs`); an upper bound of 16 KiB
+  for the parser creation and the small fixed allocations (C: 3,040-3,059
+  bytes).
 - Like C, the port does **not** charge the input buffer, and it does not
   charge expanded character data in content.
 - Setters with C's validation (`Parser::set_alloc_tracker_*`); defaults
-  100.0 and 64 MiB, unchanged (D-026). The non-root refusal needs external
-  entity parsers (module 11d / 12).
-- Relation tested: whenever C refuses through its tracker, the port
-  refuses (`tests/tests/tracker_diff.rs`, the `parse_trace` fuzz target).
-  The port may refuse where C does not, only within the margin by which its
-  charge exceeds C's (11,764-13,352 bytes measured): divergence DV-1,
-  fail-closed, reachable easily with caller-tightened limits and, at the
-  default limits, only for a tracked total of at least 64 MiB lying within
-  that margin below 100 times the direct input (never observed in tests or
-  fuzzing).
+  100.0 and 64 MiB, unchanged (D-026).
+- Relation: whenever C refuses through its tracker, the port must refuse.
+  This was violated until 2026-10-12 by two structure sizes 8 bytes below
+  C's (DIVERGENCES.md R1: 10,000 attribute defaults, ~687 KB, C refuses
+  at the default limits, the port accepted); fixed by D-034 and pinned by
+  `tests/tests/dv1_windows.rs`.
+- The port may still refuse where C does not (DV-1, fail-closed): within
+  the creation-bound margin (11,764-13,352 bytes) and, through the pool
+  shadow's 4-character slack, by a whole pool block (up to 32 MiB). At
+  the default limits both are reachable with documents of 340-690 KB
+  (W1, W2 in DIVERGENCES.md). D-034 removes them in stages with a
+  per-allocation-event comparison against the oracle.
 
 ## 6. Error codes and positions relevant to the DTD
 

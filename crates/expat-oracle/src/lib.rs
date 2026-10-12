@@ -355,6 +355,40 @@ pub fn last_tracker_bytes() -> TrackerBytes {
     t
 }
 
+/// The C structures whose `sizeof` (`offsetof(BLOCK, s)` for
+/// `BLOCK_HEADER`, `sizeof(size_t) + EXPAT_MALLOC_PADDING` for
+/// `MALLOC_HEADER`, `sizeof(NAMED *)` for `NAMED_PTR`) [`c_sizes`]
+/// returns, in its order (D-034).
+pub const ORACLE_C_SIZE_NAMES: [&str; 16] = [
+    "TAG",
+    "BINDING",
+    "PREFIX",
+    "ENTITY",
+    "CONTENT_SCAFFOLD",
+    "BLOCK_HEADER",
+    "ATTRIBUTE_ID",
+    "DEFAULT_ATTRIBUTE",
+    "NAME_AND_DEFAULT_ATTRIBUTE",
+    "NS_ATT",
+    "ELEMENT_TYPE",
+    "OPEN_INTERNAL_ENTITY",
+    "ATTRIBUTE",
+    "NAMED_PTR",
+    "MALLOC_HEADER",
+    "INT",
+];
+
+/// The C compiler's sizes of the structures named in
+/// [`ORACLE_C_SIZE_NAMES`], from the vendored `xmlparse.c` built for the
+/// current target.
+pub fn c_sizes() -> Vec<(&'static str, usize)> {
+    let mut v = [0usize; ORACLE_C_SIZE_NAMES.len()];
+    // SAFETY: `v` is a valid buffer of `v.len()` `size_t`s; the shim writes
+    // at most that many values and keeps no pointer.
+    let n = unsafe { ffi::oracle_c_sizes(v.as_mut_ptr(), v.len()) };
+    ORACLE_C_SIZE_NAMES.iter().copied().zip(v).take(n).collect()
+}
+
 /// Errors of the oracle wrapper itself (never of the parse being traced).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OracleError {

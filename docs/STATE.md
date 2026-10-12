@@ -88,7 +88,7 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 8 | `role` prolog state machine | `xmlrole.c` | **done** — `role::PrologState`, all 51 handlers; D-020 |
 | 9 | `pool` / `hash` / `heap`: string pool, hash table, allocation accounting | `xmlparse.c` | **done** — `StringPool`, `HashTable`, `Heap`; white-box vs C (block lists, slot layout, every allocation request, failure of each attempt); D-021 |
 | 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors under 11 option sets incl. namespace triplets, generated documents, fuzzing), buffer state white-box; D-023, D-025; Q-1/Q-2 resolved (replicate, D-024). DTD roles stopped with `Stop::DtdNotPorted` until module 11 |
-| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables); spec `docs/DTD-SECURITY.md`, D-026, D-027. **11b done** — internal entity expansion in content, attribute values, default values, parameter entities and entity values, recursion and nesting checks (`parse::entity`, D-028); 540/540 upstream vectors compared. **11b2 done** — billion-laughs setters, bounded amplification tests, Q-4 (D-029). **11c done** — allocation tracker charged at C's allocation points, never below C (`parse::tracker`, D-030, divergence DV-1). **11d D1 done** — external entity and not-standalone handler call sites, `getContext`, foreign DTD (D-031). **11d D2 done** — external entity parsers (`parse::external`: text declarations, conditional sections, PEs in entity values, shared DTD/tracker/accounting, D-032); `Stop::DtdNotPorted` removed. Coverage and summary: REPORT.md (module 11 step E, module 11 summary); DV-1 pending owner decision |
+| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables); spec `docs/DTD-SECURITY.md`, D-026, D-027. **11b done** — internal entity expansion in content, attribute values, default values, parameter entities and entity values, recursion and nesting checks (`parse::entity`, D-028); 540/540 upstream vectors compared. **11b2 done** — billion-laughs setters, bounded amplification tests, Q-4 (D-029). **11c done** — allocation tracker charged at C's allocation points, never below C (`parse::tracker`, D-030, divergence DV-1). **11d D1 done** — external entity and not-standalone handler call sites, `getContext`, foreign DTD (D-031). **11d D2 done** — external entity parsers (`parse::external`: text declarations, conditional sections, PEs in entity values, shared DTD/tracker/accounting, D-032); `Stop::DtdNotPorted` removed. Coverage and summary: REPORT.md (module 11 step E, module 11 summary); DV-1 being removed in stages (D-034; R1 found and fixed) |
 | 12 | public API `expat::Parser` (default handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers, unknown-encoding handler, `XML_GetInputContext`, entropy for the salt) | — | not started (the trace adapter and differential `parse_trace` already exist, module 10) |
 | 13 | `expat-capi` (optional) | `expat.h` | not started |
 
@@ -108,12 +108,17 @@ with allocation failures, white-box).
 
 ## Next steps
 
-1. Module 11: the owner's decision on DV-1; the remaining gaps listed in
+1. DV-1 parity (D-034, owner decision 2026-10-12): phase 1 (sizes from
+   the C layout, R1 fixed, `tracker_sizes` on every CI platform) done;
+   then steps 2-6 (pool slack, creation charge, untracked C allocations,
+   raw-name timing, ELEMENT_TYPE) gated by a per-allocation-event
+   comparison with the oracle.
+2. Module 11: the remaining gaps listed in
    REPORT.md (module 11 summary) that do not depend on module 12
    (`XML_UnparsedEntityDeclHandler`, the encoding argument of external
    entity parsers, per-point allocation refusals, `m_nsAtts` growth).
-2. Module 12: public `expat::Parser` on top of `parse::Parser`: default
+3. Module 12: public `expat::Parser` on top of `parse::Parser`: default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt
    from an entropy source behind `std`.
-3. Phase 4: long fuzzing runs, coverage, benchmarks against C.
+4. Phase 4: long fuzzing runs, coverage, benchmarks against C.
