@@ -108,17 +108,29 @@ with allocation failures, white-box).
 
 ## Next steps
 
-1. DV-1 parity (D-034, owner decision 2026-10-12): phase 1 (sizes from
+1. Part 2 of the coverage work is done on branch `part2-finish` (on top of
+   `part2-unparsed`): unparsed-entity handler, external entity bodies incl.
+   `entityValueProcessor`, `m_nsAtts` growth vs C, quadratic namespaced
+   duplicate check fixed, scaling test measured against C. Next: the
+   owner's go-ahead for the push and one CI round (the C-relative scaling
+   test is measured on aarch64 Linux only, not yet on the CI runners).
+   Not to be merged while the owner's no-merge rule holds.
+2. Compare the encoding argument of external entity parsers with C
+   (independent of PR #16).
+3. Full corpus merge of the Part 2 fuzz finds (only 40 curated
+   `parse_trace` inputs for the namespaced duplicate check are committed).
+4. OOM fault injection per allocation point, after PR #16 (DV-1 parity
+   phase 2) merges, so that the port's allocation points are final.
+5. Coverage: `crates/expat` 94.95 % lines, still below 95 %; the llvm-cov
+   `-dump` race fix (`-num-threads=1`) is on the PR #17 branch
+   (`q5-verification`), not on this one.
+6. DV-1 parity (D-034, owner decision 2026-10-12): phase 1 (sizes from
    the C layout, R1 fixed, `tracker_sizes` on every CI platform) done;
    then steps 2-6 (pool slack, creation charge, untracked C allocations,
    raw-name timing, ELEMENT_TYPE) gated by a per-allocation-event
-   comparison with the oracle.
-2. Module 11: the remaining gaps listed in
-   REPORT.md (module 11 summary) that do not depend on module 12
-   (`XML_UnparsedEntityDeclHandler`, the encoding argument of external
-   entity parsers, per-point allocation refusals, `m_nsAtts` growth).
-3. Module 12: public `expat::Parser` on top of `parse::Parser`: default
+   comparison with the oracle (PR #16).
+7. Module 12: public `expat::Parser` on top of `parse::Parser`: default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt
    from an entropy source behind `std`.
-4. Phase 4: long fuzzing runs, coverage, benchmarks against C.
+8. Phase 4: long fuzzing runs, coverage, benchmarks against C.
