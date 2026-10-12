@@ -357,6 +357,7 @@ impl Parser {
     /// the replacement text of every parameter entity it references
     /// (which C only expands inside parameter entities), appended to
     /// `out`.
+    #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of callStoreEntityValue (parser, encoding, buffer bounds, output, accounting) plus the handler.
     pub(crate) fn call_store_entity_value<E: Encoding, H: Handler>(
         &mut self,
         h: &mut H,

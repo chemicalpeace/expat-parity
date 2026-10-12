@@ -79,6 +79,8 @@ fn all() -> HandlerSet {
         notation_decl: true,
         element_decl: true,
         attlist_decl: true,
+        external_entity_ref: false,
+        not_standalone: false,
     }
 }
 

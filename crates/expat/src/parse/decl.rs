@@ -835,6 +835,7 @@ impl Parser {
     /// literal or replacement text), appending the replacement text to
     /// `out`. Returns at the end, or after opening a parameter entity
     /// (`*next_ptr` is then where to continue).
+    #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of storeEntityValue plus the handler.
     pub(crate) fn store_entity_value<E: Encoding, H: Handler>(
         &mut self,
         h: &mut H,
@@ -856,6 +857,7 @@ impl Parser {
         r
     }
 
+    #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of storeEntityValue plus the handler.
     fn store_entity_value_inner<E: Encoding, H: Handler>(
         &mut self,
         h: &mut H,
