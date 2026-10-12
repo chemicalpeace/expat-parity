@@ -1242,7 +1242,7 @@ number is needed (no observable output changed); listed here as a
 finding.
 
 **CI note.** In PR #15's run 38237867506 (attempt 1) the ubuntu coverage
-job aborted inside the `llvm-cov export -dump` diagnostic of
+job aborted inside the `llvm-cov report -dump` diagnostic of
 `scripts/coverage.sh` (glibc `corrupted size vs. prev_size`, SIGABRT)
 after the reports were written; the re-run of the same commit (job
 114777514198) and post-merge main 38240812899 were green. The root cause was
