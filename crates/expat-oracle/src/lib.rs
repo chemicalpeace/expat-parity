@@ -270,7 +270,8 @@ pub enum ExtHandler {
     Accept,
     /// The handler reads the entity whose system identifier is in
     /// [`ParseOptions::ext_entities`] through an external entity parser
-    /// (`XML_ExternalEntityParserCreate`), fed like the document, traces
+    /// (`XML_ExternalEntityParserCreate` with [`ParseOptions::ext_encoding`]
+    /// as its `encodingName`), fed like the document, traces
     /// `extend <ok> <code> <line> <column> <byte index>` and returns the
     /// child's status; an unknown identifier is accepted without reading.
     /// At most [`EXT_MAX_DEPTH`] nested children (`extdepth`).
