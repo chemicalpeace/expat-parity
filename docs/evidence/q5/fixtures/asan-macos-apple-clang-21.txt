@@ -1,0 +1,301 @@
+# Darwin arm64, Apple clang version 21.0.0 (clang-2100.1.1.101); repo commit 7b7efc39
+## q5_asan parse 0 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 10)  <-- past the document
+  convert #6 at offset 11 (lead BE, reads 4 bytes up to offset 14; doc len 10)  <-- past the document
+  convert #7 at offset 15 (lead BE, reads 4 bytes up to offset 18; doc len 10)  <-- past the document
+  convert #8 at offset 19 (lead BE, reads 4 bytes up to offset 22; doc len 10)  <-- past the document
+  convert #9 at offset 23 (lead BE, reads 4 bytes up to offset 26; doc len 10)  <-- past the document
+  convert #10 at offset 27 (lead BE, reads 4 bytes up to offset 30; doc len 10)  <-- past the document
+  convert #11 at offset 31 (lead BE, reads 4 bytes up to offset 34; doc len 10)  <-- past the document
+  convert #12 at offset 35 (lead BE, reads 4 bytes up to offset 38; doc len 10)  <-- past the document
+=================================================================
+==1884==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x61d000000883 at pc 0x000100aafeb4 bp 0x00016f37cdf0 sp 0x00016f37cde8
+READ of size 1 at 0x61d000000883 thread T0
+    #0 0x000100aafeb0 in unknown_toUtf8 xmltok.c:1283
+    #1 0x000100ace6d0 in parsePseudoAttribute xmltok.c:963
+    #2 0x000100ab07d8 in doParseXmlDecl xmltok.c:1071
+    #3 0x000100ab0664 in XmlParseXmlDecl xmltok_ns.c:120
+    #4 0x000100a97030 in processXmlDecl xmlparse.c:5143
+    #5 0x000100a8fdd8 in doProlog xmlparse.c:5598
+    #6 0x000100a8d4ac in prologInitProcessor xmlparse.c:5271
+    #7 0x000100a8ab48 in callProcessor xmlparse.c:1247
+    #8 0x000100a8a5fc in XML_ParseBuffer xmlparse.c:2469
+    #9 0x000100acf09c in main q5_overread.c:87
+    #10 0x00018e57c4e0 in start+0x1b4c (dyld:arm64e+0x204e0)
+
+0x61d000000883 is located 3 bytes after 2048-byte region [0x61d000000080,0x61d000000880)
+allocated by thread T0 here:
+    #0 0x0001012e1164 in malloc+0x78 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41164)
+    #1 0x000100a8a0fc in XML_GetBuffer xmlparse.c:2603
+    #2 0x000100a89a3c in XML_Parse xmlparse.c:2403
+    #3 0x000100acf09c in main q5_overread.c:87
+    #4 0x00018e57c4e0 in start+0x1b4c (dyld:arm64e+0x204e0)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow xmltok.c:1283 in unknown_toUtf8
+Shadow bytes around the buggy address:
+  0x61d000000600: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000680: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000700: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000780: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000800: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x61d000000880:[fa]fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x61d000000900: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x61d000000980: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x61d000000a00: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x61d000000a80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==1884==ABORTING
+docs/evidence/q5/run.sh: line 6:  1884 Abort trap: 6           "$@"
+exit 134
+## q5_asan parse 1 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #2 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #3 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #4 at offset 9 (lead A9, reads 4 bytes up to offset 12; doc len 13)
+  convert #5 at offset 13 (lead BE, reads 4 bytes up to offset 16; doc len 13)  <-- past the document
+  convert #6 at offset 17 (lead BE, reads 4 bytes up to offset 20; doc len 13)  <-- past the document
+  convert #7 at offset 21 (lead BE, reads 4 bytes up to offset 24; doc len 13)  <-- past the document
+  convert #8 at offset 25 (lead BE, reads 4 bytes up to offset 28; doc len 13)  <-- past the document
+  convert #9 at offset 29 (lead BE, reads 4 bytes up to offset 32; doc len 13)  <-- past the document
+  convert #10 at offset 33 (lead BE, reads 4 bytes up to offset 36; doc len 13)  <-- past the document
+  convert #11 at offset 37 (lead BE, reads 4 bytes up to offset 40; doc len 13)  <-- past the document
+  convert #12 at offset 41 (lead BE, reads 4 bytes up to offset 44; doc len 13)  <-- past the document
+=================================================================
+==1957==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x61d000000881 at pc 0x000104243eb4 bp 0x00016bbe8df0 sp 0x00016bbe8de8
+READ of size 1 at 0x61d000000881 thread T0
+    #0 0x000104243eb0 in unknown_toUtf8 xmltok.c:1283
+    #1 0x0001042626d0 in parsePseudoAttribute xmltok.c:963
+    #2 0x0001042447d8 in doParseXmlDecl xmltok.c:1071
+    #3 0x000104244664 in XmlParseXmlDecl xmltok_ns.c:120
+    #4 0x00010422b030 in processXmlDecl xmlparse.c:5143
+    #5 0x000104223dd8 in doProlog xmlparse.c:5598
+    #6 0x0001042214ac in prologInitProcessor xmlparse.c:5271
+    #7 0x00010421eb48 in callProcessor xmlparse.c:1247
+    #8 0x00010421e5fc in XML_ParseBuffer xmlparse.c:2469
+    #9 0x00010426309c in main q5_overread.c:87
+    #10 0x00018e57c4e0 in start+0x1b4c (dyld:arm64e+0x204e0)
+
+0x61d000000881 is located 1 bytes after 2048-byte region [0x61d000000080,0x61d000000880)
+allocated by thread T0 here:
+    #0 0x000104a95164 in malloc+0x78 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41164)
+    #1 0x00010421e0fc in XML_GetBuffer xmlparse.c:2603
+    #2 0x00010421da3c in XML_Parse xmlparse.c:2403
+    #3 0x00010426309c in main q5_overread.c:87
+    #4 0x00018e57c4e0 in start+0x1b4c (dyld:arm64e+0x204e0)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow xmltok.c:1283 in unknown_toUtf8
+Shadow bytes around the buggy address:
+  0x61d000000600: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000680: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000700: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000780: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000800: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x61d000000880:[fa]fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x61d000000900: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x61d000000980: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x61d000000a00: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x61d000000a80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x61d000000b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==1957==ABORTING
+docs/evidence/q5/run.sh: line 6:  1957 Abort trap: 6           "$@"
+exit 134
+## q5_asan parse 2 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 14)
+doc 2 (14 bytes), mode parse: status 0 error 30 (XML declaration not well-formed) byte index 8 line 1 column 7; convert calls 5, calls reading past the document 0, max offset read 10
+exit 0
+## q5_asan parsebuffer 0 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 10)  <-- past the document
+  convert #6 at offset 11 (lead BE, reads 4 bytes up to offset 14; doc len 10)  <-- past the document
+  convert #7 at offset 15 (lead BE, reads 4 bytes up to offset 18; doc len 10)  <-- past the document
+  convert #8 at offset 19 (lead BE, reads 4 bytes up to offset 22; doc len 10)  <-- past the document
+  convert #9 at offset 23 (lead BE, reads 4 bytes up to offset 26; doc len 10)  <-- past the document
+  convert #10 at offset 27 (lead BE, reads 4 bytes up to offset 30; doc len 10)  <-- past the document
+  convert #11 at offset 31 (lead BE, reads 4 bytes up to offset 34; doc len 10)  <-- past the document
+  convert #12 at offset 35 (lead BE, reads 4 bytes up to offset 38; doc len 10)  <-- past the document
+  convert #1000 at offset 3987 (lead BE, reads 4 bytes up to offset 3990; doc len 10)  <-- past the document
+=================================================================
+==2001==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x621000001103 at pc 0x000100737eb4 bp 0x00016f6f4df0 sp 0x00016f6f4de8
+READ of size 1 at 0x621000001103 thread T0
+    #0 0x000100737eb0 in unknown_toUtf8 xmltok.c:1283
+    #1 0x0001007566d0 in parsePseudoAttribute xmltok.c:963
+    #2 0x0001007387d8 in doParseXmlDecl xmltok.c:1071
+    #3 0x000100738664 in XmlParseXmlDecl xmltok_ns.c:120
+    #4 0x00010071f030 in processXmlDecl xmlparse.c:5143
+    #5 0x000100717dd8 in doProlog xmlparse.c:5598
+    #6 0x0001007154ac in prologInitProcessor xmlparse.c:5271
+    #7 0x000100712b48 in callProcessor xmlparse.c:1247
+    #8 0x0001007125fc in XML_ParseBuffer xmlparse.c:2469
+    #9 0x0001007570e8 in main q5_overread.c:82
+    #10 0x00018e57c4e0 in start+0x1b4c (dyld:arm64e+0x204e0)
+
+0x621000001103 is located 3 bytes after 4096-byte region [0x621000000100,0x621000001100)
+allocated by thread T0 here:
+    #0 0x000100ebd164 in malloc+0x78 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41164)
+    #1 0x0001007120fc in XML_GetBuffer xmlparse.c:2603
+    #2 0x0001007570ac in main q5_overread.c:78
+    #3 0x00018e57c4e0 in start+0x1b4c (dyld:arm64e+0x204e0)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow xmltok.c:1283 in unknown_toUtf8
+Shadow bytes around the buggy address:
+  0x621000000e80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x621000000f00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x621000000f80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x621000001000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x621000001080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x621000001100:[fa]fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001300: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001380: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==2001==ABORTING
+docs/evidence/q5/run.sh: line 6:  2001 Abort trap: 6           "$@"
+exit 134
+## q5_asan parsebuffer 1 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #2 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #3 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #4 at offset 9 (lead A9, reads 4 bytes up to offset 12; doc len 13)
+  convert #5 at offset 13 (lead BE, reads 4 bytes up to offset 16; doc len 13)  <-- past the document
+  convert #6 at offset 17 (lead BE, reads 4 bytes up to offset 20; doc len 13)  <-- past the document
+  convert #7 at offset 21 (lead BE, reads 4 bytes up to offset 24; doc len 13)  <-- past the document
+  convert #8 at offset 25 (lead BE, reads 4 bytes up to offset 28; doc len 13)  <-- past the document
+  convert #9 at offset 29 (lead BE, reads 4 bytes up to offset 32; doc len 13)  <-- past the document
+  convert #10 at offset 33 (lead BE, reads 4 bytes up to offset 36; doc len 13)  <-- past the document
+  convert #11 at offset 37 (lead BE, reads 4 bytes up to offset 40; doc len 13)  <-- past the document
+  convert #12 at offset 41 (lead BE, reads 4 bytes up to offset 44; doc len 13)  <-- past the document
+  convert #1000 at offset 3993 (lead BE, reads 4 bytes up to offset 3996; doc len 13)  <-- past the document
+=================================================================
+==2003==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x621000001101 at pc 0x000104693eb4 bp 0x00016b798df0 sp 0x00016b798de8
+READ of size 1 at 0x621000001101 thread T0
+    #0 0x000104693eb0 in unknown_toUtf8 xmltok.c:1283
+    #1 0x0001046b26d0 in parsePseudoAttribute xmltok.c:963
+    #2 0x0001046947d8 in doParseXmlDecl xmltok.c:1071
+    #3 0x000104694664 in XmlParseXmlDecl xmltok_ns.c:120
+    #4 0x00010467b030 in processXmlDecl xmlparse.c:5143
+    #5 0x000104673dd8 in doProlog xmlparse.c:5598
+    #6 0x0001046714ac in prologInitProcessor xmlparse.c:5271
+    #7 0x00010466eb48 in callProcessor xmlparse.c:1247
+    #8 0x00010466e5fc in XML_ParseBuffer xmlparse.c:2469
+    #9 0x0001046b30e8 in main q5_overread.c:82
+    #10 0x00018e57c4e0 in start+0x1b4c (dyld:arm64e+0x204e0)
+
+0x621000001101 is located 1 bytes after 4096-byte region [0x621000000100,0x621000001100)
+allocated by thread T0 here:
+    #0 0x000104e9d164 in malloc+0x78 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x41164)
+    #1 0x00010466e0fc in XML_GetBuffer xmlparse.c:2603
+    #2 0x0001046b30ac in main q5_overread.c:78
+    #3 0x00018e57c4e0 in start+0x1b4c (dyld:arm64e+0x204e0)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow xmltok.c:1283 in unknown_toUtf8
+Shadow bytes around the buggy address:
+  0x621000000e80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x621000000f00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x621000000f80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x621000001000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x621000001080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x621000001100:[fa]fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001300: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x621000001380: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==2003==ABORTING
+docs/evidence/q5/run.sh: line 6:  2003 Abort trap: 6           "$@"
+exit 134
+## q5_asan parsebuffer 2 (map with 0xBE = ASan malloc fill byte as lead of 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 14)
+doc 2 (14 bytes), mode parsebuffer: status 0 error 30 (XML declaration not well-formed) byte index 8 line 1 column 7; convert calls 5, calls reading past the document 0, max offset read 10
+exit 0

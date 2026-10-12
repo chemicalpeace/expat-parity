@@ -7,8 +7,12 @@
 | `plain.txt` | Converter call offsets: C calls the converter on bytes after the document (`<-- past the document`). |
 | `asan.txt` | `AddressSanitizer: heap-buffer-overflow` READ in `unknown_toUtf8` (`xmltok.c` 1283) under `toAscii` / `parsePseudoAttribute` / `XmlParseXmlDecl` / `processXmlDecl`, past the parser's input buffer allocated by `XML_GetBuffer` (`xmlparse.c` 2603), for both seed documents ending at `?>`. |
 | `msan.txt` | With a map that only has the two seed lead bytes: `MemorySanitizer: use-of-uninitialized-value` in `unknown_toUtf8` (`xmltok.c` 1284), uninitialised heap from `XML_GetBuffer`. |
+| `check.sh`, `check-selftest.sh` | `check.sh` requires the documented reports (ASan at `xmltok.c:1283` in `unknown_toUtf8` x4, block from `XML_GetBuffer` at `xmlparse.c:2603` x4; MSan at `xmltok.c:1284` x2; plain-build over-read), with or without a column (Apple clang prints none). `check-selftest.sh` runs it on the recorded outputs (must pass) and on 23 one-edit variants (must fail). |
+| `fixtures/asan-macos-apple-clang-21.txt` | ASan output of the macOS CI job (Apple clang 21.0.0, run 38248323590), used by `check-selftest.sh`. |
 | `miri.txt` | The port's bounds tests (`tok::tests::q5`) under Miri. |
 | `mutation-check.txt` | The C-differential regression tests fail with the fix reverted. |
 | `random-scan.txt` | Long runs of `init_diff::xml_decl_in_every_builtin_encoding`. |
 
-Reproduce: `docs/evidence/q5/build.sh && docs/evidence/q5/run.sh` (clang with ASan and MSan runtimes; `OUT` = build directory, default `/tmp/q5`).
+Security report: `docs/security/Q-5-libexpat-2.9.0-unknown_toUtf8-overread.md`. Re-run on main a990a8c: `rerun-main-a990a8c/`. `check.sh` checks the outputs (CI job `q5-sanitizers`).
+
+Reproduce: `docs/evidence/q5/build.sh && docs/evidence/q5/run.sh && docs/evidence/q5/check.sh` (clang with ASan and MSan runtimes; `OUT` = build directory, default `/tmp/q5`).

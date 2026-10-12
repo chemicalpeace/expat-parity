@@ -1,0 +1,20 @@
+warning: 3 functions have mismatched data
+free(): invalid next size (normal)
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+Stack dump without symbol names (ensure you have llvm-symbolizer in your PATH or set the environment var `LLVM_SYMBOLIZER_PATH` to point to it):
+0  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffffb1d6eeb0 llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) + 64
+1  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffffb1d6f824
+2  linux-vdso.so.1                    0x0000ffffb432d810 __kernel_rt_sigreturn + 0
+3  libc.so.6                          0x0000ffffabcf8020
+4  libc.so.6                          0x0000ffffabca6880 gsignal + 32
+5  libc.so.6                          0x0000ffffabc91a84 abort + 44
+6  libc.so.6                          0x0000ffffabceb5c8
+7  libc.so.6                          0x0000ffffabd0311c
+8  libc.so.6                          0x0000ffffabd05284
+9  libc.so.6                          0x0000ffffabd053f0
+10 libc.so.6                          0x0000ffffabd0827c __libc_free + 412
+11 libc.so.6                          0x0000ffffabca93ec
+12 libc.so.6                          0x0000ffffabca94e0
+13 libc.so.6                          0x0000ffffabc92260
+14 libc.so.6                          0x0000ffffabc9233c __libc_start_main + 156
+15 llvm-cov                           0x0000aaaac90e33e8

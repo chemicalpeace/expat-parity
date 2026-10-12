@@ -46,6 +46,56 @@ jobs:
       # per-platform report (both also run in the step above).
       - name: tracker sizes and DV-1 windows (per-platform report)
         run: cargo test --release -p expat-difftest --test tracker_sizes --test dv1_windows -- --nocapture
+      # Q-5 (D-035): the declaration count of the C-differential test and
+      # the two recorded seeded runs of the random test (195,000 cases),
+      # printed per platform (docs/security/Q-5-...-overread.md).
+      - name: Q-5 differential count and seeded random runs (per-platform report)
+        shell: bash
+        run: |
+          cargo test --release -p expat-difftest --test xmldecl_unknown_diff -- --nocapture
+          PROPTEST_CASES=100000 PROPTEST_RNG_SEED=11 cargo test --release -p expat-difftest --test init_diff -- --exact xml_decl_in_every_builtin_encoding
+          PROPTEST_CASES=95000 PROPTEST_RNG_SEED=12 cargo test --release -p expat-difftest --test init_diff -- --exact xml_decl_in_every_builtin_encoding
+
+  # Q-5: libexpat 2.9.0's over-read in unknown_toUtf8, reproduced with
+  # sanitizers on every run (docs/evidence/q5). Apple clang has no
+  # MemorySanitizer; MSVC is not set up for the sanitizer build.
+  q5-sanitizers:
+    name: Q-5 C over-read under sanitizers (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            sanitizers: asan msan
+          - os: macos-latest
+            sanitizers: asan
+    runs-on: ${{ matrix.os }}
+    env:
+      SANITIZERS: ${{ matrix.sanitizers }}
+      CC: clang
+      OUT: ${{ github.workspace }}/q5-bin
+    steps:
+      - uses: actions/checkout@v4
+      - run: clang --version
+      # check.sh must accept both toolchains' recorded outputs and reject
+      # outputs without the documented reports (runs on the checked-in files,
+      # before run.sh overwrites them).
+      - run: docs/evidence/q5/check-selftest.sh
+      - run: docs/evidence/q5/build.sh
+      - run: docs/evidence/q5/run.sh
+      - run: docs/evidence/q5/check.sh
+      # Without MSan the checked-in msan.txt is the recorded Linux run; keep it
+      # out of this OS's artifact.
+      - if: ${{ always() && !contains(matrix.sanitizers, 'msan') }}
+        run: rm -f docs/evidence/q5/msan.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: q5-sanitizers-${{ runner.os }}
+          path: |
+            docs/evidence/q5/plain.txt
+            docs/evidence/q5/asan.txt
+            docs/evidence/q5/msan.txt
 
   coverage:
     name: coverage (${{ matrix.os }})

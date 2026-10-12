@@ -202,6 +202,11 @@ fn multibyte_sequences_at_every_pseudo_attribute_position() {
     assert_eq!(rejected, 36 * CONVERTED.len());
     // 64 accepted pairs x 13 converters x 14 templates x 3 tails.
     assert_eq!(compared, 64 * CONVERTED.len() * TEMPLATES.len() * 3);
+    // Printed so that CI logs (`--nocapture`) show the count on every
+    // platform.
+    eprintln!(
+        "xmldecl_unknown_diff: {compared} declarations compared, {rejected} rejected pairs checked"
+    );
 }
 
 /// The same declarations in every built-in encoding (Latin-1 reads the

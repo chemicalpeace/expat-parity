@@ -941,7 +941,7 @@ reproduces on aarch64 Linux with the pinned toolchain, so it is a port
 divergence in `toAscii` / pseudo-attribute parsing for unknown encodings,
 not a Windows or nightly effect. It is recorded in `docs/STATE.md` as an
 open finding; fixing it changes library behaviour and is left to a
-separate change.
+separate change. **Fixed** by PR #15 (main a990a8c, D-035, section "Q-5" below).
 
 ### Module 11 summary: all test groups
 
@@ -1122,6 +1122,44 @@ encodings, `XmlParseXmlDecl` on every declaration token) 7 slices, 707 s,
 278,025 executions; `parse_trace` 6 slices, 616 s, 668,139 executions
 (built-in encodings only, where `to_utf8_until` is the old conversion). No
 crash, no mismatch.
+
+### Q-5 verification and the coverage-job abort (PR #17)
+
+**Merge order.** PR #15 was merged (main a990a8c, 14:09 +03 on
+2026-10-12) after its CI run 38237867506 attempt 2 was green; the owner's
+instruction not to merge it arrived afterwards (14:27). Nothing was
+reverted. This PR repeats the checks on main's code and is not merged by
+the agent.
+
+**Coverage-job abort: root cause.** The ubuntu coverage job of run
+38237867506 attempt 1 aborted in the `llvm-cov report -dump` diagnostic of
+`scripts/coverage.sh` (glibc `corrupted size vs. prev_size`). Cause: a data
+race in llvm-cov itself; with `-dump`, `CoverageReport::prepareSingleFileReport`
+writes "InstantiationGroup:" lines to the global `outs()` stream from its
+per-file thread pool without a lock (since LLVM D41206, 2018; unchanged in
+LLVM main). Reproduced locally with the same LLVM 23.1.1 (rustc 1.99.0,
+aarch64): `-dump` with 8 threads failed 13 of 1,955 runs (SIGABRT, SIGSEGV,
+I/O errors, a hang) on the plain merged profile and 2 of 520 with the
+records of `scripts/coverage_fix_profdata.py`; `-dump` with 1 thread
+(1,387 and 1,403 runs) and 8 threads without `-dump` (1,426 runs) never
+failed; helgrind shows unlocked `raw_ostream` writes from
+`prepareSingleFileReport` only with `-dump`. Our profile correction is not
+the cause. Fix: the diagnostic runs with `-dump -num-threads=1`; nothing is
+skipped or made non-fatal, and the reports keep the default threading.
+Evidence: `docs/evidence/llvm-cov-dump-race/`.
+
+**Q-5 checks per platform.** CI now prints, on Linux, macOS and Windows,
+the declaration count of `xmldecl_unknown_diff` (34,944) and runs the two
+recorded seeded random runs of `init_diff::xml_decl_in_every_builtin_encoding`
+(`PROPTEST_CASES=100000 PROPTEST_RNG_SEED=11`, `95000` / `12`: 195,000
+cases); job `q5-sanitizers` rebuilds the C reproducer with ASan and MSan
+(ubuntu) and ASan (macOS; Apple clang has no MSan) and fails unless every
+documented sanitizer report appears (`docs/evidence/q5/check.sh`). Miri on
+the port runs in the `miri` job (`cargo +nightly miri test -p expat
+--all-features`, which includes `tok::tests::q5`). Windows: the
+differential and random runs only; no sanitizer build is set up for MSVC.
+Security report: `docs/security/Q-5-libexpat-2.9.0-unknown_toUtf8-overread.md`
+(not filed upstream).
 
 ## Divergences
 

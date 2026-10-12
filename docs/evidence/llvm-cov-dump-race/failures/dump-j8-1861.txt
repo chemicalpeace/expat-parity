@@ -1,0 +1,27 @@
+warning: 3 functions have mismatched data
+malloc(): unaligned tcache chunk detected
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+Stack dump without symbol names (ensure you have llvm-symbolizer in your PATH or set the environment var `LLVM_SYMBOLIZER_PATH` to point to it):
+0  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff885eeeb0 llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) + 64
+1  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff885ef824
+2  linux-vdso.so.1                    0x0000ffff8aba4810 __kernel_rt_sigreturn + 0
+3  libc.so.6                          0x0000ffff82578020
+4  libc.so.6                          0x0000ffff82526880 gsignal + 32
+5  libc.so.6                          0x0000ffff82511a84 abort + 44
+6  libc.so.6                          0x0000ffff8256b5c8
+7  libc.so.6                          0x0000ffff8258311c
+8  libc.so.6                          0x0000ffff82587b74 malloc + 880
+9  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff86d412fc operator new(unsigned long) + 28
+10 llvm-cov                           0x0000aaaae21127d0
+11 llvm-cov                           0x0000aaaae2105330
+12 llvm-cov                           0x0000aaaae2105284
+13 libc.so.6                          0x0000ffff8257b70c
+14 libc.so.6                          0x0000ffff8257b7c4 pthread_once + 36
+15 llvm-cov                           0x0000aaaae210523c
+16 llvm-cov                           0x0000aaaae2105190
+17 llvm-cov                           0x0000aaaae21056e4
+18 llvm-cov                           0x0000aaaae2105834
+19 libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff885b02e8 llvm::StdThreadPool::processTasks(llvm::ThreadPoolTaskGroup*) + 332
+20 libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff885b17d8
+21 libc.so.6                          0x0000ffff825761d8
+22 libc.so.6                          0x0000ffff825de15c

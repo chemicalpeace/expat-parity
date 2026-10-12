@@ -1,0 +1,78 @@
+# Linux aarch64, Debian clang version 19.1.7 (3+b1); repo commit 6d85983e
+## Q5_NO_BE=1 q5_msan parse 0 (map: only C3 lead 2, A9 lead 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 10)  <-- past the document
+==18602==WARNING: MemorySanitizer: use-of-uninitialized-value
+    #0 0xaaaaca409dfc in unknown_toUtf8 <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1284:9
+    #1 0xaaaaca427c64 in toAscii <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:918:3
+    #2 0xaaaaca427c64 in parsePseudoAttribute <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:963:9
+    #3 0xaaaaca40aa38 in doParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1071:9
+    #4 0xaaaaca40a8cc in XmlParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok_ns.c:120:10
+    #5 0xaaaaca3ee8ac in processXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5143:9
+    #6 0xaaaaca3e8b30 in doProlog <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c
+    #7 0xaaaaca3e57c8 in prologProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5478:10
+    #8 0xaaaaca3e57c8 in prologInitProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5271:10
+    #9 0xaaaaca3e2f34 in callProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:1247:11
+    #10 0xaaaaca3e2a18 in XML_ParseBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2469:25
+    #11 0xaaaaca42892c in main <repo>/docs/evidence/q5/q5_overread.c:87:10
+    #12 0xffffb87f2258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #13 0xffffb87f2338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #14 0xaaaaca3401ec in _start (<bin>/q5_msan+0x401ec) (BuildId: 8a4846c4aa88b3053705ce66c8112736f6531b76)
+
+  Uninitialized value was created by a heap allocation
+    #0 0xaaaaca37da50 in malloc (<bin>/q5_msan+0x7da50) (BuildId: 8a4846c4aa88b3053705ce66c8112736f6531b76)
+    #1 0xaaaaca3e2588 in XML_GetBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2603:28
+    #2 0xaaaaca3e1b14 in XML_Parse <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2403:16
+    #3 0xaaaaca42892c in main <repo>/docs/evidence/q5/q5_overread.c:87:10
+    #4 0xffffb87f2258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #5 0xffffb87f2338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #6 0xaaaaca3401ec in _start (<bin>/q5_msan+0x401ec) (BuildId: 8a4846c4aa88b3053705ce66c8112736f6531b76)
+
+SUMMARY: MemorySanitizer: use-of-uninitialized-value <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1284:9 in unknown_toUtf8
+Exiting
+exit 1
+## Q5_NO_BE=1 q5_msan parse 1 (map: only C3 lead 2, A9 lead 4)
+  convert #1 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #2 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #3 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #4 at offset 9 (lead A9, reads 4 bytes up to offset 12; doc len 13)
+==18605==WARNING: MemorySanitizer: use-of-uninitialized-value
+    #0 0xaaaac3e39dfc in unknown_toUtf8 <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1284:9
+    #1 0xaaaac3e57c64 in toAscii <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:918:3
+    #2 0xaaaac3e57c64 in parsePseudoAttribute <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:963:9
+    #3 0xaaaac3e3aa38 in doParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1071:9
+    #4 0xaaaac3e3a8cc in XmlParseXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmltok_ns.c:120:10
+    #5 0xaaaac3e1e8ac in processXmlDecl <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5143:9
+    #6 0xaaaac3e18b30 in doProlog <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c
+    #7 0xaaaac3e157c8 in prologProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5478:10
+    #8 0xaaaac3e157c8 in prologInitProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:5271:10
+    #9 0xaaaac3e12f34 in callProcessor <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:1247:11
+    #10 0xaaaac3e12a18 in XML_ParseBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2469:25
+    #11 0xaaaac3e5892c in main <repo>/docs/evidence/q5/q5_overread.c:87:10
+    #12 0xffff88862258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #13 0xffff88862338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #14 0xaaaac3d701ec in _start (<bin>/q5_msan+0x401ec) (BuildId: 8a4846c4aa88b3053705ce66c8112736f6531b76)
+
+  Uninitialized value was created by a heap allocation
+    #0 0xaaaac3dada50 in malloc (<bin>/q5_msan+0x7da50) (BuildId: 8a4846c4aa88b3053705ce66c8112736f6531b76)
+    #1 0xaaaac3e12588 in XML_GetBuffer <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2603:28
+    #2 0xaaaac3e11b14 in XML_Parse <repo>/crates/expat-oracle/vendor/expat/lib/xmlparse.c:2403:16
+    #3 0xaaaac3e5892c in main <repo>/docs/evidence/q5/q5_overread.c:87:10
+    #4 0xffff88862258 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #5 0xffff88862338 in __libc_start_main csu/../csu/libc-start.c:360:3
+    #6 0xaaaac3d701ec in _start (<bin>/q5_msan+0x401ec) (BuildId: 8a4846c4aa88b3053705ce66c8112736f6531b76)
+
+SUMMARY: MemorySanitizer: use-of-uninitialized-value <repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1284:9 in unknown_toUtf8
+Exiting
+exit 1
+## Q5_NO_BE=1 q5_msan parse 2 (map: only C3 lead 2, A9 lead 4)
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 14)
+doc 2 (14 bytes), mode parse: status 0 error 30 (XML declaration not well-formed) byte index 8 line 1 column 7; convert calls 5, calls reading past the document 0, max offset read 10
+exit 0

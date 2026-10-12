@@ -1,0 +1,2 @@
+warning: 3 functions have mismatched data
+LLVM ERROR: IO failure on output stream: Bad address

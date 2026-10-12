@@ -65,9 +65,17 @@ report() {
   cov report "${args[@]}" --json --summary-only --output-path "$out/$run-summary.json"
   cov report "${args[@]}" --lcov --output-path "$out/$run.lcov"
   if [ "$mode" = stable ]; then
-    # -dump makes llvm-cov list every hash mismatch on stderr. (The nightly
-    # llvm-cov of 2026-10-11 aborts in -dump, so this is stable only.)
-    LLVM_COV_FLAGS=-dump cov report "${args[@]}" > /dev/null 2> "$out/$run-dump.txt"
+    # -dump makes llvm-cov list every hash mismatch on stderr. It also makes
+    # `llvm-cov report` write "InstantiationGroup:" lines to stdout from its
+    # per-file thread pool (CoverageReport::prepareSingleFileReport) without
+    # a lock: a data race on the shared raw_ostream buffer that corrupts the
+    # heap now and then (glibc "corrupted size vs. prev_size", SIGABRT; CI
+    # run 38237867506). -num-threads=1 runs those tasks one at a time, which
+    # removes the race; the reports themselves are made by the commands
+    # above, threaded as usual. Evidence: docs/evidence/llvm-cov-dump-race/.
+    # (The nightly llvm-cov of 2026-10-11 also aborted in -dump; that was not
+    # investigated, so -dump stays stable only.)
+    LLVM_COV_FLAGS="-dump -num-threads=1" cov report "${args[@]}" > /dev/null 2> "$out/$run-dump.txt"
     # grep exits 1 when there is no mismatch at all; 2 (a real error) fails.
     grep -E '^hash-mismatch: ' "$out/$run-dump.txt" > "$out/$run-mismatch.txt" || [ $? -eq 1 ]
     rm "$out/$run-dump.txt"

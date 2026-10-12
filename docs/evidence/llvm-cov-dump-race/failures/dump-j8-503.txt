@@ -1,0 +1,22 @@
+warning: 3 functions have mismatched data
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+Stack dump without symbol names (ensure you have llvm-symbolizer in your PATH or set the environment var `LLVM_SYMBOLIZER_PATH` to point to it):
+0  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff82d1eeb0 llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) + 64
+1  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff82d1f824
+2  linux-vdso.so.1                    0x0000ffff852d4810 __kernel_rt_sigreturn + 0
+3  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff84f6eee4
+4  libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff84f6ed58 llvm::coverage::CoverageMapping::getCoverageForFunction(llvm::coverage::FunctionRecord const&) const + 44
+5  llvm-cov                           0x0000aaaaea6f5f5c
+6  llvm-cov                           0x0000aaaaea6f2568
+7  llvm-cov                           0x0000aaaaea6e5330
+8  llvm-cov                           0x0000aaaaea6e5284
+9  libc.so.6                          0x0000ffff7ccab70c
+10 libc.so.6                          0x0000ffff7ccab7c4 pthread_once + 36
+11 llvm-cov                           0x0000aaaaea6e523c
+12 llvm-cov                           0x0000aaaaea6e5190
+13 llvm-cov                           0x0000aaaaea6e56e4
+14 llvm-cov                           0x0000aaaaea6e5834
+15 libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff82ce02e8 llvm::StdThreadPool::processTasks(llvm::ThreadPoolTaskGroup*) + 332
+16 libLLVM.so.23.1-rust-1.99.0-stable 0x0000ffff82ce17d8
+17 libc.so.6                          0x0000ffff7cca61d8
+18 libc.so.6                          0x0000ffff7cd0e15c

@@ -1,0 +1,4 @@
+warning: 225 functions have mismatched data
+PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+corrupted size vs. prev_size in fastbins
+error: failed to generate report: process didn't exit successfully: `/home/runner/.rustup/toolchains/1.99.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-cov report -use-color=0 -instr-profile=/home/runner/work/expat-rs/expat-rs/target/llvm-cov-target/expat-rs.profdata -object target/llvm-cov-target/release/deps/amplification_diff-59de9d56d26ce6e0 -object target/llvm-cov-t

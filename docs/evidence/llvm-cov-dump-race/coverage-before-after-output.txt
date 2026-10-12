@@ -1,0 +1,187 @@
+######## Linux
+all-features-raw  totals                 IDENTICAL
+    before     lines 7218/7609 regions 12885/13551 functions 570/616
+    d36        lines 7218/7609 regions 12885/13551 functions 570/616
+all-features-raw  covered-set            IDENTICAL
+    before     374d142e79ed
+    d36        374d142e79ed
+all-features-raw  raw lcov (hit counts)  DIFFERENT
+    before     f949c5ed6948
+    d36        2be283608940
+all-features-raw  hash-mismatch list     IDENTICAL
+    before     9d628fcc1e35
+    d36        9d628fcc1e35
+all-features      totals                 IDENTICAL
+    before     lines 7218/7609 regions 12885/13551 functions 570/616
+    d36        lines 7218/7609 regions 12885/13551 functions 570/616
+all-features      covered-set            IDENTICAL
+    before     573a9cdfedb4
+    d36        573a9cdfedb4
+all-features      raw lcov (hit counts)  DIFFERENT
+    before     0f0cf6af0c32
+    d36        cd009c5f2939
+all-features      hash-mismatch list     IDENTICAL
+    before     8e30066e813f
+    d36        8e30066e813f
+full-raw          totals                 IDENTICAL
+    before     lines 7218/7609 regions 12885/13551 functions 570/616
+    d36        lines 7218/7609 regions 12885/13551 functions 570/616
+full-raw          covered-set            IDENTICAL
+    before     2d922a746ae8
+    d36        2d922a746ae8
+full-raw          raw lcov (hit counts)  DIFFERENT
+    before     fa5582cea6d3
+    d36        3e3649786dac
+full-raw          hash-mismatch list     IDENTICAL
+    before     9d628fcc1e35
+    d36        9d628fcc1e35
+full              totals                 IDENTICAL
+    before     lines 7218/7609 regions 12885/13551 functions 570/616
+    d36        lines 7218/7609 regions 12885/13551 functions 570/616
+full              covered-set            IDENTICAL
+    before     8a5054d68ede
+    d36        8a5054d68ede
+full              raw lcov (hit counts)  DIFFERENT
+    before     d0b0bd942729
+    d36        b83a824e37ba
+full              hash-mismatch list     IDENTICAL
+    before     8e30066e813f
+    d36        8e30066e813f
+before     tests ok 208 (distinct 159) set 69c795837954 multiset 0f5b78707cf4; passed 208 failed 0 ignored 0; not-ok []
+d36        tests ok 208 (distinct 159) set 69c795837954 multiset 0f5b78707cf4; passed 208 failed 0 ignored 0; not-ok []
+######## macOS
+all-features-raw  totals                 IDENTICAL
+    before     lines 7218/7609 regions 12885/13551 functions 570/616
+    d36        lines 7218/7609 regions 12885/13551 functions 570/616
+    98d        lines 7218/7609 regions 12885/13551 functions 570/616
+all-features-raw  covered-set            DIFFERENT
+    before     93574d88385d
+    d36        002229cc43a8
+    98d        24fb0813913a
+all-features-raw  raw lcov (hit counts)  DIFFERENT
+    before     5b1c68e5869a
+    d36        1b122beb8107
+    98d        1060daf63be8
+all-features-raw  hash-mismatch list     IDENTICAL
+    before     c710ff0d25f7
+    d36        c710ff0d25f7
+    98d        c710ff0d25f7
+all-features      totals                 IDENTICAL
+    before     lines 7218/7609 regions 12885/13551 functions 570/616
+    d36        lines 7218/7609 regions 12885/13551 functions 570/616
+    98d        lines 7218/7609 regions 12885/13551 functions 570/616
+all-features      covered-set            DIFFERENT
+    before     9c7bc2869dc8
+    d36        8c3da61ad1ff
+    98d        b6cf69609ab3
+all-features      raw lcov (hit counts)  DIFFERENT
+    before     2e648eeefba2
+    d36        49b7efcbb417
+    98d        b4c22999abe4
+all-features      hash-mismatch list     IDENTICAL
+    before     c692fc2e136a
+    d36        c692fc2e136a
+    98d        c692fc2e136a
+full-raw          totals                 IDENTICAL
+    before     lines 7218/7609 regions 12885/13551 functions 570/616
+    d36        lines 7218/7609 regions 12885/13551 functions 570/616
+    98d        lines 7218/7609 regions 12885/13551 functions 570/616
+full-raw          covered-set            DIFFERENT
+    before     d05305246500
+    d36        462598451649
+    98d        ed6ac34d881c
+full-raw          raw lcov (hit counts)  DIFFERENT
+    before     244d304a1f8c
+    d36        3b851b4b7184
+    98d        7b4e00ba31fb
+full-raw          hash-mismatch list     IDENTICAL
+    before     c710ff0d25f7
+    d36        c710ff0d25f7
+    98d        c710ff0d25f7
+full              totals                 IDENTICAL
+    before     lines 7218/7609 regions 12885/13551 functions 570/616
+    d36        lines 7218/7609 regions 12885/13551 functions 570/616
+    98d        lines 7218/7609 regions 12885/13551 functions 570/616
+full              covered-set            DIFFERENT
+    before     a2321daaaab4
+    d36        acc4434b89fe
+    98d        a4a5a9e89d23
+full              raw lcov (hit counts)  DIFFERENT
+    before     ac2a5c6a3730
+    d36        87521c4e9101
+    98d        ee75bf58403c
+full              hash-mismatch list     IDENTICAL
+    before     c692fc2e136a
+    d36        c692fc2e136a
+    98d        c692fc2e136a
+before     tests ok 208 (distinct 159) set 69c795837954 multiset 0f5b78707cf4; passed 208 failed 0 ignored 0; not-ok []
+d36        tests ok 208 (distinct 159) set 69c795837954 multiset 0f5b78707cf4; passed 208 failed 0 ignored 0; not-ok []
+98d        tests ok 208 (distinct 159) set 69c795837954 multiset 0f5b78707cf4; passed 208 failed 0 ignored 0; not-ok []
+######## Windows
+all-features-raw  totals                 IDENTICAL
+    before     lines 7213/7606 regions 12876/13546 functions 569/615
+    d36        lines 7213/7606 regions 12876/13546 functions 569/615
+    98d        lines 7213/7606 regions 12876/13546 functions 569/615
+all-features-raw  covered-set            DIFFERENT
+    before     cc864780564c
+    d36        f759fa4fb858
+    98d        cc864780564c
+all-features-raw  raw lcov (hit counts)  DIFFERENT
+    before     7b06872905f5
+    d36        188180a6afc2
+    98d        351fff06d728
+all-features-raw  hash-mismatch list     IDENTICAL
+    before     a4732925b574
+    d36        a4732925b574
+    98d        a4732925b574
+all-features      totals                 IDENTICAL
+    before     lines 7213/7606 regions 12876/13546 functions 569/615
+    d36        lines 7213/7606 regions 12876/13546 functions 569/615
+    98d        lines 7213/7606 regions 12876/13546 functions 569/615
+all-features      covered-set            DIFFERENT
+    before     2b985a079c51
+    d36        366789990ee9
+    98d        2b985a079c51
+all-features      raw lcov (hit counts)  DIFFERENT
+    before     4f0fa2876c85
+    d36        1566a786ee03
+    98d        6aa6afb73b42
+all-features      hash-mismatch list     IDENTICAL
+    before     3cd891242a05
+    d36        3cd891242a05
+    98d        3cd891242a05
+full-raw          totals                 IDENTICAL
+    before     lines 7213/7606 regions 12876/13546 functions 569/615
+    d36        lines 7213/7606 regions 12876/13546 functions 569/615
+    98d        lines 7213/7606 regions 12876/13546 functions 569/615
+full-raw          covered-set            DIFFERENT
+    before     044b923c78b5
+    d36        023132696fa9
+    98d        044b923c78b5
+full-raw          raw lcov (hit counts)  DIFFERENT
+    before     280265384ec3
+    d36        7b616e4fd06b
+    98d        a3d9b2fc607b
+full-raw          hash-mismatch list     IDENTICAL
+    before     a4732925b574
+    d36        a4732925b574
+    98d        a4732925b574
+full              totals                 IDENTICAL
+    before     lines 7213/7606 regions 12876/13546 functions 569/615
+    d36        lines 7213/7606 regions 12876/13546 functions 569/615
+    98d        lines 7213/7606 regions 12876/13546 functions 569/615
+full              covered-set            DIFFERENT
+    before     5c10851da853
+    d36        9427b2edd15b
+    98d        5c10851da853
+full              raw lcov (hit counts)  DIFFERENT
+    before     d457dd821c76
+    d36        0e91bb62d093
+    98d        5732c08817f4
+full              hash-mismatch list     IDENTICAL
+    before     3cd891242a05
+    d36        3cd891242a05
+    98d        3cd891242a05
+before     tests ok 206 (distinct 158) set 983a517985a9 multiset 5bbe858b9cf7; passed 206 failed 0 ignored 0; not-ok []
+d36        tests ok 206 (distinct 158) set 983a517985a9 multiset 5bbe858b9cf7; passed 206 failed 0 ignored 0; not-ok []
+98d        tests ok 206 (distinct 158) set 983a517985a9 multiset 5bbe858b9cf7; passed 206 failed 0 ignored 0; not-ok []
