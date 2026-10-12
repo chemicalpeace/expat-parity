@@ -34,12 +34,12 @@ use expat_oracle::{ParamEntityParsing, ParseOptions, TrackerEvent};
 /// (the parser structure, `m_atts`, `m_dataBuf`, the DTD).
 const C_CREATION_LINES: [u32; 4] = [1395, 1405, 1410, 7865];
 
-/// Streams (of 4,620) that must be equal after creation at this stage
+/// Streams (of 4,836) that must be equal after creation at this stage
 /// (stage 4 of D-034: 3,270 of 3,420; stage 2: 3,291 of 3,420 and all
-/// 1,200 pool-boundary runs added with it, every remaining first
-/// difference the raw tag name the port charges at the start tag, stage 5;
-/// see docs/REPORT.md, DV-1 parity).
-const EQUAL_STREAMS_AT_LEAST: usize = 4_491;
+/// 1,416 pool-boundary and public-id runs added with it, every remaining
+/// first difference the raw tag name the port charges at the start tag,
+/// stage 5; see docs/REPORT.md, DV-1 parity).
+const EQUAL_STREAMS_AT_LEAST: usize = 4_707;
 
 fn base() -> ParseOptions {
     ParseOptions {
@@ -103,6 +103,20 @@ fn boundary_docs() -> Vec<Vec<u8>> {
                 }
                 docs.push(u16);
             }
+        }
+    }
+    // Public ids that normalisation shortens, with the literal ending just
+    // past the first block and the normalised id within it (C charges the
+    // literal; `dtd->pool` for the doctype's and an entity's, `m_tempPool`
+    // for a notation's).
+    for fill in 998..1022 {
+        let x = "x".repeat(fill);
+        for t in [
+            format!("<!DOCTYPE r PUBLIC '  -//{x}   y//  ' 's'><r/>"),
+            format!("<!DOCTYPE r [<!ENTITY e PUBLIC '  {x}   y  ' 's'>]><r/>"),
+            format!("<!DOCTYPE r [<!NOTATION n PUBLIC '  {x}   y  '>]><r/>"),
+        ] {
+            docs.push(t.into_bytes());
         }
     }
     docs
