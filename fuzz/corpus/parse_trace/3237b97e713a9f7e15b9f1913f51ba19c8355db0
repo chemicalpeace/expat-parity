@@ -1,0 +1,1 @@
+p˜<!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 ''><!ENTITY % p0 '<!ELEMENT r ANY>'><!ENTITY % p1 '<!ENTITY &#37; p3 "&#37;p1;">'>%p1;]><r>&e0;</r>

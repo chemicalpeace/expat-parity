@@ -1,0 +1,1 @@
+@!<!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 ''><!ENTITY e1 '&e4;&e2;'><!ENTITY e2 ''><!ENTITY e3 ''><!ENTITY e4 '	'><!ENTITY e4 'second'><!ENTITY % p0 '<!-- c -->'><!ENTITY % p1 '<!ATTLIST r d CDATA>'><!ENTITY % p2 '&#37;p0;'>]><r>&e4;&e2;</r>

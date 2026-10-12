@@ -444,12 +444,71 @@ edges), `buffer_diff` 29,229 inputs to 10,208 files (12,551 edges); both
 scanned for personal data before commit (no hits) and replayed by
 `tests/tests/fuzz_corpus.rs` on every CI platform.
 
+### Module 11b2 (billion-laughs limits): amplification accounting versus C
+
+Ported: `XML_SetBillionLaughsAttackProtectionMaximumAmplification` and
+`...ActivationThreshold` (`Parser::set_billion_laughs_*`, D-029); the
+accounting itself (`parse/accounting.rs`) existed since module 10 and is now
+exercised and compared counter by counter. The oracle gained the four limit
+setters, `trace_accounting`, `text_digest` and a capped allocator; the
+harness gained bounded comparisons (`expat_difftest::bounded`).
+
+Local run (2026-10-12, aarch64 Linux, commit 1eb3a5f, `--release`):
+`cargo test -p expat-difftest --test amplification_diff -- --nocapture`:
+
+| Group (test) | Pairs | C behaviour | Security policy | Known divergences |
+|---|---|---|---|---|
+| Setters (`setters_match_c`) | 84 | 14 factors x 6 thresholds: NaN, -NaN, -inf, -1, ±0, 0.5, 0.9999999 refused (`limit bl-amplification 0`); 1.0, 1.0000001, 1.5, 100, `f32::MAX`, +inf accepted; every threshold (0 ... `u64::MAX`) accepted. | Same as C; the port never relaxes a refused value. Non-root refusal: needs external entity parsers (11d). | none |
+| Default limits (`default_limits_match_c`) | 26 | Billion laughs (10 levels x 10) in content, attribute value, default value, parameter entity, entity value: 43 after just over 8 MiB, under every feed (whole, 1, 7, 4096-byte buffer API with namespaces); 6 levels (3 MB): accepted; 195 KB direct + 9.2 MB expansion (factor ~48): accepted. | C's defaults (100.0, 8 MiB), D-026. | none |
+| Custom limits (`custom_limits_on_generated_documents_match_c`) | 4,000 | Generated entity documents under factors 1.0-100 and thresholds 0-8 MiB, random feed: codes `{0: 832, 2: 127, 3: 24, 4: 1346, 5: 158, 11: 222, 12: 315, 13: 55, 14: 646, 15: 26, 16: 22, 18: 2, 30: 47, 43: 178}`. | Same as C. | none |
+| Threshold sweep (`threshold_sweep_matches_c`) | 987 | Factor 1.0, every threshold 0 ... total output + 2, whole and 3-byte chunks, five contexts: 43 at exactly the token where `direct + indirect >= threshold`. | Same as C. | none |
+| Amplification sweep (`amplification_sweep_matches_c`) | 13,689 | Threshold 0, every factor `(d + i) / d` the counters can take (computed in `float`) and its float neighbours: the `<=` boundary is hit exactly. | Same as C. | none |
+| Quadratic blow-up (`quadratic_blowup_matches_c`) | 10 | A 16 KiB entity referenced 1,024 times in content and in one attribute value: 43 by default under every feed; accepted with factor 1,000. | Same as C; no extra cap on replacement text (D-026). | none |
+| Breach positions (`breach_positions_match_c`) | 80 | 4-level documents over 6 lines, four small limit pairs, every feed: 60 pairs end with 43; line, column, byte index and counters equal. | Same as C. | none |
+| Q-4 (`q4_epilog_name_at_end_of_buffer`) | 3 | `<r/>junk`: C error 9 with an address-dependent direct counter (`NULL - s`, undefined behaviour). | Port counts 0 bytes for the rejected token. | Q-4: counter only, masked (DIVERGENCES.md) |
+
+All groups: 0 mismatches. Every pair compares events, error code, line,
+column, byte index and both accounting counters.
+
+**Bounds** (DTD-SECURITY.md, "Bounds of the resource-limit tests"): input
+16 KiB / 256 KiB, wall clock 20 s / 60 s per pair, heap 64 MiB / 256 MiB per
+side. Measured: largest peak 39.9 MB (port) / 33.6 MB (C) in the quadratic
+attribute case, 8.4 MB / 4.2 MB for default-limit billion laughs, slowest
+pair 0.42 s, whole file 6.4 s.
+
+**Injected bugs** (2026-10-12, each reverted after the run, `amplification_diff`):
+
+| # | Mutation | Detected by |
+|---|---|---|
+| J1 | Activation test off by one (`output < threshold` became `<=`) | threshold sweep, 96 mismatches (`thr-content-63`) |
+| J2 | Amplification test off by one (`<=` became `<`) | breach positions, 24 mismatches (`pos-content-1-0`, factor 1.0: the port stops with 43 at the first token, whose factor equals the limit; C reports `xmldecl` and goes on) |
+| J3 | Activation threshold ignored | custom limits 93, quadratic 8, setters 6, threshold sweep 256 mismatches |
+| J4 | Factor setter accepts values below 1.0 | setters, 36 mismatches |
+| J5 | Expansion bytes counted as direct | breach positions, 80 mismatches |
+| J6 | Threshold setter ignored | breach positions, 60 mismatches (C `text %0A%20%20` + 43, port expands on) |
+
+**Fuzzing** (`parse_trace` only: the only target whose code path changed —
+the oracle trace shim, the port's setters and the selector; `buffer_diff`
+is unchanged). The second selector byte's bit 7 now sets small limits with
+the counters traced. Working corpus: committed corpus (11,036) + 500 new
+seeds with small limits. From the trimmed logs in
+`docs/fuzz-logs/module-11b2/` (commit ffb5a5a, strictly sequential slices):
+
+| Target | Slices | Seconds | Executions | Findings |
+|---|---|---|---|---|
+| `parse_trace` | 7 | 673 | 2,062,998 | none (coverage 14,108 -> 14,344 edges) |
+
+The corpus replay before fuzzing found Q-4 (seven committed inputs whose
+selector already had bit 7 set). Merged corpus: 36,002 inputs to 11,174
+files (14,355 edges), scanned for personal data (no hits).
+
 ## Divergences
 
-`docs/DIVERGENCES.md`. No divergences yet. Three C quirks found by the
-harness, all chunking-related: Q-3 resolved as "replicate" (module 7; the
-input violates XML 1.0 §4.3.3), Q-1 and Q-2 resolved as "replicate"
-(module 10, D-024).
+`docs/DIVERGENCES.md`. No divergence in parse results. Four C quirks found
+by the harness: Q-3 resolved as "replicate" (module 7; the input violates
+XML 1.0 §4.3.3), Q-1 and Q-2 resolved as "replicate" (module 10, D-024),
+Q-4 (module 11b2, D-029: undefined behaviour in C's epilog accounting that
+corrupts only an internal counter) not replicated, masked in the harness.
 Platform-dependent C behaviour fixed to one choice: D-016 (counter width),
 D-017 (sign of stray bytes in `utf8_toUtf16`).
 

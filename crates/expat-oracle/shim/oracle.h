@@ -40,6 +40,29 @@ struct oracle_options {
   int buffer_api; /* 1: XML_GetBuffer(2n+3) + XML_ParseBuffer(n) per chunk */
   int no_reparse_deferral; /* 1: XML_SetReparseDeferralEnabled(p, 0) */
   int ns_triplets; /* 1: XML_SetReturnNSTriplet(p, 1) */
+  /* Module 11 resource limits. Each setter is called only if its set_*
+     flag is 1; its XML_Bool result is written to the trace as a "limit"
+     line before the document is parsed. */
+  int set_bl_amplification; /* XML_SetBillionLaughsAttackProtectionMaximumAmplification */
+  float bl_amplification;
+  int set_bl_threshold; /* XML_SetBillionLaughsAttackProtectionActivationThreshold */
+  unsigned long long bl_threshold;
+  int set_at_amplification; /* XML_SetAllocTrackerMaximumAmplification */
+  float at_amplification;
+  int set_at_threshold; /* XML_SetAllocTrackerActivationThreshold */
+  unsigned long long at_threshold;
+  /* 1: character data is traced as "textdigest <len> <fnv1a64>" instead of
+     the text itself, so traces of large expansions stay small. */
+  int text_digest;
+  /* 1: an "accounting <direct> <indirect>" line (billion-laughs counters of
+     the root parser) precedes the result line. */
+  int trace_accounting;
+  /* != 0: the parser is created with XML_ParserCreate_MM whose allocator
+     refuses any request that would take the parser's live heap above this
+     many bytes (a memory cap for bounded tests; the refusal is an ordinary
+     allocation failure inside libexpat). oracle_last_heap_peak() returns
+     the peak live heap of the calling thread's last such parse. */
+  size_t heap_cap;
 };
 
 int oracle_type_table(int id, unsigned char out[256]);
@@ -145,6 +168,7 @@ int oracle_parse_trace(const unsigned char *doc, size_t len,
                        const struct oracle_options *opts, unsigned char **out,
                        size_t *out_len);
 void oracle_free(void *p);
+size_t oracle_last_heap_peak(void);
 
 /* xmlparse.c string pool and hash table (shim/oracle_core.c). Runs a
  * program of pool or hash table operations (format: tests/src/core.rs) and

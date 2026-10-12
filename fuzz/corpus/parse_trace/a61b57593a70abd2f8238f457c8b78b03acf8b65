@@ -1,0 +1,5 @@
+M﻿<!DOCTYPE doc [
+<!ATTLIST doc d0 CDATA 'v0'><!ELEMENT _u ANY>
+<!ENTITY é PUBLIC '  spaced 
+  id  ' 'sys2.ent'>
+<!--dtd comment--><!ELEMENT a (#PCDATA| CDATA '<!ENTITY a><

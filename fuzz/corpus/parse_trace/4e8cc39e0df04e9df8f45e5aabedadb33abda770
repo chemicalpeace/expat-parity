@@ -1,0 +1,1 @@
+*æ<!DOCTYPE r [<!ENTITY e0 '&#x10FFFF;'><!ENTITY e1 '<!--c--> sp  ace &e3;&e2;'><!ENTITY e2 ''><!ENTITY e2 'second'><!ENTITY e3 'text '><!ENTITY % p0 '<!ENTITY e1 "from pe">'><!ENTITY % p1 '&#37;p1;'><!ENTITY % p2 '<!ELEMENT r ANY>'>]><r s="v&e0;w" t=' &e0;  y '>&e1;&e3;<c>&e0;</c>&e0;</r>

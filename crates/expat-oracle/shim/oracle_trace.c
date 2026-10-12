@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include "expat_config.h" /* XML_GE: declares the limit setters */
 #include "expat.h"
 #include "oracle.h"
 
@@ -33,7 +34,79 @@ struct tracer {
   struct buf out;
   struct buf text; /* pending coalesced character data */
   int in_text;
+  int digest;              /* text_digest option */
+  unsigned long long dlen; /* digest mode: length of the pending text */
+  uint64_t dhash;          /* digest mode: FNV-1a 64 of the pending text */
 };
+
+/* From internal.h (exported by xmlparse.c for its own test suite). */
+unsigned long long testingAccountingGetCountBytesDirect(XML_Parser parser);
+unsigned long long testingAccountingGetCountBytesIndirect(XML_Parser parser);
+
+#define FNV_OFFSET 0xcbf29ce484222325ULL
+#define FNV_PRIME 0x100000001b3ULL
+
+/* Capped allocator of the heap_cap option. The parse runs on one thread,
+   so thread-local counters keep concurrent tests apart. Every block
+   carries its size in a header. */
+#if defined(_MSC_VER)
+#  define ORACLE_TLS __declspec(thread)
+#else
+#  define ORACLE_TLS _Thread_local
+#endif
+static ORACLE_TLS size_t heap_cap_bytes;
+static ORACLE_TLS size_t heap_live;
+static ORACLE_TLS size_t heap_peak;
+
+size_t
+oracle_last_heap_peak(void) {
+  return heap_peak;
+}
+#define HEAP_HDR 16
+
+static void *
+capped_malloc(size_t n) {
+  if (n > heap_cap_bytes || heap_live > heap_cap_bytes - n)
+    return NULL;
+  unsigned char *b = malloc(n + HEAP_HDR);
+  if (b == NULL)
+    return NULL;
+  memcpy(b, &n, sizeof n);
+  heap_live += n;
+  if (heap_live > heap_peak)
+    heap_peak = heap_live;
+  return b + HEAP_HDR;
+}
+
+static void
+capped_free(void *p) {
+  if (p == NULL)
+    return;
+  unsigned char *b = (unsigned char *)p - HEAP_HDR;
+  size_t n;
+  memcpy(&n, b, sizeof n);
+  heap_live -= n;
+  free(b);
+}
+
+static void *
+capped_realloc(void *p, size_t n) {
+  if (p == NULL)
+    return capped_malloc(n);
+  unsigned char *b = (unsigned char *)p - HEAP_HDR;
+  size_t old;
+  memcpy(&old, b, sizeof old);
+  if (n > old && (n - old > heap_cap_bytes || heap_live > heap_cap_bytes - (n - old)))
+    return NULL;
+  unsigned char *nb = realloc(b, n + HEAP_HDR);
+  if (nb == NULL)
+    return NULL;
+  memcpy(nb, &n, sizeof n);
+  heap_live = heap_live - old + n;
+  if (heap_live > heap_peak)
+    heap_peak = heap_live;
+  return nb + HEAP_HDR;
+}
 
 static void
 buf_push(struct buf *b, const void *src, size_t n) {
@@ -116,6 +189,17 @@ static void
 flush_text(struct tracer *t) {
   if (! t->in_text)
     return;
+  if (t->digest) {
+    char tmp[64];
+    int n = snprintf(tmp, sizeof tmp, "textdigest %llu %016llx\n", t->dlen,
+                     (unsigned long long)t->dhash);
+    if (n > 0)
+      buf_push(&t->out, tmp, (size_t)n);
+    t->dlen = 0;
+    t->dhash = FNV_OFFSET;
+    t->in_text = 0;
+    return;
+  }
   buf_str(&t->out, "text");
   buf_field_n(&t->out, (const char *)t->text.data, t->text.len);
   buf_push(&t->out, "\n", 1);
@@ -197,6 +281,14 @@ on_text(void *ud, const XML_Char *s, int len) {
   struct start_ctx *c = ud;
   struct tracer *t = c->t;
   t->in_text = 1;
+  if (t->digest) {
+    for (int i = 0; i < len; i++) {
+      t->dhash ^= (unsigned char)s[i];
+      t->dhash *= FNV_PRIME;
+    }
+    t->dlen += (unsigned long long)(len > 0 ? len : 0);
+    return;
+  }
   if (len > 0)
     buf_push(&t->text, s, (size_t)len);
 }
@@ -414,12 +506,47 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   *out = NULL;
   *out_len = 0;
 
-  if (opts->ns_separator != 0)
+  t.digest = opts->text_digest;
+  t.dhash = FNV_OFFSET;
+  if (opts->heap_cap != 0) {
+    static const XML_Memory_Handling_Suite capped
+        = {capped_malloc, capped_realloc, capped_free};
+    XML_Char sep = (XML_Char)opts->ns_separator;
+    heap_cap_bytes = opts->heap_cap;
+    heap_live = 0;
+    heap_peak = 0;
+    p = XML_ParserCreate_MM(opts->encoding, &capped,
+                            opts->ns_separator != 0 ? &sep : NULL);
+  } else if (opts->ns_separator != 0)
     p = XML_ParserCreateNS(opts->encoding, (XML_Char)opts->ns_separator);
   else
     p = XML_ParserCreate(opts->encoding);
   if (p == NULL)
     return -1;
+  if (opts->set_bl_amplification) {
+    buf_str(&t.out, "limit bl-amplification");
+    buf_int(&t.out, XML_SetBillionLaughsAttackProtectionMaximumAmplification(
+                        p, opts->bl_amplification));
+    buf_push(&t.out, "\n", 1);
+  }
+  if (opts->set_bl_threshold) {
+    buf_str(&t.out, "limit bl-threshold");
+    buf_int(&t.out, XML_SetBillionLaughsAttackProtectionActivationThreshold(
+                        p, opts->bl_threshold));
+    buf_push(&t.out, "\n", 1);
+  }
+  if (opts->set_at_amplification) {
+    buf_str(&t.out, "limit at-amplification");
+    buf_int(&t.out,
+            XML_SetAllocTrackerMaximumAmplification(p, opts->at_amplification));
+    buf_push(&t.out, "\n", 1);
+  }
+  if (opts->set_at_threshold) {
+    buf_str(&t.out, "limit at-threshold");
+    buf_int(&t.out,
+            XML_SetAllocTrackerActivationThreshold(p, opts->at_threshold));
+    buf_push(&t.out, "\n", 1);
+  }
 
   ctx.t = &t;
   ctx.p = p;
@@ -459,6 +586,12 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   }
 
   flush_text(&t);
+  if (opts->trace_accounting) {
+    buf_str(&t.out, "accounting");
+    buf_uint(&t.out, testingAccountingGetCountBytesDirect(p));
+    buf_uint(&t.out, testingAccountingGetCountBytesIndirect(p));
+    buf_push(&t.out, "\n", 1);
+  }
   buf_str(&t.out, "result");
   buf_str(&t.out, st == XML_STATUS_OK ? " ok" : " error");
   buf_int(&t.out, (long long)XML_GetErrorCode(p));

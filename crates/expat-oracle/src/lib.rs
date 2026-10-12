@@ -13,6 +13,7 @@
 
 use std::ffi::{CStr, CString, c_char, c_int, c_uint, c_ushort};
 
+pub mod counting_alloc;
 mod ffi;
 pub mod tok;
 
@@ -226,6 +227,62 @@ pub struct ParseOptions {
     /// `XML_SetReturnNSTriplet(parser, XML_TRUE)` (only has an effect with
     /// namespaces).
     pub ns_triplets: bool,
+    /// Resource-limit setters called before parsing (module 11); their
+    /// results appear as `limit` lines at the start of the trace.
+    pub limits: Limits,
+    /// Trace character data as `textdigest <len> <fnv1a64>` instead of the
+    /// text, so the trace of a large expansion stays small.
+    pub text_digest: bool,
+    /// Add an `accounting <direct> <indirect>` line (the billion-laughs
+    /// counters of the root parser) before the `result` line.
+    pub trace_accounting: bool,
+    /// Non-zero: create the parser with an allocator that refuses requests
+    /// taking its live heap above this many bytes (memory cap for bounded
+    /// tests); see [`last_heap_peak`].
+    pub heap_cap: usize,
+}
+
+/// A `float` limit passed to libexpat, compared by bit pattern so the
+/// options stay `Eq` (NaN is a meaningful test value: libexpat rejects it).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Factor(pub f32);
+
+impl PartialEq for Factor {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_bits() == other.0.to_bits()
+    }
+}
+
+impl Eq for Factor {}
+
+/// Resource-limit setters; `None` leaves libexpat's default.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Limits {
+    /// `XML_SetBillionLaughsAttackProtectionMaximumAmplification`.
+    pub bl_amplification: Option<Factor>,
+    /// `XML_SetBillionLaughsAttackProtectionActivationThreshold`.
+    pub bl_threshold: Option<u64>,
+    /// `XML_SetAllocTrackerMaximumAmplification`.
+    pub at_amplification: Option<Factor>,
+    /// `XML_SetAllocTrackerActivationThreshold`.
+    pub at_threshold: Option<u64>,
+}
+
+impl Limits {
+    /// No setter is called.
+    pub const NONE: Limits = Limits {
+        bl_amplification: None,
+        bl_threshold: None,
+        at_amplification: None,
+        at_threshold: None,
+    };
+}
+
+/// Peak live heap (bytes) of the calling thread's last [`parse_trace`] that
+/// ran with a non-zero [`ParseOptions::heap_cap`].
+pub fn last_heap_peak() -> usize {
+    // SAFETY: reads a thread-local counter of the shim; no arguments.
+    unsafe { ffi::oracle_last_heap_peak() }
 }
 
 /// Errors of the oracle wrapper itself (never of the parse being traced).
@@ -273,6 +330,17 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
         buffer_api: c_int::from(opts.buffer_api),
         no_reparse_deferral: c_int::from(opts.no_reparse_deferral),
         ns_triplets: c_int::from(opts.ns_triplets),
+        set_bl_amplification: c_int::from(opts.limits.bl_amplification.is_some()),
+        bl_amplification: opts.limits.bl_amplification.map_or(0.0, |f| f.0),
+        set_bl_threshold: c_int::from(opts.limits.bl_threshold.is_some()),
+        bl_threshold: opts.limits.bl_threshold.unwrap_or(0),
+        set_at_amplification: c_int::from(opts.limits.at_amplification.is_some()),
+        at_amplification: opts.limits.at_amplification.map_or(0.0, |f| f.0),
+        set_at_threshold: c_int::from(opts.limits.at_threshold.is_some()),
+        at_threshold: opts.limits.at_threshold.unwrap_or(0),
+        text_digest: c_int::from(opts.text_digest),
+        trace_accounting: c_int::from(opts.trace_accounting),
+        heap_cap: opts.heap_cap,
     };
     let mut out: *mut u8 = std::ptr::null_mut();
     let mut out_len: usize = 0;

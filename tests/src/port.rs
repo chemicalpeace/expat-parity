@@ -187,8 +187,22 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
         ParamEntityParsing::Always => PortPep::Always,
     });
     let mut t = Tracer {
-        w: TraceWriter::new(),
+        w: if opts.text_digest {
+            TraceWriter::with_text_digest()
+        } else {
+            TraceWriter::new()
+        },
     };
+    // Same order as the C shim. The allocation tracker setters
+    // (`limits.at_*`) are applied by the tracker (module 11c).
+    if let Some(f) = opts.limits.bl_amplification {
+        let ok = p.set_billion_laughs_maximum_amplification(f.0);
+        t.w.limit("bl-amplification", ok);
+    }
+    if let Some(b) = opts.limits.bl_threshold {
+        let ok = p.set_billion_laughs_activation_threshold(b);
+        t.w.limit("bl-threshold", ok);
+    }
     if opts.no_reparse_deferral {
         p.set_reparse_deferral_enabled(false);
     }
@@ -219,6 +233,10 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
     } else {
         Status::Error
     };
+    if opts.trace_accounting {
+        let a = p.accounting();
+        t.w.accounting(a.count_bytes_direct, a.count_bytes_indirect);
+    }
     let line = p.current_line_number();
     let column = p.current_column_number();
     PortTrace::Trace(t.w.finish(status, code, line, column, p.current_byte_index()))

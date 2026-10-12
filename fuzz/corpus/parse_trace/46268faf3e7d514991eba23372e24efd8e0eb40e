@@ -1,0 +1,1 @@
+AÄ<?xml version='1.0'?><!DOCTYPE r [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 '<?pi d?>'><!ENTITY e1 '&e0;&#x10FFFF;<b></b>&e0;'>]><r>txt<c>&e0;</c></r>

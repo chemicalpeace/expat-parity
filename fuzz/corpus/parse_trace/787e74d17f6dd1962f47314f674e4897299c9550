@@ -1,0 +1,2 @@
+�﻿<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE a PUBLIC "" 'doc.dtd' [<!ELEMENT b (#PCDATA|_u)*><!ELEMENT q:j ((q:e , a , p:e? , (é*|doc*)+)?,(é?),q:e)?><!ATTLIST _u b NOTATION (n1|n2) #FIXED '&lt;&gt;&quot;&apos;' xmlns:p CDATA #REQUIRED><!ELEMENT q:e ANCDATA --c-->	&lt;</a>

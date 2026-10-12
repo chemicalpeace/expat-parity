@@ -1,0 +1,2 @@
+D'<!DOCTYPE r [<!ENTITY eA '&lt;'><!ENTITY e0 'second'><!ENTITY e1 'xé'><!ENTITY e2 ''><!ENTITY e3 '	&e4;a
+b&ext;'><!ENTITY e4 '&unp;text x'><!ENTITY e5 '	<![CDATA[x<y]]>'><!ENTITY % p0 '"x">'><!ENTITY % p1 '&#37;p0;'><!ENTITY % p2 '"x">'>%p2;<!ATTLIST r a CDATA "

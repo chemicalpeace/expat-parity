@@ -1,7 +1,0 @@
-/�﻿<!--before--><!DOCTYPE p:e [%pe1;<!ATTLIST p:e xmlns NOTATION (n1|n2) "&unp;" xmlns:p NMTOKEN "&undeclared;" id ENTITY #IMPLIED><!ENTITY é PUBLIC "a'b" "sys2.ent" >
-<!NOTATION n1 PUBLIC '  spaced 
-  id  '>
-<!ENTITY % extpe "&#38;pe1;">
-<!ENTITY e3 PUBL1C "  spaced 
-  id  " 'sys2.entTOKENS #FIXED "urn:q">
-] ><doc p:a=' x &e2; '></doc>

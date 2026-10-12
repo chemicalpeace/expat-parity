@@ -10,7 +10,7 @@
 
 use crate::docgen::{Rng, document, dtd_document, entity_document};
 use crate::port::{PortTrace, port_trace};
-use crate::trace::{first_difference, is_well_formed_trace};
+use crate::trace::{first_difference, is_well_formed_trace, mask_q4};
 use crate::vectors::upstream;
 use expat_oracle::BufferOp;
 
@@ -29,6 +29,7 @@ pub fn parse_trace_case(data: &[u8]) -> Result<(), String> {
         return Err("malformed C trace".into());
     }
     if let PortTrace::Trace(rust) = port_trace(doc, &opts)
+        && let (c, rust) = mask_q4(&c, &rust)
         && let Some((line, l, r)) = first_difference(&c, &rust)
     {
         return Err(format!(
@@ -129,7 +130,8 @@ const VECTOR_SELECTORS: [[u8; 2]; 8] = [
 /// `VECTOR_SELECTORS`, then 2,000 generated documents ([`document`]) with
 /// random selector pairs, then 2,000 documents with a document type
 /// declaration ([`dtd_document`]), then 1,500 entity documents
-/// ([`entity_document`]). `buffer_diff`: every upstream vector, 2,000
+/// ([`entity_document`]), then 500 entity documents with small
+/// billion-laughs limits (second selector with bit 7 set). `buffer_diff`: every upstream vector, 2,000
 /// generated documents, 1,000 documents with a DTD and 500 entity
 /// documents, each with a
 /// random operation header of 1-16 operations whose sizes cover the
@@ -164,6 +166,14 @@ pub fn seeds(target: &str) -> Option<Vec<Vec<u8>>> {
             for _ in 0..1500 {
                 let doc = entity_document(&mut r);
                 let mut input = vec![r.next_u64() as u8, r.next_u64() as u8];
+                input.extend_from_slice(&doc);
+                out.push(input);
+            }
+            // Module 11 billion-laughs limits: entity documents with small
+            // limits (second selector bit 7, `options_from_selectors`).
+            for _ in 0..500 {
+                let doc = entity_document(&mut r);
+                let mut input = vec![r.next_u64() as u8, r.next_u64() as u8 | 0x80];
                 input.extend_from_slice(&doc);
                 out.push(input);
             }

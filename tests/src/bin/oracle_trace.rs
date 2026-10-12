@@ -1,5 +1,6 @@
 //! Prints the oracle trace of a file (or stdin) for debugging and for
-//! regenerating golden traces: `oracle_trace [--ns] [--chunk N] [--encoding E] [FILE]`.
+//! regenerating golden traces:
+//! `oracle_trace [--ns] [--chunk N] [--encoding E] [--buffer] [--accounting] [--pe] [FILE]`.
 //! With `--golden`, rewrites `tests/vectors/upstream.traces.jsonl` from the
 //! upstream vectors (default options).
 
@@ -14,6 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--ns" => opts.ns_separator = Some(b'|'),
             "--chunk" => opts.chunk_size = args.next().ok_or("--chunk N")?.parse()?,
             "--encoding" => opts.encoding = Some(args.next().ok_or("--encoding E")?),
+            "--buffer" => opts.buffer_api = true,
+            "--accounting" => opts.trace_accounting = true,
+            "--pe" => opts.param_entity_parsing = expat_oracle::ParamEntityParsing::Always,
             "--golden" => return regen_golden(),
             _ => file = Some(a),
         }

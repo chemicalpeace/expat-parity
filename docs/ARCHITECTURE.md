@@ -195,6 +195,9 @@ literal. A C `NULL` string is written as `~`. Integers are decimal.
 | `attlist <elname> <attname> <type> <default> <isrequired>` | `XML_AttlistDeclHandler` |
 | `nsstart <prefix> <uri>` / `nsend <prefix>` | namespace declaration handlers (only with a separator) |
 | `skipped <name> <is_param>` | `XML_SkippedEntityHandler` |
+| `limit <name> <0\|1>` | only with `limits` set (module 11): first lines, one per setter called, in the order `bl-amplification`, `bl-threshold`, `at-amplification`, `at-threshold`, with the setter's `XML_Bool` |
+| `textdigest <len> <fnv1a64>` | instead of `text` when `text_digest` is set: length and FNV-1a 64 (16 lower-case hex digits) of the coalesced character data |
+| `accounting <direct> <indirect>` | only with `trace_accounting`: the billion-laughs counters of the root parser (`testingAccountingGetCountBytesDirect`/`Indirect`) after parsing, just before `result` (Q-4 in DIVERGENCES.md masks it in one known C defect) |
 | `result <ok\|error> <error_code> <line> <column> <byte_index>` | always last: return status of the last `XML_Parse` call, `XML_GetErrorCode`, `XML_GetCurrentLineNumber64`, `XML_GetCurrentColumnNumber64`, `XML_GetCurrentByteIndex64` after parsing stops |
 
 ### Why these rules

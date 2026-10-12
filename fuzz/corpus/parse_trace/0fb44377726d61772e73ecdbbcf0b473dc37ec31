@@ -1,0 +1,2 @@
+=Ý<?xml version='1.0' standalone='yes'?><!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 'xa
+b'><!ENTITY % p0 '<!ELEMENT r ANY>'><!ATTLIST r a CDATA "&e0;" t NMTOKENS "  &e0; x " f CDATA #FIXED "&amp;&e0;">]><r s="v&e0;w"accountingc></r>

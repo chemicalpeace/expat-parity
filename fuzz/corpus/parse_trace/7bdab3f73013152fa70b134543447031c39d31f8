@@ -1,0 +1,4 @@
+@<!DOCTYPE doc [
+  <!ENTITY entity '&#38;entity;'>
+]>
+<doc>&entity;</doc>

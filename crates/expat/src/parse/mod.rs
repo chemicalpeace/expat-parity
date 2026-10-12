@@ -524,6 +524,25 @@ impl Parser {
         true
     }
 
+    /// `XML_SetBillionLaughsAttackProtectionMaximumAmplification`
+    /// (`xmlparse.c` 3099-3124): `false`, and no change, for NaN or a value
+    /// below 1.0. Allowed at any time, like C. (C also refuses it on an
+    /// external entity parser; the port has none yet.)
+    pub fn set_billion_laughs_maximum_amplification(&mut self, factor: f32) -> bool {
+        if factor.is_nan() || factor < 1.0 {
+            return false;
+        }
+        self.accounting.maximum_amplification_factor = factor;
+        true
+    }
+
+    /// `XML_SetBillionLaughsAttackProtectionActivationThreshold`
+    /// (`xmlparse.c` 3126-3148): any value, at any time.
+    pub fn set_billion_laughs_activation_threshold(&mut self, bytes: u64) -> bool {
+        self.accounting.activation_threshold_bytes = bytes;
+        true
+    }
+
     /// `XML_SetReparseDeferralEnabled`.
     pub fn set_reparse_deferral_enabled(&mut self, enabled: bool) {
         self.reparse_deferral_enabled = enabled;

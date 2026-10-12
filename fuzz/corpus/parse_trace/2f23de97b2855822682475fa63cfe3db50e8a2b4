@@ -1,6 +1,0 @@
-s.<?xml version='1.0' encoding='UTF-8'?><!DOCTYPE doc PUBLIC '  spaced 
-  id  ' 'doc.dtd' [<!---->
-<!ATTLIST p:e b (x|y|z) #FIXED '1' xml:lang IDREF ''>
-<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11'>
-<!ELEMENT q:e EMPTY><!ATTLIST doc xmlns:p ID #IMPLIED xmlns IDREFS #FIXED "a b">
-<!ATTLIST doc xmlns:p NMTOKEN #REQUIR1' p:a='urn:p'><b x='y'/>&unp;</a>

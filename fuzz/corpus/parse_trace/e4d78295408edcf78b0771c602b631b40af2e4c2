@@ -1,4 +1,0 @@
-ZC﻿
-<!DOCTYPE doc [<!NOTATION n2 PUBLIC 'p' 'viewer'>
-<!ATTLIST a xmlns:q ( x | y ) #FIXED 'urn:p' xmlns:p ENTITY #FIXED "&#65;&#x42;&#32;" xmlns:p ID "&#x10000;"><!ELEMENT é (b|(_u?|a|(a?,n-1+,a*,a)?|p:e)*)+><!NOTATION n2 PUBLIC 'p' 'viewer'><!ENTITY p:x SYSTEM 'u.gif' NDATA n2 >
-<!ENTITY e2 SYSTEM 'sys.ent' >]><a a='&e1;' c=' x &e2; '><?pi?> &lt;</a>

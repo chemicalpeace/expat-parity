@@ -1,4 +1,0 @@
-@<!DOCTYPE r [
-  <!ENTITY five SYSTEM 'first.ent'>
-]>
-<r>&five;</r>

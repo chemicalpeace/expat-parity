@@ -117,3 +117,42 @@ fn well_formedness_checker_rejects_garbage() {
     assert!(!is_well_formed_trace(b"result ok 0 1 0\n"));
     assert!(is_well_formed_trace(b"result ok 0 1 0 0\n"));
 }
+
+#[test]
+fn limit_digest_and_accounting_lines() {
+    // Module 11 options: setter results first, character data as
+    // `textdigest <len> <fnv1a64>`, counters before the result line. The
+    // C shim and the writer must agree; the digest of "ab" is pinned.
+    let doc = b"<r>ab</r>";
+    let opts = ParseOptions {
+        limits: expat_oracle::Limits {
+            bl_amplification: Some(expat_oracle::Factor(0.5)),
+            bl_threshold: Some(7),
+            ..expat_oracle::Limits::NONE
+        },
+        text_digest: true,
+        trace_accounting: true,
+        ..ParseOptions::default()
+    };
+    let expected = "limit bl-amplification 0
+limit bl-threshold 1
+start r 0
+textdigest 2 089c4407b545986a
+end r
+accounting 9 0
+result ok 0 1 9 9
+";
+    let c = parse_trace(doc, &opts).expect("oracle");
+    assert_eq!(String::from_utf8_lossy(&c), expected);
+    assert!(is_well_formed_trace(&c));
+    let mut w = TraceWriter::with_text_digest();
+    w.limit("bl-amplification", false);
+    w.limit("bl-threshold", true);
+    w.start(b"r", 0, &[]);
+    w.text(b"a");
+    w.text(b"b");
+    w.end(b"r");
+    w.accounting(9, 0);
+    let r = w.finish(Status::Ok, 0, 1, 9, 9);
+    assert_eq!(String::from_utf8_lossy(&r), expected);
+}

@@ -1,4 +1,0 @@
-﻿
-<!DOCTYPE a SYSTEM 'doc.dtd' [<!ATTLIST q:e xmlns IDREFS "1" xmlns NMTOKENS #REQUIRED>
-<?dtdpi x?><!ATTLIST _u p:a CDATA "&#x10000;"><!ENTITY ext '&#x10000;☃' ><!ENTITY unp SYSTEM "sys.ent"><!ATTLIST q:e b ( x | y ) #REQUIRED xmlns:q ID #FIXED "http://www.w3.org/2000/xmlns/"><!ATTLIST _u id NOTATION (n1|e2) #IMPLIED><!ENTITY e3 SYSTEM "sys.ent"><!ENTITY % pe1 "">
-<!ENTITY e1 "&#60;b/&#62;" ><!ENTITY % pe1 SYSTEMs

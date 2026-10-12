@@ -1,5 +1,0 @@
-<!DOCTYPE doc [
-<!ELEMENT doc (chapter)>
-<!ELEMENT chapter (#PCDA_A)>
-]>
-r>Wombats are <ogahc/pter></doc>

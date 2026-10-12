@@ -1,0 +1,8 @@
+�@﻿
+<!DOCTYPE p:e [<!ELEMENT é EMPTY>
+<!ATTLIST b b NMTOKENS #REQUIRED p:a IDREFS #REQUIRED>
+<!ENTITY p:x SYSTEM 'u.gif' NDATA undeclared >
+<!ENTITY é SYSTEM "sys.ent"><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5'>
+<!NOTATION n2 PUBLIC ''><!ELEMENT p:e (n-1* , p:e? , b+)*>
+<!ELEMENT p:e ((p:e*|b|b*|_u+) , ((n-1+) , _u , (_u|(a*1+) , _u , (_u||doc)|n-1*|a)+) , p:e , b)?>
+<!ENTITY p:x SYSTEM "sys.ent" >]><doc p:a='&lt;'>&e2;<doc/>&e2;<![CDATA[&e1;]]></doc>

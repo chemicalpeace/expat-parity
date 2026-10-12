@@ -101,6 +101,38 @@ Line numbers refer to those files. The build configuration is the one of
 - There is no separate limit on nesting depth, number of entities or
   replacement text length; quadratic blow-up (one large entity referenced
   many times) is bounded only by the same amplification check.
+- Measured with the differential tests (module 11b2,
+  `tests/tests/amplification_diff.rs`): ten levels of ten references
+  (3 * 10^9 bytes unchecked) stop with 43 just after the output passes
+  8 MiB in content, attribute values, default values, parameter entities
+  and entity values; six levels (3 MB) are accepted (below the
+  activation threshold); 195 KB of direct text followed by 9.2 MB of
+  expansion (factor ~48) is accepted; a 16 KiB entity referenced 1,024
+  times (16 MiB from 20 KB) stops with 43 by default and is accepted with
+  a factor of 1,000. The port gives the same result, position and byte
+  counters in every case.
+- Known C defect in the accounting, without effect on results: Q-4 in
+  DIVERGENCES.md (`epilogProcessor` adds `NULL - s` to the direct counter
+  for a name at the end of the buffer, then fails with error 9).
+
+### Bounds of the resource-limit tests
+
+Every comparison in the amplification tests runs through
+`expat_difftest::bounded::compare`, which enforces three bounds per pair so
+that a wrong limit on either side cannot hang or exhaust the machine:
+
+| Bound | Small-document groups | Large-expansion groups | Mechanism |
+|---|---|---|---|
+| Input size | 16 KiB | 256 KiB | asserted before parsing; a larger document is a test bug |
+| Wall clock (C + port) | 20 s | 60 s | parse on a worker thread, `recv_timeout`; the test fails on expiry |
+| Port heap | 64 MiB | 256 MiB | per-thread counting `#[global_allocator]` (`expat_oracle::counting_alloc`); a request above the cap is refused, which aborts the test binary |
+| C heap | 64 MiB | 256 MiB | oracle parser created with `XML_ParserCreate_MM` and a capped allocator (`ParseOptions::heap_cap`); a refusal is `XML_ERROR_NO_MEMORY` and shows as a mismatch |
+
+Measured peaks (release build, 2026-10-12): quadratic blow-up in an
+attribute value 39.9 MB port / 33.6 MB C, default-limit billion laughs
+8.4 MB port / 4.2 MB C, small groups below 15 KB; slowest pair 0.42 s.
+Large expansions are traced with `text_digest` (character data as length
+and FNV-1a hash), so traces stay small.
 
 ## 5. Allocation tracker
 

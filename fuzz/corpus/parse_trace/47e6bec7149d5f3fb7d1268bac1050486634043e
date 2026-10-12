@@ -1,0 +1,7 @@
+S<?xml version='1.0' encoding='UTF-8'?><!--before--><!DOCTYPE doc PUBLIC '  spaced 
+  id  ' 'doc.dtd' [<!ENTITY % extpe PUBLIC "  spaced 
+  id  " 'sys2.ent' >
+<!ENTITY % pe2 "&#x10000;?">
+<!ATTLIST _u xmlns:q ENTITIES '1'><!ATTLIST b xmlns:p ENTITIES #RMQUIRED>
+<!ATTLIST a:a ID #IMPLIED>
+]><doc></doc>
