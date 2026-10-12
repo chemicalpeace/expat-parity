@@ -20,9 +20,13 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   Windows, after correcting an llvm-cov artefact that had hidden 7 covered
   lines (raw step E figure 94.86 %). DV-1 parity is in progress (D-034;
   phase 1 merged in PR #14). Q-5 fixed (PR #15, D-035). Part 2 of the
-  coverage work (branch `part2-unparsed`, no PR yet): unparsed-entity handler, external entity bodies
-  incl. `entityValueProcessor`, `m_nsAtts` growth vs C; quadratic
-  namespaced duplicate check fixed. Pending: OOM fault injection per
+  coverage work (branch `part2-finish`, draft PR #18: open, not merged,
+  not to be merged while the owner's no-merge rule holds): unparsed-entity
+  handler, external entity bodies incl. `entityValueProcessor`,
+  `m_nsAtts` growth vs C; quadratic namespaced duplicate check fixed; its
+  C-relative scaling test passed on all three CI runners (CI run
+  38289234285). The coverage figures above are PR #13's tree (7,552
+  lines); see "Next steps" 5 for the current ones. Pending: OOM fault injection per
   allocation point (after the DV-1 phase-2 merge). Next: module 12.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
@@ -109,21 +113,34 @@ with allocation failures, white-box).
 ## Next steps
 
 1. Part 2 of the coverage work is done on branch `part2-finish` (on top of
-   `part2-unparsed`): unparsed-entity handler, external entity bodies incl.
-   `entityValueProcessor`, `m_nsAtts` growth vs C, quadratic namespaced
-   duplicate check fixed, scaling test measured against C. Next: the
-   owner's go-ahead for the push and one CI round (the C-relative scaling
-   test is measured on aarch64 Linux only, not yet on the CI runners).
-   Not to be merged while the owner's no-merge rule holds.
+   `part2-unparsed`), draft PR #18 (open, not merged; not to be merged
+   while the owner's no-merge rule holds): unparsed-entity handler,
+   external entity bodies incl. `entityValueProcessor`, `m_nsAtts` growth
+   vs C, quadratic namespaced duplicate check fixed, scaling test measured
+   against C. The C-relative scaling test `ns_duplicate_check_scales_like_c`
+   passed on ubuntu, macOS and Windows in CI run 38289234285 (debug build,
+   best of 3, 10,000 -> 160,000 prefixed attributes, 118,910 -> 2,128,910
+   bytes; port/C growth ratio 0.84 / 0.98 / 1.03, limit 3.0). It reports
+   its measurement through `NS_SCALING_REPORT` (JSON) and an `ns-scaling:`
+   stderr line; CI keeps the JSON as artifact `ns-scaling-<os>`
+   (REPORT.md, Part 2, "Scaling report"). Not tested: the missing-report
+   error path of the upload step, artifact names on a job re-run, the
+   effect of the changed measurement order; the timing test keeps a low
+   but non-zero flakiness risk (same section).
 2. Compare the encoding argument of external entity parsers with C
    (independent of PR #16).
 3. Full corpus merge of the Part 2 fuzz finds (only 40 curated
    `parse_trace` inputs for the namespaced duplicate check are committed).
 4. OOM fault injection per allocation point, after PR #16 (DV-1 parity
    phase 2) merges, so that the port's allocation points are final.
-5. Coverage: `crates/expat` 94.95 % lines, still below 95 %; the llvm-cov
-   `-dump` race fix (`-num-threads=1`) is on the PR #17 branch
-   (`q5-verification`), not on this one.
+5. Coverage (CI, `crates/expat` lines, full suite): main CI run
+   38240812899 on a990a8ca measured 94.86 % (7,218 / 7,609, Linux); this
+   branch (PR #18, CI run 38289234285) 95.10 % on Linux and macOS
+   (7,238 / 7,611) and 95.07 % on Windows (7,233 / 7,608). The older
+   94.95 % (REPORT.md, PR #13) was measured on an older tree (7,552 lines)
+   and is not comparable with these. The llvm-cov `-dump` race fix
+   (`-num-threads=1`) is on the PR #17 branch (`q5-verification`), not on
+   this one.
 6. DV-1 parity (D-034, owner decision 2026-10-12): phase 1 (sizes from
    the C layout, R1 fixed, `tracker_sizes` on every CI platform) done;
    then steps 2-6 (pool slack, creation charge, untracked C allocations,

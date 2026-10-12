@@ -903,8 +903,10 @@ The CI job therefore measures without doctests; `scripts/coverage.sh DIR
 nightly-doctests` (and `nightly` as the control) remain for a later
 nightly.
 
-**Below 95 % lines.** Corrected, `crates/expat` is at 94.95 % lines on
-Linux and macOS (4 lines short of 95 %) and 94.93 % on Windows; regions
+**Below 95 % lines** (PR #13's tree, 7,552 lines; current figures are in
+Part 2, "Coverage on this branch"). Corrected, `crates/expat` was at
+94.95 % lines on Linux and macOS (4 lines short of 95 %) and 94.93 % on
+Windows; regions
 are above 95 % everywhere, functions at 92.27 %. Nothing was excluded or
 skipped to get there. The uncovered lines (`docs/coverage/ci-2f6a37a-linux.txt`,
 381 lines) by area:
@@ -983,9 +985,11 @@ behaviour and defaults are C's (D-026).
    at each allocation point; `m_nsAtts` growth is uncovered.
 6. libexpat does not cap the number or depth of external entity parsers;
    the port replicates that (an application must cap them in its handler).
-7. Coverage (CI, full suite, corrected for an llvm-cov artefact):
-   94.95 % lines on Linux and macOS, 94.93 % on Windows, below the Phase 4
-   target of 95 %; regions 95.16 % / 95.13 %, functions 92.27 %. Doctests
+7. Coverage (CI, full suite, corrected for an llvm-cov artefact, PR #13's
+   tree of 7,552 lines): 94.95 % lines on Linux and macOS, 94.93 % on
+   Windows, below the Phase 4 target of 95 % (for the current figures,
+   94.86 % on main and 95.10 % / 95.07 % on PR #18, see Part 2,
+   "Coverage on this branch"); regions 95.16 % / 95.13 %, functions 92.27 %. Doctests
    are not measured (nightly coverage unusable; on nightly they add no
    covered line).
 8. Out of scope: `XML_UNICODE` builds (D-002).
@@ -1125,8 +1129,10 @@ encodings, `XmlParseXmlDecl` on every declaration token) 7 slices, 707 s,
 (built-in encodings only, where `to_utf8_until` is the old conversion). No
 crash, no mismatch.
 
-### Part 2: remaining C behaviour (branch `part2-unparsed`, no PR yet)
+### Part 2: remaining C behaviour (branch `part2-finish`, draft PR #18)
 
+Branch `part2-finish` (on top of `part2-unparsed`), draft PR #18: open,
+not merged, and not to be merged while the owner's no-merge rule holds.
 Measured against the vendored libexpat 2.9.0 by canonical trace (events,
 error code, line, column, byte index), under `diff::option_matrix` unless
 stated. No library code was changed except the duplicate check below.
@@ -1225,7 +1231,8 @@ N1 exact equality instead of C's prefix test -- caught by
 N2 duplicate check removed -- caught by both of those and
 `ns_atts_tracker_relation`; N3 names filed under a wrong hash key --
 caught by the same three; N4 the old quadratic list -- caught by
-`ns_duplicate_check_scales_like_c` only (no output changes). The
+`ns_duplicate_check_scales_like_c` only (no output changes); the scaling
+test on the CI runners is under "Scaling report" below. The
 committed fuzz corpora (`fuzz_corpus` replay) caught none of N1-N3: they
 held no start tag with two prefixes bound to one URI. 40 curated
 `parse_trace` inputs for this were added (`docs/FUZZING.md`, Part 2);
@@ -1242,6 +1249,52 @@ after the reports were written; the re-run of the same commit (job
 found later on branch `q5-verification` (PR #17, open, not merged): a
 data race in `llvm-cov report -dump`; its fix (`-dump -num-threads=1` in
 `scripts/coverage.sh`) lives on that branch, not on this one.
+
+**Scaling report** (`ns_duplicate_check_scales_like_c`). The test prints
+one `ns-scaling:` line on stderr on every run (input sizes, best-of-3 C
+and port times, growth factors, port/C ratio, limit, runner; visible on a
+passing run only with `--nocapture`). When the environment variable
+`NS_SCALING_REPORT` names a file, it writes the same values as JSON:
+`test`, `attributes` and `input_bytes` (`small`, `large`), `c_seconds` and
+`port_seconds` (`small`, `large`), `growth` (`port`, `c`, `port_over_c`,
+`limit_port_over_c`), `passed`, `runs_per_measurement`, `statistic`
+(minimum wall-clock seconds of the runs) and `runner` (`os`, `arch`,
+`family`, `cpu`, `available_parallelism`, `debug_assertions`). The limit
+is one constant (`LIMIT_FACTOR` = 3.0) used for the check and the report.
+CI: the `test` job (all three OSes) has a step that runs this test alone
+with `--nocapture` and `NS_SCALING_REPORT`, followed by
+`actions/upload-artifact@v4` with artifact `ns-scaling-<os>`,
+`if: always()` and `if-no-files-found: error`. Failure modes, verified
+locally (aarch64 Linux, scratch changes reverted): if the JSON cannot be
+written the test fails; if both the check and the write fail, the
+original assertion message is kept with the write error appended as
+"(also: ...)"; a failed check still writes `passed: false`.
+
+CI run 38289234285 (PR #18, debug build, best of 3, 10,000 -> 160,000
+prefixed attributes, 118,910 -> 2,128,910 bytes), from the JSON
+artifacts:
+
+| Runner | C small / large | Port small / large | C growth | Port growth | Port / C (limit 3.0) |
+|---|---|---|---|---|---|
+| ubuntu-latest (x86_64, AMD EPYC 7763, 4 threads) | 6.105 / 141.586 ms | 11.606 / 227.421 ms | x23.2 | x19.6 | 0.84 |
+| macos-latest (aarch64, Apple M2 Pro (Virtual), 5 threads) | 3.690 / 83.492 ms | 6.070 / 134.180 ms | x22.6 | x22.1 | 0.98 |
+| windows-latest (x86_64, AMD Family 25, 4 threads) | 5.182 / 124.887 ms | 11.702 / 289.651 ms | x24.1 | x24.8 | 1.03 |
+
+The test passed on all three. Not tested: the missing-report path of
+`if-no-files-found: error` was never executed (checked only against the
+`action.yml` documentation of upload-artifact v4); whether the artifact
+name collides when a job is re-run; the measurement order changed with
+the report (small input first, then large; before, large first) and its
+effect was not measured. The timing test keeps a low but non-zero risk
+of flaking: in 20 local runs (aarch64 Linux) the ratio ranged 0.54-1.42
+against the limit of 3.0 (the old quadratic check measured 8.72 locally).
+
+**Coverage on this branch** (CI run 38289234285, `crates/expat`, full
+suite, same pipeline as main): lines 95.10 % on Linux and macOS
+(7,238 / 7,611) and 95.07 % on Windows (7,233 / 7,608); main CI run
+38240812899 on a990a8ca measured 94.86 % (7,218 / 7,609, Linux). The
+94.95 % of "Coverage on every CI platform" was measured on an older tree
+(7,552 lines) and is not comparable with these figures.
 
 **Fuzzing** (with the duplicate-check fix, `docs/fuzz-logs/part2`):
 `parse_trace` 7 slices, 677 s, 783,495 executions (committed corpus plus
