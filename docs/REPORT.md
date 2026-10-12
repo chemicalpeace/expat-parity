@@ -1226,9 +1226,11 @@ N2 duplicate check removed -- caught by both of those and
 `ns_atts_tracker_relation`; N3 names filed under a wrong hash key --
 caught by the same three; N4 the old quadratic list -- caught by
 `ns_duplicate_check_scales_like_c` only (no output changes). The
-committed fuzz corpora (`fuzz_corpus` replay) catch none of N1-N3: they
-hold no start tag with two prefixes bound to one URI, so they are not a
-regression net for this check (seeds for it are listed under "Not done"). No divergence
+committed fuzz corpora (`fuzz_corpus` replay) caught none of N1-N3: they
+held no start tag with two prefixes bound to one URI. 40 curated
+`parse_trace` inputs for this were added (`docs/FUZZING.md`, Part 2);
+with them the replay test `parse_trace_corpus_matches_c` catches N1, N2
+and N3 as well. No divergence
 number is needed (no observable output changed); listed here as a
 finding.
 
@@ -1249,9 +1251,9 @@ executions. No crash, no mismatch. aarch64 Linux only.
 
 **Not done here.** OOM fault injection per allocation point
 (waits for the DV-1 parity phase-2 branch, PR #16, to merge, so that the
-port's allocation points are final). Committed `parse_trace` corpus
-seeds for namespaced duplicate attributes (the fuzz runs above used 40
-such seeds in the working corpus only; the corpus merge was not done). Suspend/resume: see "Remaining uncovered
+port's allocation points are final). A libFuzzer merge of the Part 2
+runs' working corpora into `fuzz/corpus` (only the 40 curated inputs
+were added). Suspend/resume: see "Remaining uncovered
 lines".
 
 ## Divergences

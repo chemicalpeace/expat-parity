@@ -104,6 +104,20 @@ seeds of which 2,300 carry external entity bodies after
 edges). Scanned for personal data (names, e-mail addresses, local paths;
 digit runs checked by hand): no hits.
 
+Part 2 (branch `part2-unparsed` / `part2-finish`, 2026-10-12): 40 curated
+`parse_trace` inputs added by hand (file name = SHA-1 of the content, as
+libFuzzer names units), 13,869 to 13,909 files: 10 start tags with
+prefixed attributes where two prefixes are bound to one URI (duplicate
+expanded names, prefix-of names, defaults from an `ATTLIST`, 71-80
+attributes so `m_nsAtts` grows) x 4 selector pairs: `04 00` (namespaces,
+separator `|`, `XML_Parse` in one call), `04 40` (the same with
+triplets), `07 41` (triplets, buffer API, 2-byte chunks), `05 48`
+(triplets, separator `:`, 1-byte chunks). The corpus held no such start tag, so its replay
+(`fuzz_corpus`) did not catch injected bugs in the namespaced duplicate
+check; with these inputs it does. Not a libFuzzer merge: the other units
+found by the Part 2 runs are not added. No personal data (fixed ASCII
+documents).
+
 ## Run logs
 
 `docs/fuzz-logs/<module>/` keeps the libFuzzer output of the runs reported
