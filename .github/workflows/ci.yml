@@ -42,6 +42,36 @@ jobs:
       - run: cargo test --workspace --all-features
       - run: cargo test -p expat --no-default-features
 
+  coverage:
+    name: coverage (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup component add llvm-tools-preview
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov@0.9.1
+      # Full suite (both commands of the test job, no test skipped), pinned
+      # stable toolchain, instrumented release build. Doctests are not in
+      # this job: cargo-llvm-cov --doctests needs nightly, and nightly
+      # coverage is not usable at present (docs/REPORT.md, "Coverage on every
+      # CI platform"); `scripts/coverage.sh DIR nightly-doctests` and
+      # `... nightly` measure them by hand.
+      - run: scripts/coverage.sh coverage-out/stable
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-${{ runner.os }}
+          path: coverage-out/
+          if-no-files-found: error
+
   miri:
     name: miri (safe crate)
     runs-on: ubuntu-latest

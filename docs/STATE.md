@@ -12,15 +12,21 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   11c (allocation tracker, D-030) done; 11d step D1 (external entity and
   not-standalone test handlers, D-031) and step D2 (external entity
   parsers, D-032) done. `Stop::DtdNotPorted` is removed: every document
-  parses to C's result. Step E (DTD coverage, REPORT.md:
-  `crates/expat` 94.86 % lines / 95.13 % regions / 92.11 % functions) and
-  the module 11 summary table with its remaining gaps are recorded. DV-1
+  parses to C's result. Step E (DTD coverage) and the module 11 summary
+  table with its remaining gaps are recorded. Coverage is measured in CI
+  on all three platforms with the full suite (PR #13, REPORT.md "Coverage
+  on every CI platform"): `crates/expat` 94.95 % lines / 95.16 % regions /
+  92.27 % functions on Linux and macOS, 94.93 % / 95.13 % / 92.27 % on
+  Windows, after correcting an llvm-cov artefact that had hidden 7 covered
+  lines (raw step E figure 94.86 %). DV-1
   is pending the owner's decision. Next: module 12.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
   tables, doc, deny), test on ubuntu-latest / macos-latest / windows-latest,
-  Miri, fuzz smoke (60 s per target). Green on PR #1 (modules 1-5), PR #2
+  Miri, fuzz smoke (60 s per target), coverage on ubuntu-latest /
+  macos-latest / windows-latest (`scripts/coverage.sh`, artifacts
+  `coverage-<OS>`). Green on PR #1 (modules 1-5), PR #2
   (modules 6-7), PR #3 (module 8), PR #4 (module 9), PR #5 (module 10),
   PR #6 (module 11a), PR #7 (module 11b), PR #8 (module 11b2), PR #9
   (module 11c), PR #10 (module 11d D1) and the module 11d D2 PR before
@@ -29,7 +35,14 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 
 ## Blockers
 
-None.
+None. Open finding (not yet fixed, found by the coverage job, REPORT.md
+"Coverage on every CI platform"): `init_diff::xml_decl_in_every_builtin_encoding`
+(random proptest seeds) can fail — `XmlParseXmlDecl` with an unknown
+encoding returns a different `bad` position than C, e.g. seed
+`0x52f43d23123766f6` on `<?xml \xC3\xA9?>` (port 7, C 8) and seed
+`0xfe8d9b29cbd0ff22` on `<?xml no\xC3\xA9 ?>` (port 9, C 11);
+the first reproduced on aarch64 Linux. CI can therefore fail intermittently in the
+`test` and `coverage` jobs until it is fixed.
 
 ## Module Definition of Done
 

@@ -1,0 +1,46 @@
+# Nightly toolchain coverage (needed for doctests), CI run 38220630479, commit 2f6a37a.
+# rustc 1.101.0-nightly (080cc2714 2026-10-11), cargo-llvm-cov 0.9.1, --release, same full suite.
+# "nightly" = without doctests (control); "nightly-doctests" = with --doctests.
+# Corrected TOTAL lines (scripts/coverage_fix_profdata.py), crates/expat only:
+Linux nightly: TOTAL 13525 4747 64.90% 624 49 92.15% 7590 663 91.26% 0 0 -
+Linux nightly-doctests: TOTAL 13599 4747 65.09% 654 49 92.51% 7648 663 91.33% 0 0 -
+macOS nightly: TOTAL 13525 4747 64.90% 624 49 92.15% 7590 663 91.26% 0 0 -
+macOS nightly-doctests: TOTAL 13599 4747 65.09% 654 49 92.51% 7648 663 91.33% 0 0 -
+Windows nightly: not measured (run stopped by the init_diff failure, see REPORT.md)
+Windows nightly-doctests: not measured (run stopped by the init_diff failure, see REPORT.md)
+
+# Pinned stable toolchain for comparison (corrected):
+Linux stable: TOTAL 13441 650 95.16% 608 47 92.27% 7552 381 94.95% 0 0 -
+
+# Per file, Linux nightly (corrected), showing regions far below lines:
+Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+chartab/mod.rs                     41                26    36.59%           3                 1    66.67%          35                18    48.57%           0                 0         -
+encode/mod.rs                      47                 1    97.87%           4                 1    75.00%          37                 8    78.38%           0                 0         -
+hash/mod.rs                       315               123    60.95%          27                 1    96.30%         179                10    94.41%           0                 0         -
+heap.rs                            13                 5    61.54%           4                 1    75.00%          10                 3    70.00%           0                 0         -
+naming/mod.rs                     133                43    67.67%          14                 0   100.00%          66                 1    98.48%           0                 0         -
+parse/accounting.rs                41                15    63.41%           3                 0   100.00%          36                 2    94.44%           0                 0         -
+parse/content.rs                 1746               669    61.68%          41                 1    97.56%         968               110    88.64%           0                 0         -
+parse/decl.rs                    1430               588    58.88%          25                 4    84.00%         744                82    88.98%           0                 0         -
+parse/dtd.rs                      434               154    64.52%          25                 0   100.00%         279                 7    97.49%           0                 0         -
+parse/entity.rs                   570               214    62.46%          29                 2    93.10%         368                33    91.03%           0                 0         -
+parse/error.rs                      6                 0   100.00%           2                 0   100.00%           6                 0   100.00%           0                 0         -
+parse/external.rs                1124               460    59.07%          26                 1    96.15%         621                62    90.02%           0                 0         -
+parse/mod.rs                      722               240    66.76%          57                20    64.91%         534               115    78.46%           0                 0         -
+parse/model.rs                    114                39    65.79%           7                 0   100.00%          84                 5    94.05%           0                 0         -
+parse/prolog.rs                   513               166    67.64%          13                 1    92.31%         285                26    90.88%           0                 0         -
+parse/tracker.rs                  806               280    65.26%          58                 6    89.66%         500                51    89.80%           0                 0         -
+pool/mod.rs                       466               198    57.51%          33                 0   100.00%         286                18    93.71%           0                 0         -
+role/mod.rs                      1170               487    58.38%          68                 1    98.53%         540                 3    99.44%           0                 0         -
+siphash/mod.rs                    167                62    62.87%           8                 0   100.00%          85                 5    94.12%           0                 0         -
+tok/convert.rs                    460               135    70.65%          20                 0   100.00%         232                12    94.83%           0                 0         -
+tok/init.rs                       209                59    71.77%          22                 3    86.36%         131                22    83.21%           0                 0         -
+tok/mod.rs                         17                 3    82.35%           2                 0   100.00%          14                 0   100.00%           0                 0         -
+tok/normal.rs                     119                41    65.55%          16                 2    87.50%          68                 7    89.71%           0                 0         -
+tok/scan.rs                      2045               507    75.21%          60                 0   100.00%        1017                27    97.35%           0                 0         -
+tok/unknown.rs                    340               130    61.76%          25                 4    84.00%         171                25    85.38%           0                 0         -
+tok/utf16.rs                      113                32    71.68%          18                 0   100.00%          68                 2    97.06%           0                 0         -
+tok/xmldecl.rs                    364                70    80.77%          14                 0   100.00%         226                 9    96.02%           0                 0         -
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+TOTAL                           13525              4747    64.90%         624                49    92.15%        7590               663    91.26%           0                 0         -
