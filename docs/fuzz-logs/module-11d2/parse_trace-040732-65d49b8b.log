@@ -1,0 +1,52 @@
+# libFuzzer log, trimmed: 310 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=70 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 986269050
+INFO: Loaded 1 modules   (75108 inline 8-bit counters): 75108 [0xaaaaadc0c2f0, 0xaaaaadc1e854), 
+INFO: Loaded 1 PC tables (75108 PCs): 75108 [0xaaaaadc1e858,0xaaaaadd43e98), 
+INFO:    24758 files found in <corpus>
+INFO: seed corpus: files: 24758 min: 1b max: 11931b total: 8089360b rss: 47Mb
+#8192	pulse  cov: 9828 ft: 30900 corp: 5689/86Kb exec/s: 4096 rss: 421Mb
+#16384	pulse  cov: 15229 ft: 56767 corp: 9983/473Kb exec/s: 2730 rss: 440Mb
+#24759	INITED cov: 16789 ft: 73554 corp: 12973/3812Kb exec/s: 917 rss: 531Mb
+Loaded 1024/24788 files from <corpus>
+Loaded 2048/24788 files from <corpus>
+Loaded 4096/24788 files from <corpus>
+#32768	pulse  cov: 16811 ft: 73615 corp: 12995/3820Kb lim: 11944 exec/s: 1057 rss: 672Mb
+#65536	pulse  cov: 16831 ft: 73739 corp: 13043/3878Kb lim: 11957 exec/s: 1213 rss: 716Mb
+#101924	DONE   cov: 16855 ft: 73848 corp: 13088/3897Kb lim: 11970 exec/s: 1435 rss: 716Mb
+###### Recommended dictionary. ######
+"\000\356\356\000" # Uses: 486
+"attr" # Uses: 468
+"\000\000\021\000" # Uses: 514
+"\001\000\000\006" # Uses: 437
+"\001\000" # Uses: 453
+"\357\377\377\377" # Uses: 407
+"p0.ent" # Uses: 425
+"\"\000" # Uses: 410
+"*\000" # Uses: 389
+"\000\000\000\000\000\000\000\000" # Uses: 385
+"\377\377\377\377\377\377\377\013" # Uses: 335
+"\377\000" # Uses: 355
+"\004\000" # Uses: 381
+"\377\377\377\377" # Uses: 227
+"\037\000" # Uses: 217
+"\013\000\000\000\000\000\000\000" # Uses: 123
+"\001\000\0002" # Uses: 99
+"\377\377\377\377\377\377\377\012" # Uses: 76
+"\000\000\000\000\000\000\000\016" # Uses: 79
+"limit at-am" # Uses: 47
+"\014\000\000\000\000\000\000\000" # Uses: 19
+"text %C5%AE" # Uses: 32
+"\005\000\000\000" # Uses: 31
+"ID" # Uses: 11
+"\011\000\000\000" # Uses: 0
+###### End of recommended dictionary. ######
+Done 101924 runs in 71 second(s)
+stat::number_of_executed_units: 101924
+stat::average_exec_per_sec:     1435
+stat::new_units_added:          310
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              716
