@@ -114,8 +114,10 @@ with allocation failures, white-box).
    comparison with the oracle.
 2. Module 11: the remaining gaps listed in
    REPORT.md (module 11 summary) that do not depend on module 12
-   (`XML_UnparsedEntityDeclHandler`, the encoding argument of external
-   entity parsers, per-point allocation refusals, `m_nsAtts` growth).
+   (`XML_UnparsedEntityDeclHandler`, per-point allocation refusals,
+   `m_nsAtts` growth). The encoding argument of external entity parsers
+   is compared (docs/EXTERNAL-ENTITY-ENCODING.md, `ext_encoding_diff`, no
+   difference); its unknown-encoding handler branch waits for module 12.
 3. Module 12: public `expat::Parser` on top of `parse::Parser`: default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt
