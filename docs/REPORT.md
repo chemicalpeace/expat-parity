@@ -810,8 +810,8 @@ behaviour and defaults are C's (D-026).
 
 **Remaining gaps** (module 11):
 
-1. DV-1 is **pending the owner's decision** (DIVERGENCES.md); the code
-   is unchanged.
+1. DV-1: owner decision 2026-10-12 is exact parity in stages (D-033);
+   phase 1 (sizes, R1 fix) below, W1/W2 remain until the later stages.
 2. Suspend / resume, the default handler, the unknown-encoding handler and
    `XML_GetInputContext` are module 12; their branches in the DTD code are
    uncovered. External entity parsers exist inside `expat::parse` but have
@@ -826,6 +826,29 @@ behaviour and defaults are C's (D-026).
 7. Coverage: 94.86 % lines for `crates/expat`, below the Phase 4 target of
    95 %; measured on one platform, without doctests.
 8. Out of scope: `XML_UNICODE` builds (D-002).
+
+### DV-1 parity, phase 1 (D-033): structure sizes and the reverse violation R1
+
+What was wrong: `BINDING` (48 vs C's 56) and `NAME_AND_DEFAULT_ATTRIBUTE`
+(16 vs 24) were charged below C's `sizeof`, so the port accepted
+documents C refuses at the default limits (DIVERGENCES.md R1). DV-1 was
+wider than documented: besides the creation bound (W1) the pool slack can
+cost a whole pool block (W2).
+
+| Group (test) | Inputs | C behaviour | Port behaviour | Divergence |
+|---|---|---|---|---|
+| Sizes (`tracker_sizes`) | 16 structures and quantities: TAG, BINDING, PREFIX, ENTITY, CONTENT_SCAFFOLD, offsetof(BLOCK, s), ATTRIBUTE_ID, DEFAULT_ATTRIBUTE, NAME_AND_DEFAULT_ATTRIBUTE, NS_ATT, ELEMENT_TYPE, OPEN_INTERNAL_ENTITY, ATTRIBUTE, NAMED *, malloc header, int | `sizeof`/`offsetof` from the vendored `xmlparse.c` built for the CI platform (oracle). 64-bit Linux: 96, 56, 16, 64, 32, 12, 24, 24, 24, 24, 88, 48, 32, 8, 8, 4. | Computed from C's field lists (`parse::c_layout`): equal for 15; ELEMENT_TYPE 96 (known over-count, step 6 of D-033). An under-count fails on every platform. | ELEMENT_TYPE +8 (and NS_ATT +8 on Windows), fail-closed |
+| R1 (`dv1_windows::r1_attribute_defaults`) | W1 document with 10,000 ATTLIST defaults, pads 187,657, 188,000, 188,322, 188,323, 188,456, 188,457 | Refuses the first three (end 35,211,416), accepts from 188,323. | Refuses the first five (end 35,224,776), accepts from 188,457. Before the fix it accepted all six. | none in the C-refuses direction; DV-1 W1 shape for 188,323-188,456 |
+| W1 (`dv1_windows::w1_creation_charge`) | pads 330,745, 330,746, 330,878, 330,879 | Refuses at 330,745, accepts from 330,746 (end 67,117,916). | Refuses up to 330,878 (end 33,576,836), accepts at 330,879. | DV-1 (W1), pinned until step 3 |
+| W2 (`dv1_windows::w2_pool_slack`) | 84,947 references + tail 362, 363, 366, 367 | Accepts 362-366 (end 33,563,484), refuses 367. | Accepts 362, refuses 363-367. | DV-1 (W2), pinned until step 2 |
+
+Injected bugs (logs: `inject-logs/phase1` in the working notes, not in the
+repository): P1 `BINDING_SIZE` back to 6 words: caught by `tracker_sizes`
+(not by `dv1_windows`, whose documents declare no namespaces); P2
+`NAME_AND_DEFAULT_ATTRIBUTE_SIZE` back to 2 words: caught by both
+(`R1 pad 187657: the port accepts a document C refuses`); P3
+`ELEMENT_TYPE_SIZE` 10 words, P4 `NS_ATT_SIZE` 16, P5 one pointer removed
+from the `TAG` field list: caught by `tracker_sizes`.
 
 ## Divergences
 

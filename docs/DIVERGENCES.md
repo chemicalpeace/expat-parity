@@ -8,53 +8,103 @@ The C library is the oracle; a divergence is accepted only when the C
 behaviour is a bug relative to the XML 1.0 (Fifth Edition) / Namespaces in
 XML 1.0 specifications or to libexpat's own documentation.
 
-### DV-1 Allocation tracker: the port can refuse slightly earlier than C (module 11c, D-030)
+### DV-1 Allocation tracker: the port can refuse earlier than C (module 11c, D-030, D-033)
 
-- Reproducer: any document under tightened tracker limits at C's exact
-  passing threshold, e.g. the sweep document "deep nesting" in
-  `tests/tests/tracker_diff.rs` with `XML_SetAllocTrackerMaximumAmplification(1.0)`
-  and `XML_SetAllocTrackerActivationThreshold(t)`, where `t` is the
-  smallest threshold at which C succeeds: C parses the document, the port
-  stops with `XML_ERROR_NO_MEMORY` (36 of 36 sweep documents x option
-  sets).
 - Cause: the port cannot count libexpat's allocations (it does not
   allocate C's structures), so it charges at least C's bytes at C's
-  allocation points or earlier (D-030); its total exceeds C's by a margin
-  (measured 11,764-13,352 bytes, mostly the 16 KiB creation bound against
-  C's 3,040-3,059 bytes). Documents whose C total ends within that margin
-  below the refusal point are refused by the port only.
-- At the default limits (100.0, 64 MiB) the window requires a tracked
-  total of at least 64 MiB within the margin below 100 times the direct
-  input; no test, vector or fuzz input reached it (the tests assert that
-  the port never refuses at the default limits where C accepts).
+  allocation points or earlier (D-030). Its total exceeds C's by a margin
+  `Δ(k) = N_port(k) − N_C(k)` at allocation event `k`. A document is
+  refused by the port only when, at some event, the port's new total
+  reaches the activation threshold with an amplification above the
+  maximum while C's stays below at every event of its own parse.
+- The margin has these components (measured on 64-bit Linux through the
+  oracle, `docs/REPORT.md` DV-1 section):
+  - the creation bound `CREATION_CHARGE` = 16,384 bytes against C's
+    3,040 (root parser, 64-bit) minus the C allocations the port does not
+    replay one by one (measured: the namespace implicit context's pool
+    block, 1,044 bytes, `m_atts` growth, the XML declaration strings);
+    measured 11,764-13,352 bytes;
+  - `ELEMENT_TYPE` charged as 96 bytes against C's 88: +8 bytes per
+    element type, unbounded (grows with the number of element types);
+  - `NS_ATT` charged as 24 bytes against C's 16 on Windows (4-byte
+    `unsigned long`): +8 bytes per slot of `m_nsAtts` there;
+  - the raw tag name charged together with the converted name when the
+    tag opens (`Tracker::open_tag`); C stores it later and only when the
+    input buffer moves (`storeRawNames`): grows with name length x depth;
+  - **`POOL_SLACK` = 4**: a pool string is grown when fewer than
+    `len + 4` characters are free, where C's `XmlConvert` fills a block to
+    its last byte. When a string ends in the last four characters of a
+    block that C fills exactly, the port doubles the block and C does not:
+    the margin is **one whole pool block** (up to 32 MiB at the default
+    limits), not a few kilobytes.
+- Reproducers at the default limits (100.0, 64 MiB), in
+  `tests/tests/dv1_windows.rs` (permanent regressions, D-033):
+  - **W1 (creation charge):** `pad` spaces + `<!DOCTYPE r [<!ENTITY ee '`
+    395 x `x` `'>]><r v='` + 85,000 x `&ee;` + `'/>`. For pad
+    330,746-330,878 (documents of 671,180-671,312 bytes, 133 documents)
+    C accepts (its last pool doubling reaches 67,117,916 bytes, amplification
+    100.00) and the port refuses (33,576,836 + 33,554,432 = 67,131,268 >
+    100 x direct). With 10,000 attribute defaults on an unused element type
+    the same window lies at pad 188,323-188,456.
+  - **W2 (pool slack):** 84,947 x `&ee;` + `tail` x `x`, no padding. For
+    tail 363-366 (documents of 340,585-340,588 bytes) C fills its 32 MiB
+    block exactly (33,554,431 characters and the NUL; end 33,563,484) and
+    accepts; the port doubles to 64 MiB (amplification 197) and refuses.
+  - With caller-tightened limits the window is easy to reach: at C's exact
+    passing threshold the port refuses in 36 of 36 sweep cases
+    (`tracker_diff.rs::threshold_boundary_sweep`, amplification 1.0).
 - Justification: fail-closed security behaviour; the refusal is the same
   error C's tracker gives (`XML_ERROR_NO_MEMORY`), and the allocation
   tracker is a resource limit, not part of XML 1.0 well-formedness.
-  Exact replication would require C's structure layouts and every
-  incidental allocation (D-030).
-- The opposite direction never happens by construction and is tested:
-  whenever C refuses through its tracker, the port refuses
-  (`tests/tests/tracker_diff.rs`, `parse_trace` fuzz target).
+- The opposite direction (C refuses, the port accepts) is a security
+  defect, not a divergence: it was found (R1 below) and fixed, and is
+  tested by `tracker_sizes.rs` (every structure size >= C's `sizeof`),
+  `dv1_windows.rs`, the corpus relations in `tracker_diff.rs` and the
+  tracker relation of the `parse_trace` fuzz target.
 - External entity parsers (module 11d step D2, D-032): every child
   charges the root's tracker. A general entity parser's charge is fully
   released when it is freed; a parameter entity parser keeps the shared
   DTD's growth charged (as in C) and releases its own structures. The
-  port's charge for buffers it does not shadow one by one stays inside
-  the creation bound, so the margin over C stays 13,312-13,352 bytes
-  whatever the number of children (87,381 nested parameter entity
-  parsers: C 8,028, port 21,380 bytes at the end). Before this was fixed
-  the child's own buffers stayed charged, about 1 KB per parameter
-  entity parser, enough for a refusal at the default limits where C
-  succeeds; `external_parser_diff.rs::billion_laughs_across_external_entities`
-  asserts the bound.
-- **Status: pending owner decision** (2026-10-12). Whether the ~13 KB
-  window above 64 MiB at the default limits is acceptable, or the port
-  must be brought to C's exact count there, is open; the behaviour is
-  left unchanged until decided.
-- Regression tests: `tests/tests/tracker_diff.rs::threshold_boundary_sweep`
-  (asserts the 36/36 count), `generated_documents_tracker_relation` and
+  creation-bound part of the margin stays 13,312-13,352 bytes whatever
+  the number of children (87,381 nested parameter entity parsers: C
+  8,028, port 21,380 bytes at the end;
+  `external_parser_diff.rs::billion_laughs_across_external_entities`).
+- **Status: being removed (owner decision 2026-10-12, D-033: option B,
+  exact per-allocation parity, in stages).** Until every stage is merged,
+  W1 and W2 remain and `dv1_windows.rs` pins them as "C accepts, port
+  refuses". Rollback rule: if a parity stage ever produces C-refuses /
+  port-accepts, `CREATION_CHARGE` returns to 16,384 and `POOL_SLACK` to 4
+  (the size fixes stay).
+- Regression tests: `tests/tests/dv1_windows.rs` (W1, W2, R1),
+  `tracker_diff.rs::threshold_boundary_sweep` (36/36),
+  `generated_documents_tracker_relation` and
   `upstream_vectors_tracker_relation` (no refusal at default limits where
-  C accepts).
+  C accepts, on those corpora).
+
+### R1 Reverse violation: the port accepted documents C refuses (found and fixed 2026-10-12, D-033)
+
+- **This was a security defect, not an accepted divergence.** Two
+  structure sizes were charged below C's `sizeof` on 64-bit targets:
+  `BINDING` 48 bytes against 56 (`size_t uriLen; size_t uriAlloc;`,
+  `xmlparse.c` 262-270) and `NAME_AND_DEFAULT_ATTRIBUTE` 16 against 24
+  (`size_t attIndex; bool initialized;`, 374-386). The port under-counted
+  8 bytes per binding and per (element type, default attribute) entry,
+  without bound, contradicting D-030's "at least C's bytes".
+- Reproducer: the W1 document with
+  `<!ATTLIST z a0 CDATA 'v' ... a9999 CDATA 'v'>` (10,000 defaults on an
+  element type that never occurs), pad 187,657-188,322 (documents of
+  686,993-687,658 bytes). C: `XML_ERROR_NO_MEMORY` (last doubling to
+  68,765,848 bytes, amplification 100.10, `xmlparse.c:8608`). The port
+  accepted (its total 68,699,208, 66,640 bytes below C's at that event).
+- Why the tests missed it: their documents were small, so the
+  16 KiB creation bound covered the deficit; the relation was only
+  checked at the end of the parse, never per event.
+- Fix (D-033): every tracked structure size is computed from C's field
+  list with the target's C layout (`parse::c_layout`) and compared with
+  the C compiler's `sizeof` on every CI platform
+  (`tests/tests/tracker_sizes.rs`, an under-count always fails). Now C and
+  the port both refuse R1 (`dv1_windows.rs::r1_attribute_defaults`).
+  Injected bugs P1-P5 (each size reverted or shortened) are caught.
 
 Platform-dependent C behaviour that the port fixes to one choice, without an
 observable effect on parsing, is recorded in DECISIONS (D-016 counter width,
