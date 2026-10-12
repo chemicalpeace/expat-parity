@@ -443,6 +443,28 @@ pub const CONTENT_SCAFFOLD_SIZE: usize = c_layout::CONTENT_SCAFFOLD;
 /// `INIT_SCAFFOLD_ELEMENTS`
 pub const INIT_SCAFFOLD_ELEMENTS: usize = 32;
 
+/// Every structure size the tracker charges, by C name, for the
+/// comparison with the C compiler's `sizeof` / `offsetof`
+/// (`tests/tests/tracker_sizes.rs`, on every CI platform).
+pub const TRACKER_SIZES: &[(&str, usize)] = &[
+    ("TAG", TAG_SIZE),
+    ("BINDING", BINDING_SIZE),
+    ("PREFIX", super::dtd::PREFIX_SIZE),
+    ("ENTITY", super::dtd::ENTITY_SIZE),
+    ("CONTENT_SCAFFOLD", CONTENT_SCAFFOLD_SIZE),
+    ("BLOCK_HEADER", BLOCK_HEADER_SIZE),
+    ("ATTRIBUTE_ID", super::dtd::ATTRIBUTE_ID_SIZE),
+    ("DEFAULT_ATTRIBUTE", DEFAULT_ATTRIBUTE_SIZE),
+    ("NAME_AND_DEFAULT_ATTRIBUTE", NAME_AND_DEFAULT_ATTRIBUTE_SIZE),
+    ("NS_ATT", NS_ATT_SIZE),
+    ("ELEMENT_TYPE", super::dtd::ELEMENT_TYPE_SIZE),
+    ("OPEN_INTERNAL_ENTITY", OPEN_ENTITY_SIZE),
+    ("ATTRIBUTE", ATTRIBUTE_SIZE),
+    ("NAMED_PTR", POINTER_SIZE),
+    ("MALLOC_HEADER", MALLOC_HEADER as usize),
+    ("INT", core::mem::size_of::<i32>()),
+];
+
 /// The tracker with the shadows of C's structures whose allocations depend
 /// on the input.
 #[derive(Debug, Clone, Default, PartialEq)]

@@ -64,7 +64,7 @@ mod tracker;
 mod tests;
 
 pub use accounting::{Account, Accounting};
-pub use tracker::{AllocTracker, PoolShadow, TableShadow, Tracker, TrackerHeap};
+pub use tracker::{AllocTracker, PoolShadow, TableShadow, Tracker, TrackerHeap, TRACKER_SIZES};
 pub use dtd::{
     AttributeId, Binding, BindingId, DefaultAttribute, Dtd, ElementType, Entity, EntityRef, Prefix,
     PrefixId,

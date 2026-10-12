@@ -41,6 +41,10 @@ jobs:
       - uses: actions/checkout@v4
       - run: cargo test --workspace --all-features
       - run: cargo test -p expat --no-default-features
+      # D-033: the tracker's structure sizes against this platform's C
+      # compiler, printed for the per-platform report.
+      - name: tracker sizes vs C sizeof
+        run: cargo test -p expat-difftest --test tracker_sizes -- --nocapture
 
   miri:
     name: miri (safe crate)

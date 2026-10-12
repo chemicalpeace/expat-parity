@@ -817,3 +817,35 @@ oracle_tracker_bytes(const void *parser) {
   const struct XML_ParserStruct *p = (const struct XML_ParserStruct *)parser;
   return (unsigned long long)p->m_alloc_tracker.bytesAllocated;
 }
+
+/* ---- C structure sizes charged by the tracker (D-033) ------------------- */
+
+/* sizeof / offsetof of the structures whose allocations the port's tracker
+ * charges, taken by the C compiler from the vendored xmlparse.c, in the
+ * order of ORACLE_C_SIZE_NAMES (src/lib.rs). Returns the number of values
+ * written (at most `n`). */
+size_t
+oracle_c_sizes(size_t *out, size_t n) {
+  const size_t v[] = {
+      sizeof(TAG),
+      sizeof(BINDING),
+      sizeof(PREFIX),
+      sizeof(ENTITY),
+      sizeof(CONTENT_SCAFFOLD),
+      offsetof(BLOCK, s),
+      sizeof(ATTRIBUTE_ID),
+      sizeof(DEFAULT_ATTRIBUTE),
+      sizeof(NAME_AND_DEFAULT_ATTRIBUTE),
+      sizeof(NS_ATT),
+      sizeof(ELEMENT_TYPE),
+      sizeof(OPEN_INTERNAL_ENTITY),
+      sizeof(ATTRIBUTE),
+      sizeof(NAMED *),
+      sizeof(size_t) + EXPAT_MALLOC_PADDING,
+      sizeof(int),
+  };
+  size_t i;
+  for (i = 0; i < n && i < sizeof(v) / sizeof(v[0]); i++)
+    out[i] = v[i];
+  return i;
+}
