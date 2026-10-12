@@ -757,8 +757,11 @@ pub type ExternalEntities = Vec<(Vec<u8>, Vec<u8>)>;
 pub const EXTERNAL_MARKER: &[u8] = b"\x00\xEE\xEE\x00";
 
 /// The system identifiers a document declares (`SYSTEM 'x'` or
-/// `SYSTEM "x"`, ASCII spelling), distinct, in order of appearance.
+/// `SYSTEM "x"`, ASCII spelling; NUL bytes are skipped so the ASCII of a
+/// UTF-16 document is found too), distinct, in order of appearance.
 pub fn system_ids(doc: &[u8]) -> Vec<Vec<u8>> {
+    let squeezed: Vec<u8> = doc.iter().copied().filter(|&b| b != 0).collect();
+    let doc = squeezed.as_slice();
     let mut out: Vec<Vec<u8>> = Vec::new();
     let mut i = 0;
     while let Some(p) = doc

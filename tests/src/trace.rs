@@ -7,7 +7,7 @@
 use std::fmt::Write as _;
 
 /// Event tags that may start a trace line.
-pub const TAGS: [&str; 21] = [
+pub const TAGS: [&str; 26] = [
     "xmldecl",
     "doctype",
     "enddoctype",
@@ -29,6 +29,11 @@ pub const TAGS: [&str; 21] = [
     "textdigest",
     "limit",
     "accounting",
+    "extref",
+    "notstandalone",
+    "extend",
+    "extdepth",
+    "extcreate",
 ];
 
 /// FNV-1a 64 offset basis (`textdigest` lines).

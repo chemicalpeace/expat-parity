@@ -8,7 +8,9 @@
 //! [`seeds`] produces the seed inputs the corpora are regenerated from
 //! (`docs/FUZZING.md`); it is a pure function of a fixed seed.
 
-use crate::docgen::{Rng, document, dtd_document, entity_document};
+use crate::docgen::{
+    Rng, document, dtd_document, entity_document, external_case, join_external_input,
+};
 use crate::port::port_trace;
 use crate::trace::{first_difference, is_well_formed_trace, mask_q4};
 use crate::vectors::upstream;
@@ -183,6 +185,24 @@ pub fn seeds(target: &str) -> Option<Vec<Vec<u8>>> {
                 let doc = entity_document(&mut r);
                 let mut input = vec![r.next_u64() as u8, r.next_u64() as u8 | 0x80];
                 input.extend_from_slice(&doc);
+                out.push(input);
+            }
+            // Module 11d: documents with external entities whose bodies
+            // follow the document (`docgen::join_external_input`), mostly
+            // with parameter entity parsing on, the last 300 with small
+            // billion-laughs limits.
+            for i in 0..1800 {
+                let (doc, entities) = external_case(&mut r);
+                let pep = [0u8, 1, 2, 2][r.below(4)] << 6;
+                let sel = (r.next_u64() as u8 & 0b111) | pep;
+                let sel2 = if i < 1500 {
+                    r.next_u64() as u8 & 0x7F
+                } else {
+                    r.next_u64() as u8 | 0x80
+                };
+                let bodies: Vec<Vec<u8>> = entities.into_iter().map(|(_, b)| b).collect();
+                let mut input = vec![sel, sel2];
+                input.extend_from_slice(&join_external_input(&doc, &bodies));
                 out.push(input);
             }
             Some(out)
