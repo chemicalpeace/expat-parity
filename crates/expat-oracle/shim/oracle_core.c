@@ -843,6 +843,12 @@ oracle_c_sizes(size_t *out, size_t n) {
       sizeof(NAMED *),
       sizeof(size_t) + EXPAT_MALLOC_PADDING,
       sizeof(int),
+      sizeof(struct XML_ParserStruct),
+      sizeof(DTD),
+      offsetof(struct XML_ParserStruct, m_position),
+      sizeof(ACCOUNTING),
+      sizeof(MALLOC_TRACKER),
+      sizeof(ENTITY_STATS),
   };
   size_t i;
   for (i = 0; i < n && i < sizeof(v) / sizeof(v[0]); i++)

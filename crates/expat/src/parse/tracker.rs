@@ -56,15 +56,39 @@ pub const ALLOC_MAXIMUM_AMPLIFICATION_DEFAULT: f32 = 100.0;
 /// `EXPAT_ALLOC_TRACKER_ACTIVATION_THRESHOLD_DEFAULT` (64 MiB).
 pub const ALLOC_ACTIVATION_THRESHOLD_DEFAULT: u64 = 67_108_864;
 
-/// Charged when the parser is created: an upper bound of what
-/// `parserCreate` allocates (the parser structure, `m_atts`, `m_dataBuf`,
-/// the DTD; 3,040 bytes on 64-bit Linux, measured through the oracle).
-/// Everything C allocates after creation is replayed allocation by
-/// allocation (since stage 4 of D-034 also the implicit namespace
-/// context's `m_tempPool` block); the excess over C's creation is the
-/// margin stage 3 removes. `tracker_diff.rs` checks it against C's count
-/// after creation on every CI platform.
-pub const CREATION_CHARGE: u64 = 16_384;
+/// What `parserCreate` allocates after the parser structure, in C's
+/// order: `m_atts` (`INIT_ATTS_SIZE` `ATTRIBUTE`s, `xmlparse.c` 1405) and
+/// `m_dataBuf` (`INIT_DATA_BUF_SIZE` characters, 1410).
+const CREATION_ARRAYS: [usize; 2] = [
+    super::INIT_ATTS_SIZE * c_layout::ATTRIBUTE,
+    super::INIT_DATA_BUF_SIZE,
+];
+
+/// `dtdCreate`'s allocation (`xmlparse.c` 7865): the DTD structure. A
+/// parameter entity parser shares its parent's DTD and allocates none.
+const CREATION_DTD: usize = c_layout::DTD;
+
+/// What `parserCreate` charges to the tracker for a parser with its own
+/// DTD and no protocol encoding name: the parser structure (counted
+/// directly, `xmlparse.c` 1304-1395), `m_atts`, `m_dataBuf` and the DTD,
+/// each with its [`MALLOC_HEADER`]. Derived from the C layout of the
+/// target ([`c_layout::PARSER`], [`c_layout::DTD`]): 3,040 bytes on 64-bit
+/// Unix, 3,008 on 64-bit Windows (its parser structure is 32 bytes
+/// smaller, four `unsigned long` members). Since stage 3 of D-034 it is
+/// charged as C's four separate allocations; `tracker_sizes.rs` checks the
+/// sizes against the C compiler and `tracker_events.rs` the events against
+/// C's on every CI platform.
+///
+/// Rollback (D-034): setting this to 16,384 restores the old upper bound;
+/// the excess is then charged with the parser structure.
+pub const CREATION_CHARGE: u64 = (c_layout::PARSER + CREATION_ARRAYS[0] + CREATION_ARRAYS[1] + CREATION_DTD) as u64
+    + 4 * MALLOC_HEADER;
+
+/// The parser structure's charge: `CREATION_CHARGE` minus the arrays and
+/// the DTD (exactly `sizeof(struct XML_ParserStruct)` plus the header
+/// unless the rollback is in effect).
+const PARSER_STRUCT_CHARGE: u64 =
+    CREATION_CHARGE - (CREATION_ARRAYS[0] + CREATION_ARRAYS[1] + CREATION_DTD) as u64 - 3 * MALLOC_HEADER;
 
 /// `INIT_BLOCK_SIZE` of the string pools.
 const INIT_BLOCK_SIZE: i64 = 1024;
@@ -100,6 +124,11 @@ pub struct AllocTracker {
     /// Every change of the count while enabled ([`AllocTracker::log_events`]),
     /// for the per-event comparison with C (tests only; `None` normally).
     pub events: Option<alloc::vec::Vec<TrackerEvent>>,
+    /// The increases [`AllocTracker::charge_creation`] made, in order
+    /// (the parser structure, `m_atts`, `m_dataBuf`, the DTD, the encoding
+    /// name), so that [`AllocTracker::log_events`], switched on after the
+    /// parser exists, can report them as C does: one event each.
+    creation: [u64; 5],
 }
 
 impl Default for AllocTracker {
@@ -110,6 +139,7 @@ impl Default for AllocTracker {
             maximum_amplification_factor: ALLOC_MAXIMUM_AMPLIFICATION_DEFAULT,
             activation_threshold_bytes: ALLOC_ACTIVATION_THRESHOLD_DEFAULT,
             events: None,
+            creation: [0; 5],
         }
     }
 }
@@ -117,13 +147,37 @@ impl Default for AllocTracker {
 impl AllocTracker {
     /// Starts (or stops, discarding them) recording every change of the
     /// count as a [`TrackerEvent`].
-    /// The count so far is recorded as one first event (the parser's
-    /// creation charge, which C reports as several allocations).
+    /// The parser's creation allocations are recorded first, one event
+    /// each as [`AllocTracker::charge_creation`] charged them; anything
+    /// charged after them and before this call as one more event.
     pub fn log_events(&mut self, on: bool) {
         self.events = on.then(alloc::vec::Vec::new);
-        if on && self.bytes_allocated > 0 {
-            self.record(true, false, self.bytes_allocated);
+        if !on {
+            return;
         }
+        let (now, peak) = (self.bytes_allocated, self.peak_bytes_allocated);
+        let mut total = 0u64;
+        let mut events = alloc::vec::Vec::new();
+        for size in self.creation.into_iter().take_while(|&s| s > 0) {
+            total = total.saturating_add(size);
+            events.push(TrackerEvent {
+                increase: true,
+                refused: false,
+                size,
+                total,
+                peak: total,
+            });
+        }
+        if now > total {
+            events.push(TrackerEvent {
+                increase: true,
+                refused: false,
+                size: now - total,
+                total: now,
+                peak,
+            });
+        }
+        self.events = Some(events);
     }
 
     fn record(&mut self, increase: bool, refused: bool, size: u64) {
@@ -234,35 +288,82 @@ impl AllocTracker {
         self.release((size as u64).saturating_add(MALLOC_HEADER));
     }
 
-    /// Charges the creation of an external entity parser (the same bound
-    /// as a root parser's creation, `CREATION_CHARGE`, plus the encoding
-    /// name), checked against the root parser's limits like C's
-    /// `parserCreate` with a parent; `false` = refused, nothing charged.
-    pub fn charge_child_creation(&mut self, encoding_name_len: Option<usize>, direct: u64) -> bool {
-        let increase = CREATION_CHARGE
-            .saturating_add(encoding_name_len.map_or(0, |n| (n as u64).saturating_add(1 + MALLOC_HEADER)));
-        if !self.tolerable(increase, direct) {
+    /// `parserCreate` of an external entity parser (`xmlparse.c`
+    /// 1298-1470), checked against the root parser's limits: the parser
+    /// structure is checked before it is counted (1304-1311), then
+    /// `m_atts`, `m_dataBuf`, the DTD of a general entity parser
+    /// (`own_dtd`; a parameter entity parser shares its parent's) and the
+    /// copy of the encoding name are allocated in this order. On a refusal
+    /// C frees what it allocated (the arrays in reverse order, then the
+    /// structure; after a refused encoding name `XML_ParserFree` releases
+    /// the DTD, `m_atts`, `m_dataBuf` and the structure) and returns
+    /// `NULL`: `false`, the count back where it was.
+    pub fn charge_child_creation(&mut self, encoding_name_len: Option<usize>, own_dtd: bool, direct: u64) -> bool {
+        if !self.tolerable(PARSER_STRUCT_CHARGE, direct) {
             return false;
         }
-        self.add(increase);
+        self.add(PARSER_STRUCT_CHARGE);
+        if !self.alloc(CREATION_ARRAYS[0], direct) {
+            self.release(PARSER_STRUCT_CHARGE);
+            return false;
+        }
+        if !self.alloc(CREATION_ARRAYS[1], direct) {
+            self.free(CREATION_ARRAYS[0]);
+            self.release(PARSER_STRUCT_CHARGE);
+            return false;
+        }
+        if own_dtd && !self.alloc(CREATION_DTD, direct) {
+            self.free(CREATION_ARRAYS[1]);
+            self.free(CREATION_ARRAYS[0]);
+            self.release(PARSER_STRUCT_CHARGE);
+            return false;
+        }
+        if let Some(n) = encoding_name_len
+            && !self.alloc(n.saturating_add(1), direct)
+        {
+            // `XML_ParserFree` of the new parser (1925-1941): the DTD
+            // (its tables have no slots yet), `m_atts`, `m_dataBuf`,
+            // the structure.
+            if own_dtd {
+                self.free(CREATION_DTD);
+            }
+            self.free(CREATION_ARRAYS[0]);
+            self.free(CREATION_ARRAYS[1]);
+            self.release(PARSER_STRUCT_CHARGE);
+            return false;
+        }
         true
     }
 
-    /// Releases what [`AllocTracker::charge_child_creation`] charged
-    /// (`XML_ParserFree` of the external entity parser).
-    pub fn release_child_creation(&mut self, encoding_name_len: Option<usize>) {
-        let charge = CREATION_CHARGE
-            .saturating_add(encoding_name_len.map_or(0, |n| (n as u64).saturating_add(1 + MALLOC_HEADER)));
-        self.release(charge);
+    /// `FREE(parser, p)` of `dtdDestroy`: the DTD structure.
+    pub fn release_dtd(&mut self) {
+        self.free(CREATION_DTD);
     }
 
-    /// Charges the parser creation (`CREATION_CHARGE` plus the copy of
-    /// the protocol encoding name, `copyString`). Never refused: C checks
-    /// nothing for a root parser's own structure.
+    /// `FREE(parser, parser)` at the end of `XML_ParserFree`: the parser
+    /// structure.
+    pub fn release_parser_struct(&mut self) {
+        self.release(PARSER_STRUCT_CHARGE);
+    }
+
+    /// `parserCreate` of a root parser: the parser structure (counted
+    /// without a check, 1386-1395), then `m_atts`, `m_dataBuf`, the DTD
+    /// and the copy of the protocol encoding name (`copyString` in
+    /// `parserInit`) as separate allocations. Nothing can be refused: the
+    /// count stays far below the activation threshold, which only the
+    /// parser being created could lower.
     pub fn charge_creation(&mut self, encoding_name_len: Option<usize>) {
-        self.add(CREATION_CHARGE);
-        if let Some(n) = encoding_name_len {
-            self.add((n as u64).saturating_add(1 + MALLOC_HEADER));
+        self.add(PARSER_STRUCT_CHARGE);
+        self.creation = [PARSER_STRUCT_CHARGE, 0, 0, 0, 0];
+        let mut sizes = [Some(CREATION_ARRAYS[0]), Some(CREATION_ARRAYS[1]), Some(CREATION_DTD), None];
+        sizes[3] = encoding_name_len.map(|n| n.saturating_add(1));
+        for (k, size) in (1..).zip(sizes.into_iter().flatten()) {
+            let before = self.bytes_allocated;
+            let granted = self.alloc(size, 0);
+            debug_assert!(granted, "parser creation refused");
+            if let Some(slot) = self.creation.get_mut(k) {
+                *slot = self.bytes_allocated - before;
+            }
         }
     }
 }
@@ -329,6 +430,20 @@ impl PoolShadow {
     pub fn charged_bytes(&self) -> u64 {
         let blocks = (self.blocks.len() + self.free_blocks.len()) as u64;
         (self.total_block_bytes() as u64).saturating_add(blocks.saturating_mul(MALLOC_HEADER))
+    }
+
+    /// `poolDestroy` (`xmlparse.c` 8433-8446) on the tracker: the blocks in
+    /// use, newest (C's list head) first, then the free blocks, head first;
+    /// the pool is empty afterwards.
+    pub fn destroy(&mut self, t: &mut AllocTracker) {
+        for size in core::mem::take(&mut self.blocks).into_iter().rev() {
+            t.free(block_bytes(size));
+        }
+        for size in core::mem::take(&mut self.free_blocks).into_iter().rev() {
+            t.free(block_bytes(size));
+        }
+        self.start = 0;
+        self.ptr = 0;
     }
 
     /// `poolGrow`.
@@ -504,6 +619,18 @@ pub struct TableShadow {
 }
 
 impl TableShadow {
+    /// `hashTableDestroy` on the tracker: each of the `used` entries of
+    /// `create_size` bytes, then the slot array.
+    pub fn destroy(&mut self, t: &mut AllocTracker, create_size: usize) {
+        for _ in 0..self.used {
+            t.free(create_size);
+        }
+        if self.power > 0 {
+            t.free((1usize << self.power) * POINTER_SIZE);
+        }
+        *self = TableShadow::default();
+    }
+
     /// Charges the insertion of a new entry of `create_size` bytes.
     pub fn insert<H: Heap + ?Sized>(&mut self, heap: &mut H, create_size: usize) -> Result<(), NoMemory> {
         if self.power == 0 {
@@ -578,6 +705,12 @@ pub const TRACKER_SIZES: &[(&str, usize)] = &[
     ("NAMED_PTR", POINTER_SIZE),
     ("MALLOC_HEADER", MALLOC_HEADER as usize),
     ("INT", core::mem::size_of::<i32>()),
+    ("PARSER", c_layout::PARSER),
+    ("DTD", c_layout::DTD),
+    ("PARSER_M_POSITION", c_layout::PARSER_M_POSITION),
+    ("ACCOUNTING", c_layout::ACCOUNTING),
+    ("MALLOC_TRACKER", c_layout::MALLOC_TRACKER),
+    ("ENTITY_STATS", c_layout::ENTITY_STATS),
 ];
 
 /// A `TAG` of `m_tagStack` as far as its allocations go.

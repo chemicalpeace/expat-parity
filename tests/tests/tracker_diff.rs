@@ -135,11 +135,12 @@ fn creation_charge_covers_c() {
                 ..base()
             };
             let r = tracker::run(b"<r/>", &o).unwrap();
-            assert!(
-                r.port_tracker.created >= r.c_tracker.created,
-                "{enc:?} {ns:?}: port {} < C {}",
-                r.port_tracker.created,
-                r.c_tracker.created
+            // Equal since stage 3 of D-034 (C's creation allocations with
+            // this platform's sizes; was an upper bound of 16 KiB).
+            assert_eq!(
+                r.port_tracker.created, r.c_tracker.created,
+                "{enc:?} {ns:?}: port {} != C {}",
+                r.port_tracker.created, r.c_tracker.created
             );
             eprintln!(
                 "creation {enc:?} ns={}: C {} port {}",
@@ -339,8 +340,9 @@ fn threshold_boundary_sweep() {
                     boundary_hits += 1;
                 }
             }
-            // At C's passing threshold the port may still fail (it is stricter),
-            // count it, it is the margin of D-030.
+            // At C's passing threshold the port must pass too: since stage
+            // 3 of D-034 its count equals C's at every event, so a port that
+            // still refuses here is an over-count (counted, must be 0).
             let oo = at(&o, Some(1.0), Some(hi));
             if let Ok(r) = tracker::run(&doc, &oo)
                 && tracker::relation(&r, &oo) == Ok(Relation::PortStricter)
@@ -360,9 +362,9 @@ fn threshold_boundary_sweep() {
     );
     assert!(boundary_hits > 50);
     // Every sweep document and option set: at C's exact passing threshold
-    // the port still refuses (the creation charge alone is 16 KiB above
-    // C's), the documented divergence under tightened limits.
-    assert_eq!(stricter, sweep_documents().len() * option_sets().len());
+    // the port passes too (before stage 3 of D-034 it still refused there:
+    // its creation charge was 16 KiB above C's, DV-1).
+    assert_eq!(stricter, 0, "the port refuses at C's passing threshold");
 }
 
 /// With the threshold at 0, the amplification factor decides: every

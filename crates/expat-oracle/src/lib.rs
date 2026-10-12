@@ -358,8 +358,13 @@ pub fn last_tracker_bytes() -> TrackerBytes {
 /// The C structures whose `sizeof` (`offsetof(BLOCK, s)` for
 /// `BLOCK_HEADER`, `sizeof(size_t) + EXPAT_MALLOC_PADDING` for
 /// `MALLOC_HEADER`, `sizeof(NAMED *)` for `NAMED_PTR`) [`c_sizes`]
-/// returns, in its order (D-034).
-pub const ORACLE_C_SIZE_NAMES: [&str; 16] = [
+/// returns, in its order (D-034). `PARSER` is `struct XML_ParserStruct`;
+/// `PARSER_M_POSITION` is `offsetof(struct XML_ParserStruct, m_position)`
+/// (after the `unsigned long m_nsAttsVersion`); `ACCOUNTING`,
+/// `MALLOC_TRACKER` and `ENTITY_STATS` are the parser's members with an
+/// `unsigned long debugLevel` (stage 3: the parser structure is 32 bytes
+/// smaller on 64-bit Windows).
+pub const ORACLE_C_SIZE_NAMES: [&str; 22] = [
     "TAG",
     "BINDING",
     "PREFIX",
@@ -376,6 +381,12 @@ pub const ORACLE_C_SIZE_NAMES: [&str; 16] = [
     "NAMED_PTR",
     "MALLOC_HEADER",
     "INT",
+    "PARSER",
+    "DTD",
+    "PARSER_M_POSITION",
+    "ACCOUNTING",
+    "MALLOC_TRACKER",
+    "ENTITY_STATS",
 ];
 
 /// The C compiler's sizes of the structures named in

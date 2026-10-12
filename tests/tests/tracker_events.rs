@@ -28,11 +28,7 @@ use std::collections::BTreeMap;
 use expat_difftest::docgen::{self, Rng};
 use expat_difftest::port::port_trace_with_tracker_events;
 use expat_difftest::vectors::upstream;
-use expat_oracle::{ParamEntityParsing, ParseOptions, TrackerEvent};
-
-/// `xmlparse.c` lines of `parserCreate`'s and `dtdCreate`'s allocations
-/// (the parser structure, `m_atts`, `m_dataBuf`, the DTD).
-const C_CREATION_LINES: [u32; 4] = [1395, 1405, 1410, 7865];
+use expat_oracle::{ExtHandler, Factor, Limits, ParamEntityParsing, ParseOptions, TrackerEvent};
 
 /// Streams (of 5,196) that must be equal after creation at this stage
 /// (stage 4 of D-034: 3,270 of 3,420; stage 2: 3,291 of 3,420 and all
@@ -57,7 +53,174 @@ fn option_sets() -> Vec<ParseOptions> {
             ns_triplets: true,
             ..b.clone()
         },
-        ParseOptions { chunk_size: 7, ..b },
+        ParseOptions {
+            chunk_size: 7,
+            ..b.clone()
+        },
+        // A protocol encoding name: `parserInit` copies it (`copyString`)
+        // after the DTD, a fifth creation allocation.
+        ParseOptions {
+            encoding: Some("UTF-8".to_string()),
+            ..b
+        },
+    ]
+}
+
+/// Option sets for documents with external entities: the test handler
+/// reads them through external entity parsers (`ExtHandler::Read`), whose
+/// creation, allocations and release go through the root parser's
+/// tracker; whole, 1-byte chunks with namespaces, 7-byte chunks through
+/// the buffer API with `UNLESS_STANDALONE`, and a handler that refuses.
+fn external_option_sets(ents: &[(Vec<u8>, Vec<u8>)]) -> Vec<ParseOptions> {
+    let b = ParseOptions {
+        ext_handler: ExtHandler::Read,
+        ext_entities: ents.to_vec(),
+        ..base()
+    };
+    vec![
+        b.clone(),
+        ParseOptions {
+            ns_separator: Some(b'|'),
+            chunk_size: 1,
+            ..b.clone()
+        },
+        ParseOptions {
+            chunk_size: 7,
+            buffer_api: true,
+            param_entity_parsing: ParamEntityParsing::UnlessStandalone,
+            not_standalone: Some(true),
+            ..b.clone()
+        },
+        ParseOptions {
+            ext_handler: ExtHandler::Fail,
+            ..b
+        },
+    ]
+}
+
+/// Tightened tracker limits (activation threshold 0, so every allocation
+/// is checked against `total / direct`), with factors that make C refuse
+/// at different points of the parse: during the parse, while an external
+/// entity parser is created (its structure, arrays, DTD), while it
+/// parses, or never. The refusal events and the error and position must
+/// be equal.
+fn limit_option_sets(o: &ParseOptions) -> Vec<ParseOptions> {
+    factor_option_sets(o, &[8.0f32, 20.0, 45.0, 100.0, 400.0])
+}
+
+/// Activation thresholds from 3,000 to 20,000 bytes in steps of 40, with
+/// the smallest factor (1.0, which any count above the direct bytes
+/// exceeds): C refuses the first allocation that takes the count to the
+/// threshold, so for the nested external cases the refusal walks through
+/// every allocation in turn, the external entity parsers' creation
+/// (structure, `m_atts`, `m_dataBuf`, DTD), DTD copy, context, parse and
+/// release included.
+fn threshold_sweep(o: &ParseOptions) -> Vec<ParseOptions> {
+    (3_000..20_000)
+        .step_by(40)
+        .map(|t| ParseOptions {
+            limits: Limits {
+                at_amplification: Some(Factor(1.0)),
+                at_threshold: Some(t),
+                ..Limits::NONE
+            },
+            ..o.clone()
+        })
+        .collect()
+}
+
+fn factor_option_sets(o: &ParseOptions, factors: &[f32]) -> Vec<ParseOptions> {
+    factors
+        .iter()
+        .copied()
+        .map(|f| ParseOptions {
+            limits: Limits {
+                at_amplification: Some(Factor(f)),
+                at_threshold: Some(0),
+                ..Limits::NONE
+            },
+            ..o.clone()
+        })
+        .collect()
+}
+
+/// Documents run under [`limit_option_sets`]: every fifth generated
+/// document and every fourth external case.
+const LIMIT_STRIDE: (usize, usize) = (5, 4);
+
+/// Every (document, option set) run of the test.
+fn all_runs() -> Vec<(Vec<u8>, ParseOptions)> {
+    let mut v = Vec::new();
+    for (i, doc) in corpus().into_iter().enumerate() {
+        for o in option_sets() {
+            v.push((doc.clone(), o));
+        }
+        if i % LIMIT_STRIDE.0 == 0 {
+            for o in limit_option_sets(&base()) {
+                v.push((doc.clone(), o));
+            }
+        }
+    }
+    let mut r = Rng::new(0x6578_7465_726e_616c);
+    for i in 0..EXTERNAL_CASES {
+        let (doc, ents) = docgen::external_case(&mut r);
+        for o in external_option_sets(&ents) {
+            v.push((doc.clone(), o));
+        }
+        if i % LIMIT_STRIDE.1 == 0 {
+            for o in limit_option_sets(&external_option_sets(&ents)[0]) {
+                v.push((doc.clone(), o));
+            }
+        }
+    }
+    for (doc, ents) in nested_external_cases() {
+        for o in external_option_sets(&ents) {
+            v.push((doc.clone(), o));
+        }
+        for base in external_option_sets(&ents).iter().take(3) {
+            for o in threshold_sweep(base) {
+                v.push((doc.clone(), o));
+            }
+        }
+    }
+    v
+}
+
+/// External entity bodies by system identifier.
+type Entities = Vec<(Vec<u8>, Vec<u8>)>;
+
+/// Generated documents with external entities (`docgen::external_case`).
+const EXTERNAL_CASES: usize = 400;
+
+/// External general entities nested several levels deep (each child
+/// parser created from inside the previous one's handler), a parameter
+/// entity inside an external subset, and a general entity whose context
+/// string carries namespace bindings into the child.
+fn nested_external_cases() -> Vec<(Vec<u8>, Entities)> {
+    let ent = |k: &str, v: &str| (k.as_bytes().to_vec(), v.as_bytes().to_vec());
+    vec![
+        (
+            b"<!DOCTYPE r [<!ENTITY a SYSTEM 'a.xml'>]><r>&a;</r>".to_vec(),
+            vec![
+                ent("a.xml", "<!DOCTYPE x [<!ENTITY b SYSTEM 'b.xml'>]><a>&b;</a>"),
+                ent("b.xml", "<b>text<c/></b>"),
+            ],
+        ),
+        (
+            b"<!DOCTYPE r [<!ENTITY a SYSTEM 'a.xml'><!ENTITY b SYSTEM 'b.xml'><!ENTITY c SYSTEM 'c.xml'>]><r>&a;</r>".to_vec(),
+            vec![ent("a.xml", "<a>&b;&b;</a>"), ent("b.xml", "<b>&c;</b>"), ent("c.xml", "<c x='1'>deep</c>")],
+        ),
+        (
+            b"<!DOCTYPE r SYSTEM 'sub.dtd'><r a='&e;'/>".to_vec(),
+            vec![
+                ent("sub.dtd", "<!ENTITY % p SYSTEM 'p.ent'>%p;<!ATTLIST r b CDATA 'd'>"),
+                ent("p.ent", "<!ENTITY e 'from p'><!ENTITY % q 'x'>"),
+            ],
+        ),
+        (
+            b"<!DOCTYPE r [<!ENTITY g SYSTEM 'g.xml'>]><r xmlns='urn:d' xmlns:p='urn:p'><p:s>&g;</p:s></r>".to_vec(),
+            vec![ent("g.xml", "<p:t xmlns:q='urn:q' q:a='1'>x</p:t>")],
+        ),
     ]
 }
 
@@ -168,62 +331,135 @@ fn sign(increase: bool) -> char {
     if increase { '+' } else { '-' }
 }
 
+/// The `result` line of a trace: status, error code, line, column and
+/// byte index where the parse stopped.
+fn result_line(trace: &[u8]) -> String {
+    String::from_utf8_lossy(trace)
+        .lines()
+        .rev()
+        .find(|l| l.starts_with("result "))
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// The first event where two streams differ (direction, size, refusal,
+/// running total or peak), or `None` when they are equal.
+fn first_unequal(
+    c: &[TrackerEvent],
+    port: &[expat::internal::parse::TrackerEvent],
+) -> Option<usize> {
+    let k = c
+        .iter()
+        .zip(port)
+        .take_while(|(c, p)| {
+            c.increase == p.increase
+                && c.size == p.size
+                && c.refused == p.refused
+                && c.total == p.total
+                && c.peak == p.peak
+        })
+        .count();
+    (k != c.len() || k != port.len()).then_some(k)
+}
+
 #[test]
 fn tracker_events_against_c() {
     let platform = format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS);
-    let (mut runs, mut equal) = (0usize, 0usize);
+    let (mut runs, mut equal_parse, mut equal_all, mut equal_result) =
+        (0usize, 0usize, 0usize, 0usize);
+    let (mut refusals, mut peaks_equal) = (0usize, 0usize);
     let mut first_difference: BTreeMap<String, (usize, String)> = BTreeMap::new();
+    let mut refused_at: BTreeMap<u32, usize> = BTreeMap::new();
     let mut failures = Vec::new();
-    for (di, doc) in corpus().iter().enumerate() {
-        for (oi, o) in option_sets().iter().enumerate() {
-            runs += 1;
-            let (_, c) = expat_oracle::parse_trace_with_tracker_events(doc, o).expect("oracle");
-            let (_, port) = port_trace_with_tracker_events(doc, o);
-            // 1. Self-consistency.
-            let c_tuples = |e: &TrackerEvent| (e.increase, e.refused, e.size, e.total, e.peak);
-            match consistent(c.events.iter().map(c_tuples), 0) {
-                Ok(0) => {}
-                Ok(left) => failures.push(format!("doc {di} opt {oi}: C ends at {left}, not 0")),
-                Err(e) => failures.push(format!("doc {di} opt {oi}: C stream: {e}")),
-            }
-            if let Err(e) = consistent(
-                port.iter()
-                    .map(|e| (e.increase, e.refused, e.size, e.total, e.peak)),
-                0,
-            ) {
-                failures.push(format!("doc {di} opt {oi}: port stream: {e}"));
-            }
-            // 2. Event by event after creation, up to the end of the parse.
-            let c_ev: Vec<&TrackerEvent> = c.events[..c.at_end]
-                .iter()
-                .skip_while(|e| C_CREATION_LINES.contains(&e.line))
-                .collect();
-            let p_ev = port.get(1..).unwrap_or_default();
-            let k = c_ev
-                .iter()
-                .zip(p_ev)
-                .take_while(|(c, p)| {
-                    c.increase == p.increase && c.size == p.size && c.refused == p.refused
-                })
-                .count();
-            if k == c_ev.len() && k == p_ev.len() {
-                equal += 1;
-                continue;
-            }
-            let key = c_ev.get(k).map_or("port has more events".to_string(), |e| {
-                format!("C {}{} at xmlparse.c:{}", sign(e.increase), e.size, e.line)
+    for (di, (doc, o)) in all_runs().iter().enumerate() {
+        runs += 1;
+        let (c_trace, c) = expat_oracle::parse_trace_with_tracker_events(doc, o).expect("oracle");
+        let (p_trace, port, port_at_end) = port_trace_with_tracker_events(doc, o);
+        // 1. Self-consistency; both streams return to 0 after
+        //    `XML_ParserFree` (child parsers included).
+        let c_tuples = |e: &TrackerEvent| (e.increase, e.refused, e.size, e.total, e.peak);
+        match consistent(c.events.iter().map(c_tuples), 0) {
+            Ok(0) => {}
+            Ok(left) => failures.push(format!("run {di}: C ends at {left}, not 0")),
+            Err(e) => failures.push(format!("run {di}: C stream: {e}")),
+        }
+        match consistent(
+            port.iter()
+                .map(|e| (e.increase, e.refused, e.size, e.total, e.peak)),
+            0,
+        ) {
+            Ok(0) => {}
+            Ok(left) => failures.push(format!("run {di}: port ends at {left}, not 0")),
+            Err(e) => failures.push(format!("run {di}: port stream: {e}")),
+        }
+        // 2. Limit outcome: error code and position.
+        if result_line(&c_trace) == result_line(&p_trace) {
+            equal_result += 1;
+        } else {
+            failures.push(format!(
+                "run {di}: C `{}` port `{}`",
+                result_line(&c_trace),
+                result_line(&p_trace)
+            ));
+        }
+        if let Some(e) = c.events.iter().find(|e| e.refused) {
+            refusals += 1;
+            *refused_at.entry(e.line).or_insert(0usize) += 1;
+        }
+        // 3. Event by event from the parser's creation to the end of the
+        //    parse, then through `XML_ParserFree`.
+        let c_parse = &c.events[..c.at_end];
+        let p_parse = port.get(..port_at_end).unwrap_or_default();
+        let peak = |e: Option<&TrackerEvent>| e.map_or(0, |e| e.peak);
+        if peak(c_parse.last()) == p_parse.last().map_or(0, |e| e.peak) {
+            peaks_equal += 1;
+        }
+        let parse_diff = first_unequal(c_parse, p_parse);
+        let all_diff = first_unequal(&c.events, &port);
+        if parse_diff.is_none() {
+            equal_parse += 1;
+        }
+        let Some(k) = all_diff else {
+            equal_all += 1;
+            continue;
+        };
+        let phase = if parse_diff.is_none() {
+            "release"
+        } else {
+            "parse"
+        };
+        let key = c
+            .events
+            .get(k)
+            .map_or(format!("{phase}: port has more events"), |e| {
+                format!(
+                    "{phase}: C {}{}{} at xmlparse.c:{}",
+                    sign(e.increase),
+                    e.size,
+                    if e.refused { " refused" } else { "" },
+                    e.line
+                )
             });
-            let port_side = p_ev.get(k).map_or("no event".to_string(), |e| {
-                format!("{}{}", sign(e.increase), e.size)
-            });
-            let entry = first_difference.entry(key).or_insert((0, String::new()));
-            entry.0 += 1;
-            if entry.1.is_empty() {
-                entry.1 = format!("doc {di} opt {oi} event {k}: port {port_side}");
-            }
+        let port_side = port.get(k).map_or("no event".to_string(), |e| {
+            format!(
+                "{}{}{}",
+                sign(e.increase),
+                e.size,
+                if e.refused { " refused" } else { "" }
+            )
+        });
+        let entry = first_difference.entry(key).or_insert((0, String::new()));
+        entry.0 += 1;
+        if entry.1.is_empty() {
+            entry.1 = format!("run {di} event {k}: port {port_side}");
         }
     }
-    println!("EVENTS {platform}: {runs} runs, {equal} equal event streams after creation");
+    println!(
+        "EVENTS {platform}: {runs} runs; {equal_parse} streams equal from creation to the end of the parse, \
+         {equal_all} also through XML_ParserFree; {peaks_equal} equal peaks; {equal_result} equal results \
+         ({refusals} runs with a refusal in C)"
+    );
+    println!("EVENTS {platform} first refusal in C by xmlparse.c line: {refused_at:?}");
     let mut classes: Vec<_> = first_difference.iter().collect();
     classes.sort_by_key(|(_, (n, _))| std::cmp::Reverse(*n));
     for (key, (n, example)) in &classes {
@@ -231,12 +467,12 @@ fn tracker_events_against_c() {
     }
     assert!(
         failures.is_empty(),
-        "{platform}: {} inconsistent streams: {:?}",
+        "{platform}: {} failures: {:?}",
         failures.len(),
         failures.iter().take(5).collect::<Vec<_>>()
     );
     assert!(
-        equal >= EQUAL_STREAMS_AT_LEAST,
-        "{platform}: {equal} equal streams, fewer than the {EQUAL_STREAMS_AT_LEAST} of this stage"
+        equal_all >= EQUAL_STREAMS_AT_LEAST,
+        "{platform}: {equal_all} equal streams, fewer than the {EQUAL_STREAMS_AT_LEAST} of this stage"
     );
 }
