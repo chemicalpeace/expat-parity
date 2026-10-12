@@ -1,0 +1,36 @@
+# libFuzzer log, trimmed: 263 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2211291382
+INFO: Loaded 1 modules   (75203 inline 8-bit counters): 75203 [0xaaaacef9c430, 0xaaaacefae9f3), 
+INFO: Loaded 1 PC tables (75203 PCs): 75203 [0xaaaacefae9f8,0xaaaacf0d4628), 
+INFO:    15447 files found in <corpus>
+INFO: seed corpus: files: 15447 min: 1b max: 11931b total: 5421712b rss: 43Mb
+#8192	pulse  cov: 12262 ft: 40517 corp: 7443/165Kb exec/s: 2730 rss: 421Mb
+#15448	INITED cov: 17164 ft: 75720 corp: 13507/4322Kb exec/s: 532 rss: 525Mb
+#16384	pulse  cov: 17164 ft: 75721 corp: 13508/4323Kb lim: 11944 exec/s: 546 rss: 525Mb
+#32768	pulse  cov: 17164 ft: 75723 corp: 13510/4320Kb lim: 11957 exec/s: 936 rss: 674Mb
+#65536	pulse  cov: 17170 ft: 75736 corp: 13516/4313Kb lim: 11983 exec/s: 1285 rss: 674Mb
+#108402	DONE   cov: 17177 ft: 75794 corp: 13538/4332Kb lim: 12022 exec/s: 1062 rss: 674Mb
+###### Recommended dictionary. ######
+"\002\000\000\000" # Uses: 1857
+"accounting " # Uses: 1338
+"entity" # Uses: 710
+"\015\000\000\000\000\000\000\000" # Uses: 579
+"\000\000" # Uses: 539
+"start doc 0" # Uses: 485
+"0\000\000\000" # Uses: 475
+"NO" # Uses: 373
+"start %E8%8" # Uses: 279
+"accounting 62 0" # Uses: 214
+"\012\000\000\000" # Uses: 257
+"fo_" # Uses: 194
+###### End of recommended dictionary. ######
+Done 108402 runs in 102 second(s)
+stat::number_of_executed_units: 108402
+stat::average_exec_per_sec:     1062
+stat::new_units_added:          263
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              674
