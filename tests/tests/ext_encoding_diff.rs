@@ -13,8 +13,10 @@
 //! ([`Outcome`]: final status, error code, line, column, byte index, every
 //! `extend` line of a child parser, the handler's return value for every
 //! `extref`, and the full canonical trace, i.e. the event and callback
-//! sequence) and then compared. A difference fails the test with both
-//! records.
+//! sequence) and then compared. The handler's return value is not traced:
+//! [`Outcome::from_trace`] reconstructs it from the same trace by the test
+//! handlers' rule, so it adds nothing beyond the `extend` lines. A
+//! difference fails the test with both records.
 //!
 //! Groups: `encoding_matrix` (entity context x body encoding / BOM / text
 //! declaration x `encodingName` argument x the parent's protocol encoding,

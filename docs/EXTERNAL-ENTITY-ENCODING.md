@@ -3,12 +3,22 @@
 Scope: how the encoding of an external parsed entity is chosen when it is
 read through an external entity parser (`XML_ExternalEntityParserCreate`),
 how external entity processing is switched on and off, and how errors of
-the child parser reach the parent. Every statement about C below is backed
-by the vendored source (`crates/expat-oracle/vendor/expat/lib`, line
-numbers of 2.9.0) and by the differential test
-`tests/tests/ext_encoding_diff.rs`, which runs each case on the C oracle
-and on the port and records both results separately. **Result: no
-difference between C and the port in any case** (counts in
+the child parser reach the parent. Statements about C below cite the
+vendored source (`crates/expat-oracle/vendor/expat/lib`, line numbers of
+2.9.0). The behaviour the differential test
+`tests/tests/ext_encoding_diff.rs` exercises is also run on the C oracle
+and on the port, with both results recorded separately and compared
+(sections 4 and 5). Some statements rest on reading the source only and
+are not exercised by that test: that libexpat never opens a file or URL
+(section 1; the test handlers only read in-memory bodies); which settings
+a child inherits beyond its handlers and parameter entity parsing
+(section 1: reparse deferral is never switched in this test, and
+namespace processing and triplets are varied but no entity body contains
+a prefix or a namespace declaration); `XML_SetEncoding` (section 2,
+item 1, and G-2); the inherited unknown-encoding handler (section 2,
+item 6, and G-1); and the C line numbers themselves. **Result: no
+difference between C and the port was observed in any of the 158,556
+compared cases** (20,160 + 138,252 + 120 + 24, per test in
 "Verification"). No library code was changed for this document.
 
 ## 1. How external entity processing is enabled
@@ -206,7 +216,8 @@ the full traces are compared.
 Every one of these cells was also run with the three other parent
 encodings and fed in 1-byte chunks and in 7-byte chunks through the
 buffer API; Rust and C results per case (status, code, position, every
-child's `extend`, handler return values) are in
+child's `extend`, and the handler return values as reconstructed from the
+trace, see section 5) are in
 `docs/evidence/ext-entity-encoding/matrix.tsv` (parent NULL rows and the
 configuration rows; regenerate all with
 `EXT_ENC_MATRIX=<file> cargo test -p expat-difftest --test ext_encoding_diff matrix_dump`).
@@ -391,11 +402,22 @@ A not-standalone handler returning 0 turns the "handler called" rows into
 
 Per case the test records C and the port separately (`Outcome`: status,
 code, line, column, byte index, the `extend` line of every child, the
-handler's return value for every `extref`, the full trace) and, on a
-difference, prints both records and the first differing trace line.
+full trace) and, on a difference, prints both records and the first
+differing trace line. `Outcome` also holds `handler_returns`, one value
+per `extref`. It is not observed directly (neither the shim nor the port
+adapter writes the handler's return value to the trace); `Outcome::from_trace`
+reconstructs it from each side's own trace with the test handlers' fixed
+rule: 0 for `Fail`, 1 for `Accept`; for `Read`, 1 when the system id is
+NULL or not among `ext_entities`, otherwise the `<ok>` field of the
+`extend` line that closes that call (0 after `extdepth` or `extcreate`).
+Because the full traces are compared too, it adds no evidence beyond the
+`extend` lines; the effect of the return value is checked through the
+parent's result (21 at the reference, or the parse continues) and the
+rest of its trace.
 
 Sensitivity (mutations applied one at a time to a scratch copy, never
-committed; logs outside the repository):
+committed; logs outside the repository, so the counts cannot be
+re-checked from it):
 
 | Mutation | Where | Caught by |
 |---|---|---|
