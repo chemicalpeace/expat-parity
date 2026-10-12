@@ -236,6 +236,12 @@ fn ns_atts_tracker_relation() {
 /// three times C's growth factor; C and the fixed port both grow ~25 times,
 /// a quadratic check ~200 times. Relative to C, so it holds on slow, loaded
 /// and instrumented builds; best of three runs each.
+///
+/// The measurement is reported on success too: one `ns-scaling` line on
+/// stderr (visible with `--nocapture`) and, when `NS_SCALING_REPORT` names
+/// a file, the same values as JSON (C and port times, growth factors,
+/// ratio, input sizes, runner OS / architecture / CPU / parallelism, build
+/// profile).
 #[test]
 fn ns_duplicate_check_scales_like_c() {
     let doc = |n: usize| {
@@ -250,8 +256,12 @@ fn ns_duplicate_check_scales_like_c() {
         ns_separator: Some(b'|'),
         ..ParseOptions::default()
     };
+    const RUNS: usize = 3;
+    // The port may grow at most this many times C's growth factor; the
+    // same constant is reported, so the report cannot drift from the check.
+    const LIMIT_FACTOR: f64 = 3.0;
     let best = |d: &[u8], parse: &dyn Fn(&[u8], &ParseOptions) -> Vec<u8>| {
-        (0..3)
+        (0..RUNS)
             .map(|_| {
                 let t = std::time::Instant::now();
                 let r = parse(d, &o);
@@ -264,16 +274,121 @@ fn ns_duplicate_check_scales_like_c() {
             .as_secs_f64()
             .max(1e-6)
     };
-    let (small, large) = (doc(10_000), doc(160_000));
+    let (n_small, n_large) = (10_000usize, 160_000usize);
+    let (small, large) = (doc(n_small), doc(n_large));
     let c_trace = |d: &[u8], o: &ParseOptions| parse_trace(d, o).expect("oracle");
-    let port = best(&large, &port_trace) / best(&small, &port_trace);
-    let c = best(&large, &c_trace) / best(&small, &c_trace);
+    let (port_small, port_large) = (best(&small, &port_trace), best(&large, &port_trace));
+    let (c_small, c_large) = (best(&small, &c_trace), best(&large, &c_trace));
+    let port = port_large / port_small;
+    let c = c_large / c_small;
+    let limit = LIMIT_FACTOR * c;
+    let passed = port < limit;
+    let runner = runner_info();
     eprintln!(
-        "10,000 -> 160,000 prefixed attributes: port x{port:.1}, C x{c:.1}, relative {:.2}",
+        "ns-scaling: attributes {n_small} -> {n_large} ({} -> {} bytes); \
+         port {:.3} ms -> {:.3} ms (x{port:.1}); C {:.3} ms -> {:.3} ms (x{c:.1}); \
+         relative {:.2} (limit {LIMIT_FACTOR:.2}); runner {runner}",
+        small.len(),
+        large.len(),
+        port_small * 1e3,
+        port_large * 1e3,
+        c_small * 1e3,
+        c_large * 1e3,
         port / c
     );
+    // A failed report write must not hide a failed measurement: the write
+    // result is kept and reported together with the assertion below.
+    let mut write_error = None;
+    if let Some(path) = std::env::var_os("NS_SCALING_REPORT") {
+        let report = serde_json::json!({
+            "test": "ns_atts_diff::ns_duplicate_check_scales_like_c",
+            "attributes": { "small": n_small, "large": n_large },
+            "input_bytes": { "small": small.len(), "large": large.len() },
+            "runs_per_measurement": RUNS,
+            "statistic": "minimum wall-clock seconds of the runs",
+            "port_seconds": { "small": port_small, "large": port_large },
+            "c_seconds": { "small": c_small, "large": c_large },
+            "growth": { "port": port, "c": c, "port_over_c": port / c, "limit_port_over_c": LIMIT_FACTOR },
+            "passed": passed,
+            "runner": {
+                "os": std::env::consts::OS,
+                "arch": std::env::consts::ARCH,
+                "family": std::env::consts::FAMILY,
+                "cpu": cpu_model(),
+                "available_parallelism": std::thread::available_parallelism().map_or(0, usize::from),
+                "debug_assertions": cfg!(debug_assertions),
+            },
+        });
+        let text = serde_json::to_string_pretty(&report).expect("json");
+        if let Err(e) = std::fs::write(&path, text) {
+            write_error = Some(format!(
+                "write NS_SCALING_REPORT {}: {e}",
+                std::path::Path::new(&path).display()
+            ));
+        }
+    }
+    let note = write_error
+        .as_ref()
+        .map_or(String::new(), |e| format!(" (also: {e})"));
     assert!(
-        port < 3.0 * c,
-        "port grows x{port:.1}, C x{c:.1}: quadratic duplicate check?"
+        passed,
+        "port grows x{port:.1}, C x{c:.1}: quadratic duplicate check?{note}"
     );
+    if let Some(e) = write_error {
+        panic!("{e}");
+    }
+}
+
+/// The CPU model as the OS reports it (`/proc/cpuinfo` on Linux,
+/// `sysctl -n machdep.cpu.brand_string` on macOS, `PROCESSOR_IDENTIFIER`
+/// on Windows); "unknown" otherwise. Informational only.
+fn cpu_model() -> String {
+    let linux = || {
+        let info = std::fs::read_to_string("/proc/cpuinfo").ok()?;
+        let field = |name: &str| {
+            info.lines()
+                .filter_map(|l| l.split_once(':'))
+                .find(|(k, _)| k.trim() == name)
+                .map(|(_, v)| v.trim().to_string())
+        };
+        // x86 reports a model name; arm64 only implementer and part ids.
+        field("model name").or_else(|| {
+            Some(format!(
+                "implementer {} part {}",
+                field("CPU implementer")?,
+                field("CPU part")?
+            ))
+        })
+    };
+    let macos = || {
+        let out = std::process::Command::new("sysctl")
+            .args(["-n", "machdep.cpu.brand_string"])
+            .output()
+            .ok()?;
+        Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|s| !s.is_empty())
+    };
+    let windows = || std::env::var("PROCESSOR_IDENTIFIER").ok();
+    match std::env::consts::OS {
+        "linux" => linux(),
+        "macos" => macos(),
+        "windows" => windows(),
+        _ => None,
+    }
+    .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// `os/arch, cpu, N threads, debug|release` for the stderr line.
+fn runner_info() -> String {
+    format!(
+        "{}/{}, {}, {} threads, {}",
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        cpu_model(),
+        std::thread::available_parallelism().map_or(0, usize::from),
+        if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        }
+    )
 }
