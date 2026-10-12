@@ -1,11 +1,0 @@
-�﻿<?xml version='1.0' encoding='UTF-8'?>
-<!DOCTYPE a PUBLIC "" 'doc.dtd' [<!ELEMENT b (#PCDATA|_u)*><!ELEMENT q:e ((q:e , a , p:e? , (é*|doc*)+)?,(é?),q:e)?><!ATTLIST _u b NOTATION (n1|n2) #FIXED '&lt;&gt;&quot;&apos;' xmlns:p CDATA #REQUIRED><!ELEMENT q:e ANY>
-%pe2;
-<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5'>
-<!ATTLIST doc q:a NOTATION (n1|n2) 'line
-break
-andcr	tab' xmlns NOTATION (n1|n2) "&#65;&#x42;&#32;"><!ATTLIST é xml:lang CDATA '&undeclared;' xmlns:q ID #FIXED '1' q:a CDATA #FIXED "urn:p">
-%extpe;<!ENTITY lt ']]>' >
-<!ATTLIST a:e)?><!ATT�LIST _u b NOTATION (n1|n2) #FIXED '&lt;&gt;&quot;&apos;' xmlns:p C<!ATTLIST a b ID #FIXED 'x'><!ATTLIST a xml:lang ENTITYSTEM 'u.gif' NDATA n1 >
-]>
-<a><!--c-->	&lt;</a>

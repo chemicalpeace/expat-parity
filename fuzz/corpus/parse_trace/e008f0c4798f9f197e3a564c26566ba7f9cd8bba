@@ -1,0 +1,6 @@
+EÎ<?xml version='1.0' standalone='no'?>
+<!DOCTYPE p:e [<!---->
+<!ATTLIST b b NOTATION (n1|n2) #REQUIRED id IDREF #FIXED ' x  y '>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13' d14 CDATA 'v14' d15 CDATA 'v15'><!ENTITY e2 PUBLIC '' "sys2.ent" ><!ELEMENT b (#PCDATA)>
+<!ENTITY % pe2 '<a/>' >
+] ><doc xmlns:p=' x &e2; ' id='1'><!--c-->&undeclared;<b p:a='&e1;'><?pi?><?pi?><doc id='urn:p' c='1'></doc></b></doc>

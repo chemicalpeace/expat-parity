@@ -1,0 +1,1 @@
+Žî<!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 ''><!ENTITY e1 '&e3;'><!ENTITY e1 'second'><!ENTITY e2 '&#x10FFFF;'><!ENTITY e3 '<i>&unp;'><!ENTITY e3 'second'><!ENTITY e4 '<?pi d?>'><!ENTITY e4 'second'><!ENTITY e5 'text &#38;#60; sp  ace '><!ATTLIST r a CDATA "&e0;" t NMTOKENS "  &e2; x " f CDATA #FIXED "&amp;&e4;">]><r>&e1;&e0;&e4;txt</r>

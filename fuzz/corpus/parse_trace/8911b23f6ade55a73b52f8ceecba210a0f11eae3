@@ -1,0 +1,2 @@
+Nç<?xml version='1.0' standalone='no'?><!DOCTYPE r [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 '&#10;&e1;a
+b&#13;'><!ENTITY e1 '&e1; sp  ace '><!ENTITY % p0 '<!ENTITY &#37; p2 "&#37;p1;">'><!ENTITY % p1 '<!ENTITY &#37; p3 "&#37;p2;">'>%p1;]><r s="v&e1;w">txt</r>

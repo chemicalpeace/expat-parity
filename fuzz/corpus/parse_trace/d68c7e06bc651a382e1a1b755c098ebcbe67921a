@@ -1,0 +1,7 @@
+l≈Ôªø<?xml version='1.0' standalone='yes'?><!--before--><!DOCTYPE p:e PUBLIC "-//X//DTD x//EN" 'doc.dtd' [<!ENTITY e3 '<!ELEMENT q ANY>' >
+<!NOTATION n2 SYSTEM 'viewer'>
+<!ENTITY ext SYSTEM 'u.gif' NDATA n1 >	<!--dtd comment--><!---->
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6'>
+
+<!----><!ATTLIST a xmlns NMTOKEN '&lt;&gt;&quot;&apos;' xmlns:p NMTOKENS 'urn:p' xmlns:p IDREF "x&e2;y">
+] ><doc c='urn:p'><a/></doc>

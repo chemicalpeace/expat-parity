@@ -1,0 +1,5 @@
+³¸
+<!DOCTYPE doc PUBLIC '' 'doc.dtd' [<!ATTLIST _u xmlns ( x | y ) #REQUIRED xmlns NOTATION (n1|n2) "&lt;&gt;&quot;&apos;">
+%undeclared;<!ENTITY amp SYSTEM 'u.gif' NDATA n2>
+<!ENTITY % pe2 "<!ENTITY e3 'from pe'>"><!ENTITY % pe3 "&e1;">]>
+<doc id='&undeclared;' a='&e1;'>&ext;<doc></doc>	</doc>

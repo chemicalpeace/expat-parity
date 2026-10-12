@@ -1,0 +1,5 @@
+<!DOCTYPE doc [
+  <!ATTLIST doc
+    a1  (a|b|c)   'a'
+    a2  (oo|bar) #IMPLIEDòòòò>]>
+<doc>wombat</doc>

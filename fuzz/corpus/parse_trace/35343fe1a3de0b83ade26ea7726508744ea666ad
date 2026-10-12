@@ -1,0 +1,1 @@
+укяЛП<!DOCTYPE r [<!ENTITY e0 '&#10;text '><!ENTITY e0 'second'><!ENTITY e1 'text УЉ'><!ENTITY % p0 '<!ELEMENT r ANY>'><!ENTITY % p1 '<!ENTITY'><!ENTITY % p2 '<!ELEMENT r ANY>'>%p0;]><r>txt<c>&e0;</c>txt<c>&e0;</c></r>

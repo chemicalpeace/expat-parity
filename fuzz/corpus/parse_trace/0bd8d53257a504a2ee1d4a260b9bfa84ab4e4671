@@ -1,0 +1,9 @@
+�v﻿<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE a [<!--dtd comment--><!ENTITY e3 '&#x10000;☃'>
+<!ATTLIST q:e p:a (x|y|z) #REQUIRED><!ELEMENT doc EMPTY>
+<!ELEMENT a (#PCDATA)>
+
+
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4'><!ENTITY % pe1 "]]>" ><!ENTITY ext PUBLIC "a'b" 'sys2.ent' >
+]>
+<doc><?pi?><!--c--></doc>

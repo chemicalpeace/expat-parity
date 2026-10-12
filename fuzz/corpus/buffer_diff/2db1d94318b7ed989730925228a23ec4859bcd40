@@ -1,0 +1,4 @@
+¡<?xml version='1.0'?><!--before--><!DOCTYPE doc PUBLIC '' 'doc.dtd' [<!ATTLIST doc q:a IDREF #REQUIRED><!--dtd comment-->
+<!ELEMENT q:e (#PCDATA|A)*>
+<!ATTLIST a xml:lang ENTITY "urn#18;pe1;" >
+<!ATTLIST p:e xmlns:q NOTATION (n1|n2) #REQUIRED>%uneclared;<!ATTLIST a xml:lang ( x | y ) #FIXED '' xmlns:p ENTITIES #REQUIRED xmlns NOTATION (n1|n2) #FIXED '1'>]><b p:a='&lt;'><?pi?>&e9;<doc/>&e3;</b>

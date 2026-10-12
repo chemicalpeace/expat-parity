@@ -1,0 +1,5 @@
+˜gï»¿<!--before--><!DOCTYPE doc [<!ENTITY amp "&#37;pe1;"><!ENTITY % extpe '&#xD800;' >
+ 
+<!NOTATION n2 SYSTEM 'viewer'>
+<!NOTATION n2 SYSTEM 'viewer'>
+]><doc c='urn:p' p:a='&ext;'><!--c--><?pi?><doc/><!--c--></doc>

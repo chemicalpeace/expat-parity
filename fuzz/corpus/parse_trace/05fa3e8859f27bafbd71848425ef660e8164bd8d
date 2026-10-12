@@ -1,0 +1,6 @@
+·€<!--before--><!DOCTYPE p:e [<!ENTITY lt '&#60;b/&#62;'>%undeclared;
+<!ATTLIST doc xmlns:q (x|y|z) 'a|b'><!ELEMENT doc (#PCDATA)>
+<!NOTATION n2 PUBLIC 'p' 'viewer'>%extpe;
+
+<!ATTLIST p:e xmlns IDREF #IMPLIED xmlns:q IDREFS #IMPLIED><!ELEMENT a (#PCDATA|p:e|Ã©)*>
+<!ENTITY % pe1 SYSTEM "sys.ent">]><doc p:a='1'>&e9;<?pi?>&undeclared;</doc>

@@ -1,0 +1,4 @@
+-<!--before--><!DOCTYPE doc [
+%extpe;
+<!ENTITY % pe2 '&#x3C;b>x&#x3C;/b>' >]>
+<b c='1'>&unp;</b>

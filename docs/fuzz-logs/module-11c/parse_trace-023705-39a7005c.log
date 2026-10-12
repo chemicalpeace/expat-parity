@@ -1,0 +1,52 @@
+# libFuzzer log, trimmed: 442 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3418261166
+INFO: Loaded 1 modules   (70189 inline 8-bit counters): 70189 [0xaaaad01da470, 0xaaaad01eb69d), 
+INFO: Loaded 1 PC tables (70189 PCs): 70189 [0xaaaad01eb6a0,0xaaaad02fd970), 
+INFO:    14572 files found in <corpus>
+INFO: seed corpus: files: 14572 min: 1b max: 12104b total: 4681645b rss: 42Mb
+#8192	pulse  cov: 12193 ft: 40413 corp: 7093/163Kb exec/s: 4096 rss: 419Mb
+#14573	INITED cov: 15033 ft: 67581 corp: 11913/3416Kb exec/s: 728 rss: 507Mb
+#16384	pulse  cov: 15033 ft: 67583 corp: 11915/3416Kb lim: 11944 exec/s: 819 rss: 507Mb
+#32768	pulse  cov: 15033 ft: 67609 corp: 11924/3427Kb lim: 11944 exec/s: 1129 rss: 563Mb
+#65536	pulse  cov: 15033 ft: 67668 corp: 11941/3453Kb lim: 11970 exec/s: 1598 rss: 563Mb
+#131072	pulse  cov: 15034 ft: 67731 corp: 11979/3494Kb lim: 12022 exec/s: 1598 rss: 563Mb
+#154457	DONE   cov: 15034 ft: 67740 corp: 11987/3508Kb lim: 12022 exec/s: 1608 rss: 563Mb
+###### Recommended dictionary. ######
+"\000\000\000\000\000\000\000X" # Uses: 1350
+"\001\021\000\000" # Uses: 1183
+"\377\377" # Uses: 1145
+"\377\377\377\026" # Uses: 1112
+"\377\034" # Uses: 1079
+"\001\000\000\000" # Uses: 753
+":\000\000\000" # Uses: 740
+"\001\000\000\005" # Uses: 484
+"\005\000" # Uses: 541
+"\000\000\000\004" # Uses: 430
+"nsend" # Uses: 389
+"attr" # Uses: 414
+"accounting " # Uses: 318
+"\001\000" # Uses: 308
+"doctype d ~" # Uses: 253
+"\017\000\000\000\000\000\000\000" # Uses: 263
+"\377\377\377\001" # Uses: 223
+"W\000\000\000\000\000\000\000" # Uses: 239
+"NO" # Uses: 200
+"\374\377\377\377" # Uses: 206
+"xmldecl 1.0" # Uses: 177
+"xmldecl 1.1" # Uses: 137
+"\377\377\377\377\377\377\377\014" # Uses: 120
+"\377\377\377\377\377\377\377\002" # Uses: 90
+"\201\000" # Uses: 59
+"CD" # Uses: 49
+"\376\377\377\377\377\377\377\377" # Uses: 31
+###### End of recommended dictionary. ######
+Done 154457 runs in 96 second(s)
+stat::number_of_executed_units: 154457
+stat::average_exec_per_sec:     1608
+stat::new_units_added:          442
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              563

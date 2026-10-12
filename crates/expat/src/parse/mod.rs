@@ -56,11 +56,13 @@ mod entity;
 mod error;
 mod model;
 mod prolog;
+mod tracker;
 
 #[cfg(test)]
 mod tests;
 
 pub use accounting::{Account, Accounting};
+pub use tracker::{AllocTracker, PoolShadow, TableShadow, Tracker, TrackerHeap};
 pub use dtd::{
     AttributeId, Binding, BindingId, DefaultAttribute, Dtd, ElementType, Entity, EntityRef, Prefix,
     PrefixId,
@@ -428,6 +430,13 @@ pub struct Parser {
     pub(crate) open_value_entities: Vec<entity::OpenEntity>,
     /// The length of `m_freeEntities`.
     pub(crate) free_entities: usize,
+
+    // Allocation tracker (module 11c, D-030).
+    /// `m_alloc_tracker` and the shadows of C's allocations.
+    pub(crate) tracker: Tracker,
+    /// Characters of the pool string being built (an attribute value or
+    /// entity value) already charged to the tracker.
+    pub(crate) charged_len: usize,
 }
 
 impl Parser {
@@ -499,6 +508,12 @@ impl Parser {
             open_attribute_entities: Vec::new(),
             open_value_entities: Vec::new(),
             free_entities: 0,
+            tracker: {
+                let mut t = Tracker::default();
+                t.t.charge_creation(encoding.map(<[u8]>::len));
+                t
+            },
+            charged_len: 0,
         }
     }
 
@@ -541,6 +556,62 @@ impl Parser {
     pub fn set_billion_laughs_activation_threshold(&mut self, bytes: u64) -> bool {
         self.accounting.activation_threshold_bytes = bytes;
         true
+    }
+
+    /// `XML_SetAllocTrackerMaximumAmplification` (`xmlparse.c` 3150-3176):
+    /// `false`, and no change, for NaN or a value below 1.0. Allowed at
+    /// any time, like C.
+    pub fn set_alloc_tracker_maximum_amplification(&mut self, factor: f32) -> bool {
+        self.tracker.t.set_maximum_amplification(factor)
+    }
+
+    /// `XML_SetAllocTrackerActivationThreshold` (`xmlparse.c` 3178-3200):
+    /// any value, at any time.
+    pub fn set_alloc_tracker_activation_threshold(&mut self, bytes: u64) -> bool {
+        self.tracker.t.set_activation_threshold(bytes)
+    }
+
+    /// The allocation tracker: bytes charged so far (an upper bound of
+    /// what libexpat has allocated at the same point, D-030) and the
+    /// limits.
+    pub fn alloc_tracker(&self) -> &AllocTracker {
+        &self.tracker.t
+    }
+
+    /// Charges the growth of the current string of pool `pool` to `len`
+    /// characters (C appends to the pool as it goes; the port charges after
+    /// each token, before the next amplification check).
+    pub(crate) fn charge_current(&mut self, pool: tracker::Pool, len: usize) -> Result<(), Stop> {
+        if len > self.charged_len {
+            let direct = self.direct();
+            let (p, mut heap) = self.tracker.pool(pool, direct);
+            p.append(&mut heap, len - self.charged_len)
+                .map_err(|_| Stop::Error(XmlError::NoMemory))?;
+            self.charged_len = len;
+        }
+        Ok(())
+    }
+
+    /// Ends the current string of pool `pool`: its NUL (if `nul`), then
+    /// `poolFinish` (`keep`) or `poolDiscard`.
+    pub(crate) fn finish_current(&mut self, pool: tracker::Pool, nul: bool, keep: bool) -> Result<(), Stop> {
+        let direct = self.direct();
+        let (p, mut heap) = self.tracker.pool(pool, direct);
+        self.charged_len = 0;
+        if nul {
+            p.append(&mut heap, 1).map_err(|_| Stop::Error(XmlError::NoMemory))?;
+        }
+        if keep {
+            p.finish();
+        } else {
+            p.discard();
+        }
+        Ok(())
+    }
+
+    /// `countBytesDirect`, the denominator of both amplification checks.
+    pub(crate) fn direct(&self) -> u64 {
+        self.accounting.count_bytes_direct
     }
 
     /// `XML_SetReparseDeferralEnabled`.
@@ -750,6 +821,10 @@ impl Parser {
                     self.error_code = XmlError::NoMemory.into();
                     return None;
                 }
+                // C allocates the input buffer with the plain `malloc_fcn`,
+                // outside the allocation tracker ("to leave limiting the
+                // input size to the application", `xmlparse.c` 2601-2603),
+                // so the port does not charge it either.
                 let mut new_buf = vec![0u8; size as usize];
                 if self.has_buffer {
                     let from = self.buffer_ptr - keep;

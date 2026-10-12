@@ -85,6 +85,15 @@ working corpus (14,646) + 10,320 seeds (now including 500 entity documents
 with small billion-laughs limits) = 36,002 inputs to 11,174 files (14,355
 edges); scanned for personal data, no hits. `buffer_diff` unchanged.
 
+Module 11c merges (2026-10-12): `parse_trace` committed corpus (11,174) +
+working corpus of the logged runs (15,907) + 10,320 seeds = 37,401 inputs
+to 12,638 files (15,054 edges); `buffer_diff` 10,208 + 13,709 + 4,040 =
+27,957 inputs to 10,451 files (12,866 edges). The target now also checks
+the allocation-tracker relation (`expat_difftest::tracker::check_from`).
+Scanned for personal data (names, e-mail addresses, local paths): no hits.
+An earlier step-C run (commit 7762e9d) and its merged corpus were lost
+with a sandbox reset before they were pushed; its numbers are not used.
+
 ## Run logs
 
 `docs/fuzz-logs/<module>/` keeps the libFuzzer output of the runs reported

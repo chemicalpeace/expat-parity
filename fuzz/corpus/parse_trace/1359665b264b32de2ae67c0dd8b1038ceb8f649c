@@ -1,0 +1,1 @@
+s¯<!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 ''><!ENTITY e0 'second'><!ENTITY % p0 '<?pi?>'><!ENTITY % p1 '<!ATTLIST r d CDATA "&e0;">'>%p0;%p0;]><r s="v&e0;w">txt&e0;txt</r>

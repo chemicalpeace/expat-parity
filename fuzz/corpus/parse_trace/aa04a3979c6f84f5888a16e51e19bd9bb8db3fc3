@@ -1,0 +1,5 @@
+ۅ﻿<!DOCTYPE p:e [
+
+<!ENTITY e1 SYSTEM 'sys.ent' >
+<!ELEMENT _u EMPTY>%extpe;
+<!ENTIT

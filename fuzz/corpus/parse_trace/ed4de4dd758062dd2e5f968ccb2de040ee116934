@@ -1,0 +1,6 @@
+�<!DOCTYPE doc SYSTEM 'doc.dtd' [<!ENTITY e3 "<!ENTITY e9 'nine'>" >
+ <!ATTLIST n-1 a IDREF #FIXED "a|b">
+<!ATTLIST é xmlns:p (x|y|z) #IMPLIED>
+<!ATTLIST p:e xml:lang (x|y|z) #FIXED 'http://www.w3.org/XML/1998/namespace'><!ENTITY e2 SYSTEM 'sys.ent' ><!ATTLIST é xml:lang ENTITIES #IMPLIED b NOTATION (n1|n2) #FIXED 'line
+break
+andcr	tab' q:a ENTITY #REQUIRED><!ELEMEN&T b (#P

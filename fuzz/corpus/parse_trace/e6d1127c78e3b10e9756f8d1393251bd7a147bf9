@@ -1,0 +1,3 @@
+ò²<?xml version='1.0' encoding='UTF-8'?><!--before--><!DOCTYPE a PUBLIC "a'b" 'doc.dtd' [<!ELEMENT p:e (_u+,b+,doc?)*><!ENTITY e2 PUBLIC "-//X//DTD x//EN" 'sys2.ent'><!ATTLIST a xmlns:p CDATA 'http://www.w3.org/XML/1998/namespace' xmlns:p IDREFS #FIXED 'a&amp;b' a IDREFS #IMPLIED>
+%pe2;]>
+<doc xmlns:p='&undeclared;' id='&e1;'><a/>&lt;<doc/></doc>

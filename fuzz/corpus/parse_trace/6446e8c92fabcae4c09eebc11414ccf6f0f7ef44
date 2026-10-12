@@ -1,0 +1,3 @@
+�<!--before--><!DOCTYPE doc [<!ELEMENT _u (#PCDATA|n-1|b|é)*><!ELEMENT é (#PCDATA|n-1|a)*>
+
+]><a a='1' a='&lt;'><doc a='&e1;' xmlns:p='&ext;'><a c=' x &e2; '>&e9;<!--c--><!--c--><b x='y'/></a><!--c--></doc><?pi?></a>

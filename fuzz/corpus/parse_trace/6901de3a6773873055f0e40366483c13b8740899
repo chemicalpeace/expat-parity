@@ -1,0 +1,1 @@
+@2<?xml version='1.0' standalone='ye3'?><!DOCTYPE r [<!ENTITY e0 '	'><!ENTITY e0 'second'><!ENTITY e1 '	<![CDATA[x<y]]><!--c-->'><!ENTITY e1 'second'><!ENTITY % p0 '&#37;p0;'>%p1;]><r><c>&e0;</c>&e1;&e0;</r>

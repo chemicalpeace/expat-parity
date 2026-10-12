@@ -1,0 +1,7 @@
+J﻿<!DOCTYPE doc [<!ENTITY lt "text" ><!ELEMENT a EMPTY>
+<!ATTLIST é p:a IDREF #IMPLIED>
+
+<!ENTITY e3 '&e1;' >
+<!ENTITY % pe3 SYSTEM 'sys.ent'>
+]>
+<doc a='&ext;' p:a='urn:p'>]]</doc>

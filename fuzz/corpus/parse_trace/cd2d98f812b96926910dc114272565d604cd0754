@@ -1,0 +1,6 @@
+%﻿<?xml version='1.0' standalone='yes'?><!DOCTYPE doc [<!ATTLIST q:e xmlns ID #IMPLIED xmlns IDREFS #REQUIRED id ( x | y ) 'urn:q'>
+
+
+<!ATTLIST b p:a IDREF "a|b" q:a CDATA #IMPLIED><!ENTITY unp "a&amp;b"><!---->
+<!ELEMENT q:e EMPTY>]>
+<a c='&e1;' c='urn:p'><b id='&ext;' id='&e1;'></b>&e3;</a>

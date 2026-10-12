@@ -8,7 +8,37 @@ The C library is the oracle; a divergence is accepted only when the C
 behaviour is a bug relative to the XML 1.0 (Fifth Edition) / Namespaces in
 XML 1.0 specifications or to libexpat's own documentation.
 
-_No divergences yet._
+### DV-1 Allocation tracker: the port can refuse slightly earlier than C (module 11c, D-030)
+
+- Reproducer: any document under tightened tracker limits at C's exact
+  passing threshold, e.g. the sweep document "deep nesting" in
+  `tests/tests/tracker_diff.rs` with `XML_SetAllocTrackerMaximumAmplification(1.0)`
+  and `XML_SetAllocTrackerActivationThreshold(t)`, where `t` is the
+  smallest threshold at which C succeeds: C parses the document, the port
+  stops with `XML_ERROR_NO_MEMORY` (36 of 36 sweep documents x option
+  sets).
+- Cause: the port cannot count libexpat's allocations (it does not
+  allocate C's structures), so it charges at least C's bytes at C's
+  allocation points or earlier (D-030); its total exceeds C's by a margin
+  (measured 11,764-13,352 bytes, mostly the 16 KiB creation bound against
+  C's 3,040-3,059 bytes). Documents whose C total ends within that margin
+  below the refusal point are refused by the port only.
+- At the default limits (100.0, 64 MiB) the window requires a tracked
+  total of at least 64 MiB within the margin below 100 times the direct
+  input; no test, vector or fuzz input reached it (the tests assert that
+  the port never refuses at the default limits where C accepts).
+- Justification: fail-closed security behaviour; the refusal is the same
+  error C's tracker gives (`XML_ERROR_NO_MEMORY`), and the allocation
+  tracker is a resource limit, not part of XML 1.0 well-formedness.
+  Exact replication would require C's structure layouts and every
+  incidental allocation (D-030).
+- The opposite direction never happens by construction and is tested:
+  whenever C refuses through its tracker, the port refuses
+  (`tests/tests/tracker_diff.rs`, `parse_trace` fuzz target).
+- Regression tests: `tests/tests/tracker_diff.rs::threshold_boundary_sweep`
+  (asserts the 36/36 count), `generated_documents_tracker_relation` and
+  `upstream_vectors_tracker_relation` (no refusal at default limits where
+  C accepts).
 
 Platform-dependent C behaviour that the port fixes to one choice, without an
 observable effect on parsing, is recorded in DECISIONS (D-016 counter width,

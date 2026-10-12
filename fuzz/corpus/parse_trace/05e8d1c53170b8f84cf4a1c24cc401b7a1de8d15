@@ -1,0 +1,9 @@
+‰{<?xml version='1.0' encoding='UTF-8'?><!--before--><!DOCTYPE doc PUBLIC "" 'doc.dtd' [<!ENTITY unp "&#38;#38;">
+<!ENTITY e1 SYSTEM 'u.gif' NDATA n1 ><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13' d14 CDATA 'v14'>
+<!ENTITY % extpe PUBLIC "  spaced 
+  id  " "sys2.ent" >
+%pe2;
+
+<!ATTLIST p:e xmlns:q ENTITY #REQUIRED q:a NMTOKEN #FIXED 'http://www.w3.org/2000/xmlns/' xmlns:q NMTOKEN #REQUIRED>
+	
+] ><doc xmlns:p='urn:p'><!--c--><?pi?><b c='&lt;'>a&amp;b&undeclared;</b></doc>

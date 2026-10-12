@@ -1,0 +1,2 @@
+	Í<?xml version='1.0' standalone='yes'?><!DOCTYPE r [<!ENTITY e0 '<i>in</i><![CDATA[x<y]]>&un;'><!ENTITY e0 'second'><!ENTITY e1 ''><!ENTITY e2 'text &e4;&#x10FFFF;<i>'><!ENTITY e3 ''><!ENTITY e3 'second'><!ENTITY e4 'a
+b<i/>'><!ENTITY e5 '<!--c--> sp  ace <?pi d?>'><!ENTITY % p0 '<!ENTITY &#37; p2 "&#37;p1;">'><!ENTITY % p1 '<!ENTITY e3 "from pe">'>%p0;%p0;]><r s="v&e3;w"><c>&e0;</c>txttxt<c>&e0;</c></r>

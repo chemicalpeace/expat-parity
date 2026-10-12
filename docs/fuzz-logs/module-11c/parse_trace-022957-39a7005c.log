@@ -1,0 +1,129 @@
+# libFuzzer log, trimmed: 1620 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 405124030
+INFO: Loaded 1 modules   (70189 inline 8-bit counters): 70189 [0xaaaac21fa470, 0xaaaac220b69d), 
+INFO: Loaded 1 PC tables (70189 PCs): 70189 [0xaaaac220b6a0,0xaaaac231d970), 
+INFO:    11174 files found in <corpus>
+INFO: seed corpus: files: 11174 min: 1b max: 12104b total: 3019549b rss: 40Mb
+#8192	pulse  cov: 13710 ft: 48185 corp: 7710/280Kb exec/s: 2730 rss: 423Mb
+#11175	INITED cov: 15006 ft: 65363 corp: 10520/2725Kb exec/s: 931 rss: 519Mb
+Loaded 1024/11284 files from <corpus>
+Loaded 2048/11284 files from <corpus>
+Loaded 4096/11284 files from <corpus>
+#16384	pulse  cov: 15006 ft: 65537 corp: 10639/2750Kb lim: 11922 exec/s: 1260 rss: 569Mb
+#32768	pulse  cov: 15009 ft: 65854 corp: 10854/2819Kb lim: 11922 exec/s: 1927 rss: 605Mb
+#65536	pulse  cov: 15017 ft: 66154 corp: 11096/2935Kb lim: 11922 exec/s: 2114 rss: 605Mb
+#131072	pulse  cov: 15018 ft: 66502 corp: 11364/3068Kb lim: 11922 exec/s: 2299 rss: 605Mb
+#210601	DONE   cov: 15019 ft: 66777 corp: 11568/3216Kb lim: 11922 exec/s: 2193 rss: 605Mb
+###### Recommended dictionary. ######
+"\377\000" # Uses: 414
+"\377\377\377\377\377\377\377\377" # Uses: 319
+"\0001" # Uses: 336
+"\001\000" # Uses: 351
+"\377\377\377\377" # Uses: 303
+"\377\377\377\011" # Uses: 328
+"\001\000\000*" # Uses: 268
+"\000\000\000\000\000\000\000\000" # Uses: 314
+"entity %C3%" # Uses: 314
+"\017\000" # Uses: 295
+"\377\377\377\377\377\377\377\006" # Uses: 267
+"+\000" # Uses: 284
+"\000\021\000\000" # Uses: 330
+"E\000\000\000\000\000\000\000" # Uses: 289
+"\002\000\000\000" # Uses: 298
+"\000\000\000\000" # Uses: 310
+"limit at-th" # Uses: 268
+"limit" # Uses: 297
+"\001\000\000\000\000\000\000\006" # Uses: 261
+"\001\000\000'" # Uses: 269
+"\000\000\000\012" # Uses: 302
+"\000\000\000\000\000\000\000\007" # Uses: 278
+"entity e0 0" # Uses: 243
+"element doc" # Uses: 248
+"\000\000" # Uses: 278
+"accounting " # Uses: 277
+"\377\377\377\377\377\377\377\013" # Uses: 243
+"\034\000\000\000" # Uses: 255
+"\013\000" # Uses: 228
+"start do_ 0" # Uses: 223
+"attr" # Uses: 234
+"\015\000\000\000\000\000\000\000" # Uses: 255
+"doctype" # Uses: 220
+"limit bl-am" # Uses: 213
+"\376\377\377\377" # Uses: 219
+"S\000" # Uses: 212
+"text ]]%E1%" # Uses: 199
+"\001\000\000\000\000\000\000\016" # Uses: 218
+"\000\026" # Uses: 229
+"\376\377\377\377\377\377\377\377" # Uses: 198
+"text" # Uses: 201
+"\377\177" # Uses: 243
+"Y\000\000\000\000\000\000\000" # Uses: 192
+"\017\000\000\000\000\000\000\000" # Uses: 179
+"\257\000\000\000\000\000\000\000" # Uses: 179
+"start %E8%8" # Uses: 158
+"\377\377\3771" # Uses: 208
+"\374\377\377\377" # Uses: 196
+"]\000\000\000\000\000\000\000" # Uses: 185
+"text FFFFF%" # Uses: 150
+")\000\000\000\000\000\000\000" # Uses: 185
+"\375\377\377\377" # Uses: 181
+"\377\377\377\000" # Uses: 178
+"8\000\000\000\000\000\000\000" # Uses: 173
+"\000\000\000\005" # Uses: 159
+"\001\000\000\000" # Uses: 167
+"\001\000\000\000\000\000\000 " # Uses: 147
+"\360\000\000\000" # Uses: 166
+"text %20%20" # Uses: 152
+"\035\000\000\000" # Uses: 148
+"\377\377\377\377\377\377\377\025" # Uses: 154
+"\000\000\000\000\000\000\000\025" # Uses: 135
+"\007\000" # Uses: 147
+"\001|" # Uses: 145
+"start doc 2" # Uses: 127
+"\011\000" # Uses: 108
+"\000\000\000\000\000\000\000\001" # Uses: 114
+"\000\005" # Uses: 137
+"attr http:/" # Uses: 110
+"text %E2%84" # Uses: 110
+"notation n2" # Uses: 114
+"1\000\000\000" # Uses: 107
+"xm" # Uses: 103
+"C\000\000\000\000\000\000\000" # Uses: 99
+"\377\377\377\377\377\377\377\014" # Uses: 101
+"\377\377\377\005" # Uses: 84
+"doc" # Uses: 88
+"\002\000" # Uses: 100
+"\377\377\377\001" # Uses: 103
+"NO" # Uses: 70
+"\003\000\000\000" # Uses: 74
+"\000\000\000\000\000\000\000\004" # Uses: 61
+"\002\000\000\000\000\000\000\000" # Uses: 72
+"\377\001" # Uses: 69
+"\001\000\0001" # Uses: 62
+"limit bl-th" # Uses: 50
+"\333\026\000\000\000\000\000\000" # Uses: 53
+"\021\000\000\000\000\000\000\000" # Uses: 45
+"\001\001" # Uses: 49
+"\377\377\377\003" # Uses: 38
+",\000\000\000\000\000\000\000" # Uses: 43
+"\005\000" # Uses: 40
+"\001\010\000\000" # Uses: 35
+"\000\001" # Uses: 18
+"\023\000\000\000\000\000\000\000" # Uses: 10
+"\001\000\0008" # Uses: 8
+"endcdata" # Uses: 9
+"text %E9%81" # Uses: 3
+"\000\000\000\000\000\000\000\024" # Uses: 3
+"\001\000\000\001" # Uses: 4
+"doctype doc" # Uses: 1
+###### End of recommended dictionary. ######
+Done 210601 runs in 96 second(s)
+stat::number_of_executed_units: 210601
+stat::average_exec_per_sec:     2193
+stat::new_units_added:          1620
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              605

@@ -167,6 +167,7 @@ unsafe extern "C" {
         out_len: *mut usize,
     ) -> c_int;
     pub(crate) fn oracle_last_heap_peak() -> usize;
+    pub(crate) fn oracle_last_tracker(created: *mut u64, end: *mut u64);
     pub(crate) fn oracle_free(p: *mut c_void);
     pub(crate) fn oracle_core_run(
         prog: *const u8,

@@ -582,3 +582,55 @@ recorded in DIVERGENCES.md.
   token; the harness masks the counter line only in that exact situation
   (DIVERGENCES.md Q-4). Replicating an address-dependent value is
   impossible and would not be meaningful.
+
+## D-030 Allocation tracker: charge at least C's bytes, no later (module 11c)
+
+- **What C does.** libexpat 2.9.0 counts every `MALLOC`/`REALLOC` of a
+  parser (`expat_malloc` 898-950, `expat_realloc` 987-1060) as
+  `sizeof(size_t) + EXPAT_MALLOC_PADDING + size` and refuses an allocation
+  (`XML_ERROR_NO_MEMORY`) when the new total is at or above the activation
+  threshold (64 MiB) and `total / countBytesDirect` exceeds the maximum
+  amplification (100.0) (`expat_heap_increase_tolerable` 860-894). Two
+  allocations are deliberately outside the tracker: the input buffer
+  (`XML_GetBuffer`, plain `malloc_fcn`, "to leave limiting the input size
+  to the application", 2601-2603) and the content models given to the
+  element declaration handler (6442, 8780).
+- **Decision: charge, do not replicate byte for byte.** The port keeps its
+  own data structures (owned `Vec`s, D-021, D-027), so it cannot count C's
+  allocations. It *charges* its tracker (`parse::tracker`) at the point
+  where C allocates, or earlier, at least the bytes C allocates:
+  exactly C's sizes for the structures whose growth the port replays
+  (string pools through `PoolShadow`, which replays `poolGrow` on lengths
+  only; hash tables through `heap::Heap`; `TAG` structures, their name
+  buffers and the free list; namespace bindings and their URI buffers;
+  `m_atts`/`m_nsAtts`; open-entity records with C's free list (D-028);
+  default-attribute arrays and their per-element tables; the content-model
+  scaffold and group connector); and an upper bound,
+  `CREATION_CHARGE` = 16 KiB, for the parser creation (3,040-3,059 bytes in
+  C on 64-bit targets, checked on every CI platform by
+  `creation_charge_covers_c`) plus the small fixed allocations the port
+  does not replay one by one. Like C, the port does **not** charge the
+  input buffer; charging it would make the port refuse large documents
+  that C accepts at the default limits, which D-026 rules out.
+- **Why.** Byte-exact replication would tie the port to C's structure
+  layouts (`sizeof` per platform) and to every incidental allocation,
+  for no security gain. The property that matters is one-sided: whenever
+  libexpat refuses through its tracker, the port must refuse too. Charging
+  at least as much, no later, gives it, because both sides count the same
+  direct bytes (`parse::accounting`), so the port's ratio is never lower
+  at any point of the parse.
+- **Consequence (divergence DV-1).** The port's total is above C's by a
+  margin (measured 11,764-13,352 bytes in the tests, dominated by the
+  creation bound). A document whose C total ends within that margin below
+  the refusal point is refused by the port only. With limits tightened by
+  the caller this is easy to reach (at C's exact passing threshold the
+  port refuses in 36/36 sweep cases); at the default limits it needs a
+  tracked total of at least 64 MiB within ~13 KB of 100 times the direct
+  input, and no test or fuzz input has reached it. It is fail-closed (the
+  error is `XML_ERROR_NO_MEMORY`, as from C's tracker) and recorded in
+  DIVERGENCES.md. This is the one exception to "no stricter behaviour"
+  in D-026, accepted because the alternative (byte-exact replication) is
+  not achievable with the port's data structures.
+- **Verification.** `tests/tests/tracker_diff.rs` (groups in REPORT.md,
+  module 11c), the tracker relation in the `parse_trace` fuzz target
+  (`expat_difftest::tracker::check_from`), injected bugs K1-K7.

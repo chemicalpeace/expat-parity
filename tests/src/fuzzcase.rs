@@ -17,26 +17,42 @@ use expat_oracle::BufferOp;
 /// The `parse_trace` check: the first two bytes select the options
 /// ([`crate::options_from_selectors`]), the rest is the document. The C
 /// trace must be well formed and, unless the port stopped at a part that is
-/// not ported yet, equal to the port's trace. Inputs shorter than two bytes
-/// pass.
+/// not ported yet, equal to the port's trace; then the allocation-tracker
+/// relation must hold ([`crate::tracker::check_from`]: two more runs with
+/// tight tracker limits). Inputs shorter than two bytes pass.
 pub fn parse_trace_case(data: &[u8]) -> Result<(), String> {
     let [sel, sel2, doc @ ..] = data else {
         return Ok(());
     };
     let opts = crate::options_from_selectors(*sel, *sel2);
     let c = expat_oracle::parse_trace(doc, &opts).map_err(|e| format!("oracle shim: {e:?}"))?;
+    let c_tracker = expat_oracle::last_tracker_bytes();
     if !is_well_formed_trace(&c) {
         return Err("malformed C trace".into());
     }
-    if let PortTrace::Trace(rust) = port_trace(doc, &opts)
-        && let (c, rust) = mask_q4(&c, &rust)
+    let port = port_trace(doc, &opts);
+    let port_tracker = crate::port::last_port_tracker();
+    if let PortTrace::Trace(rust) = &port
+        && let (c, rust) = mask_q4(&c, rust)
         && let Some((line, l, r)) = first_difference(&c, &rust)
     {
         return Err(format!(
             "trace mismatch at line {line}: C `{l}` port `{r}` ({opts:?})"
         ));
     }
-    Ok(())
+    // Module 11c: the allocation tracker relation (the port's count at
+    // least C's, and the port fails whenever C fails with tight tracker
+    // limits).
+    let base = crate::tracker::Run {
+        c,
+        port: match port {
+            PortTrace::Trace(t) => Some(t),
+            PortTrace::DtdNotPorted => None,
+        },
+        c_tracker,
+        port_tracker,
+    };
+    crate::tracker::check_from(doc, &opts, &base, &mut crate::tracker::Tally::default())
 }
 
 /// Decodes a `buffer_diff` input: one flag byte (bit 0 namespaces, bit 1

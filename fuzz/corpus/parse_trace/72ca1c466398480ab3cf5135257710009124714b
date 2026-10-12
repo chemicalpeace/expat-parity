@@ -1,0 +1,4 @@
+Ì0<!--before--><!DOCTYPE a PUBLIC "" 'doc.dtd' [<!ATTLIST doc d0 CDATA 'v0'>
+<!ELEMENT doc (#PCDATA)><!ENTITY ext SYSTEM 'u.gif' NDATA n1><!ENTITY % pe2 "<!ATTLIST doc pa CDATA 'pe default'>" >
+<!ENTITY e2 SYSTEM "sys.ent">
+]><a c=' x &e2; '><!--c--></a>

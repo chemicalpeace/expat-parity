@@ -1,4 +1,0 @@
-ÿý<!DOCTYPE dc SYSTEM 'foo' [
-  <!ATTLIST doc baz ID #REQUIREb3D>
-  <!ENTITY en SYSTEM 'bar'>
-]>

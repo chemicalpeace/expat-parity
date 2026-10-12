@@ -25,6 +25,7 @@ pub mod port;
 pub mod role;
 pub mod tok;
 pub mod trace;
+pub mod tracker;
 pub mod vectors;
 
 use expat_oracle::{ParamEntityParsing, ParseOptions};

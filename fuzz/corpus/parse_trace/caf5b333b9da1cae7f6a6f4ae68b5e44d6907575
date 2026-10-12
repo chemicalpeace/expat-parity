@@ -1,0 +1,5 @@
+�﻿<!--before--><!DOCTYPE a [<!NOTATION n2 SYSTEM 'viewer'><!ELEMENT é ANY><!ATTLIST a p:a ENTITIES #REQUIRED>
+<!ENTITY lt "&e3;" ><!ATTLIST doc xmlns]:p ID "&e1;">
+<!ATTL]IST doc d0 CDATA 'v0' d1 CDATA 'v1'>
+<!ELEMENT a (#PCDATA|a)*>
+<!ENTITY %

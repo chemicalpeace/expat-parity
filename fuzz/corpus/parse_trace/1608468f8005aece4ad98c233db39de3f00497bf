@@ -1,0 +1,1 @@
+Æì<!DOCTYPE r [<!ENTITY e0 ''><!ENTITY e0 'second'>]><r s="v&e0;w">&e0;txt<c>&e0;</c></r>

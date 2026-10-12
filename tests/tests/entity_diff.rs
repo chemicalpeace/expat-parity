@@ -218,6 +218,25 @@ const CASES: &[(&str, &str, i64)] = &[
         "<!DOCTYPE r [<!ENTITY o '<a>'><!ENTITY c '</a>'>]><r>&o;&c;</r>",
         13,
     ),
+    // The entity ends right after an inner reference while its start tag
+    // is still open: the check runs when the inner entity closes
+    // (`processInternalEntity`, `xmlparse.c`; injected bug I2 was only
+    // caught by generated documents before these cases).
+    (
+        "async-open-then-empty-ref",
+        "<!DOCTYPE r [<!ENTITY e '<a>&f;'><!ENTITY f ''>]><r>&e;</a></r>",
+        13,
+    ),
+    (
+        "async-open-then-text-ref",
+        "<!DOCTYPE r [<!ENTITY e '<a>&f;'><!ENTITY f 'x'>]><r>&e;</a></r>",
+        13,
+    ),
+    (
+        "async-inner-opens-at-end",
+        "<!DOCTYPE r [<!ENTITY e '<i>t</i>&f;'><!ENTITY f '<b><i/>'>]><r>&e;</b></r>",
+        13,
+    ),
     // --- attribute values
     (
         "attr-text",

@@ -1,0 +1,5 @@
+éç<!--before--><!DOCTYPE a PUBLIC "  spaced 
+  id  " 'doc.dtd' [<!ELEMENT doc (#PCDATA|_u|a)*>
+<!ELEMENT b (((n-1? , a , b+)) , q:e*)?><!ATTLIST b c CDATA #FIXED 'line
+break
+andcr	tab'>] ><doc c='1' a=' x &e2; '>&undeclared;&ext;<!--c--></doc>

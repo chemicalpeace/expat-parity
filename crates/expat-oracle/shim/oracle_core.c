@@ -803,3 +803,17 @@ oracle_buffer_run(const unsigned char *doc, size_t len, const int *ops,
   *out_len = o.len;
   return 0;
 }
+
+/* ---- allocation tracker readout (module 11c) --------------------------- */
+
+/* The live byte count of a parser's allocation tracker
+ * (`m_alloc_tracker.bytesAllocated`, which `expat_malloc`/`expat_realloc`/
+ * `expat_free` keep). The parser comes from the main copy of xmlparse.c
+ * (oracle_trace.c); this copy is compiled from the same unmodified source
+ * with the same configuration header, so `struct XML_ParserStruct` has the
+ * same layout. Read-only. */
+unsigned long long
+oracle_tracker_bytes(const void *parser) {
+  const struct XML_ParserStruct *p = (const struct XML_ParserStruct *)parser;
+  return (unsigned long long)p->m_alloc_tracker.bytesAllocated;
+}

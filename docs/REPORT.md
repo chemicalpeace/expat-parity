@@ -21,8 +21,9 @@ prolog/DTD state machine); module 9 is the string pool and hash table of
 `xmlparse.c` for documents without a document type declaration (buffer,
 prolog, content, attributes, namespaces, CDATA, epilog, positions). No
 public parser API exists yet (module 12); module 11 (in progress) is the
-DTD: 11a declarations and 11b internal entity expansion and recursion are
-done.
+DTD: 11a declarations, 11b internal entity expansion and recursion, 11b2
+billion-laughs limits and 11c the allocation tracker are done; external
+entities (11d) are next.
 
 ## Verification infrastructure
 
@@ -502,9 +503,93 @@ The corpus replay before fuzzing found Q-4 (seven committed inputs whose
 selector already had bit 7 set). Merged corpus: 36,002 inputs to 11,174
 files (14,355 edges), scanned for personal data (no hits).
 
+### Module 11c (allocation tracker): the tracker relation versus C
+
+Ported: `MALLOC_TRACKER` and its setters (`parse::tracker`,
+`Parser::set_alloc_tracker_*`). The port charges its tracker at C's
+allocation points or earlier, at least C's bytes (D-030); the input buffer
+is not charged, as in C (`xmlparse.c` 2601-2603). The oracle gained a
+tracker readout (bytes after creation and at the end of the parse).
+Because the counts are not byte-identical, the tests check the relation
+that matters for security (`expat_difftest::tracker`): **whenever C stops
+with `XML_ERROR_NO_MEMORY`, the port does too**; at the default limits the
+port never refuses a document C accepts; every other trace line is equal.
+Each `check` runs a document three times: under the group's options, then
+with factor 1.0 and the threshold at C's final count, and at half of it.
+
+Local run (2026-10-12, aarch64 Linux, commit 929fcb7, `--release`):
+`cargo test -p expat-difftest --test tracker_diff -- --nocapture`:
+
+| Group (test) | Runs | C behaviour | Security policy | Known divergences |
+|---|---|---|---|---|
+| Setters (`setters_match_c`) | 9 | Factor NaN, -1, 0, 0.999999 refused; 1.0 and +inf accepted; thresholds 0 and `u64::MAX` accepted; factor 1.0 with threshold 0 fails at the first tracked allocation (error 1). | Same validation as C; defaults 100.0 / 64 MiB unchanged (D-026). Non-root refusal: needs external entity parsers (11d / 12). | none |
+| Creation charge (`creation_charge_covers_c`) | 8 | 3,040 bytes after `XML_ParserCreate(NS)`, 3,054-3,059 with an encoding name (UTF-8, ISO-8859-1, UTF-16LE). | Port charges 16,384 (+ name), an upper bound. | DV-1 margin |
+| Upstream vectors (`upstream_vectors_tracker_relation`) | 6,480 (540 vectors x 4 option sets x 3) | C refuses in 3,676 tight runs. | Port refuses in all of them; 4 tight runs refused by the port only; port total >= C's at the end (smallest margin 12,272 bytes). | DV-1 (4 tight runs) |
+| Generated documents (`generated_documents_tracker_relation`) | 4,500 (1,500 documents x 3) | C refuses in 2,798 tight runs. | Port refuses in all of them; 20 refused by the port only; smallest margin 11,764 bytes. | DV-1 (20 tight runs) |
+| Threshold sweep (`threshold_boundary_sweep`) | 9 documents x 4 option sets: 50 grid thresholds (1 KiB-64 MiB) + C's boundary found by bisection, probed at -64, -1, 0 | 108 boundary probes where C refuses. | Port refuses in all 108; at C's exact passing threshold the port refuses in 36/36 (asserted). | DV-1 (36/36) |
+| Amplification sweep (`amplification_boundary_sweep`) | 1,152 (36 x 32 factors 1.0-4,000, threshold 0) | C refuses in 986 probes. | Port refuses in all of them. | DV-1 |
+| Tracker-only attribute (`tracker_only_attribute`) | 3 | 85,000 references to a 395-character entity in one attribute (340,434 bytes, billion-laughs factor 99.75): error 1 at the default limits (33,563,484 bytes tracked); accepted with factor 1,000 or a 128 MiB threshold. | Port: error 1 at the default limits (33,576,836 charged); equal traces in both relaxed runs. | none |
+| Attribute expansion sizes (`attribute_expansion_sizes`) | 5 | 395 x 40,000 and 395 x 84,000 accepted; 395 x 85,500 and 300 x 120,000 refused (1); 2,000 x 20,000 stops with 43 first. | Same outcomes; equal traces where C accepts. | none |
+| Content expansion control (`content_expansion_is_not_tracked`) | 1 | The same 33 MB expansion in content is streamed; C's total stays at 7,580 bytes; accepted. | Port accepts (20,932 charged); equal trace (text digest). | none |
+
+All groups: 0 violations of the relation, 0 mismatches outside the
+result line. Bounds: 512 KiB input, 60 s and 384 MiB heap per side for the
+large groups (`LARGE` in `tracker_diff.rs`); measured heap peaks for the
+tracker-only document 34.1 MB (C) / 52.3 MB (port), 0.16 s; whole file
+3.3 s.
+
+**Injected bugs** (2026-10-12, each reverted after the run, `tracker_diff`;
+the exact mutations were re-run after a sandbox reset lost the first
+session's working copy):
+
+| # | Mutation | Detected by |
+|---|---|---|
+| K1 | `PoolShadow`: the current block grows by 1.5x instead of 2x (`tracker.rs`) | `tracker_only_attribute`, `attribute_expansion_sizes` |
+| K2 | `AllocTracker::realloc` does not charge an increase (`tracker.rs`) | `tracker_only_attribute`, `attribute_expansion_sizes`, threshold sweep (12) |
+| K3 | A new `TAG` structure not charged (`tracker.rs`) | threshold sweep, 34 violations (first: deep nesting) |
+| K4 | `add_binding`: a new `BINDING` treated as reused, its structure not charged (`content.rs`) | threshold sweep, 6 violations (nested namespace scopes) |
+| K5 | Factor setter accepts values >= 0.5 (`tracker.rs`) | `setters_match_c` |
+| K6 | `charge_current` charges half of a string's growth (`mod.rs`) | `tracker_only_attribute`, `attribute_expansion_sizes` |
+| K7 | `defineAttribute`: growth of the default-attribute array not charged (`dtd.rs`) | threshold sweep, 12 violations (distinct attribute names) |
+
+K4 and K7 were first **not** detected: the seven original sweep documents
+never needed enough bindings or default attributes for the undercharge
+to exceed the creation margin. Two targeted documents were added (nested
+namespace scopes: 600 nested prefixed elements, each declaring its own
+prefix; distinct attribute names: 8 element types x 60 defaulted
+attributes); both bugs are now caught, and the logs without the targeted
+documents are kept with the injection logs.
+
+Entity cases added in this PR: injected bug I2 of module 11b (the
+proper-nesting check when an entity ends right after an inner reference)
+had been caught only by the generated documents; three curated cases
+(`async-open-then-empty-ref`, `async-open-then-text-ref`,
+`async-inner-opens-at-end`, C error 13) now catch it in
+`curated_entity_cases_match_c` (1,053 pairs, 0 mismatches).
+
+**Fuzzing** (both targets: `parse_trace` now checks the tracker relation
+with two extra tight runs per input; `buffer_diff` because the parser's
+allocation paths changed). From the trimmed logs in
+`docs/fuzz-logs/module-11c/` (commit 39a7005, strictly sequential slices):
+
+| Target | Slices | Seconds | Executions | Findings |
+|---|---|---|---|---|
+| `parse_trace` | 7 | 672 | 1,221,587 | none (coverage 15,006 -> 15,042 edges) |
+| `buffer_diff` | 7 | 617 | 4,269,530 | none (coverage 12,801 -> 12,855 edges) |
+
+Merged corpora: `parse_trace` 12,638 files, `buffer_diff` 10,451 files
+(docs/FUZZING.md), scanned for personal data (no hits). A first step-C run
+on commit 7762e9d (parse_trace 665 s / 1,257,130, buffer_diff 660 s /
+4,667,919 executions, no findings) is not counted: its logs were lost
+with the sandbox before they were committed.
+
 ## Divergences
 
-`docs/DIVERGENCES.md`. No divergence in parse results. Four C quirks found
+`docs/DIVERGENCES.md`. One divergence: DV-1 (module 11c, D-030), the
+allocation tracker may refuse (`XML_ERROR_NO_MEMORY`) slightly earlier
+than C, within the margin by which its charge exceeds C's count; it is
+fail-closed and was observed only with caller-tightened limits. No other
+divergence in parse results. Four C quirks found
 by the harness: Q-3 resolved as "replicate" (module 7; the input violates
 XML 1.0 §4.3.3), Q-1 and Q-2 resolved as "replicate" (module 10, D-024),
 Q-4 (module 11b2, D-029: undefined behaviour in C's epilog accounting that
@@ -526,10 +611,9 @@ comparisons start when the parser exists.
   guessed error) only where an external entity parser would be needed
   (external subset or external parameter entity with a handler); all 540
   upstream vectors are compared under every option set.
-- The allocation tracker's byte counts (`XML_SetAllocTrackerMaximumAmplification`)
-  are replicated for the hash tables only; whether every parser structure is
-  replicated is decided in module 11 (D-021, D-023). Without a failing
-  allocator or a tracker limit nothing observable depends on it.
+- The allocation tracker is not byte-identical to C: the port charges at
+  least C's bytes, no later (D-030), so it can refuse slightly earlier
+  (DV-1). The input buffer is not tracked, as in C.
 - D-017: on targets where C `char` is unsigned (aarch64 Linux) C's
   `utf8_toUtf16` zero-extends stray bytes that the port sign-extends; the
   parser never passes such bytes to the converter, and the tokenizer

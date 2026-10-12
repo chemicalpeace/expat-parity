@@ -1,0 +1,8 @@
+‘øï»¿<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE p:e PUBLIC '-//X//DTD x//EN' 'doc.dtd' [<!ATTLIST b xml:lang ENTITIES #IMPLIED xmlns:p NOTATION (n1|n2) 'aÂ f' q:a CDATA #FIXED "">
+<!ATTLIST b b NMTOKENS #FIXED "urn:p" a ENTITY #FIXED "http://www.w3.org/2000/xmlns/" xml:lang CDATA #FIXED " x  y ">
+<!ATTLIST Ã© c ENTITY 'x&e2;y' c ENTITY #FIXED "">
+
+<!ENns:p ENTTION n2 PUBLIC 'p' 'viewer'>
+<!ENTITY lt "]]>">
+]><doc id=' x &e2; ' id='1'><!--c-->a&amp;b</doc>

@@ -12,6 +12,7 @@ use super::entity::EntityType;
 use super::error::{Stop, XmlError};
 use super::model::{ContentModel, ContentQuant, ContentType};
 use super::prolog::to_utf8;
+use super::tracker::Pool;
 use super::{Handler, ParamEntityParsing, Parser};
 use crate::encode::utf8_encode;
 use crate::role::Role;
@@ -90,8 +91,9 @@ impl Parser {
     ) -> Result<crate::hash::EntryId, Stop> {
         let name = to_utf8(enc, bytes(buf, s, end));
         let salt = self.salt;
+        let direct = self.direct();
         self.dtd
-            .element_type(&salt, self.ns, &name)
+            .element_type(&salt, &mut self.tracker, direct, self.ns, &name)
             .map_err(|_| XmlError::NoMemory.into())
     }
 
@@ -127,12 +129,23 @@ impl Parser {
 
     /// Calls the attribute-list declaration handler for the attribute
     /// being declared (C: the common tail of the four value roles).
-    fn report_attlist<H: Handler>(&mut self, h: &mut H, dflt: Option<&[u8]>, is_required: bool) {
+    fn report_attlist<H: Handler>(
+        &mut self,
+        h: &mut H,
+        dflt: Option<&[u8]>,
+        is_required: bool,
+    ) -> Result<(), Stop> {
         let Some(t) = self.decl_attribute_type.as_mut() else {
-            return;
+            return Ok(());
         };
         if is_enumerated_type(t) {
             t.push(b')');
+            // `)` and the NUL in `m_tempPool`, then `poolFinish`.
+            let direct = self.accounting.count_bytes_direct;
+            let (p, mut heap) = self.tracker.pool(Pool::Temp, direct);
+            p.append(&mut heap, 2)
+                .map_err(|_| Stop::Error(XmlError::NoMemory))?;
+            p.finish();
         }
         let elname = self.decl_element_name();
         let attname = self
@@ -142,6 +155,8 @@ impl Parser {
             .to_vec();
         let att_type = self.decl_attribute_type.clone().unwrap_or_default();
         h.attlist_decl(&elname, &attname, &att_type, dflt, is_required);
+        self.tracker.temp_pool.clear();
+        Ok(())
     }
 
     /// Handles a role of a document type declaration (the cases of
@@ -165,7 +180,11 @@ impl Parser {
         match role {
             Role::DoctypeName => {
                 if self.handlers.start_doctype_decl {
-                    self.doctype_name = Some(to_utf8(enc, bytes(buf, s, next)));
+                    let name = to_utf8(enc, bytes(buf, s, next));
+                    // `m_doctypeName` lives in `m_tempPool`.
+                    let direct = self.direct();
+                    self.tracker.store(Pool::Temp, name.len(), direct).map_err(no_mem)?;
+                    self.doctype_name = Some(name);
                     self.doctype_pubid = None;
                 }
                 // Always initialize to NULL.
@@ -182,6 +201,7 @@ impl Parser {
                     );
                     // C clears the temporary pool here; the system id
                     // pointer stays non-NULL and is only tested later.
+                    self.tracker.temp_pool.clear();
                 }
             }
             Role::DoctypePublicId | Role::EntityPublicId => {
@@ -189,20 +209,25 @@ impl Parser {
                     self.use_foreign_dtd = false;
                     let (r, _) = self
                         .dtd
-                        .declare_entity(&salt, true, EXTERNAL_SUBSET_NAME)
+                        .declare_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct, true, EXTERNAL_SUBSET_NAME)
                         .map_err(no_mem)?;
                     self.decl_entity = Some(r);
                     self.dtd.has_param_entity_refs = true;
                 }
                 self.check_public_id(enc, buf, s, next)?;
                 if role == Role::DoctypePublicId && self.handlers.start_doctype_decl {
-                    self.doctype_pubid =
-                        Some(normalize_public_id(&Self::literal(enc, buf, s, next)));
+                    let lit = Self::literal(enc, buf, s, next);
+                    let direct = self.direct();
+                    self.tracker.store(Pool::Temp, lit.len(), direct).map_err(no_mem)?;
+                    self.doctype_pubid = Some(normalize_public_id(&lit));
                 }
                 if self.dtd.keep_processing
                     && let Some(r) = self.decl_entity
                 {
                     let id = normalize_public_id(&Self::literal(enc, buf, s, next));
+                    // `poolStoreString(&dtd->pool, ...)` + `poolFinish`.
+                    let direct = self.direct();
+                    self.tracker.store(Pool::Dtd, id.len(), direct).map_err(no_mem)?;
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.public_id = Some(id);
                     }
@@ -221,6 +246,7 @@ impl Parser {
                         self.doctype_pubid.as_deref(),
                         false,
                     );
+                    self.tracker.temp_pool.clear();
                 }
                 if self.doctype_sysid.is_some() || self.use_foreign_dtd {
                     // Reading the external subset needs an external
@@ -238,8 +264,12 @@ impl Parser {
             }
             Role::AttributeName => {
                 let name = to_utf8(enc, bytes(buf, s, next));
-                self.decl_attribute_id =
-                    Some(self.dtd.attribute_id(&salt, self.ns, &name).map_err(no_mem)?);
+                let direct = self.direct();
+                self.decl_attribute_id = Some(
+                    self.dtd
+                        .attribute_id(&salt, &mut self.tracker, direct, self.ns, &name)
+                        .map_err(no_mem)?,
+                );
                 self.decl_attribute_is_cdata = false;
                 self.decl_attribute_type = None;
                 self.decl_attribute_is_id = false;
@@ -269,6 +299,10 @@ impl Parser {
                         b"("
                     };
                     let value = to_utf8(enc, bytes(buf, s, next));
+                    // The type string grows in `m_tempPool`.
+                    let direct = self.direct();
+                    let (p, mut heap) = self.tracker.pool(Pool::Temp, direct);
+                    p.append(&mut heap, prefix.len() + value.len()).map_err(no_mem)?;
                     let t = self.decl_attribute_type.get_or_insert_with(Vec::new);
                     t.extend_from_slice(prefix);
                     t.extend_from_slice(&value);
@@ -277,17 +311,22 @@ impl Parser {
             Role::ImpliedAttributeValue | Role::RequiredAttributeValue => {
                 if self.dtd.keep_processing {
                     if let (Some(et), Some(att)) = (self.decl_element_type, self.decl_attribute_id) {
-                        self.dtd.define_attribute(
-                            et,
-                            att,
-                            self.decl_attribute_is_cdata,
-                            self.decl_attribute_is_id,
-                            None,
-                        );
+                        let direct = self.direct();
+                        self.dtd
+                            .define_attribute(
+                                &mut self.tracker,
+                                direct,
+                                et,
+                                att,
+                                self.decl_attribute_is_cdata,
+                                self.decl_attribute_is_id,
+                                None,
+                            )
+                            .map_err(no_mem)?;
                     }
                     if self.handlers.attlist_decl && self.decl_attribute_type.is_some() {
                         self.ev_end(enc, Some(s));
-                        self.report_attlist(h, None, role == Role::RequiredAttributeValue);
+                        self.report_attlist(h, None, role == Role::RequiredAttributeValue)?;
                     }
                 }
             }
@@ -304,17 +343,22 @@ impl Parser {
                     )?;
                     // ID attributes aren't allowed to have a default.
                     if let (Some(et), Some(att)) = (self.decl_element_type, self.decl_attribute_id) {
-                        self.dtd.define_attribute(
-                            et,
-                            att,
-                            self.decl_attribute_is_cdata,
-                            false,
-                            Some(value.clone()),
-                        );
+                        let direct = self.direct();
+                        self.dtd
+                            .define_attribute(
+                                &mut self.tracker,
+                                direct,
+                                et,
+                                att,
+                                self.decl_attribute_is_cdata,
+                                false,
+                                Some(value.clone()),
+                            )
+                            .map_err(no_mem)?;
                     }
                     if self.handlers.attlist_decl && self.decl_attribute_type.is_some() {
                         self.ev_end(enc, Some(s));
-                        self.report_attlist(h, Some(&value), role == Role::FixedAttributeValue);
+                        self.report_attlist(h, Some(&value), role == Role::FixedAttributeValue)?;
                     }
                 }
             }
@@ -322,7 +366,10 @@ impl Parser {
                 if self.dtd.keep_processing {
                     // This stores the replacement text of m_declEntity.
                     let mut text = Vec::new();
+                    self.charged_len = 0;
                     let result = self.call_store_entity_value(enc, buf, s + m, next - m, &mut text, Account::None);
+                    self.charge_current(Pool::EntityValue, text.len())?;
+                    self.finish_current(Pool::EntityValue, false, self.decl_entity.is_some())?;
                     if let Some(r) = self.decl_entity {
                         if i32::try_from(text.len()).is_err() {
                             return Err(XmlError::NoMemory.into());
@@ -357,7 +404,10 @@ impl Parser {
                     self.use_foreign_dtd = false;
                     self.dtd.has_param_entity_refs = true;
                     self.doctype_sysid = Some(if self.handlers.start_doctype_decl {
-                        Self::literal(enc, buf, s, next)
+                        let lit = Self::literal(enc, buf, s, next);
+                        let direct = self.direct();
+                        self.tracker.store(Pool::Temp, lit.len(), direct).map_err(no_mem)?;
+                        lit
                     } else {
                         // Makes m_doctypeSysid non-NULL when no start
                         // handler is set.
@@ -368,7 +418,7 @@ impl Parser {
                     if self.decl_entity.is_none() {
                         let (r, _) = self
                             .dtd
-                            .declare_entity(&salt, true, EXTERNAL_SUBSET_NAME)
+                            .declare_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct, true, EXTERNAL_SUBSET_NAME)
                             .map_err(no_mem)?;
                         if let Some(e) = self.dtd.entity_mut(r) {
                             e.public_id = None;
@@ -380,6 +430,8 @@ impl Parser {
                     && let Some(r) = self.decl_entity
                 {
                     let sysid = Self::literal(enc, buf, s, next);
+                    let direct = self.direct();
+                    self.tracker.store(Pool::Dtd, sysid.len(), direct).map_err(no_mem)?;
                     let base = self.cur_base.clone();
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.system_id = Some(sysid);
@@ -412,6 +464,8 @@ impl Parser {
                     && let Some(r) = self.decl_entity
                 {
                     let notation = to_utf8(enc, bytes(buf, s, next));
+                    let direct = self.direct();
+                    self.tracker.store(Pool::Dtd, notation.len(), direct).map_err(no_mem)?;
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.notation = Some(notation);
                     }
@@ -450,7 +504,7 @@ impl Parser {
                     let name = to_utf8(enc, bytes(buf, s, next));
                     let (r, created) = self
                         .dtd
-                        .declare_entity(&salt, is_param, &name)
+                        .declare_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct, is_param, &name)
                         .map_err(no_mem)?;
                     if created {
                         // If we have a parent parser or are reading an
@@ -474,15 +528,20 @@ impl Parser {
                 self.decl_notation_public_id = None;
                 self.decl_notation_name = None;
                 if self.handlers.notation_decl {
-                    self.decl_notation_name = Some(to_utf8(enc, bytes(buf, s, next)));
+                    let name = to_utf8(enc, bytes(buf, s, next));
+                    let direct = self.direct();
+                    self.tracker.store(Pool::Temp, name.len(), direct).map_err(no_mem)?;
+                    self.decl_notation_name = Some(name);
                 }
             }
             Role::NotationPublicId => {
                 self.check_public_id(enc, buf, s, next)?;
                 // A name is only stored when the handler is set.
                 if self.decl_notation_name.is_some() {
-                    self.decl_notation_public_id =
-                        Some(normalize_public_id(&Self::literal(enc, buf, s, next)));
+                    let lit = Self::literal(enc, buf, s, next);
+                    let direct = self.direct();
+                    self.tracker.store(Pool::Temp, lit.len(), direct).map_err(no_mem)?;
+                    self.decl_notation_public_id = Some(normalize_public_id(&lit));
                 }
             }
             Role::NotationSystemId => {
@@ -490,6 +549,8 @@ impl Parser {
                     && self.handlers.notation_decl
                 {
                     let sysid = Self::literal(enc, buf, s, next);
+                    let direct = self.direct();
+                    self.tracker.store(Pool::Temp, sysid.len(), direct).map_err(no_mem)?;
                     self.ev_end(enc, Some(s));
                     h.notation_decl(
                         &name,
@@ -498,6 +559,7 @@ impl Parser {
                         self.decl_notation_public_id.as_deref(),
                     );
                 }
+                self.tracker.temp_pool.clear();
             }
             Role::NotationNoSystemId => {
                 if let Some(pubid) = self.decl_notation_public_id.clone()
@@ -507,9 +569,12 @@ impl Parser {
                     self.ev_end(enc, Some(s));
                     h.notation_decl(&name, self.cur_base.as_deref(), None, Some(&pubid));
                 }
+                self.tracker.temp_pool.clear();
             }
             Role::GroupOpen => {
                 let level = self.prolog_state.level as usize;
+                let direct = self.direct();
+                self.tracker.group(level, direct).map_err(no_mem)?;
                 if self.group_connector.len() <= level {
                     self.group_connector.resize(level + 1, 0);
                 }
@@ -517,8 +582,12 @@ impl Parser {
                     *c = 0;
                 }
                 if self.dtd.in_eldecl {
+                    self.tracker
+                        .scaffold_part(self.dtd.scaff_count, direct)
+                        .map_err(no_mem)?;
                     let myindex = self.dtd.next_scaffold_part();
                     let lvl = self.dtd.scaff_level;
+                    self.tracker.scaffold_level(lvl, direct).map_err(no_mem)?;
                     if self.dtd.scaff_index.len() <= lvl {
                         self.dtd.scaff_index.resize(lvl + 1, 0);
                     }
@@ -596,6 +665,10 @@ impl Parser {
                 if self.dtd.in_eldecl {
                     let quant = quant_of(role);
                     let nxt = if quant == ContentQuant::None { next } else { next - m };
+                    let direct = self.direct();
+                    self.tracker
+                        .scaffold_part(self.dtd.scaff_count, direct)
+                        .map_err(no_mem)?;
                     let myindex = self.dtd.next_scaffold_part();
                     let el = self.get_element_type(enc, buf, s, nxt)?;
                     let name = self.dtd.element_types.key(el).unwrap_or_default().to_vec();
@@ -675,6 +748,11 @@ impl Parser {
             return Ok(());
         }
         let name = Self::literal(enc, buf, s, next);
+        // The name is stored in `dtd->pool` for the lookup.
+        let direct = self.direct();
+        self.tracker
+            .store_discard(Pool::Dtd, name.len(), direct)
+            .map_err(|_| Stop::Error(XmlError::NoMemory))?;
         let entity = self.dtd.param_entities.find(&self.salt, &name);
         // First, determine if a check for an existing declaration is
         // needed; if yes, check that the entity exists, and that it is
@@ -756,6 +834,8 @@ impl Parser {
             return Ok(());
         }
         loop {
+            // `dtd->entityValuePool` grows with each token's characters.
+            self.charge_current(Pool::EntityValue, out.len())?;
             let r = entity_value_tok(enc, buf, ptr);
             // XmlEntityValueTok doesn't always set the last arg.
             let mut next = r.next.unwrap_or(ptr);
@@ -770,6 +850,11 @@ impl Parser {
                 Scan::Token(Tok::ParamEntityRef) => {
                     if self.is_param_entity || enc.is_internal() {
                         let name = to_utf8(enc, bytes(buf, ptr + m, next - m));
+                        // The name is stored in `m_tempPool` for the lookup.
+                        let direct = self.direct();
+                        self.tracker
+                            .store_discard(Pool::Temp, name.len(), direct)
+                            .map_err(|_| Stop::Error(XmlError::NoMemory))?;
                         let Some(id) = self.dtd.param_entities.find(&self.salt, &name) else {
                             // Not a well-formedness error - see XML 1.0:
                             // WFC Entity Declared (C cannot report a

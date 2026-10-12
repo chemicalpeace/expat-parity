@@ -1,0 +1,4 @@
+,�
+<!DOCTYPE p:e SYSTEM 'doc.dtd' [%pe2;<!ENTITY amp PUBLIC "" "sys2.ent"><!ENTITY % pe3 "<!ATTLIST doc pa CDATA 'pe default'>"><!ATTLIST b xmlns CDATA 'http://www.w3.org/2000/xmlns/' a CDATA #REQUIRED>
+<!ATTLIST a c CDATA "htp://www.w3.org/2000/xmlns/" xmlns:p CDATA #REQUIRED><!ENTITY (mp CDATA #FIXED "a b" xmlns:p  SYSTEM "sys.ent" ><!ELEMENT q:e ANY>
+<!ATTLIST q:e p:a (x|y|z) '' xmlns CDATA #FIXED "a b" xmlns:p ( x | y ) #REQUIRED><!ENTITY e3 SYSTEM 'u.gif' N><?pi?>&e3;&lt;</doc>

@@ -66,6 +66,10 @@ pub struct Outcome {
     pub c_peak: usize,
     /// Wall-clock time of both parses.
     pub elapsed: Duration,
+    /// libexpat's allocation tracker count (module 11c).
+    pub c_tracker: expat_oracle::TrackerBytes,
+    /// The port's allocation tracker (module 11c).
+    pub port_tracker: crate::port::PortTracker,
 }
 
 impl Outcome {
@@ -100,17 +104,27 @@ pub fn compare(id: &str, doc: &[u8], opts: &ParseOptions, bounds: Bounds) -> Out
         let start = Instant::now();
         let c = expat_oracle::parse_trace(&doc, &o);
         let c_peak = expat_oracle::last_heap_peak();
+        let c_tracker = expat_oracle::last_tracker_bytes();
         counting_alloc::reset(bounds.port_heap_cap);
         let port = port_trace(&doc, &o);
         let port_peak = counting_alloc::peak();
         counting_alloc::reset(usize::MAX);
-        let _ = tx.send((c, port, c_peak, port_peak, start.elapsed()));
+        let port_tracker = crate::port::last_port_tracker();
+        let _ = tx.send((
+            c,
+            port,
+            c_peak,
+            port_peak,
+            start.elapsed(),
+            c_tracker,
+            port_tracker,
+        ));
     });
     if let Err(e) = spawned {
         panic!("{id}: cannot spawn the worker thread: {e}");
     }
     match rx.recv_timeout(bounds.timeout) {
-        Ok((Ok(c), port, c_peak, port_peak, elapsed)) => Outcome {
+        Ok((Ok(c), port, c_peak, port_peak, elapsed, c_tracker, port_tracker)) => Outcome {
             c,
             port: match port {
                 PortTrace::Trace(t) => Some(t),
@@ -119,6 +133,8 @@ pub fn compare(id: &str, doc: &[u8], opts: &ParseOptions, bounds: Bounds) -> Out
             port_peak,
             c_peak,
             elapsed,
+            c_tracker,
+            port_tracker,
         },
         Ok((Err(e), ..)) => panic!("{id}: oracle failed: {e}"),
         Err(_) => panic!(

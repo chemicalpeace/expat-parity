@@ -1,0 +1,1 @@
+þÞ<?xml version='1.0' encoding='ISO-8859-1'?><!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 ''><!ENTITY e0 'second'><!ENTITY e1 '&lt;'><!ENTITY e1 'second'><!ENTITY e2 '&e2;&unp;'><!ATTLIST r a CDATA "&e1;" t NMTOKENS "  &e1; x " f CDATA #FIXED "&amp;&e1;">]><r s="v&e0;w">txt<c>&e0;</c></r>

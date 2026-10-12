@@ -1,0 +1,3 @@
+Å∫<?xml version='1.0' standalone='yes'?><!DOCTYPE doc [<!NOTATION n1 SYSTEM 'viewer'><!ATTLIST doc q:a IDREF #FIXED '1' xmlns NMTOKEN ''>
+<!ENTITY È PUBLIC "bad{char}" 'sys2.ent'><!ENTITY % pe2 SYSTEM 'sys.ent' >%pe1;
+] ><a>&e9;</a>

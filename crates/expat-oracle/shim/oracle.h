@@ -169,6 +169,10 @@ int oracle_parse_trace(const unsigned char *doc, size_t len,
                        size_t *out_len);
 void oracle_free(void *p);
 size_t oracle_last_heap_peak(void);
+/* Allocation tracker byte count (m_alloc_tracker.bytesAllocated) of the
+   calling thread's last oracle_parse_trace: after creation and the limit
+   setters, and at the end of the parse. */
+void oracle_last_tracker(unsigned long long *created, unsigned long long *end);
 
 /* xmlparse.c string pool and hash table (shim/oracle_core.c). Runs a
  * program of pool or hash table operations (format: tests/src/core.rs) and

@@ -136,22 +136,57 @@ and FNV-1a hash), so traces stay small.
 
 ## 5. Allocation tracker
 
+### What C does
+
 - Defaults (`internal.h` 113-115, `parserCreate` 1360-1370): maximum
   amplification **100.0** of bytes allocated per direct input byte,
   activation threshold **67,108,864 bytes (64 MiB, 2^26)**.
 - Every `MALLOC`/`REALLOC` of the parser (`expat_malloc` 898-950,
   `expat_realloc` 987-1060, `expat_heap_increase_tolerable` 860-894)
-  counts `sizeof(size_t) + EXPAT_MALLOC_PADDING + size`. Above the
-  threshold, an allocation that makes `allocated / direct` exceed the
-  maximum fails and is reported as `XML_ERROR_NO_MEMORY`. Content models
-  given to the element declaration handler are allocated with the plain
-  `malloc_fcn` and not tracked (6442, 8780).
-- Setters: `XML_SetAllocTrackerMaximumAmplification` (3150-3176),
-  `XML_SetAllocTrackerActivationThreshold` (3178-3200).
-- Whether the port replicates the tracker's byte counts is decision 11c
-  (D-021, D-023): the counts depend on every allocation size of the C
-  data structures (pool blocks, attribute arrays, scaffolds), which the
-  port reproduces so far only for the pools and hash tables.
+  counts `sizeof(size_t) + EXPAT_MALLOC_PADDING + size` (8 + size on every
+  supported target); `FREE` subtracts it. An allocation is refused when
+  the new total is at or above the threshold **and** `total / direct`
+  exceeds the maximum (computed in `float`; with nothing read directly the
+  ratio is infinite). A refusal surfaces as `XML_ERROR_NO_MEMORY` (1) at
+  the allocation site.
+- **Not tracked:** the input buffer (`XML_GetBuffer`, allocated with the
+  plain `malloc_fcn`: "We are avoiding MALLOC(..) here to leave limiting
+  the input size to the application using Expat", 2601-2603) and the
+  content models handed to the element declaration handler (6442, 8780).
+  Character data expanded from entities in content is streamed through
+  the fixed data buffer and does not grow the total either; attribute
+  values and entity values are built in string pools and do.
+- Setters: `XML_SetAllocTrackerMaximumAmplification` (3150-3176: NaN and
+  values below 1.0 refused, non-root parsers refused) and
+  `XML_SetAllocTrackerActivationThreshold` (3178-3200: any value, root
+  parser only).
+- Example only the tracker stops: 85,000 references to a 395-character
+  entity in one attribute value (340,434 bytes of input, billion-laughs
+  factor 99.75, below 100). The value's pool block doubles to 64 MiB
+  (33,563,484 bytes tracked when the next doubling is refused), so C
+  reports error 1 at the default limits; 84,000 references are accepted.
+
+### What the port does (D-030)
+
+- The port charges its tracker (`parse::tracker`) at C's allocation points
+  or earlier, at least C's bytes: exactly C's sizes for the pools
+  (`PoolShadow` replays `poolGrow` on lengths), hash tables, tags,
+  bindings, attribute arrays, open-entity records, default-attribute
+  arrays and the scaffold; an upper bound of 16 KiB for the parser
+  creation and the small fixed allocations (C: 3,040-3,059 bytes).
+- Like C, the port does **not** charge the input buffer, and it does not
+  charge expanded character data in content.
+- Setters with C's validation (`Parser::set_alloc_tracker_*`); defaults
+  100.0 and 64 MiB, unchanged (D-026). The non-root refusal needs external
+  entity parsers (module 11d / 12).
+- Relation tested: whenever C refuses through its tracker, the port
+  refuses (`tests/tests/tracker_diff.rs`, the `parse_trace` fuzz target).
+  The port may refuse where C does not, only within the margin by which its
+  charge exceeds C's (11,764-13,352 bytes measured): divergence DV-1,
+  fail-closed, reachable easily with caller-tightened limits and, at the
+  default limits, only for a tracked total of at least 64 MiB lying within
+  that margin below 100 times the direct input (never observed in tests or
+  fuzzing).
 
 ## 6. Error codes and positions relevant to the DTD
 

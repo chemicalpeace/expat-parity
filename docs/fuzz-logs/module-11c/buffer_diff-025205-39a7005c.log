@@ -1,0 +1,50 @@
+# libFuzzer log, trimmed: 509 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 622978551
+INFO: Loaded 1 modules   (70189 inline 8-bit counters): 70189 [0xaaaad557a470, 0xaaaad558b69d), 
+INFO: Loaded 1 PC tables (70189 PCs): 70189 [0xaaaad558b6a0,0xaaaad569d970), 
+INFO:    13209 files found in <corpus>
+INFO: seed corpus: files: 13209 min: 1b max: 27271b total: 3758802b rss: 41Mb
+#8192	pulse  cov: 10563 ft: 31168 corp: 7122/242Kb exec/s: 2730 rss: 425Mb
+#13210	INITED cov: 12844 ft: 49329 corp: 10398/2257Kb exec/s: 2201 rss: 429Mb
+#16384	pulse  cov: 12844 ft: 49329 corp: 10398/2257Kb lim: 27299 exec/s: 2730 rss: 470Mb
+#32768	pulse  cov: 12844 ft: 49332 corp: 10401/2259Kb lim: 27383 exec/s: 4096 rss: 530Mb
+#65536	pulse  cov: 12845 ft: 49336 corp: 10404/2258Kb lim: 27593 exec/s: 5461 rss: 530Mb
+#131072	pulse  cov: 12845 ft: 49344 corp: 10409/2257Kb lim: 27915 exec/s: 5957 rss: 530Mb
+#262144	pulse  cov: 12851 ft: 49378 corp: 10427/2291Kb lim: 28643 exec/s: 6393 rss: 530Mb
+#524288	pulse  cov: 12855 ft: 49420 corp: 10449/2345Kb lim: 29987 exec/s: 6808 rss: 530Mb
+#660678	DONE   cov: 12855 ft: 49461 corp: 10463/2355Kb lim: 30841 exec/s: 6882 rss: 530Mb
+###### Recommended dictionary. ######
+"\002\000\000\000\000\000\000\000" # Uses: 6541
+"xmlns:" # Uses: 5450
+"\001\000 \000" # Uses: 4831
+"\000\000" # Uses: 4522
+"\312\000" # Uses: 3261
+"pe1" # Uses: 3316
+"a4" # Uses: 3045
+"vwvvvvvv" # Uses: 2942
+"\001\000\000\000\000\000\000," # Uses: 2542
+"\000\000\000\000\000\000\000T" # Uses: 2618
+"\000\000\000\000\000\000\000\001" # Uses: 2283
+"d0" # Uses: 2188
+"b6" # Uses: 1644
+"\006UUUUUUU" # Uses: 1675
+"999" # Uses: 1339
+"$\000\000\000" # Uses: 1216
+"vvZvvvvvv" # Uses: 1218
+"\032\000" # Uses: 1237
+"c1" # Uses: 1033
+"\251\252\252\252\252\252\252\012" # Uses: 990
+"\377\017" # Uses: 798
+"d8" # Uses: 649
+"\000\000\000\000\000\000\000\003" # Uses: 260
+###### End of recommended dictionary. ######
+Done 660678 runs in 96 second(s)
+stat::number_of_executed_units: 660678
+stat::average_exec_per_sec:     6882
+stat::new_units_added:          509
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              530
