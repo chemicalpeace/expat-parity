@@ -20,7 +20,7 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   Windows, after correcting an llvm-cov artefact that had hidden 7 covered
   lines (raw step E figure 94.86 %). DV-1 parity is in progress (D-034;
   phase 1 merged in PR #14). Q-5 fixed (PR #15, D-035). Part 2 of the
-  coverage work (PR #16): unparsed-entity handler, external entity bodies
+  coverage work (branch `part2-unparsed`, no PR yet): unparsed-entity handler, external entity bodies
   incl. `entityValueProcessor`, `m_nsAtts` growth vs C; quadratic
   namespaced duplicate check fixed. Pending: OOM fault injection per
   allocation point (after the DV-1 phase-2 merge). Next: module 12.

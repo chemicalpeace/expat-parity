@@ -1125,7 +1125,7 @@ encodings, `XmlParseXmlDecl` on every declaration token) 7 slices, 707 s,
 (built-in encodings only, where `to_utf8_until` is the old conversion). No
 crash, no mismatch.
 
-### Part 2: remaining C behaviour (PR #16)
+### Part 2: remaining C behaviour (branch `part2-unparsed`, no PR yet)
 
 Measured against the vendored libexpat 2.9.0 by canonical trace (events,
 error code, line, column, byte index), under `diff::option_matrix` unless
@@ -1209,11 +1209,26 @@ denial-of-service risk C does not have). The names are now grouped by
 their SipHash in a `BTreeMap` (same duplicate rule: equal hash and the
 stored name starts with the new one): 84 ms for the same tag.
 Unprefixed attributes were not affected (they use attribute-id flags, as
-in C). Regression test `ns_duplicate_check_scales_like_c`: four times the
-attributes must take less than nine times as long (self-relative, so it
-holds on slow and instrumented builds; ratio 2.5-2.8 release / 4.0 debug after
-the fix, 15.9 before it, which fails the test). Behaviour is unchanged:
-the full suite and the new C-differential tests pass. No divergence
+in C). Regression test `ns_duplicate_check_scales_like_c`, measured against C
+on the same machine: from 10,000 to 160,000 prefixed attributes (16
+times) the port's time may grow at most three times as much as C's (best
+of three runs each). aarch64 Linux: C x24.3-25.4, the fixed port
+0.98-1.03 of C's factor in debug and release builds; the old list x214.9
+(8.75 of C's factor), which fails. (A first, self-relative version of the
+test -- 4x the attributes in under 9x the time -- measured x4.8-5.2 after
+the fix and x15.6 before it: too close to its bound to be stable on loaded
+CI runners, so it was replaced.) Behaviour is unchanged:
+the full suite and the new C-differential tests pass. Injected bugs in
+the new check (`ns_atts_diff`, `parse_diff`; logs kept outside the repo):
+N1 exact equality instead of C's prefix test -- caught by
+`ns_atts_growth_matches_c` and `parse_diff::namespace_triplets_match_c`;
+N2 duplicate check removed -- caught by both of those and
+`ns_atts_tracker_relation`; N3 names filed under a wrong hash key --
+caught by the same three; N4 the old quadratic list -- caught by
+`ns_duplicate_check_scales_like_c` only (no output changes). The
+committed fuzz corpora (`fuzz_corpus` replay) catch none of N1-N3: they
+hold no start tag with two prefixes bound to one URI, so they are not a
+regression net for this check (seeds for it are listed under "Not done"). No divergence
 number is needed (no observable output changed); listed here as a
 finding.
 
@@ -1221,13 +1236,16 @@ finding.
 job aborted inside the `llvm-cov export -dump` diagnostic of
 `scripts/coverage.sh` (glibc `corrupted size vs. prev_size`, SIGABRT)
 after the reports were written; the re-run of the same commit (job
-114777514198) and post-merge main 38240812899 were green. Treated as an
-intermittent llvm-cov crash, not reproduced; the mismatch check stays as
-it is.
+114777514198) and post-merge main 38240812899 were green. The root cause was
+found later on branch `q5-verification` (PR #17, open, not merged): a
+data race in `llvm-cov report -dump`; its fix (`-dump -num-threads=1` in
+`scripts/coverage.sh`) lives on that branch, not on this one.
 
-**Not done in this PR.** OOM fault injection per allocation point
-(waits for the DV-1 parity phase-2 branch to merge, so that the port's
-allocation points are final). Suspend/resume: see "Remaining uncovered
+**Not done here.** OOM fault injection per allocation point
+(waits for the DV-1 parity phase-2 branch, PR #16, to merge, so that the
+port's allocation points are final). Committed `parse_trace` corpus
+seeds for namespaced duplicate attributes (the fuzz runs below used 40
+such seeds in the working corpus only; the corpus merge was not done). Suspend/resume: see "Remaining uncovered
 lines".
 
 ## Divergences
