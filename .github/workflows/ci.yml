@@ -77,6 +77,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: clang --version
+      # check.sh must accept both toolchains' recorded outputs and reject
+      # outputs without the documented reports (runs on the checked-in files,
+      # before run.sh overwrites them).
+      - run: docs/evidence/q5/check-selftest.sh
       - run: docs/evidence/q5/build.sh
       - run: docs/evidence/q5/run.sh
       - run: docs/evidence/q5/check.sh

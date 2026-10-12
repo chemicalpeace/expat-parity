@@ -1,7 +1,7 @@
 # Q-5: out-of-bounds read in libexpat 2.9.0 `unknown_toUtf8` (via `XmlParseXmlDecl`)
 
-Status: found while porting (docs/DIVERGENCES.md Q-5, D-035). **Not filed
-upstream.** Reproduced only as described under "What is verified". This
+Status: found while porting (docs/DIVERGENCES.md Q-5, D-035). **Not
+reported upstream yet** (see "Responsible-disclosure status"). Reproduced only as described under "What is verified". This
 document is a reproducible record, not a vulnerability advisory: no claim
 is made about exploitability or about versions other than the one tested.
 
@@ -55,12 +55,16 @@ doc 0 and doc 1 are the two inputs the port's random test
 `init_diff::xml_decl_in_every_builtin_encoding` found (seeds
 `0x52f43d23123766f6` and `0xfe8d9b29cbd0ff22`), reduced to a fixed map.
 
-## Build and run
+## Reproduction steps
+
+Needs a checkout of this repository and clang with the ASan runtime (and the
+MSan runtime on Linux; Apple clang has none).
 
 ```sh
 docs/evidence/q5/build.sh     # OUT=/tmp/q5 by default; SANITIZERS="asan msan" by default
 docs/evidence/q5/run.sh       # writes docs/evidence/q5/{plain,asan,msan}.txt
 docs/evidence/q5/check.sh     # exits 1 unless the reports below are all present
+docs/evidence/q5/check-selftest.sh  # check.sh accepts the recorded outputs, rejects 23 edited ones
 ```
 
 `build.sh` compiles `xmlparse.c xmlrole.c xmltok.c` (+ the oracle's
@@ -177,11 +181,39 @@ unknown-encoding handler.
     (`xmltok.c:1283` rather than `<path>/xmltok.c:1283:38`); `check.sh`
     accepts both forms and still requires file, line and function exactly.
     MSan is not available with Apple clang, so not run on macOS.
+- Re-run in CI run 38248323590 (PR #17 head 98d87c5e): the same counts on
+  Linux x86_64 (ASan + MSan) and macOS arm64 (ASan); `check.sh` passed on
+  both.
+- Why the macOS job of run 38246973844 failed: not a missing report. Its
+  `asan.txt` (artifact `q5-sanitizers-macOS`) has all four reports, e.g.
+  `SUMMARY: AddressSanitizer: heap-buffer-overflow xmltok.c:1283 in unknown_toUtf8`
+  and `#1 0x00010421a0fc in XML_GetBuffer xmlparse.c:2603`; the check
+  pattern then required a column (`xmltok\.c:1283:[0-9]+`), which Linux clang
+  prints (`<repo>/crates/expat-oracle/vendor/expat/lib/xmltok.c:1283:38`) and
+  Apple clang does not, so it counted 0 SUMMARY lines while the
+  `XML_GetBuffer` pattern (no column required) counted 4.
+  `check-selftest.sh` (run in CI before the build) shows `check.sh` accepts
+  both recorded outputs and rejects 23 edited ones: no report, 3 of 4
+  reports, SEGV or heap-use-after-free instead of heap-buffer-overflow,
+  other line/file/function, other allocation site, missing MSan report,
+  no plain-build over-read.
 - The text of `unknown_toUtf8` is identical on libexpat `master` as fetched
   on 2026-10-12 (latest commit touching `xmltok.c`: c002e805, 2026-10-04).
   That is a source comparison only; master was **not** built or tested.
 
-## What is not verified (no claim made)
+### Platforms
+
+| Platform / compiler | Plain build | ASan | MSan | Where |
+|---|---|---|---|---|
+| Linux aarch64, Debian clang 19.1.7 | reads past the data | 4 reports | 2 reports | `docs/evidence/q5/*.txt`, `rerun-main-a990a8c/` (local) |
+| Linux x86_64, Ubuntu clang 18.1.3 | reads past the data | 4 reports | 2 reports | CI 38246973844, 38248323590 (`q5-sanitizers-Linux`) |
+| macOS arm64, Apple clang 21.0.0 (clang-2100.1.1.101) | reads past the data | 4 reports | not available | CI 38246973844, 38248323590 (`q5-sanitizers-macOS`) |
+| Windows (MSVC or clang-cl) | **not tested** | **not tested** | **not tested** | no sanitizer build is set up |
+| GCC, other clang versions, 32-bit, big-endian | **not tested** | | | |
+
+Version: only libexpat 2.9.0 (`R_2_9_0`, a76b1174) was built and run.
+
+## What is not verified / uncertainties (no claim made)
 
 - Whether the bytes read can change what the parser reports, leak to the
   application, or crash a non-sanitised build. In the plain build every
@@ -192,7 +224,7 @@ unknown-encoding handler.
   test's maps were random too.
 - Other entry points that call `toAscii` with an unknown encoding (text
   declarations of external entities), other platforms than those in
-  "What is verified", other compilers, libexpat versions, or
+  "Platforms", other compilers, libexpat versions, or
   `XML_UNICODE` builds. (By reading the source only: `unknown_toUtf16`,
   xmltok.c 1304-1320, loops `while (*fromP < fromLim ...)`, so the same
   overshoot ends its loop; it was not tested.)
@@ -208,7 +240,18 @@ Miri (`docs/evidence/q5/miri.txt`, re-run in `rerun-main-a990a8c/miri.txt`).
 The divergence (error position at the trailing byte, where C's result
 depends on memory past the data) is DIVERGENCES.md Q-5 / D-035.
 
-## Upstream
+## Responsible-disclosure status
 
-Not reported. This file and `docs/evidence/q5` are kept so that a report
-can be made later from verified material.
+- **Not reported upstream yet.** No contact with the libexpat maintainers
+  has been made; no CVE requested.
+- libexpat's `SECURITY.md` asks for a private report by email to the
+  maintainer and at least 90 days before public exposure.
+- Note: this repository is public, and the finding is already visible in
+  it (on `main` since PR #15: DIVERGENCES.md Q-5 / D-035 and
+  `docs/evidence/q5`; and in PR #17 with this file). Whether and when to
+  report privately, and whether to keep this material public until then,
+  is the repository owner's decision; nothing here should be read as a
+  coordinated disclosure.
+- This file and `docs/evidence/q5` contain what the policy asks a report to
+  include (description, how to reproduce); impact is listed under "What is
+  not verified".
