@@ -1,0 +1,1 @@
+…\<?xml version='1.0' standalone='yes'?><!DOCTYPE r [<!ENTITY e0 '<![CDATA[x<y]]>	&#13;&undeclared;'><!ENTITY e1 '&e1;'><!ENTITY % p0 '<!ENTITY &#37; p3 "&#37;p0;">'><!ENTITY % p1 '<!ENTITY e1 "from pe">'><!ENTITY % p2 '<!ELEMENT r ANY>'>%p0;%p3;<!ATTLIST r a CDATA "&e1;" t NMTOKENS "  &e0; x " f CDATA #FIXED "&amp]><r s="v&e1;w">txt&e1;&e1;</r>

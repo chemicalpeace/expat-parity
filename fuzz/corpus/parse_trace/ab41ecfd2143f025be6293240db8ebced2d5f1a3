@@ -1,0 +1,1 @@
+Ä<!DOCTYPE r [<!ENTITY e0 '&e1;&e1;&#10;x'><!ENTITY e1 '&#13;&#x20;&unp;'><!ENTITY % p0 '&#37;p0;'>]><r s="v&e1;w">&e0;txt</r>

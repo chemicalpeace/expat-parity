@@ -1,10 +1,0 @@
-ÄÆ<?xml version='1.0' standalone='yes'?><!--before--><!DOCTYPE doc [<!ENTITY % extpe "line
-break
-andcr" >
-	<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10'><!ENTITY e3 '&#x10000;â˜ƒ' >
-<!ATTLIST q:e a IDREF #IMPLIED><!NOTATION n1 PUBLIC "a'b"><?dtdpi x?>
-<!NOTATION n2 SYSTEM 'viewer'>
-%pe2;
-%undeclared;
-]>
-<a><![CDATA[&e1;]]>&e3;</a>

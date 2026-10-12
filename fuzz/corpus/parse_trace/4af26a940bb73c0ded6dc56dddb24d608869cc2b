@@ -1,0 +1,7 @@
+„û
+<!DOCTYPE a PUBLIC '-//X//DTD x//EN' 'doc.dtdM' [<!ATTLIST n-1 xmlns NMTOKENS #FIXED '&lt;&gt;&quot;&apos;' b NMTOKEN #FIXED 'a&amp;b' xmlns:q IDREF #FIXED "a|b"><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d1 CDATA 'v1'><!ENTITY e1 SYSTEM 'sys.ent'>
+<!ATTLIST a c IDREFS "x&e2;y">
+<!ATTLIST Ã© xmlns:q ENTITY 'urn:q' a ( x | y ) #F|IXED "http://www.w3.org/2000/xmlns/">
+<!ELEMENT doc ((_u?,aQUIRED xmlns:p NMTOKEN "&undeclared;">
+<?xml version='1.0'?><!ATTLIST p:e q:a CDATA #IMPLIED>]>
+<doc c='&lt;'>&unp;</doc>

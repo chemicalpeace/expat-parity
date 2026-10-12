@@ -1,0 +1,68 @@
+# libFuzzer log, trimmed: 939 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=/tmp/xr/fuzz/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 88864550
+INFO: Loaded 1 modules   (64805 inline 8-bit counters): 64805 [0xaaaae67b7960, 0xaaaae67c7685), 
+INFO: Loaded 1 PC tables (64805 PCs): 64805 [0xaaaae67c7688,0xaaaae68c48d8), 
+INFO:    10174 files found in <corpus>
+INFO: seed corpus: files: 10174 min: 1b max: 17989b total: 2054892b rss: 39Mb
+#8192	pulse  cov: 11602 ft: 36783 corp: 8087/430Kb exec/s: 2730 rss: 414Mb
+#10175	INITED cov: 12442 ft: 45410 corp: 9723/1831Kb exec/s: 2035 rss: 433Mb
+#16384	pulse  cov: 12442 ft: 45410 corp: 9723/1831Kb lim: 18017 exec/s: 3276 rss: 471Mb
+#18583	RELOAD cov: 12442 ft: 45413 corp: 9725/1831Kb lim: 18017 exec/s: 3097 rss: 471Mb
+#32768	pulse  cov: 12442 ft: 45415 corp: 9726/1831Kb lim: 18087 exec/s: 4096 rss: 522Mb
+#65536	pulse  cov: 12443 ft: 45428 corp: 9734/1833Kb lim: 18185 exec/s: 5041 rss: 546Mb
+#131072	pulse  cov: 12450 ft: 45456 corp: 9749/1834Kb lim: 18367 exec/s: 5461 rss: 546Mb
+#262144	pulse  cov: 12454 ft: 45516 corp: 9777/1838Kb lim: 18745 exec/s: 5957 rss: 546Mb
+#524288	pulse  cov: 12469 ft: 45706 corp: 9843/1864Kb lim: 19613 exec/s: 6721 rss: 546Mb
+#652820	DONE   cov: 12473 ft: 45777 corp: 9871/1870Kb lim: 20005 exec/s: 6800 rss: 546Mb
+###### Recommended dictionary. ######
+"vvvvvvAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" # Uses: 3617
+"\377\377\377\377\377\377\377\377" # Uses: 3543
+"/\000" # Uses: 3292
+"\005\000\000\000\000\000\000\000" # Uses: 3207
+"\001\013" # Uses: 3347
+"d6" # Uses: 2522
+"n-0" # Uses: 2215
+"\001\000\000\000\000\000\000\005" # Uses: 2238
+"http://www.w3.org/2000/xmlns/" # Uses: 1986
+"\000\000\007\002" # Uses: 2092
+"d0" # Uses: 2059
+"\377\377\377\377\377\377\377\013" # Uses: 1426
+"id" # Uses: 1362
+"d1" # Uses: 1250
+"\311\000" # Uses: 1303
+"\007\000\000\000" # Uses: 1203
+"ar" # Uses: 1199
+"\377\377\377\377\377\377\377\017" # Uses: 1196
+"\001\000\000\000\000\000\000\001" # Uses: 1146
+"\376\377\377\377" # Uses: 940
+"\377\377\377\377\377\377\377\036" # Uses: 923
+"d9" # Uses: 918
+"\003\000\000\000\000\000\000\000" # Uses: 851
+"\001\000\000 " # Uses: 875
+"\000\000\373\377\216\001f\200" # Uses: 814
+"\377\377\377\377" # Uses: 792
+"xmmns:" # Uses: 805
+"vZvvvvvvvv" # Uses: 834
+"999" # Uses: 813
+"\001\000\000\000\000\000\000\031" # Uses: 736
+"Zv\352\260\264\352\260\264\350\200\230\304\200\315" # Uses: 677
+"\020\000\000\000\000\000\000\000" # Uses: 622
+"d87" # Uses: 457
+"xml:lanx" # Uses: 512
+"b2" # Uses: 451
+"n\000-\0002\000" # Uses: 444
+"\377\377\372\377\216\001\261\000" # Uses: 415
+"c1" # Uses: 266
+"\001\000\000\000\000\000\000\000" # Uses: 235
+"AAAAAA" # Uses: 220
+###### End of recommended dictionary. ######
+Done 652820 runs in 96 second(s)
+stat::number_of_executed_units: 652820
+stat::average_exec_per_sec:     6800
+stat::new_units_added:          939
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              546

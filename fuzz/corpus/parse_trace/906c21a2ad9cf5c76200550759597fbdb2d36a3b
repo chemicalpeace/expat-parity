@@ -1,7 +1,0 @@
-½!<?xml version='1.0' standalone='no'?><!DOCTYPE doc [<!NOTATION n1 SYSTEM 'viewer'>
-<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3'><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2'> %pe1; 
-<!ATTLIST a xmlns:p IDREFS "&e1;" xmlns:q IDREF #IMPLIED xmlns NMTOKENS #FIXED "&#x10000;">
-%extpe;
-<?dtdpi x?>
-<?dtdpi x?>
-<!ATTLIST a b ID #FIXED 'x'>] ><doc c='&ext;'>&e3;</doc>

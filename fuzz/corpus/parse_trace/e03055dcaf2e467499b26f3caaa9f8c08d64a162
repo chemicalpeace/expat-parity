@@ -1,0 +1,2 @@
+B<?xml version='1.0' standalone='yes'?><!DOCTYPE r [<!ENTITY e0 '&#x20;<i/>&e4;'><!ENTITY e1 'a
+b'><!ENTITY e2 '&e4;'><!ENTITY e3 '<!--c-->'><!ENTITY e3 'second'><!ENTITY e4 ''><!ENTITY e4 'second'><!ENTITY % p0 '<!ENTITY e3 "from pe">'><!ENTITY % p1 '<!ELE.ENT r ANY>'>%p0;%p1;]><r s="v&e2;w"><

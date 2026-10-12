@@ -1,0 +1,3 @@
+D�<?xml version='1.0' standalone='no'?><!DOCTYPE p:e SYSTEM 'doc.dtd' [<!ENTITY e3 '&#x3C;b>x&#x3C;/b>'><!NOTATION n2 PUBLIC 'p' 'viewer'><!ENTITY ext '&#x10000;☃'>
+<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7'><!ATTLIST p:e a NOTATION (n1|n2) #IMPLIED q:a (x|y|z) ' x  y ' xmlns:p (x|y|z) #FIXED 'urn:q'>
+<!ATTLIST p:e id IDREFS #REQUIRED><!ATTLIST a xmlns (x|y|z) '&e1;' xmlns (x|y|z) ""><!ENTITY % extpe SYSTEM 'sys.ent'><!ATTLIST b xml:lang CDATA #IMPLIED xmlnsnsstart:p NOTATION (n1|n2) #FIXED "a b" xmlns NOTATION (n1|n2) "urn:p">]><b a='&lt;' c='1'>&lt;&#60;&#x3C;<b x='y'/><a a='urn:p' p:a='&undeclared;'>&unp;&e1;&e3;&e1;</a></b>

@@ -1,6 +1,0 @@
-/ï
-<!DOCTYPE p:e [<!ELEMENT n-1 ((a+|b|q:e*|a*)?|q:e|doc?|b*)><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10' d11 CDATA 'v11' d12 CDATA 'v12' d13 CDATA 'v13' d14 CDATA 'v14' d15 CDATA 'v15' d16 CDATA 'v16'>
-<!ELEMENT a (#PCDATA)*><!ATTLIST b xmlns IDREFS "a&amp;b">
-<!ENTITY p:x '&#38;#38;'>%undeclared;
-<!ELEMENT n-1 (_u|a|n-1?|doc)>
-]><doc a='&lt;' xmlns:p='&ext;'>&unp;&e1;</doc>

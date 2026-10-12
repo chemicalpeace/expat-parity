@@ -1,5 +1,0 @@
-<!DOCTYPE doc [
-<!ELEMENT doc (chapter)>
-<!ELEMENT chapter (#PCDATA)>
-]>
-r>Wombats are go</chapter></doc>

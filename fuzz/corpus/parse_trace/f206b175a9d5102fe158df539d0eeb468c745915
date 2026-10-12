@@ -1,0 +1,2 @@
+#çÔªø<?xml version='1.0' standalone='no'?><!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 '<![CDATA[x<y]]>&#x20;&e2;&e1;'><!ENTITY e0 'second'><!ENTITY e1 '&#10;&#10;a
+b&undeclared;'><!ENTITY e2 ''><!ATTLIST r a CDATA "&e1;" t NMTOKENS "  &e2; x " f CDATA #FIXED "&amp;&e1;">]><r><c>&e0;</c><c>&e0;</c>txt</r>

@@ -1,0 +1,6 @@
+{Â<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE p:e [<!ATTLIST doc xmlns:p ENTITY #IMPLIED><!ATTLIST doc xmlns:q NOTATION (n1|n2) "a|b">
+<!ENTITY % extpe '&#x3C;b>x&#x3C;/b>' >
+<!ATTLIST a xmlns:p (x|y|z) #FIXED "a|b">
+<!ATTLIST b xmlns CDATA '&lt;&gt;&quot;&apos;' b (x|y|z) #FIXED '&lt;&gt;&quot;&apos;'>
+<!ATTLIST n-0 a ( x | y ) 'http://www.w3.org/2000/xmlns/'><!ATTLIST p:e id IDREFSa c='&lt;'><!--c-->&e9;</a>

@@ -286,6 +286,8 @@ pub(crate) enum Processor {
     Content,
     CdataSection,
     Epilog,
+    /// `internalEntityProcessor`
+    InternalEntity,
     Error,
 }
 
@@ -416,6 +418,16 @@ pub struct Parser {
     pub(crate) decl_attribute_is_id: bool,
     /// `m_groupConnector[0..m_groupSize]`
     pub(crate) group_connector: Vec<u8>,
+
+    // Entity expansion (module 11b).
+    /// `m_openInternalEntities`, innermost last.
+    pub(crate) open_internal_entities: Vec<entity::OpenEntity>,
+    /// `m_openAttributeEntities`, innermost last.
+    pub(crate) open_attribute_entities: Vec<entity::OpenEntity>,
+    /// `m_openValueEntities`, innermost last.
+    pub(crate) open_value_entities: Vec<entity::OpenEntity>,
+    /// The length of `m_freeEntities`.
+    pub(crate) free_entities: usize,
 }
 
 impl Parser {
@@ -483,6 +495,10 @@ impl Parser {
             decl_attribute_is_cdata: false,
             decl_attribute_is_id: false,
             group_connector: Vec::new(),
+            open_internal_entities: Vec::new(),
+            open_attribute_entities: Vec::new(),
+            open_value_entities: Vec::new(),
+            free_entities: 0,
         }
     }
 
@@ -891,6 +907,8 @@ impl Parser {
             Processor::Content => self.content_processor(h, buf, start, end_ptr),
             Processor::CdataSection => self.cdata_section_processor(h, buf, start, end_ptr),
             Processor::Epilog => self.epilog_processor(h, buf, start, end_ptr),
+            // `internalEntityProcessor` ignores `s`, `end` and `nextPtr`.
+            Processor::InternalEntity => self.internal_entity_processor(h),
             // `errorProcessor` returns `m_errorCode`, which a later call
             // that the reparse-deferral heuristic skipped may have reset to
             // XML_ERROR_NONE; then it succeeds, like C.

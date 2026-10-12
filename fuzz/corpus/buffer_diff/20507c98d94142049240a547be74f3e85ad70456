@@ -1,0 +1,3 @@
+Ù<?xml version='1.0' standalone='yes'?><!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [%p2e;
+<!NOTATION n1 SYSTEM 'viewer'><!ENTITY e2 SYSTEM 'sys.ent'><!ELEMENT _u EMPTY>
+<!ATTLIST doc c ENTITY #FIXED "&#x10000;" p:a ENTITIES #REQUIRED><!ATTLIST doc d5 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CATA 'v0' d/ed;</doc>

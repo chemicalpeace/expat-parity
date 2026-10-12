@@ -1,0 +1,7 @@
+<!DOCTYPE doc [
+<!ELEMENT doc (a|b|c)+>
+<!ELEMENT a EMPTY>
+<!ELEMENT b (#PCDATA)>
+<!#ELEMoo'>This  a foo</b>
+<c></c>
+</doc>

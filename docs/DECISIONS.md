@@ -528,3 +528,28 @@ recorded in DIVERGENCES.md.
   `Stop::DtdNotPorted`; the not-standalone and external-entity-reference
   handlers belong to the public API (module 12) and behave as unset, like
   C without them.
+
+## D-028 Entity expansion: event pointers and the free-entity count (module 11b)
+
+- **Event pointer of an open entity.** C decides whether `doContent`,
+  `doCdataSection` and `doProlog` write `m_eventPtr`/`m_eventEndPtr` or the
+  `internalEventPtr`/`internalEventEndPtr` of the innermost open internal
+  entity by comparing `enc != parser->m_encoding` (`xmlparse.c` 3587-3593,
+  5524-5530). The port has no encoding pointers; it asks the encoding
+  (`tok::Encoding::is_internal`, true only for the internal UTF-8
+  encodings that replacement text is scanned with). `m_encoding` is never
+  one of them (`XmlGetInternalEncoding` returns distinct structures in C),
+  so the test is equivalent. The guarded writes of `storeAtts`,
+  `appendAttributeValue` and `storeEntityValue`
+  (`if (enc == parser->m_encoding) parser->m_eventPtr = ...`) are
+  `Parser::ev_doc`. Effect: an error inside an expansion reports the
+  position of the outermost reference in the document, like C (verified
+  by the curated cases; the injected bug I4 in REPORT.md breaks 254 pairs).
+- **Open-entity lists** are three `Vec<OpenEntity>` (innermost last)
+  instead of C's linked lists; only the head is ever accessed.
+- **`m_freeEntities`** (C's free list of `OPEN_INTERNAL_ENTITY` records
+  reused by `processEntity`) is kept as a count only (`free_entities`).
+  Nothing observable reads the list except through allocation: reusing a
+  record avoids a `MALLOC` of `sizeof(OPEN_INTERNAL_ENTITY)`, which matters
+  for the allocation tracker (11c). The count lets the tracker charge
+  exactly the allocations C makes.

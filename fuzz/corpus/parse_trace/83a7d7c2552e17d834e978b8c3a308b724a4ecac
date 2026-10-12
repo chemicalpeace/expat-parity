@@ -1,4 +1,0 @@
-:·<?xml version='1.0' standalone='yes'?><!DOCTYPE a SYSTEM 'doc.dtd' [<!ATTLIST b b ID #REQUIRED q:a NMTOKENS "http://www.w3.org/2000/xmlns/">
-<!ELEMENT n-1 (#PCDATA|p:e|a)*>
-<!ATTLIST b a CDATA #IMPLIED q:a (x|y|z) '' xmlns:p (x|y|z) ""><!--dtd comment--><!NOTATION n1 SYSTEMTLIST b b ID #LEMENT a (#PCDATA)>]><doc>&e1;
-</doc>

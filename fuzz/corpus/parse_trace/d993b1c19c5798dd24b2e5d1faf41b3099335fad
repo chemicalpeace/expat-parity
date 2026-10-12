@@ -1,6 +1,0 @@
-+©<?xml version='1.0'?><!DOCTYPE p:e SYSTEM 'doc.dtd' [%undeclared;
-<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9' d10 CDATA 'v10'><!ENTITY % pe2 ''>
-<!ATTLIST _u a IDREF "a&amp;b" xmlns ENTITY #IMPLIED xmlns:q ( x | y ) '&lt;'>
-
-<!----><!ATTLIST b b NOTATION (n1|n2) "" b ENTITIE 'a|Sb' xml:lang ENTITIES #REQUIRED>
-<!ATTLIST q:e xmlns:p CDAa&amp;b&unp;</doc><b x='y'/>&lt;</doc><a/></b>

@@ -1,0 +1,2 @@
+V<!DOCTYPE a [<!--dtd comment-->%extpe;
+<!ATTLIST doc id ENTITY "&ext;">

@@ -1,6 +1,0 @@
-3Â<?xml version='1.0'?><!--before--><!DOCTYPE doc [<!ATTLIST doc c NMTOKEN #REQUIRED a CDATA "a|b" xmlns CDATA #IMPLIED><!ATTLIST _u xmlns:q ( x | y ) #IMPLIED xmlns NMTOKENS #FIXED "a|b" p:a ( x | y ) #IMPLIED><!ELEMENT  (#PCDATA)>
-
-<!ELEMENT Ã© EMPTY><!ELEMENT doc (_u|(a?|a)+|n-1?|_u)>
- %undeclared;
-<!ENTITY ext '<a/>' >
-<!ATTLIST doc c DREFS /a>

@@ -1,3 +1,0 @@
-°‰ï»¿<?xml version='1.0' encoding='UTO-8'?><!--before--><!DOCTYPE a [<!ELEMENT a (a+ , (q:e?,b,doc,Ã©)* , (b*)+)><!ATTLIST a xmlns NOTATIO '&#38;#38;'>
-<!ELEMENT n-1 ((doc?|doc)?|((a)+,a,b*)?|b?)><!ELEMENT b ((Ã©+ , n-1 , _u*)+)+><!EN "sys.ent" >
-] ><doc><b x='y'/>×Š‘;<?pi?></doc>

@@ -1,3 +1,0 @@
-Ÿ<?xml version='1.0' standalone='yes'?>
-<!DOCTYPE doc [<!ELEMENT _u (_u*|p:e?)><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7'><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d0 CDATA 'v9'><!ENTITY e1 "%"><!NOTATION n1 SYSTEM 'viewer'>
-<!ELEMENT a (doc+|q:e*|b|doc+)?><!ELEMENT q:e EMPTY><!NOTATION n2 PUBLIC 'baYSTEM 'viewer'>%p</doc>

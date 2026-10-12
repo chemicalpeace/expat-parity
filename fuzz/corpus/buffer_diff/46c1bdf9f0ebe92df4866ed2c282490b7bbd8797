@@ -1,5 +1,0 @@
-�﻿
-<!DOCTYPE doc [%extpe;
-<!----><!ENTITY e3 SYSTEM "sys.ent">
-<!ENTITY é SYSTEM 'u.gif' NDATA n1><![iewer'><!ELEMENT doc EMPTY>
-] ><doc c='1'>&undeclared;a&amp;b</doc>

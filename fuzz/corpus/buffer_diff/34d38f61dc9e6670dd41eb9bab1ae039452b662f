@@ -1,0 +1,2 @@
+Î<?xml version='1.0'?><!--before--><!DOCTYPE doc SYSTEM 'doc.dtd' [<!ATTLIST a xmlns ID #FIXED "" a ID #FIXED "a|b">
+<!ATTLIST a xmlns:p IDREF #REQUIRED xmlns:q CDATA #REQUIRED p:a ID "&lt;">' d4 CDATA '

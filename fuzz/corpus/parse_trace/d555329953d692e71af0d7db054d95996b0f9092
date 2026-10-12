@@ -1,0 +1,9 @@
+d¶ï»¿<!DOCTYPE a [<!NOTATION n2 PUBLIC '  spaced 
+  id  '><!NOTATION n1 PUBLIC 'p' 'viewer'>
+<!ENTITY ext SYSTEM 'u.gif' NDATA undeclared ><!ELEMENT n-1 (#PCDATA)>
+<?dtdpi x?>
+<!ELEMENT n-1 EMPTY>
+<!ATTLIST a id ( x | y ) '&#65;&#x42;&#32;' b ( x | y ) '&ext;'>
+%pe1;<!ENTITY e//www.w3.od ><!ELEMENT n-1 (#PC" xm%lns:p ID #FIXED "&#x10000;">
+<!ENTITY % pe1 "<!ENTITY e9 'nine'>" >]>
+<b p:a='&e1;' a='&elt;&#60;&#x3C;</doc><b><!--c--><!--c--><!--c-->&e3;</b></b>

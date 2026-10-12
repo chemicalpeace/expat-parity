@@ -1,0 +1,1 @@
+´<!DOCTYPE r [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 'text '><!ATTLIST r a CDATA "&e0;" t NMTOKENS "  &e0; x " f CDATA #FIXED "&amp;&e0;">]><r t=' &e0;  y '>&e0;</r>

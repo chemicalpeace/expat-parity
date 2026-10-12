@@ -1,0 +1,1 @@
+Á<?xml version='1.0' standalone='yes'?><!DOCTYPE r [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 '&#13;&unp;&#x10FFFF;'><!ENTITY e1 ''><!ENTITY e1 'second'><!ENTITY % p0 '"x">'><!ENTITY % p1 '<!ENTITY &#37; p3 "&#37;p1;">'>%p2;%p2;]><r><c>&e0;</c>txt&e1;&e0;</r>

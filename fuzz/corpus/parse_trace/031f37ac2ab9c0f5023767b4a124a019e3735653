@@ -1,0 +1,2 @@
+u‹<!DOCTYPE r SYSTEM 'r.dtd' [<!ENTITY e0 '&ext;a
+b'><!ENTITY e1 '&e4;<i>text &#10;'><!ENTITY e2 '&#x20;'><!ENTITY e3 ''><!ENTITY e4 '&#x10FFFF;<i a="&amp;">t</i>'>]><r s="v&e0;w"><c>&e0;</c>txtt

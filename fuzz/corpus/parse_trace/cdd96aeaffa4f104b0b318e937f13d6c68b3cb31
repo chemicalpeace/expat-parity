@@ -1,6 +1,0 @@
-<!DOCTYPE doc [
-  <!ATTLIST doc
-    a1  (a|b|c)   'a'
-    a2  (foo|bar) #IMP
-   PLIED
-    a8  ENTITY   E   #NTITIES a10 CDATA     #IMPc>wombat</doc>

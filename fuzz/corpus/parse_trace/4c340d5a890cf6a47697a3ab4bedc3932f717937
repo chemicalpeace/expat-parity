@@ -1,0 +1,3 @@
+¶<ï»¿<?xml version='1.0'?><!DOCTYPE r [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 ''><!ENTITY e1 '&unp;&#10;<i>'><!ENTITY e2 '<i/>	'><!ENTITY e3 ''><!ENTITY e4 '&e5;	<![CDATA[x<y]]>
+'><!ENTITY e5 'a
+btext '><!ENTITY % p0 '<!ELEMENT r ANY>'><!ENTITY % p1 '<!ELEMENT r ANY>'><!ENTITY % p2 '<!ENTITY'>%p0;]><r s="v&e1;w">&e3;&e2;</r>

@@ -1,0 +1,75 @@
+# libFuzzer log, trimmed: 831 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=/tmp/xr/fuzz/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 580816688
+INFO: Loaded 1 modules   (64805 inline 8-bit counters): 64805 [0xaaaab0b47960, 0xaaaab0b57685), 
+INFO: Loaded 1 PC tables (64805 PCs): 64805 [0xaaaab0b57688,0xaaaab0c548d8), 
+INFO:    11879 files found in <corpus>
+INFO: seed corpus: files: 11879 min: 1b max: 19251b total: 2647456b rss: 40Mb
+#8192	pulse  cov: 10964 ft: 32453 corp: 7395/297Kb exec/s: 2730 rss: 419Mb
+#11880	INITED cov: 12487 ft: 46028 corp: 9876/1857Kb exec/s: 2376 rss: 436Mb
+#16384	pulse  cov: 12487 ft: 46028 corp: 9876/1857Kb lim: 19279 exec/s: 3276 rss: 510Mb
+#32768	pulse  cov: 12487 ft: 46030 corp: 9877/1857Kb lim: 19363 exec/s: 4681 rss: 532Mb
+#65536	pulse  cov: 12487 ft: 46031 corp: 9878/1856Kb lim: 19531 exec/s: 5461 rss: 535Mb
+#131072	pulse  cov: 12487 ft: 46068 corp: 9890/1859Kb lim: 19881 exec/s: 6241 rss: 535Mb
+#262144	pulse  cov: 12498 ft: 46099 corp: 9909/1860Kb lim: 20413 exec/s: 6721 rss: 535Mb
+#524288	pulse  cov: 12506 ft: 46295 corp: 9971/1877Kb lim: 21379 exec/s: 7182 rss: 535Mb
+#708015	DONE   cov: 12508 ft: 46457 corp: 10009/1899Kb lim: 22009 exec/s: 7375 rss: 535Mb
+###### Recommended dictionary. ######
+"\376\377\377\377\377\377\377\377" # Uses: 5103
+"c4" # Uses: 5162
+"\001\000\000'" # Uses: 4905
+"xmlns:" # Uses: 4668
+"vZvvvvvvvv" # Uses: 3656
+"\001\000\000\000\000\000\000\003" # Uses: 3648
+"\001\000{\375" # Uses: 3059
+"\017\000\000\000\000\000\000\000" # Uses: 2344
+"\311\377\000\000" # Uses: 1981
+"\377\377\377\003" # Uses: 1948
+"d9" # Uses: 1951
+"\021\000\000\000\000\000\000\000" # Uses: 1818
+"d1" # Uses: 1444
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\345\251\266\347\231\266\347\230\266\347\231\266\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 995
+"\377\377\377\377\377\377\377\377" # Uses: 1300
+"\303\276\303\277\303\277" # Uses: 1236
+"vvwvvvvvvv" # Uses: 1062
+"\345\234\250vwvvvvvvvvvvvvvvvvvvvv" # Uses: 944
+"attrib" # Uses: 1028
+"\006\013\001\000" # Uses: 999
+"\001\000\0006" # Uses: 980
+"b6" # Uses: 918
+"\000\200" # Uses: 987
+"\000\000" # Uses: 778
+"\001\000\000\000\000\000\000\000" # Uses: 842
+"c1" # Uses: 710
+"\034\000" # Uses: 710
+"vwvvvvvv" # Uses: 662
+"\013\000\000\000" # Uses: 653
+"\000\000\000\000\000\000\000\020" # Uses: 577
+"p1" # Uses: 540
+"\001\000\000\000\000\000\000\001" # Uses: 353
+"eee" # Uses: 348
+"xmlnw:" # Uses: 311
+"\377\377\377\377\377\377\377\017" # Uses: 312
+"Zvvvvvvv" # Uses: 288
+"d3" # Uses: 278
+"\007\000\000\000" # Uses: 202
+"\021\000" # Uses: 214
+"\024UUUUUUU" # Uses: 193
+"=\000" # Uses: 197
+"130" # Uses: 169
+"\377\377" # Uses: 160
+"ZZvvvvv" # Uses: 113
+"\000\000\000\000\000\000\0000" # Uses: 108
+"\377\377\377\377\377\377\377\011" # Uses: 98
+"d8" # Uses: 76
+"\003\000\000\000\000\000\000\000" # Uses: 4
+###### End of recommended dictionary. ######
+Done 708015 runs in 96 second(s)
+stat::number_of_executed_units: 708015
+stat::average_exec_per_sec:     7375
+stat::new_units_added:          831
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              535

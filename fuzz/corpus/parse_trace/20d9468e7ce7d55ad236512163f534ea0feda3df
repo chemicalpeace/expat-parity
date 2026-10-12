@@ -1,0 +1,11 @@
+/�﻿<!--before--><!DOCTYPE p:e [%pe1;<!ATTLIST
+
+
+ p:e xmlns NOTATION (n1|n2) "&unp;" xmlns:p NMTOKEN "&undeclared;" id ENTITY #IMPLIED><!ENTITY é PUBLIC "a'b" "sys2.ent" >
+<!NOTATION n1 PUBLIC '  spaced 
+  id  '>
+<!ENTITY % extpe "&#37;pe1;">
+<!ENTITY e3 PUBLIC "  spaced 
+  id  " 'sys-.ent' >
+<?dtdpi x?>
+<!ATT#x10000;' id NOTATION (n1|n2) #IMPLIED><!ENTITY amp PUBL '></doc>

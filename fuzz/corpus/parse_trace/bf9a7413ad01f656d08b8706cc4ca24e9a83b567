@@ -1,0 +1,3 @@
+0ú<?xml version='1.0' encoding='ISO-8859-1'?><!DOCTYPE r [<!ENTITY ext SYSTEM 'ext.xml'><!NOTATION n SYSTEM 'n'><!ENTITY unp SYSTEM 'u' NDATA n><!ENTITY e0 '&e4;
+<i>in</i><i a="v"/>'><!ENTITY e1 'text &e2;'><!ENTITY e1 'second'><!ENTITY e2 'a
+b</b>'><!ENTITY e3 '&#10;&e4;text <![CDATA[x<y]]>'><!ENTITY e8 'textY e6 "from pe">'>%p1;]><r><c>&e0;</c>txt&e3;</r>

@@ -1,0 +1,58 @@
+# libFuzzer log, trimmed: 683 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=/tmp/xr/fuzz/artifacts/buffer_diff/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 904293668
+INFO: Loaded 1 modules   (64805 inline 8-bit counters): 64805 [0xaaaab2117960, 0xaaaab2127685), 
+INFO: Loaded 1 PC tables (64805 PCs): 64805 [0xaaaab2127688,0xaaaab22248d8), 
+INFO:    14844 files found in <corpus>
+INFO: seed corpus: files: 14844 min: 1b max: 19251b total: 3695227b rss: 42Mb
+#8192	pulse  cov: 9850 ft: 28615 corp: 6729/211Kb exec/s: 2730 rss: 430Mb
+#14845	INITED cov: 12534 ft: 47023 corp: 10145/1834Kb exec/s: 2474 rss: 430Mb
+#16384	pulse  cov: 12534 ft: 47023 corp: 10145/1834Kb lim: 19279 exec/s: 2730 rss: 452Mb
+#32768	pulse  cov: 12534 ft: 47023 corp: 10145/1833Kb lim: 19391 exec/s: 4096 rss: 529Mb
+#65536	pulse  cov: 12534 ft: 47049 corp: 10147/1833Kb lim: 19559 exec/s: 5461 rss: 565Mb
+#131072	pulse  cov: 12536 ft: 47104 corp: 10154/1837Kb lim: 19895 exec/s: 5698 rss: 565Mb
+#262144	pulse  cov: 12538 ft: 47140 corp: 10167/1850Kb lim: 20595 exec/s: 6393 rss: 565Mb
+#524288	pulse  cov: 12539 ft: 47218 corp: 10192/1878Kb lim: 21729 exec/s: 6990 rss: 565Mb
+#676472	DONE   cov: 12540 ft: 47294 corp: 10214/1909Kb lim: 22261 exec/s: 7046 rss: 565Mb
+###### Recommended dictionary. ######
+"\345\234\250\350\216\203\350\215\274\350\216\203\350\216\203\350\216\203\347\266\203\350\216\203\350\216\203\350\215\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347\201\260\347" # Uses: 4409
+"a4" # Uses: 5812
+"\377\000" # Uses: 4944
+"d18" # Uses: 4527
+"n-0" # Uses: 4024
+"\000\000\373\377\254\255\302\200" # Uses: 3698
+"\000\000\000\000\000\000\000\000" # Uses: 3077
+"\017\000\000\000\000\000\000\000" # Uses: 2829
+"\000\000\000\000\000\000\000\020" # Uses: 2288
+"U}\000\000" # Uses: 1896
+"ar" # Uses: 1817
+"xml:lZ" # Uses: 1774
+"xmlns:" # Uses: 1569
+"@\000\000\000\000\000\000\000" # Uses: 1396
+"amx" # Uses: 1263
+"a6" # Uses: 1191
+"d1" # Uses: 1113
+"\002\000\000\000\000\000\000\000" # Uses: 935
+"AAAAAA" # Uses: 862
+"\000\000\000\000\000\000\000\006" # Uses: 849
+"Zvvvvvvv" # Uses: 824
+"\014\000\000\000\000\000\000\000" # Uses: 722
+"\001\000\000\257" # Uses: 662
+"\007\000\000\000\000\000\000\000" # Uses: 466
+"c8" # Uses: 452
+"Zv\352\260\264\352" # Uses: 438
+"a7" # Uses: 417
+"Zvvvvv" # Uses: 339
+"\001\000\000\000\000\000\000\012" # Uses: 245
+"b2" # Uses: 225
+"\377\377\377\003" # Uses: 22
+###### End of recommended dictionary. ######
+Done 676472 runs in 96 second(s)
+stat::number_of_executed_units: 676472
+stat::average_exec_per_sec:     7046
+stat::new_units_added:          683
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              565

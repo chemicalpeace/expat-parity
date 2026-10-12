@@ -1,4 +1,0 @@
-¬ä<?xml version='1.0' encoding='ISO-8859-1'?>
-<!DOCTYPE p:e [<!ENTITY e2 '&#60;b/&#62;' >
-<!ELEMENT doc ((p:e+,p:e+)*|_u|(_u?)?)><&!ATTLIST a xml:lang ENTITY #REQUIRED xmlns:q IDREF "x&e2;y" xml:lang ENTITIES #IMPLIED>]>
-<a>	&lt;</a>

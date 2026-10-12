@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='ISO-8859-1'?>
+<!DOCTYPE doc SYSTEM 'doc.dtd' [<!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3' d4 CDATA 'v4' d5 CDATA 'v5' d6 CDATA 'v6' d7 CDATA 'v7' d8 CDATA 'v8' d9 CDATA 'v9'>
+<!ATTLIST n-1 a ID #IMPLIED><!ATTLIST doc d0 CDATA 'v0' d1 CDATA 'v1' d2 CDATA 'v2' d3 CDATA 'v3'>
+<?dtdpi x?><!---->
+<!ATTLIST doc d0 CDATA 'v0'><!ATTLIST q:e b IDREF #IMPLIED xmlns:p CDATA #IMPLIED>
+<?dtdpi x?>]><a><doc/><a i></a>

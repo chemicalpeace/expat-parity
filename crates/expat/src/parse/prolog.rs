@@ -116,7 +116,7 @@ impl Parser {
             };
             let next = scanned.next.unwrap_or(s);
             let have_more = !self.final_buffer;
-            let done = with_known!(k, e => self.do_prolog(h, e, buf, s, scanned.scan, next, next_ptr, have_more))?;
+            let done = with_known!(k, e => self.do_prolog(h, e, buf, s, scanned.scan, next, next_ptr, have_more, true, Account::Direct))?;
             match done {
                 PrologDone::Done => return Ok(()),
                 PrologDone::Rescan(at) => s = at,
@@ -144,10 +144,12 @@ impl Parser {
         .into())
     }
 
-    /// `doProlog` (document entity, `XML_ACCOUNT_DIRECT`): handles `tok`
-    /// (`buf[s..next]`) and the following tokens.
+    /// `doProlog`: handles `tok` (`buf[s..next]`) and the following tokens,
+    /// of the document entity (`XML_ACCOUNT_DIRECT`) or of the replacement
+    /// text of an internal parameter entity (`XML_ACCOUNT_ENTITY_EXPANSION`,
+    /// internal encoding, `allow_closing_doctype == false`).
     #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of doProlog.
-    fn do_prolog<E: Encoding, H: Handler>(
+    pub(crate) fn do_prolog<E: Encoding, H: Handler>(
         &mut self,
         h: &mut H,
         enc: &E,
@@ -157,12 +159,14 @@ impl Parser {
         next: usize,
         next_ptr: &mut usize,
         have_more: bool,
+        allow_closing_doctype: bool,
+        account: Account,
     ) -> Result<PrologDone, Stop> {
         let end = buf.len();
         let (mut s, mut tok, mut next) = (s, tok, next);
         loop {
-            self.event_ptr = Some(s);
-            self.event_end_ptr = Some(next);
+            self.ev(enc, Some(s));
+            self.ev_end(enc, Some(next));
             let t = match tok {
                 Scan::Token(t) => t,
                 _ => {
@@ -172,14 +176,40 @@ impl Parser {
                     }
                     match tok {
                         Scan::Invalid => {
-                            self.event_ptr = Some(next);
+                            self.ev(enc, Some(next));
                             return Err(XmlError::InvalidToken.into());
                         }
                         Scan::Partial => return Err(XmlError::UnclosedToken.into()),
                         Scan::PartialChar => return Err(XmlError::PartialChar.into()),
                         Scan::PartialToken(Tok::PrologS) => Tok::PrologS,
-                        // A document entity without open internal entities.
-                        Scan::None => return Err(XmlError::NoElements.into()),
+                        Scan::None => {
+                            // For an internal PE NOT referenced between
+                            // declarations.
+                            if enc.is_internal()
+                                && !self
+                                    .open_internal_entities
+                                    .last()
+                                    .is_some_and(|o| o.between_decl)
+                            {
+                                *next_ptr = s;
+                                return Ok(PrologDone::Done);
+                            }
+                            // WFC: PE Between Declarations - must check
+                            // that PE contains complete markup, not only
+                            // for external PEs, but also for internal PEs
+                            // if the reference occurs between
+                            // declarations.
+                            if self.is_param_entity || enc.is_internal() {
+                                if self.prolog_state.token_role(Scan::None, enc, buf, end, end)
+                                    == Role::Error
+                                {
+                                    return Err(XmlError::IncompletePe.into());
+                                }
+                                *next_ptr = s;
+                                return Ok(PrologDone::Done);
+                            }
+                            return Err(XmlError::NoElements.into());
+                        }
                         Scan::PartialToken(t) => {
                             next = end;
                             t
@@ -206,7 +236,7 @@ impl Parser {
             if !matches!(role, Role::InstanceStart | Role::XmlDecl | Role::TextDecl)
                 && !self
                     .accounting
-                    .diff_tolerated(Scan::Token(t), next - s, Account::Direct)
+                    .diff_tolerated(Scan::Token(t), next - s, account)
             {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
@@ -232,7 +262,7 @@ impl Parser {
                     .into());
                 }
                 // Every other role belongs to a document type declaration.
-                _ => self.dtd_role(h, enc, buf, role, t, s, next, true)?,
+                _ => self.dtd_role(h, enc, buf, role, t, s, next, allow_closing_doctype)?,
             }
             match self.parsing {
                 Parsing::Suspended => {

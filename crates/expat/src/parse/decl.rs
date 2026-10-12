@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 
 use super::accounting::Account;
 use super::dtd::EntityRef;
+use super::entity::EntityType;
 use super::error::{Stop, XmlError};
 use super::model::{ContentModel, ContentQuant, ContentType};
 use super::prolog::to_utf8;
@@ -110,7 +111,7 @@ impl Parser {
         next: usize,
     ) -> Result<(), Stop> {
         if let Err(bad) = is_public_id(enc, bytes(buf, 0, next), s) {
-            self.event_ptr = Some(bad);
+            self.ev(enc, Some(bad));
             return Err(XmlError::Publicid.into());
         }
         Ok(())
@@ -285,7 +286,7 @@ impl Parser {
                         );
                     }
                     if self.handlers.attlist_decl && self.decl_attribute_type.is_some() {
-                        self.event_end_ptr = Some(s);
+                        self.ev_end(enc, Some(s));
                         self.report_attlist(h, None, role == Role::RequiredAttributeValue);
                     }
                 }
@@ -312,7 +313,7 @@ impl Parser {
                         );
                     }
                     if self.handlers.attlist_decl && self.decl_attribute_type.is_some() {
-                        self.event_end_ptr = Some(s);
+                        self.ev_end(enc, Some(s));
                         self.report_attlist(h, Some(&value), role == Role::FixedAttributeValue);
                     }
                 }
@@ -321,7 +322,7 @@ impl Parser {
                 if self.dtd.keep_processing {
                     // This stores the replacement text of m_declEntity.
                     let mut text = Vec::new();
-                    let result = self.store_entity_value(enc, buf, s + m, next - m, &mut text);
+                    let result = self.call_store_entity_value(enc, buf, s + m, next - m, &mut text, Account::None);
                     if let Some(r) = self.decl_entity {
                         if i32::try_from(text.len()).is_err() {
                             return Err(XmlError::NoMemory.into());
@@ -335,7 +336,7 @@ impl Parser {
                         if self.handlers.entity_decl
                             && let Some(is_param) = info
                         {
-                            self.event_end_ptr = Some(s);
+                            self.ev_end(enc, Some(s));
                             let name = self.dtd.entity_name(r).to_vec();
                             h.entity_decl(
                                 &name,
@@ -391,7 +392,7 @@ impl Parser {
                     && let Some(r) = self.decl_entity
                     && self.handlers.entity_decl
                 {
-                    self.event_end_ptr = Some(s);
+                    self.ev_end(enc, Some(s));
                     let name = self.dtd.entity_name(r).to_vec();
                     if let Some(e) = self.dtd.entity(r) {
                         h.entity_decl(
@@ -415,9 +416,11 @@ impl Parser {
                         e.notation = Some(notation);
                     }
                     let name = self.dtd.entity_name(r).to_vec();
+                    if self.handlers.unparsed_entity_decl || self.handlers.entity_decl {
+                        self.ev_end(enc, Some(s));
+                    }
                     if let Some(e) = self.dtd.entity(r) {
                         if self.handlers.unparsed_entity_decl {
-                            self.event_end_ptr = Some(s);
                             h.unparsed_entity_decl(
                                 &name,
                                 e.base.as_deref(),
@@ -426,7 +429,6 @@ impl Parser {
                                 e.notation.as_deref().unwrap_or_default(),
                             );
                         } else if self.handlers.entity_decl {
-                            self.event_end_ptr = Some(s);
                             h.entity_decl(
                                 &name,
                                 false,
@@ -488,7 +490,7 @@ impl Parser {
                     && self.handlers.notation_decl
                 {
                     let sysid = Self::literal(enc, buf, s, next);
-                    self.event_end_ptr = Some(s);
+                    self.ev_end(enc, Some(s));
                     h.notation_decl(
                         &name,
                         self.cur_base.as_deref(),
@@ -502,7 +504,7 @@ impl Parser {
                     && self.handlers.notation_decl
                 {
                     let name = self.decl_notation_name.clone().unwrap_or_default();
-                    self.event_end_ptr = Some(s);
+                    self.ev_end(enc, Some(s));
                     h.notation_decl(&name, self.cur_base.as_deref(), None, Some(&pubid));
                 }
             }
@@ -572,7 +574,7 @@ impl Parser {
                         } else {
                             ContentType::Empty
                         };
-                        self.event_end_ptr = Some(s);
+                        self.ev_end(enc, Some(s));
                         let name = self.decl_element_name();
                         h.element_decl(&name, &ContentModel::leaf(kind));
                     }
@@ -625,7 +627,7 @@ impl Parser {
                     if self.dtd.scaff_level == 0 {
                         if self.handlers.element_decl {
                             let model = self.dtd.build_model();
-                            self.event_end_ptr = Some(s);
+                            self.ev_end(enc, Some(s));
                             let name = self.decl_element_name();
                             h.element_decl(&name, &model);
                         }
@@ -714,21 +716,27 @@ impl Parser {
         Ok(())
     }
 
-    /// `storeEntityValue` for the literal `buf[ptr..end]` (document
-    /// entity, `XML_ACCOUNT_NONE`), appending the replacement text to
-    /// `out`.
+    /// `storeEntityValue` on `buf[ptr..]` (the slice ends at the end of the
+    /// literal or replacement text), appending the replacement text to
+    /// `out`. Returns at the end, or after opening a parameter entity
+    /// (`*next_ptr` is then where to continue).
     pub(crate) fn store_entity_value<E: Encoding>(
         &mut self,
         enc: &E,
         buf: &[u8],
         ptr: usize,
-        end: usize,
         out: &mut Vec<u8>,
+        account: Account,
+        next_ptr: &mut usize,
     ) -> Result<(), Stop> {
         let old_in_entity_value = self.prolog_state.in_entity_value;
         self.prolog_state.in_entity_value = true;
-        let r = self.store_entity_value_inner(enc, bytes(buf, 0, end), ptr, out, Account::None);
+        let mut next = ptr;
+        let r = self.store_entity_value_inner(enc, buf, ptr, out, account, &mut next);
         self.prolog_state.in_entity_value = old_in_entity_value;
+        // If 'nextPtr' is given, it should be updated during the
+        // processing.
+        *next_ptr = next;
         r
     }
 
@@ -739,6 +747,7 @@ impl Parser {
         ptr: usize,
         out: &mut Vec<u8>,
         account: Account,
+        next_out: &mut usize,
     ) -> Result<(), Stop> {
         let m = E::MINBPC;
         let mut ptr = ptr;
@@ -750,6 +759,7 @@ impl Parser {
             let r = entity_value_tok(enc, buf, ptr);
             // XmlEntityValueTok doesn't always set the last arg.
             let mut next = r.next.unwrap_or(ptr);
+            *next_out = next;
             if !self
                 .accounting
                 .diff_tolerated(r.scan, next.saturating_sub(ptr), account)
@@ -758,15 +768,38 @@ impl Parser {
             }
             match r.scan {
                 Scan::Token(Tok::ParamEntityRef) => {
-                    if self.is_param_entity {
-                        // Only external parameter entities get here
-                        // (module 12).
-                        return Err(Stop::DtdNotPorted);
+                    if self.is_param_entity || enc.is_internal() {
+                        let name = to_utf8(enc, bytes(buf, ptr + m, next - m));
+                        let Some(id) = self.dtd.param_entities.find(&self.salt, &name) else {
+                            // Not a well-formedness error - see XML 1.0:
+                            // WFC Entity Declared (C cannot report a
+                            // skipped entity here).
+                            self.dtd.keep_processing = self.dtd.standalone;
+                            return Ok(());
+                        };
+                        let r = EntityRef::Param(id);
+                        let (open, external) = match self.dtd.entity(r) {
+                            Some(e) => (e.open, e.system_id.is_some()),
+                            None => (false, false),
+                        };
+                        if open || self.decl_entity == Some(r) {
+                            self.ev_doc(enc, Some(ptr));
+                            return Err(XmlError::RecursiveEntityRef.into());
+                        }
+                        if external {
+                            // Read only by an external entity reference
+                            // handler (public API); without one it is
+                            // skipped.
+                            self.dtd.keep_processing = self.dtd.standalone;
+                            ptr = next;
+                            continue;
+                        }
+                        return self.process_entity(r, false, EntityType::Value);
                     }
                     // In the internal subset, PE references are not legal
                     // within markup declarations, e.g entity values in
                     // this case.
-                    self.event_ptr = Some(ptr);
+                    self.ev_doc(enc, Some(ptr));
                     return Err(XmlError::ParamEntityRef.into());
                 }
                 Scan::None => return Ok(()),
@@ -782,7 +815,7 @@ impl Parser {
                 Scan::Token(Tok::CharRef) => {
                     let n = char_ref_number(enc, buf, ptr);
                     let Ok(c) = u32::try_from(n) else {
-                        self.event_ptr = Some(ptr);
+                        self.ev_doc(enc, Some(ptr));
                         return Err(XmlError::BadCharRef.into());
                     };
                     let mut tmp = [0u8; 4];
@@ -790,15 +823,15 @@ impl Parser {
                     out.extend_from_slice(tmp.get(..k).unwrap_or_default());
                 }
                 Scan::Partial => {
-                    self.event_ptr = Some(ptr);
+                    self.ev_doc(enc, Some(ptr));
                     return Err(XmlError::InvalidToken.into());
                 }
                 Scan::Invalid => {
-                    self.event_ptr = Some(next);
+                    self.ev_doc(enc, Some(next));
                     return Err(XmlError::InvalidToken.into());
                 }
                 _ => {
-                    self.event_ptr = Some(ptr);
+                    self.ev_doc(enc, Some(ptr));
                     return Err(XmlError::UnexpectedState.into());
                 }
             }
