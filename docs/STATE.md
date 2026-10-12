@@ -138,9 +138,16 @@ with allocation failures, white-box).
    branch (PR #18, CI run 38289234285) 95.10 % on Linux and macOS
    (7,238 / 7,611) and 95.07 % on Windows (7,233 / 7,608). The older
    94.95 % (REPORT.md, PR #13) was measured on an older tree (7,552 lines)
-   and is not comparable with these. The llvm-cov `-dump` race fix
-   (`-num-threads=1`) is on the PR #17 branch (`q5-verification`), not on
-   this one.
+   and is not comparable with these. `scripts/coverage.sh` on this branch
+   now runs the llvm-cov `report -dump` diagnostic with `-num-threads=1`
+   (commit 1445f800, cherry-picked from PR #17's ec9cf645; only the
+   evidence comment differs: PR #17, branch `q5-verification`,
+   `docs/evidence/llvm-cov-dump-race/`). PR #17 (not merged) still holds
+   the original commit and the evidence; the summary, missing-lines, JSON
+   and lcov calls are unchanged. CI run 38299714072 on 1445f800: all 9
+   jobs green, the Ubuntu coverage `-dump` step completed without SIGABRT,
+   95.10 % lines. One successful run does not prove the race is gone (the
+   earlier failure was intermittent).
 6. DV-1 parity (D-034, owner decision 2026-10-12): phase 1 (sizes from
    the C layout, R1 fixed, `tracker_sizes` on every CI platform) done;
    then steps 2-6 (pool slack, creation charge, untracked C allocations,

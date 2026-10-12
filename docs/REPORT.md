@@ -1247,8 +1247,16 @@ job aborted inside the `llvm-cov export -dump` diagnostic of
 after the reports were written; the re-run of the same commit (job
 114777514198) and post-merge main 38240812899 were green. The root cause was
 found later on branch `q5-verification` (PR #17, open, not merged): a
-data race in `llvm-cov report -dump`; its fix (`-dump -num-threads=1` in
-`scripts/coverage.sh`) lives on that branch, not on this one.
+data race in `llvm-cov report -dump`. `scripts/coverage.sh` on this branch
+(PR #18) now runs that diagnostic with `-dump -num-threads=1` (commit
+1445f800, cherry-picked from PR #17's ec9cf645; only the evidence comment
+differs, pointing to PR #17, branch `q5-verification`,
+`docs/evidence/llvm-cov-dump-race/`). PR #17 still holds the original
+commit and the evidence. The summary, missing-lines, JSON and lcov calls
+are unchanged. PR #18's CI run 38299714072 on that commit: all 9 jobs
+green; the Ubuntu coverage `-dump` step completed without SIGABRT; 95.10 %
+lines. A single successful run does not prove that the race is gone, since
+the earlier failure was intermittent.
 
 **Scaling report** (`ns_duplicate_check_scales_like_c`). The test prints
 one `ns-scaling:` line on stderr on every run (input sizes, best-of-3 C
