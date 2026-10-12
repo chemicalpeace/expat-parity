@@ -1034,6 +1034,95 @@ repository): P1 `BINDING_SIZE` back to 6 words: caught by `tracker_sizes`
 `ELEMENT_TYPE_SIZE` 10 words, P4 `NS_ATT_SIZE` 16, P5 one pointer removed
 from the `TAG` field list: caught by `tracker_sizes`.
 
+### Q-5 (D-035): unknown-encoding `XmlParseXmlDecl` error position and C's over-read
+
+Found by the random test `init_diff::xml_decl_in_every_builtin_encoding`
+(intermittent red CI on the coverage job, PR #13 / main CI 38229597972).
+
+**Reproduction (same input, port and C).** Tokenizer level (the port's
+`Parser` has no unknown-encoding handler before module 12):
+`docs/evidence/q5/repro_xmldecl_unknown.rs`, copied to `tests/examples/`
+and run with `cargo run -q --release -p expat-difftest --example
+repro_xmldecl_unknown` (aarch64 Linux). Before the fix (main `dc871d8`,
+`repro-port-before.txt`):
+
+```
+seed 0x52f43d23123766f6 doc "<?xml é?><a/>" decl end 10      (C3 lead 2, A9 lead 4)
+  ns=false gte=false: port ok=false bad=Some(7) | C ok=false bad=Some(8)   (same for all 4 ns/gte)
+seed 0xfe8d9b29cbd0ff22 doc "<?xml noé ?><a/>" decl end 13   (C3 lead 3, A9 lead 4)
+  ns=false gte=false: port ok=false bad=Some(9) | C ok=false bad=Some(11)
+```
+
+After the fix (`repro-port-after.txt`): `bad=Some(8) | C bad=Some(8)` and
+`bad=Some(11) | C bad=Some(11)`. C through the public API
+(`docs/evidence/q5/q5_overread.c`, `XML_ParserCreate("x-q5")` + an
+unknown-encoding handler with the same lead bytes and a converter giving
+`I` for `C3 A9`, `plain.txt`): `<?xml \xC3\xA9?><a/>` gives
+`XML_ERROR_XML_DECL` (30), byte index 8, line 1, column 7.
+
+**What 7/8 and 9/11 are.** `bad` is the `badPtr` argument, which
+`processXmlDecl` passes as `&parser->m_eventPtr` (`xmlparse.c` 5143-5145);
+`XML_GetCurrentByteIndex64` is `m_parseEndByteIndex - (m_parseEndPtr -
+m_eventPtr)` (2714-2722), so for a document parsed from offset 0 they are
+byte indexes. Columns are character counts (`XmlUpdatePosition`,
+`XML_GetCurrentColumnNumber64` 2831-2840): byte 8 is column 7 and byte 11
+column 10, because `C3 A9` is one character for the tokenizer.
+
+**Root cause.** `doParseXmlDecl` sets `end` before `?>` (`xmltok.c`
+1069-1070); `parsePseudoAttribute` steps one byte at a time and calls
+`toAscii(enc, ptr, end)` (915-923) on the trailing byte `A9`, which the map
+makes a lead byte of 4. `unknown_toUtf8` (1273-1301) checks only
+`*fromP == fromLim` (1281), hands the converter `A9 ? > <` (1286), steps
+past `fromLim` (1291-1292); the converter gives a negative value (no
+output), so C continues with `a` (byte 11) and returns `a`: no error at
+byte 7, the next one at byte 8. The port stopped at `end` and returned
+-1 at byte 7. Fix `fb35448e`: `Encoding::to_utf8_until` (the C loop on the
+whole buffer, `fromLim` at `lim`), used by `to_ascii`.
+
+**Memory safety (upstream finding Q-5).** When the declaration ends the
+data, C reads past it: ASan (`asan.txt`, clang, the vendored 2.9.0, both
+`XML_Parse` and `XML_GetBuffer` + `XML_ParseBuffer`) reports
+`heap-buffer-overflow` READ in `unknown_toUtf8` `xmltok.c:1283` past the
+buffer `XML_GetBuffer` allocated (`xmlparse.c:2603`), for both seed
+documents ending at `?>` (the map makes ASan's fill byte `0xBE` a lead byte
+converting to nothing, so the walk runs off the allocation: 2,048 bytes
+for `XML_Parse`, 4,096 for `XML_ParseBuffer`). With only the two seed
+lead bytes in the map, MSan (`msan.txt`) reports use of uninitialised
+heap at `xmltok.c:1284`, and the converter is called on bytes after the
+document (`plain.txt`, `<-- past the document`). The port: `#![forbid(unsafe_code)]`,
+checked slice access only, stops with `InputIncomplete` where C leaves
+the data; the parser hands processors `buffer[..buffer_end]`. Miri on the
+port-only tests `tok::tests::q5` (`miri.txt`): 2 passed, no UB.
+Divergence policy: DIVERGENCES.md Q-5 / D-035 (replicate inside the data;
+past it the port reports the error at the trailing byte instead of
+modelling indeterminate memory).
+
+**Tests.** `tests/tests/xmldecl_unknown_diff.rs` (C-differential, 5 tests):
+both seeds verbatim (4 ns/text-declaration variants each, scanners and
+token walk); 34,944 declarations = 64 map pairs (lead of 2/3/4, malformed,
+non-XML, 2- and 3-byte BMP, ASCII; 36 pairs C rejects, checked as rejected
+on both sides) x 13 converter results (ASCII, 2/3/4-byte UTF-8, surrogate,
+past Unicode, negative, 0) x 14 pseudo-attribute positions x 3 tails, each
+with both NS modes and declaration kinds (`ok`, `bad` and its line/column,
+version, encoding name, standalone); the same 14 declarations in all 12
+built-in encodings; whole parses of them under the option matrix (error
+code, line, column, byte index). `crates/expat/src/tok/tests.rs` `q5`:
+port bounds tests (Miri). Mutation check (`mutation-check.txt`): with the
+fix reverted, 3 of the 5 differential tests fail (the two
+built-in-encoding tests are unaffected, as expected).
+
+**Random test.** `PROPTEST_CASES=100000 PROPTEST_RNG_SEED=11` and
+`95000` / seed 12 on the release build: ok, no mismatch
+(`random-scan.txt`); earlier runs of the same test on the fixed library
+(260,000 cases with seeds 1-4) also passed.
+
+**Fuzzing** (aarch64 Linux, library `fb35448e`,
+`docs/fuzz-logs/q5-unknown-xmldecl/SUMMARY.md`): `tok_diff` (seeded unknown
+encodings, `XmlParseXmlDecl` on every declaration token) 7 slices, 707 s,
+278,025 executions; `parse_trace` 6 slices, 616 s, 668,139 executions
+(built-in encodings only, where `to_utf8_until` is the old conversion). No
+crash, no mismatch.
+
 ## Divergences
 
 `docs/DIVERGENCES.md`. One divergence: DV-1 (module 11c, D-030), the
@@ -1042,11 +1131,14 @@ than C, within the margin by which its charge exceeds C's count; it is
 fail-closed and was observed only with caller-tightened limits; its
 status is **pending the owner's decision** (DIVERGENCES.md). External
 entity parsers (module 11d) keep the same margin, independent of the
-number of child parsers. No other divergence in parse results. Four C quirks found
+number of child parsers. No other divergence in parse results. Five C quirks found
 by the harness: Q-3 resolved as "replicate" (module 7; the input violates
 XML 1.0 §4.3.3), Q-1 and Q-2 resolved as "replicate" (module 10, D-024),
 Q-4 (module 11b2, D-029: undefined behaviour in C's epilog accounting that
-corrupts only an internal counter) not replicated, masked in the harness.
+corrupts only an internal counter) not replicated, masked in the harness;
+Q-5 (D-035: C's unknown-encoding `toAscii` reads past the data, an
+out-of-bounds read shown with ASan/MSan) replicated inside the data, not
+outside it.
 Platform-dependent C behaviour fixed to one choice: D-016 (counter width),
 D-017 (sign of stray bytes in `utf8_toUtf16`).
 

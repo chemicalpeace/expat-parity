@@ -35,14 +35,13 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 
 ## Blockers
 
-None. Open finding (not yet fixed, found by the coverage job, REPORT.md
-"Coverage on every CI platform"): `init_diff::xml_decl_in_every_builtin_encoding`
-(random proptest seeds) can fail — `XmlParseXmlDecl` with an unknown
-encoding returns a different `bad` position than C, e.g. seed
-`0x52f43d23123766f6` on `<?xml \xC3\xA9?>` (port 7, C 8) and seed
-`0xfe8d9b29cbd0ff22` on `<?xml no\xC3\xA9 ?>` (port 9, C 11);
-the first reproduced on aarch64 Linux. CI can therefore fail intermittently in the
-`test` and `coverage` jobs until it is fixed.
+None. The unknown-encoding `XmlParseXmlDecl` position finding that made
+`init_diff::xml_decl_in_every_builtin_encoding` fail intermittently
+(seeds `0x52f43d23123766f6`, port 7 / C 8, and `0xfe8d9b29cbd0ff22`, port
+9 / C 11) is fixed on branch `fix-unknown-xmldecl-position` (D-035,
+DIVERGENCES.md Q-5): the port now converts like C's `unknown_toUtf8`
+inside the data and stops where C reads past it (an out-of-bounds read in
+libexpat 2.9.0, `docs/evidence/q5`).
 
 ## Module Definition of Done
 

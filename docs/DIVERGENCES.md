@@ -204,3 +204,75 @@ are resolved as "replicate" (Q-1/Q-2: D-024, module 10; Q-3: D-019, module 7).
 
 The exact set of chunk-dependent upstream vectors is pinned by
 `tests/tests/upstream_vectors.rs::oracle_chunk_dependence_is_exactly_the_known_set`.
+
+### Q-5 `toAscii` in `XmlParseXmlDecl` with an unknown encoding reads past `fromLim` and past the data — resolved: replicate inside the data, do not replicate the over-read (out-of-bounds read in C)
+
+- Reproducers (random test `init_diff::xml_decl_in_every_builtin_encoding`,
+  now pinned in `tests/tests/xmldecl_unknown_diff.rs`): seed
+  `0x52f43d23123766f6`, `<?xml \xC3\xA9?><a/>` (map: `\xC3` lead of 2,
+  `\xA9` lead of 4): C `bad` 8, port 7 before the fix; seed
+  `0xfe8d9b29cbd0ff22`, `<?xml no\xC3\xA9 ?><a/>` (`\xC3` lead of 3,
+  `\xA9` lead of 4): C 11, port 9. `bad` is `processXmlDecl`'s
+  `&parser->m_eventPtr` (`xmlparse.c` 5143-5145), so it is the error's
+  byte index: `XML_GetCurrentByteIndex64` = `m_parseEndByteIndex -
+  (m_parseEndPtr - m_eventPtr)` (2714-2722). The column is a character
+  count from `XmlUpdatePosition` (`XML_GetCurrentColumnNumber64`,
+  2831-2840): C reports byte 8 / column 7 and byte 11 / column 10
+  (`docs/evidence/q5/plain.txt`), `XML_ERROR_XML_DECL` (30) in both.
+- Cause: `doParseXmlDecl` sets `end` to the `?` of `?>` (`xmltok.c`
+  1069-1070); `parsePseudoAttribute` and `checkXmlDeclVersionNum` step by
+  `minBytesPerChar` (one byte for an unknown encoding) and call
+  `toAscii(enc, ptr, end)` (915-923) at every byte, including trailing
+  bytes of a multi-byte character. `unknown_toUtf8` (1273-1301) stops
+  only when `*fromP == fromLim` exactly (1281). When the map makes the
+  trailing byte a lead byte, it passes the converter the whole sequence
+  (1286) and advances past `fromLim` (1291-1292), after which the
+  position never equals `fromLim` again; a sequence that converts to
+  nothing (`XmlUtf8Encode` of a negative value is 0 bytes) does not fill
+  the one-byte output, so C goes on with the following bytes until one
+  produces output. The port stopped at `end`.
+- **Upstream finding (out-of-bounds read).** When the declaration is at the
+  end of the data, C reads past the data and, in a run of such sequences,
+  past the allocation: `docs/evidence/q5/q5_overread.c` uses only the
+  public API (unknown protocol encoding with an unknown-encoding handler,
+  `XML_Parse` and `XML_GetBuffer`/`XML_ParseBuffer`) on both seed
+  documents ending at `?>`. AddressSanitizer reports a
+  heap-buffer-overflow READ in `unknown_toUtf8` (`xmltok.c` 1283) past the
+  input buffer `XML_GetBuffer` allocated (`xmlparse.c` 2603), under
+  `toAscii` / `parsePseudoAttribute` / `XmlParseXmlDecl` /
+  `processXmlDecl` (`asan.txt`; the map makes ASan's heap fill byte
+  `0xBE` a lead byte that converts to nothing). With a map that has only
+  the two seed lead bytes, MemorySanitizer reports a use of uninitialised
+  heap memory at `xmltok.c` 1284 (`msan.txt`), and the application's
+  converter is called on bytes after the document (`plain.txt`). The bytes
+  read are the parser's unused buffer space (stale or uninitialised) and,
+  in the worst case, memory after the buffer. Requires an application
+  that installs an unknown-encoding handler whose map makes a byte that
+  can follow a lead byte a lead byte itself. Not reported upstream (the
+  project contacts nobody); recorded for the owner.
+- Decision (D-035): **replicate C inside the data, do not replicate the
+  over-read.** `Encoding::to_utf8_until(buf, from, lim, to)` runs C's
+  loop on the whole buffer with `fromLim` at `lim` (so it converts the
+  bytes after `end` that C converts, which are inside the data); where C
+  would read past the end of `buf` (a sequence not complete in `buf`, or
+  the next byte after an empty conversion), it stops with
+  `InputIncomplete` and `toAscii` gives `-1`: the declaration error is
+  reported at that byte. The crate is `#![forbid(unsafe_code)]` and every
+  access is a checked `get`, so the port cannot read outside the slice;
+  the parser passes the processors `buffer[..buffer_end]`
+  (`parse/mod.rs` `call_processor`), so in the parser the bound is the
+  data the application gave, not the allocated buffer. The port's parser
+  has no unknown-encoding handler yet (module 12); when it gets one this
+  bound stays.
+- Observable divergence: only where C reads outside the data, i.e. where
+  C's result depends on indeterminate memory; there the port reports
+  `XML_ERROR_XML_DECL` at the trailing byte (`bad` 7 for
+  `<?xml \xC3\xA9?>` at the end of the data). Everywhere else the error
+  code, byte index, line and column equal C's.
+- Tests: `tests/tests/xmldecl_unknown_diff.rs` (C-differential: both
+  seeds verbatim; 14 pseudo-attribute positions x 10 map kinds per byte x
+  13 converter results x 3 tails, both NS modes and declaration kinds;
+  the same declarations in all 12 built-in encodings and as whole parses
+  under the option matrix; the port-only case pinned);
+  `crates/expat/src/tok/tests.rs` `q5` (port-only bounds tests, run under
+  Miri in CI).
