@@ -34,12 +34,12 @@ use expat_oracle::{ParamEntityParsing, ParseOptions, TrackerEvent};
 /// (the parser structure, `m_atts`, `m_dataBuf`, the DTD).
 const C_CREATION_LINES: [u32; 4] = [1395, 1405, 1410, 7865];
 
-/// Streams (of 4,836) that must be equal after creation at this stage
+/// Streams (of 5,196) that must be equal after creation at this stage
 /// (stage 4 of D-034: 3,270 of 3,420; stage 2: 3,291 of 3,420 and all
-/// 1,416 pool-boundary and public-id runs added with it, every remaining
-/// first difference the raw tag name the port charges at the start tag,
-/// stage 5; see docs/REPORT.md, DV-1 parity).
-const EQUAL_STREAMS_AT_LEAST: usize = 4_707;
+/// 1,776 pool-boundary, public-id, chop and `xmlns:` runs added with it,
+/// every remaining first difference the raw tag name the port charges at
+/// the start tag, stage 5; see docs/REPORT.md, DV-1 parity).
+const EQUAL_STREAMS_AT_LEAST: usize = 5_067;
 
 fn base() -> ParseOptions {
     ParseOptions {
@@ -115,6 +115,21 @@ fn boundary_docs() -> Vec<Vec<u8>> {
             format!("<!DOCTYPE r PUBLIC '  -//{x}   y//  ' 's'><r/>"),
             format!("<!DOCTYPE r [<!ENTITY e PUBLIC '  {x}   y  ' 's'>]><r/>"),
             format!("<!DOCTYPE r [<!NOTATION n PUBLIC '  {x}   y  '>]><r/>"),
+        ] {
+            docs.push(t.into_bytes());
+        }
+    }
+    // A tokenized attribute value whose trailing space fills the pool block
+    // (`poolChop` lets the NUL take its place), in `dtd->pool` (a default)
+    // and in `m_tempPool` (a start tag); and an `xmlns:` attribute id whose
+    // prefix C looks up without copying it, right after a long element
+    // type name in `dtd->pool`.
+    for fill in 990..1030 {
+        let x = "x".repeat(fill);
+        for t in [
+            format!("<!DOCTYPE r [<!ATTLIST r a NMTOKENS ' {x} '>]><r/>"),
+            format!("<!DOCTYPE r [<!ATTLIST r a NMTOKENS #IMPLIED>]><r a=' {x} '/>"),
+            format!("<!DOCTYPE r [<!ATTLIST {x} xmlns:p CDATA #IMPLIED>]><r/>"),
         ] {
             docs.push(t.into_bytes());
         }
