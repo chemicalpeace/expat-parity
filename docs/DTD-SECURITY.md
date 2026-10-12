@@ -50,6 +50,27 @@ Line numbers refer to those files. The build configuration is the one of
   reported to the skipped-entity handler (3698-3705, 6362-6370) and is not
   an error.
 
+- **External entity parsers (module 11d step D2).** What the handler
+  feeds into `XML_ExternalEntityParserCreate`'s child is parsed with the
+  same checks as the document: text declaration rules, conditional
+  sections only in external PEs / the subset, recursion through the open
+  entities passed in the context string (`XML_ERROR_RECURSIVE_ENTITY_REF`),
+  proper nesting. Every child counts its bytes as *indirect* in the root's
+  billion-laughs accounting and allocates through the root's tracker.
+- **Security note: libexpat does not limit the number or depth of
+  external entity parsers.** Measured (`external_parser_diff.rs`, default
+  limits): a document whose external entities each reference the next
+  one four times, nine levels deep, makes C create and run **87,381
+  nested external entity parsers** (general or parameter entities, 0.3-0.7
+  s) without any error, because the total bytes stay below the 8 MiB
+  activation threshold of the amplification check and the tracker's
+  64 MiB threshold. Only the application's handler can stop this (the
+  test handler caps nesting at 16). The port behaves identically
+  (D-026: defaults are C's); an application that reads external entities
+  must cap their depth and count in its handler, or lower the
+  billion-laughs activation threshold (with a 4 KiB threshold the same
+  documents stop with 43 after 120-692 children).
+
 ## 3. Recursion
 
 - Every expansion sets `entity->open` (6723) until the entity and

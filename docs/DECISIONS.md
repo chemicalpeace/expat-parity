@@ -653,3 +653,34 @@ recorded in DIVERGENCES.md.
 - **Why.** Equal handler calls and arguments are the observable contract
   of this part of libexpat; an in-memory resolver keeps the tests
   hermetic and bounded.
+
+## D-032 External entity parsers share the root's state by move (module 11d step D2)
+
+- **What C does.** `XML_ExternalEntityParserCreate` (`xmlparse.c`
+  1680-1863) creates a child that, for a parameter entity or the external
+  subset (NULL context), uses the parent's `DTD` pointer, and for a
+  general entity gets a copy (`dtdCopy`) plus the parent's namespace
+  bindings and open entities from the context string (`setContext`).
+  Every child allocates through the root parser's allocation tracker and
+  counts its bytes as indirect in the root's billion-laughs accounting
+  (`getRootParserOf`). `XML_ParserFree` of the child frees what it owns;
+  a shared DTD's growth stays with the root.
+- **Decision.** The port has no shared pointers: the parent passes an
+  `ExternalEntities` factory to `Handler::external_entity_ref`; the
+  `ExternalEntityParser` guard moves the shared parts (DTD and its pool
+  shadows for parameter entities, tracker and accounting always) into the
+  child and back when it is dropped. The parent cannot run in between: it
+  is suspended inside its handler. On drop, a general entity parser's
+  tracker count returns to its value before the creation (C frees the DTD
+  copy too); a parameter entity parser releases its creation charge and
+  everything it owns itself (`Tracker::own_bytes`, open-entity structures,
+  `m_atts` growth), keeping the DTD's growth charged.
+- **Why.** Moving ownership gives C's sharing semantics without
+  `unsafe`, reference counting or interior mutability, and makes "the
+  parent is suspended" a compile-time fact. Releasing the child's own
+  structures is required for the tracker relation (D-030): without it the
+  port's count grew by about 1 KB per parameter entity parser and refused
+  at the default limits where C succeeds (REPORT.md, module 11d step D2).
+- **Verification.** `tests/tests/external_parser_diff.rs` (groups in
+  REPORT.md), the `parse_trace` fuzz target with external entity bodies,
+  injected bugs E1-E14.

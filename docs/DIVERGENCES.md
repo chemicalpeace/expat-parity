@@ -35,6 +35,18 @@ XML 1.0 specifications or to libexpat's own documentation.
 - The opposite direction never happens by construction and is tested:
   whenever C refuses through its tracker, the port refuses
   (`tests/tests/tracker_diff.rs`, `parse_trace` fuzz target).
+- External entity parsers (module 11d step D2, D-032): every child
+  charges the root's tracker. A general entity parser's charge is fully
+  released when it is freed; a parameter entity parser keeps the shared
+  DTD's growth charged (as in C) and releases its own structures. The
+  port's charge for buffers it does not shadow one by one stays inside
+  the creation bound, so the margin over C stays 13,312-13,352 bytes
+  whatever the number of children (87,381 nested parameter entity
+  parsers: C 8,028, port 21,380 bytes at the end). Before this was fixed
+  the child's own buffers stayed charged, about 1 KB per parameter
+  entity parser, enough for a refusal at the default limits where C
+  succeeds; `external_parser_diff.rs::billion_laughs_across_external_entities`
+  asserts the bound.
 - **Status: pending owner decision** (2026-10-12). Whether the ~13 KB
   window above 64 MiB at the default limits is acceptable, or the port
   must be brought to C's exact count there, is open; the behaviour is

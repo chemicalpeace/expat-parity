@@ -94,6 +94,16 @@ Scanned for personal data (names, e-mail addresses, local paths): no hits.
 An earlier step-C run (commit 7762e9d) and its merged corpus were lost
 with a sandbox reset before they were pushed; its numbers are not used.
 
+Module 11d step D2 merges (2026-10-12): `parse_trace` committed corpus
+(12,638) + working corpus of the first logged run (27,310, incl. 12,120
+seeds of which 2,300 carry external entity bodies after
+`EXTERNAL_MARKER`) = 39,948 inputs to 13,555 files (1,986 new edges), then
+13,555 + the working corpus of the run after the PE-parser fix (15,709) =
+29,264 inputs to 13,869 files (106 new edges); `buffer_diff` 10,451 +
+17,792 (incl. 4,040 seeds) = 28,243 inputs to 10,766 files (31 new
+edges). Scanned for personal data (names, e-mail addresses, local paths;
+digit runs checked by hand): no hits.
+
 ## Run logs
 
 `docs/fuzz-logs/<module>/` keeps the libFuzzer output of the runs reported
