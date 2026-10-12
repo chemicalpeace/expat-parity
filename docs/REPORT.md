@@ -1123,7 +1123,7 @@ encodings, `XmlParseXmlDecl` on every declaration token) 7 slices, 707 s,
 (built-in encodings only, where `to_utf8_until` is the old conversion). No
 crash, no mismatch.
 
-### Q-5 verification and the coverage-job abort (PR #16)
+### Q-5 verification and the coverage-job abort (PR #17)
 
 **Merge order.** PR #15 was merged (main a990a8c, 14:09 +03 on
 2026-10-12) after its CI run 38237867506 attempt 2 was green; the owner's
