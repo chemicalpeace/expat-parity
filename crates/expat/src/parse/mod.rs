@@ -15,11 +15,11 @@
 //! empty element), so which handlers are "set" is part of the parser
 //! configuration ([`HandlerSet`]) rather than of the handler object.
 //!
-//! Scope (Phase 3 module 10, `docs/STATE.md`): the prolog without a
-//! document type declaration, content, attributes, namespaces, CDATA
-//! sections and the epilog. A document type declaration stops the parser
-//! with [`Stop::DtdNotPorted`] (module 11). The application-facing API
-//! (`XML_StopParser`, the default handler, external entity parsers,
+//! Scope (`docs/STATE.md`): the prolog, the document type declaration with
+//! entities and the amplification limits (module 11), external entity
+//! parsers driven by the external entity reference handler (module 11d),
+//! content, attributes, namespaces, CDATA sections and the epilog. The
+//! application-facing API (`XML_StopParser`, the default handler,
 //! unknown-encoding handlers) is module 12.
 //!
 //! ```
@@ -707,7 +707,7 @@ impl Parser {
         self.reparse_deferral_enabled = enabled;
     }
 
-    /// `XML_GetErrorCode`, or [`Stop::DtdNotPorted`].
+    /// `XML_GetErrorCode`.
     pub fn error_code(&self) -> Stop {
         self.error_code
     }

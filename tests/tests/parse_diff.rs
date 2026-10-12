@@ -4,12 +4,12 @@
 //! separators, chunkings, `XML_Parse` versus the buffer API, reparse
 //! deferral on and off).
 //!
-//! Documents with a document type declaration stop the port with
-//! `Stop::DtdNotPorted` until module 11; they are counted, never compared.
+//! Documents with a document type declaration are compared too (module
+//! 11 ported the DTD; module 11d removed the last unported stop).
 
 use expat_difftest::diff::option_matrix;
 use expat_difftest::docgen::{Rng, document, dtd_document};
-use expat_difftest::port::{PortTrace, port_trace};
+use expat_difftest::port::port_trace;
 use expat_difftest::trace::first_difference;
 use expat_difftest::vectors::upstream;
 use expat_oracle::{ParamEntityParsing, ParseOptions, parse_trace};
@@ -17,36 +17,23 @@ use expat_oracle::{ParamEntityParsing, ParseOptions, parse_trace};
 #[derive(Default)]
 struct Tally {
     compared: usize,
-    unported: usize,
     failures: Vec<String>,
 }
 
 impl Tally {
-    /// Compares one (document, options) pair; returns false if the port
-    /// stopped at a DTD.
-    fn check(&mut self, id: &str, doc: &[u8], o: &ParseOptions) -> bool {
+    /// Compares one (document, options) pair.
+    fn check(&mut self, id: &str, doc: &[u8], o: &ParseOptions) {
         let c = parse_trace(doc, o).expect("oracle");
-        match port_trace(doc, o) {
-            PortTrace::DtdNotPorted => {
-                self.unported += 1;
-                false
-            }
-            PortTrace::Trace(t) => {
-                self.compared += 1;
-                if let Some((line, l, r)) = first_difference(&c, &t) {
-                    self.failures
-                        .push(format!("{id} {o:?}: line {line}: C `{l}` port `{r}`"));
-                }
-                true
-            }
+        let t = port_trace(doc, o);
+        self.compared += 1;
+        if let Some((line, l, r)) = first_difference(&c, &t) {
+            self.failures
+                .push(format!("{id} {o:?}: line {line}: C `{l}` port `{r}`"));
         }
     }
 
     fn assert_clean(&self, what: &str) {
-        eprintln!(
-            "{what}: {} pairs equal to C, {} stopped at a DTD (module 11)",
-            self.compared, self.unported
-        );
+        eprintln!("{what}: {} pairs compared", self.compared);
         for f in self.failures.iter().take(30) {
             eprintln!("{f}");
         }
@@ -92,20 +79,17 @@ fn extended_options() -> Vec<ParseOptions> {
 fn upstream_vectors_match_c() {
     let opts = extended_options();
     let mut tally = Tally::default();
-    let mut fully = 0usize;
+    let mut vectors = 0usize;
     for v in upstream() {
         let doc = v.doc();
-        let mut all = true;
         for o in &opts {
-            all &= tally.check(&v.source, &doc, o);
+            tally.check(&v.source, &doc, o);
         }
-        fully += usize::from(all);
+        vectors += 1;
     }
-    eprintln!("upstream: {fully} of 540 vectors compared under every option set");
+    eprintln!("upstream: {vectors} vectors compared under every option set");
     tally.assert_clean("upstream");
-    // Every vector without a document type declaration is compared under
-    // every option set; the count changes only with the ported scope.
-    assert_eq!(fully, 540);
+    assert_eq!(vectors, 540);
 }
 
 /// Random option set for generated documents.
@@ -180,7 +164,7 @@ fn namespace_triplets_match_c() {
                         ns_triplets: triplets,
                         ..ParseOptions::default()
                     };
-                    assert!(tally.check(&format!("triplets #{i}"), doc, &o));
+                    tally.check(&format!("triplets #{i}"), doc, &o);
                 }
             }
         }
@@ -204,9 +188,7 @@ fn q1_q2_epilog_line_breaks_replicate_c() {
             ..ParseOptions::default()
         };
         let c = parse_trace(doc, &o).expect("oracle");
-        let PortTrace::Trace(t) = port_trace(doc, &o) else {
-            panic!("no DTD here");
-        };
+        let t = port_trace(doc, &o);
         assert_eq!(t, c, "{doc:?} chunk {chunk}");
         let text = String::from_utf8(t).expect("utf-8 trace");
         assert_eq!(
@@ -351,7 +333,7 @@ fn repeated_attribute_definitions_match_c() {
     let mut tally = Tally::default();
     for (i, doc) in docs.iter().enumerate() {
         for o in extended_options() {
-            assert!(tally.check(&format!("attdef #{i}"), doc, &o));
+            tally.check(&format!("attdef #{i}"), doc, &o);
         }
     }
     tally.assert_clean("attribute definitions");
@@ -376,7 +358,7 @@ fn deep_content_models_match_c() {
                 chunk_size: chunk,
                 ..ParseOptions::default()
             };
-            assert!(tally.check(&format!("depth {depth}"), &doc, &o));
+            tally.check(&format!("depth {depth}"), &doc, &o);
         }
         tally.assert_clean("deep models");
     }

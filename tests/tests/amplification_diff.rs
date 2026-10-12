@@ -107,19 +107,16 @@ impl Tally {
         self.max_c_peak = self.max_c_peak.max(out.c_peak);
         self.max_elapsed = self.max_elapsed.max(out.elapsed);
         if !out.equal() {
-            let msg = match &out.port {
-                None => format!("{id} {o:?}: port stopped with DtdNotPorted"),
-                Some(p) => match first_difference(&out.c, p) {
-                    Some((line, c, r)) => {
-                        let cut = |s: &str| s.chars().take(160).collect::<String>();
-                        format!(
-                            "{id} {o:?}: line {line}: C `{}` port `{}`",
-                            cut(&c),
-                            cut(&r)
-                        )
-                    }
-                    None => format!("{id} {o:?}: traces differ"),
-                },
+            let msg = match first_difference(&out.c, &out.port) {
+                Some((line, c, r)) => {
+                    let cut = |s: &str| s.chars().take(160).collect::<String>();
+                    format!(
+                        "{id} {o:?}: line {line}: C `{}` port `{}`",
+                        cut(&c),
+                        cut(&r)
+                    )
+                }
+                None => format!("{id} {o:?}: traces differ"),
             };
             self.failures.push(msg);
         }
@@ -526,7 +523,7 @@ fn q4_epilog_name_at_end_of_buffer() {
             "C fails with junk after the document element"
         );
         let (c_direct, _) = counters(&out.c);
-        let port_direct = out.port.as_deref().map(|p| counters(p).0).unwrap_or(0);
+        let port_direct = counters(&out.port).0;
         eprintln!("q4 {chunk}: C direct counter {c_direct}, port {port_direct}");
         assert!(
             port_direct <= doc.len() as u64,

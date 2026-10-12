@@ -13,10 +13,6 @@ fn main() {
     };
     let c = expat_oracle::parse_trace(&doc, &o).expect("oracle");
     println!("C:\n{}", String::from_utf8_lossy(&c));
-    match expat_difftest::port::port_trace(&doc, &o) {
-        expat_difftest::port::PortTrace::Trace(t) => {
-            println!("port:\n{}", String::from_utf8_lossy(&t))
-        }
-        other => println!("port: {other:?}"),
-    }
+    let t = expat_difftest::port::port_trace(&doc, &o);
+    println!("port:\n{}", String::from_utf8_lossy(&t));
 }

@@ -19,22 +19,16 @@
 //! under random handler options.
 
 use expat_difftest::docgen::{Rng, entity_document};
-use expat_difftest::port::{PortTrace, port_trace};
+use expat_difftest::port::port_trace;
 use expat_difftest::trace::first_difference;
 use expat_oracle::{ExtHandler, ParamEntityParsing, ParseOptions, parse_trace};
 
 /// Compares `doc` under `o`; returns the C trace.
 fn check(failures: &mut Vec<String>, id: &str, doc: &[u8], o: &ParseOptions) -> Vec<u8> {
     let c = parse_trace(doc, o).expect("oracle");
-    match port_trace(doc, o) {
-        PortTrace::DtdNotPorted => {
-            failures.push(format!("{id} {o:?}: port stopped (DtdNotPorted)"))
-        }
-        PortTrace::Trace(t) => {
-            if let Some((line, l, r)) = first_difference(&c, &t) {
-                failures.push(format!("{id} {o:?}: line {line}: C `{l}` port `{r}`"));
-            }
-        }
+    let t = port_trace(doc, o);
+    if let Some((line, l, r)) = first_difference(&c, &t) {
+        failures.push(format!("{id} {o:?}: line {line}: C `{l}` port `{r}`"));
     }
     c
 }

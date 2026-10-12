@@ -19,16 +19,6 @@ use expat_oracle::{BufferOp, EXT_MAX_DEPTH, ExtHandler, ParamEntityParsing, Pars
 /// `oracle_trace.c`).
 pub const ORACLE_HASH_SALT: [u8; 16] = *b"expat-rs-oracle!";
 
-/// Result of a port parse.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PortTrace {
-    /// The canonical trace.
-    Trace(Vec<u8>),
-    /// The document needs a part of the parser that is not ported yet
-    /// (module 11, [`Stop::DtdNotPorted`]); there is no trace to compare.
-    DtdNotPorted,
-}
-
 struct Tracer {
     w: TraceWriter,
     /// The shim's test external entity reference handler.
@@ -78,10 +68,8 @@ impl Tracer {
             }
         }
         self.depth -= 1;
-        let code = match child.error_code() {
-            Stop::Error(e) => i64::from(e.to_c()),
-            Stop::DtdNotPorted => 999,
-        };
+        let Stop::Error(e) = child.error_code();
+        let code = i64::from(e.to_c());
         let line = child.current_line_number();
         let column = child.current_column_number();
         let index = child.current_byte_index();
@@ -297,7 +285,7 @@ pub fn last_port_tracker() -> PortTracker {
 }
 
 /// Parses `doc` with the port under `opts` and returns its trace.
-pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
+pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
     let mut p = Parser::new(
         opts.encoding.as_deref().map(str::as_bytes),
         opts.ns_separator,
@@ -374,10 +362,8 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
             peak: p.alloc_tracker().peak_bytes_allocated,
         });
     });
-    let code = match p.error_code() {
-        Stop::Error(e) => e.to_c(),
-        Stop::DtdNotPorted => return PortTrace::DtdNotPorted,
-    };
+    let Stop::Error(e) = p.error_code();
+    let code = e.to_c();
     // The shim writes `ok` only for XML_STATUS_OK.
     let status = if st == parse::Status::Ok {
         Status::Ok
@@ -390,11 +376,10 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> PortTrace {
     }
     let line = p.current_line_number();
     let column = p.current_column_number();
-    PortTrace::Trace(t.w.finish(status, code, line, column, p.current_byte_index()))
+    t.w.finish(status, code, line, column, p.current_byte_index())
 }
 
-/// The port as a [`TraceSource`]. A document outside the ported scope
-/// yields the line `unported dtd`, which never equals a C trace.
+/// The port as a [`TraceSource`].
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Port;
 
@@ -404,10 +389,7 @@ impl TraceSource for Port {
     }
 
     fn trace(&self, doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
-        match port_trace(doc, opts) {
-            PortTrace::Trace(t) => t,
-            PortTrace::DtdNotPorted => b"unported dtd\n".to_vec(),
-        }
+        port_trace(doc, opts)
     }
 }
 
@@ -456,10 +438,8 @@ pub fn buffer_run(doc: &[u8], ops: &[BufferOp], ns: bool, reparse_deferral: bool
             parse::Status::Ok => 1,
             parse::Status::Suspended => 2,
         };
-        let code = match p.error_code() {
-            Stop::Error(e) => e.to_c(),
-            Stop::DtdNotPorted => 999,
-        };
+        let Stop::Error(e) = p.error_code();
+        let code = e.to_c();
         let b = p.buffer_state();
         let _ = writeln!(
             out,

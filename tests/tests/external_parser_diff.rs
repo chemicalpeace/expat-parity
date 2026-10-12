@@ -23,7 +23,7 @@
 
 use expat_difftest::bounded::{Bounds, CountingAlloc, compare};
 use expat_difftest::docgen::{Rng, external_case};
-use expat_difftest::port::{PortTrace, port_trace};
+use expat_difftest::port::port_trace;
 use expat_difftest::trace::first_difference;
 use expat_oracle::{ExtHandler, Factor, ParamEntityParsing, ParseOptions, parse_trace};
 
@@ -57,15 +57,9 @@ fn entities(list: &[(&str, &str)]) -> Entities {
 /// Compares `doc` under `o`; returns the C trace.
 fn check(failures: &mut Vec<String>, id: &str, doc: &[u8], o: &ParseOptions) -> Vec<u8> {
     let c = parse_trace(doc, o).expect("oracle");
-    match port_trace(doc, o) {
-        PortTrace::DtdNotPorted => {
-            failures.push(format!("{id} {o:?}: port stopped (DtdNotPorted)"))
-        }
-        PortTrace::Trace(t) => {
-            if let Some((line, l, r)) = first_difference(&c, &t) {
-                failures.push(format!("{id}: line {line}: C `{l}` port `{r}` ({o:?})"));
-            }
-        }
+    let t = port_trace(doc, o);
+    if let Some((line, l, r)) = first_difference(&c, &t) {
+        failures.push(format!("{id}: line {line}: C `{l}` port `{r}` ({o:?})"));
     }
     c
 }
@@ -777,7 +771,7 @@ fn billion_laughs_across_external_entities() {
             assert!(
                 out.equal(),
                 "{kind} {fan}^{depth} {threshold:?}: traces differ: {:?}",
-                out.port.as_ref().and_then(|p| first_difference(&out.c, p))
+                first_difference(&out.c, &out.port)
             );
             let code = result_code(&out.c);
             let breaches = lines_with(&out.c, "extend 0 43").len();

@@ -749,6 +749,9 @@ pub fn entity_document(r: &mut Rng) -> Vec<u8> {
     doc
 }
 
+/// External entities by system identifier: (system id, bytes).
+pub type ExternalEntities = Vec<(Vec<u8>, Vec<u8>)>;
+
 /// Separates a `parse_trace` fuzz input's document from the bodies of its
 /// external entities (module 11d, step D2; [`split_external_input`]).
 pub const EXTERNAL_MARKER: &[u8] = b"\x00\xEE\xEE\x00";
@@ -791,7 +794,7 @@ pub fn system_ids(doc: &[u8]) -> Vec<Vec<u8>> {
 /// entity bodies (further marker-separated segments) assigned in order to
 /// the document's system identifiers ([`system_ids`]). `None` without a
 /// marker.
-pub fn split_external_input(data: &[u8]) -> Option<(&[u8], Vec<(Vec<u8>, Vec<u8>)>)> {
+pub fn split_external_input(data: &[u8]) -> Option<(&[u8], ExternalEntities)> {
     let m = EXTERNAL_MARKER;
     let at = data.windows(m.len()).position(|w| w == m)?;
     let doc = data.get(..at)?;
@@ -887,7 +890,7 @@ fn external_decls(r: &mut Rng, n: usize, out: &mut String) {
 /// optional external subset, with the bodies of its entities (by system
 /// identifier; some identifiers have no body, some bodies are damaged or
 /// encoded differently). Module 11d, step D2.
-pub fn external_case(r: &mut Rng) -> (Vec<u8>, Vec<(Vec<u8>, Vec<u8>)>) {
+pub fn external_case(r: &mut Rng) -> (Vec<u8>, ExternalEntities) {
     let n = 1 + r.below(3);
     let mut doc = String::new();
     doc.push_str(r.pick(&[
@@ -918,7 +921,7 @@ pub fn external_case(r: &mut Rng) -> (Vec<u8>, Vec<(Vec<u8>, Vec<u8>)>) {
     doc.push_str(r.pick(&["<r>", "<r xmlns='urn:d' xmlns:p='urn:p'>", "<r a='1'>"]));
     for _ in 0..1 + r.below(3) {
         match r.below(4) {
-            0 => doc.push_str("x"),
+            0 => doc.push('x'),
             1 => doc.push_str("<k/>"),
             _ => doc.push_str(&format!("&g{};", r.below(n))),
         }

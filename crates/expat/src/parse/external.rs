@@ -352,7 +352,7 @@ impl Parser {
             None => {
                 // The DTD instance is shared between the document's root
                 // parser and external PE parsers.
-                child.dtd = core::mem::replace(&mut self.dtd, Dtd::new());
+                child.dtd = core::mem::take(&mut self.dtd);
                 child.tracker.dtd_pool = core::mem::take(&mut self.tracker.dtd_pool);
                 child.tracker.entity_value_pool = core::mem::take(&mut self.tracker.entity_value_pool);
                 child.tracker.scaff_size = self.tracker.scaff_size;
@@ -376,7 +376,7 @@ impl Parser {
     fn external_entity_parser_free(&mut self, child: &mut Parser, bytes_before: u64) {
         let mut t = child.tracker.t;
         if child.is_param_entity {
-            self.dtd = core::mem::replace(&mut child.dtd, Dtd::new());
+            self.dtd = core::mem::take(&mut child.dtd);
             self.tracker.dtd_pool = core::mem::take(&mut child.tracker.dtd_pool);
             self.tracker.entity_value_pool = core::mem::take(&mut child.tracker.entity_value_pool);
             self.tracker.scaff_size = child.tracker.scaff_size;
