@@ -593,9 +593,24 @@ pub fn builtin_of_known(k: Known) -> Builtin {
     }
 }
 
-/// Compares `XmlParseXmlDecl(NS)` on the declaration token `buf[ptr..end]`.
+/// Compares `XmlParseXmlDecl(NS)` on the declaration token `buf[ptr..end]`,
+/// and, when it fails, the line and column that `XmlUpdatePosition` gives
+/// for the error position (`processXmlDecl` passes `&m_eventPtr` as
+/// `badPtr`, so this is what `XML_GetCurrentLineNumber` and
+/// `XML_GetCurrentColumnNumber` report, and `bad` is the byte index for a
+/// document parsed from offset 0).
+///
+/// With an unknown encoding C's `toAscii` hands the converter a multi-byte
+/// sequence that starts before `end` and may extend past the token
+/// (Q-5); [`c::parse_xml_decl`] runs C on `buf` followed by 8 bytes of
+/// `>`, so the port is given the same bytes. Where those bytes are past
+/// the real buffer C would read outside it and the port stops instead
+/// (Q-5, docs/DIVERGENCES.md); that case is pinned by
+/// `tests/tests/xmldecl_unknown_diff.rs`, not compared here.
 pub fn check_xml_decl<S: Subject>(s: &S, ns: bool, gte: bool, buf: &[u8], ptr: usize, end: usize) {
-    let r = rs::parse_xml_decl(gte, s.rs(), ns, buf, ptr, end);
+    let mut padded = buf.to_vec();
+    padded.extend([b'>'; 8]);
+    let r = rs::parse_xml_decl(gte, s.rs(), ns, &padded, ptr, end);
     let cd = c::parse_xml_decl(ns, gte, s.c(), buf, ptr, end);
     let encoding = match r.encoding {
         None => c::FoundEncoding::Untouched,
@@ -621,6 +636,16 @@ pub fn check_xml_decl<S: Subject>(s: &S, ns: bool, gte: bool, buf: &[u8], ptr: u
         "{s:?} XmlParseXmlDecl(ns {ns}, text decl {gte}) of {:?}",
         &buf[ptr..end]
     );
+    if let Some(bad) = r.bad.filter(|&b| b <= end) {
+        let mut pos = rs::Position::default();
+        rs::update_position(s.rs(), &buf[..bad], 0, &mut pos);
+        assert_eq!(
+            (pos.line_number, pos.column_number),
+            c::update_position(s.c(), &buf[..bad], 0, (0, 0)),
+            "{s:?} position of XmlParseXmlDecl error {bad} in {:?}",
+            &buf[ptr..end]
+        );
+    }
 }
 
 /// Encoding names given to `XmlInitEncoding`: none, each built-in name in

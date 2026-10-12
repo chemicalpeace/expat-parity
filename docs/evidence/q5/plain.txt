@@ -1,0 +1,64 @@
+# Linux aarch64, Debian clang version 19.1.7 (3+b1); repo commit 020a0618
+## q5_plain parse 0
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 10)  <-- past the document
+doc 0 (10 bytes), mode parse: status 0 error 30 (XML declaration not well-formed) byte index 8 line 1 column 7; convert calls 5, calls reading past the document 1, max offset read 10
+exit 0
+## q5_plain parse 1
+  convert #1 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #2 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #3 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #4 at offset 9 (lead A9, reads 4 bytes up to offset 12; doc len 13)
+doc 1 (13 bytes), mode parse: status 0 error 30 (XML declaration not well-formed) byte index 11 line 1 column 10; convert calls 4, calls reading past the document 0, max offset read 12
+exit 0
+## q5_plain parse 2
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 14)
+doc 2 (14 bytes), mode parse: status 0 error 30 (XML declaration not well-formed) byte index 8 line 1 column 7; convert calls 5, calls reading past the document 0, max offset read 10
+exit 0
+## q5_plain parsebuffer 0
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 10)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 10)  <-- past the document
+  convert #6 at offset 11 (lead BE, reads 4 bytes up to offset 14; doc len 10)  <-- past the document
+  convert #7 at offset 15 (lead BE, reads 4 bytes up to offset 18; doc len 10)  <-- past the document
+  convert #8 at offset 19 (lead BE, reads 4 bytes up to offset 22; doc len 10)  <-- past the document
+  convert #9 at offset 23 (lead BE, reads 4 bytes up to offset 26; doc len 10)  <-- past the document
+  convert #10 at offset 27 (lead BE, reads 4 bytes up to offset 30; doc len 10)  <-- past the document
+  convert #11 at offset 31 (lead BE, reads 4 bytes up to offset 34; doc len 10)  <-- past the document
+  convert #12 at offset 35 (lead BE, reads 4 bytes up to offset 38; doc len 10)  <-- past the document
+  convert #1000 at offset 3987 (lead BE, reads 4 bytes up to offset 3990; doc len 10)  <-- past the document
+doc 0 (10 bytes), mode parsebuffer: status 0 error 30 (XML declaration not well-formed) byte index 8 line 1 column 7; convert calls 1027, calls reading past the document 1023, max offset read 4098
+exit 0
+## q5_plain parsebuffer 1
+  convert #1 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #2 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #3 at offset 8 (lead C3, reads 2 bytes up to offset 9; doc len 13)
+  convert #4 at offset 9 (lead A9, reads 4 bytes up to offset 12; doc len 13)
+  convert #5 at offset 13 (lead BE, reads 4 bytes up to offset 16; doc len 13)  <-- past the document
+  convert #6 at offset 17 (lead BE, reads 4 bytes up to offset 20; doc len 13)  <-- past the document
+  convert #7 at offset 21 (lead BE, reads 4 bytes up to offset 24; doc len 13)  <-- past the document
+  convert #8 at offset 25 (lead BE, reads 4 bytes up to offset 28; doc len 13)  <-- past the document
+  convert #9 at offset 29 (lead BE, reads 4 bytes up to offset 32; doc len 13)  <-- past the document
+  convert #10 at offset 33 (lead BE, reads 4 bytes up to offset 36; doc len 13)  <-- past the document
+  convert #11 at offset 37 (lead BE, reads 4 bytes up to offset 40; doc len 13)  <-- past the document
+  convert #12 at offset 41 (lead BE, reads 4 bytes up to offset 44; doc len 13)  <-- past the document
+  convert #1000 at offset 3993 (lead BE, reads 4 bytes up to offset 3996; doc len 13)  <-- past the document
+doc 1 (13 bytes), mode parsebuffer: status 0 error 30 (XML declaration not well-formed) byte index 11 line 1 column 10; convert calls 1025, calls reading past the document 1021, max offset read 4096
+exit 0
+## q5_plain parsebuffer 2
+  convert #1 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #2 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #3 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #4 at offset 6 (lead C3, reads 2 bytes up to offset 7; doc len 14)
+  convert #5 at offset 7 (lead A9, reads 4 bytes up to offset 10; doc len 14)
+doc 2 (14 bytes), mode parsebuffer: status 0 error 30 (XML declaration not well-formed) byte index 8 line 1 column 7; convert calls 5, calls reading past the document 0, max offset read 10
+exit 0

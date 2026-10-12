@@ -758,3 +758,29 @@ recorded in DIVERGENCES.md.
   mismatch on any platform a test failure instead of a silent
   under-count.
 
+
+## D-035 Unknown-encoding `toAscii` reads past `fromLim`: replicate inside the data, never outside it (Q-5, 2026-10-12)
+
+- **Finding.** The random test `init_diff::xml_decl_in_every_builtin_encoding`
+  found `XmlParseXmlDecl` with an unknown encoding reporting a different
+  error position than C (seeds `0x52f43d23123766f6`: port 7, C 8;
+  `0xfe8d9b29cbd0ff22`: port 9, C 11). Root cause in C: `toAscii` starts
+  at trailing bytes; `unknown_toUtf8` converts the whole sequence of a
+  byte the map makes a lead byte even past `fromLim` and then never meets
+  `fromLim` again (`xmltok.c` 1281-1292). At the end of the data this is
+  an out-of-bounds read in libexpat 2.9.0, shown with ASan and MSan
+  through the public API (`docs/evidence/q5`, DIVERGENCES.md Q-5).
+- **Decision.** The port converts exactly the bytes C converts as long as
+  they are inside the data (`Encoding::to_utf8_until`, the converter loop
+  of `unknown_toUtf8` with `fromLim` at `lim` on the whole buffer), so the
+  error code, byte index, line and column equal C's. Where C would read
+  past the data, the port stops (`InputIncomplete`, `toAscii` = -1); it
+  never models indeterminate memory. Built-in encodings are unchanged
+  (`to_utf8_until` defaults to `to_utf8` on `buf[from..lim]`).
+- **Why.** The positions are observable through `XML_GetCurrentByteIndex`
+  and the column, so they must be equal wherever C is defined; C's result
+  past the data depends on memory the application never passed, which a
+  memory-safe port cannot and must not reproduce (same policy as Q-4,
+  D-029).
+- **Pinned by** `tests/tests/xmldecl_unknown_diff.rs` (C-differential) and
+  `crates/expat/src/tok/tests.rs` `q5` (port-only, Miri in CI).

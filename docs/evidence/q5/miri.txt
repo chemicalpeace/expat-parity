@@ -1,0 +1,7 @@
+# MIRIFLAGS=-Zmiri-strict-provenance cargo +nightly miri test -p expat --all-features --lib q5   (miri 0.1.0 (080cc27146 2026-10-11), Linux aarch64)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+running 2 tests
+test tok::tests::q5::to_ascii_stops_at_the_end_of_the_buffer ... ok
+test tok::tests::q5::to_utf8_until_never_leaves_the_buffer ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 46 filtered out; finished in 10.80s
+warning: 1 warning emitted
