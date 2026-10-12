@@ -49,6 +49,7 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 mod accounting;
+pub mod c_layout;
 mod content;
 mod decl;
 mod dtd;
