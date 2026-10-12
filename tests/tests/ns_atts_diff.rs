@@ -229,11 +229,13 @@ fn ns_atts_tracker_relation() {
 }
 
 /// The duplicate check stays near-linear in the number of prefixed
-/// attributes, like C's hash table: four times the attributes take well
-/// under the sixteen times a quadratic check would (the port's first
-/// version compared each name with every earlier one: 1.5 s for an 80,000
-/// attribute, 1 MB start tag, against 47 ms in C). Self-relative, so it
-/// holds on slow and instrumented builds; best of three runs.
+/// attributes, like C's hash table (the port's first version compared each
+/// name with every earlier one: 1.5 s for an 80,000 attribute, 1 MB start
+/// tag, against 47 ms in C). Measured against C on the same machine: going
+/// from 10,000 to 160,000 attributes (16 times) may cost the port at most
+/// three times C's growth factor; C and the fixed port both grow ~25 times,
+/// a quadratic check ~200 times. Relative to C, so it holds on slow, loaded
+/// and instrumented builds; best of three runs each.
 #[test]
 fn ns_duplicate_check_scales_like_c() {
     let doc = |n: usize| {
@@ -248,21 +250,30 @@ fn ns_duplicate_check_scales_like_c() {
         ns_separator: Some(b'|'),
         ..ParseOptions::default()
     };
-    let best = |d: &[u8]| {
+    let best = |d: &[u8], parse: &dyn Fn(&[u8], &ParseOptions) -> Vec<u8>| {
         (0..3)
             .map(|_| {
                 let t = std::time::Instant::now();
-                let r = port_trace(d, &o);
+                let r = parse(d, &o);
                 let e = t.elapsed();
                 assert!(r.windows(10).any(|w| w == b"result ok "), "parse failed");
                 e
             })
             .min()
             .unwrap_or_default()
+            .as_secs_f64()
+            .max(1e-6)
     };
-    let small = best(&doc(20_000));
-    let large = best(&doc(80_000));
-    let ratio = large.as_secs_f64() / small.as_secs_f64().max(1e-6);
-    eprintln!("20,000 attributes {small:?}, 80,000 {large:?}, ratio {ratio:.1}");
-    assert!(ratio < 9.0, "ratio {ratio:.1}: quadratic duplicate check?");
+    let (small, large) = (doc(10_000), doc(160_000));
+    let c_trace = |d: &[u8], o: &ParseOptions| parse_trace(d, o).expect("oracle");
+    let port = best(&large, &port_trace) / best(&small, &port_trace);
+    let c = best(&large, &c_trace) / best(&small, &c_trace);
+    eprintln!(
+        "10,000 -> 160,000 prefixed attributes: port x{port:.1}, C x{c:.1}, relative {:.2}",
+        port / c
+    );
+    assert!(
+        port < 3.0 * c,
+        "port grows x{port:.1}, C x{c:.1}: quadratic duplicate check?"
+    );
 }
