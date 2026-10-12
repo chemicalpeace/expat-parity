@@ -301,6 +301,29 @@ const CASES: &[Case] = &[
         &[],
     ),
     (
+        "g-one-byte",
+        "<!DOCTYPE r [<!ENTITY g SYSTEM 'g.xml'>]><r>&g;</r>",
+        &[("g.xml", "<")],
+    ),
+    (
+        "g-utf16-bom-only",
+        "<!DOCTYPE r [<!ENTITY g SYSTEM 'g.xml'>]><r>&g;</r>",
+        &[("g.xml", "u16:")],
+    ),
+    (
+        "sub-one-byte",
+        "<!DOCTYPE r SYSTEM 'r.dtd'><r/>",
+        &[("r.dtd", "<")],
+    ),
+    (
+        "sub-pe-in-entity-value-one-byte",
+        "<!DOCTYPE r SYSTEM 'r.dtd'><r>&v;</r>",
+        &[
+            ("r.dtd", "<!ENTITY % p SYSTEM 'p.ent'><!ENTITY v '[%p;]'>"),
+            ("p.ent", "a"),
+        ],
+    ),
+    (
         "g-utf16",
         "<!DOCTYPE r [<!ENTITY g SYSTEM 'g.xml'>]><r>&g;</r>",
         &[("g.xml", "u16:<a>u16</a>")],
@@ -834,4 +857,44 @@ fn tracker_relation_across_external_parsers() {
         eprintln!("{e}");
     }
     assert!(errors.is_empty(), "{} relation violations", errors.len());
+}
+
+/// Allocations an external subset makes in the shared DTD stay charged to
+/// the root parser after its parser is freed (C: they belong to the root's
+/// DTD): a subset declaring 3,000 entities, then content that references
+/// the last one. The relation's end check (the port's count at least C's)
+/// and the tight runs see the subset's growth.
+#[test]
+fn tracker_keeps_external_subset_growth() {
+    let mut subset = String::new();
+    for i in 0..3_000 {
+        subset.push_str(&format!(
+            "<!ENTITY e{i} 'value number {i} of the external subset'>"
+        ));
+    }
+    let doc = b"<!DOCTYPE r SYSTEM 'big.dtd'><r>&e2999;</r>";
+    let mut tally = expat_difftest::tracker::Tally::default();
+    for chunk in [0, 7] {
+        let o = ParseOptions {
+            ext_handler: ExtHandler::Read,
+            ext_entities: vec![(b"big.dtd".to_vec(), subset.clone().into_bytes())],
+            param_entity_parsing: ParamEntityParsing::Always,
+            chunk_size: chunk,
+            ..ParseOptions::default()
+        };
+        let run = expat_difftest::tracker::run(doc, &o).expect("run");
+        eprintln!(
+            "external subset growth (chunk {chunk}): C tracker end {}, port {}",
+            run.c_tracker.end, run.port_tracker.end
+        );
+        assert!(
+            run.c_tracker.end > 300_000,
+            "the subset's DTD growth is tracked by C"
+        );
+        expat_difftest::tracker::check_from(doc, &o, &run, &mut tally).expect("relation");
+    }
+    eprintln!(
+        "external subset growth: {} runs, C refused {}, port-only {}, margin {:?}",
+        tally.runs, tally.c_no_memory, tally.port_stricter, tally.min_margin
+    );
 }

@@ -61,14 +61,26 @@ pub fn run(doc: &[u8], opts: &ParseOptions) -> Result<Run, String> {
     })
 }
 
+/// Whether a trace shows a refusal by the allocation tracker: the parse
+/// ended with `XML_ERROR_NO_MEMORY`, or an external entity parser did
+/// (`extend 0 1 ...`; the root then reports
+/// `XML_ERROR_EXTERNAL_ENTITY_HANDLING`), or one could not be created
+/// (`extcreate`, module 11d).
+pub fn refused(trace: &[u8]) -> bool {
+    result_error_code(trace) == Some(NO_MEMORY)
+        || trace
+            .split(|&b| b == b'\n')
+            .any(|l| l.starts_with(b"extend 0 1 ") || l == b"extcreate")
+}
+
 /// Classifies a run (`Err`: the relation is violated).
 pub fn relation(r: &Run, opts: &ParseOptions) -> Result<Relation, String> {
     let (c, p) = mask_q4(&r.c, &r.port);
     let Some((line, l, rl)) = first_difference(&c, &p) else {
         return Ok(Relation::Equal);
     };
-    let c_code = result_error_code(&c);
-    let p_code = result_error_code(&p);
+    let c_code = refused(&c).then_some(NO_MEMORY).or(result_error_code(&c));
+    let p_code = refused(&p).then_some(NO_MEMORY).or(result_error_code(&p));
     match (c_code, p_code) {
         (Some(NO_MEMORY), Some(NO_MEMORY)) => Ok(Relation::BothNoMemory),
         (Some(NO_MEMORY), _) => Err(format!(
@@ -150,7 +162,7 @@ pub fn check_from(
         match relation(&r, &o)? {
             Relation::BothNoMemory => tally.c_no_memory += 1,
             Relation::PortStricter => tally.port_stricter += 1,
-            Relation::Equal if result_error_code(&r.c) == Some(NO_MEMORY) => {
+            Relation::Equal if refused(&r.c) => {
                 tally.c_no_memory += 1;
             }
             Relation::Equal => {}
