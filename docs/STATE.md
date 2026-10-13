@@ -159,7 +159,7 @@ with allocation failures, white-box).
    jobs green, the Ubuntu coverage `-dump` step completed without SIGABRT,
    95.10 % lines. One successful run does not prove the race is gone (the
    earlier failure was intermittent). Integrated tree (PR #16 + #19 + #18):
-   <TBD: coverage from the CI run on the integrated tree>.
+   coverage pending its first CI run.
 6. Module 12: public `expat::Parser` on top of `parse::Parser`: default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt

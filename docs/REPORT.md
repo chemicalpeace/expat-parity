@@ -1325,8 +1325,9 @@ handler (module 12).
 
 ### Part 2: remaining C behaviour (branch `part2-finish`, PR #18)
 
-Branch `part2-finish` (on top of `part2-unparsed`), PR #18, merged after
-PR #16 and PR #19 as <TBD: merge commit>, CI run <TBD>.
+Branch `part2-finish` (on top of `part2-unparsed`), PR #18, integrated
+after PR #16 (merged as main `4a6cd19f`, CI run 38402332452) and PR #19
+(merged as main `ecdec368`, CI run 38412206267).
 Measured against the vendored libexpat 2.9.0 by canonical trace (events,
 error code, line, column, byte index), under `diff::option_matrix` unless
 stated. No library code was changed except the duplicate check below.
