@@ -18,16 +18,19 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   on every CI platform"): `crates/expat` 94.95 % lines / 95.16 % regions /
   92.27 % functions on Linux and macOS, 94.93 % / 95.13 % / 92.27 % on
   Windows, after correcting an llvm-cov artefact that had hidden 7 covered
-  lines (raw step E figure 94.86 %). DV-1 parity is in progress (D-034;
-  phase 1 merged in PR #14). Q-5 fixed (PR #15, D-035). Part 2 of the
-  coverage work (branch `part2-finish`, draft PR #18: open, not merged,
-  not to be merged while the owner's no-merge rule holds): unparsed-entity
-  handler, external entity bodies incl. `entityValueProcessor`,
-  `m_nsAtts` growth vs C; quadratic namespaced duplicate check fixed; its
-  C-relative scaling test passed on all three CI runners (CI run
-  38289234285). The coverage figures above are PR #13's tree (7,552
-  lines); see "Next steps" 5 for the current ones. Pending: OOM fault injection per
-  allocation point (after the DV-1 phase-2 merge). Next: module 12.
+  lines (raw step E figure 94.86 %). DV-1 (tracker refusing earlier than
+  C) is removed by exact per-allocation parity (D-034 stages 1-8, PR #16):
+  equal tracker streams, traces, W1/W2/R1 boundaries and structure sizes
+  on aarch64 Linux, x86_64 Linux, aarch64 macOS and x86_64 Windows, CI run
+  38245716778; REPORT.md "DV-1 parity, stages 2-8". Q-5 fixed (PR #15, D-035). Part 2 of the
+  coverage work (PR #18): unparsed-entity handler, external entity bodies
+  incl. `entityValueProcessor`, `m_nsAtts` growth vs C; quadratic
+  namespaced duplicate check fixed; its C-relative scaling test passed on
+  all three CI runners (CI run 38289234285). The encoding argument of
+  external entity parsers is compared (PR #19, no difference). The
+  coverage figures above are PR #13's tree (7,552 lines); see "Next steps"
+  5 for the current ones. Next: OOM fault injection per allocation point,
+  then module 12.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
@@ -92,7 +95,7 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 8 | `role` prolog state machine | `xmlrole.c` | **done** — `role::PrologState`, all 51 handlers; D-020 |
 | 9 | `pool` / `hash` / `heap`: string pool, hash table, allocation accounting | `xmlparse.c` | **done** — `StringPool`, `HashTable`, `Heap`; white-box vs C (block lists, slot layout, every allocation request, failure of each attempt); D-021 |
 | 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors under 11 option sets incl. namespace triplets, generated documents, fuzzing), buffer state white-box; D-023, D-025; Q-1/Q-2 resolved (replicate, D-024). DTD roles stopped with `Stop::DtdNotPorted` until module 11 |
-| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables); spec `docs/DTD-SECURITY.md`, D-026, D-027. **11b done** — internal entity expansion in content, attribute values, default values, parameter entities and entity values, recursion and nesting checks (`parse::entity`, D-028); 540/540 upstream vectors compared. **11b2 done** — billion-laughs setters, bounded amplification tests, Q-4 (D-029). **11c done** — allocation tracker charged at C's allocation points, never below C (`parse::tracker`, D-030, divergence DV-1). **11d D1 done** — external entity and not-standalone handler call sites, `getContext`, foreign DTD (D-031). **11d D2 done** — external entity parsers (`parse::external`: text declarations, conditional sections, PEs in entity values, shared DTD/tracker/accounting, D-032); `Stop::DtdNotPorted` removed. Coverage and summary: REPORT.md (module 11 step E, module 11 summary); DV-1 being removed in stages (D-034; R1 found and fixed) |
+| 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables); spec `docs/DTD-SECURITY.md`, D-026, D-027. **11b done** — internal entity expansion in content, attribute values, default values, parameter entities and entity values, recursion and nesting checks (`parse::entity`, D-028); 540/540 upstream vectors compared. **11b2 done** — billion-laughs setters, bounded amplification tests, Q-4 (D-029). **11c done** — allocation tracker charged at C's allocation points, never below C (`parse::tracker`, D-030, divergence DV-1). **11d D1 done** — external entity and not-standalone handler call sites, `getContext`, foreign DTD (D-031). **11d D2 done** — external entity parsers (`parse::external`: text declarations, conditional sections, PEs in entity values, shared DTD/tracker/accounting, D-032); `Stop::DtdNotPorted` removed. Coverage and summary: REPORT.md (module 11 step E, module 11 summary); DV-1 removed by exact tracker parity (D-034 stages 1-8; R1 found and fixed) |
 | 12 | public API `expat::Parser` (default handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers, unknown-encoding handler, `XML_GetInputContext`, entropy for the salt) | — | not started (the trace adapter and differential `parse_trace` already exist, module 10) |
 | 13 | `expat-capi` (optional) | `expat.h` | not started |
 
@@ -112,9 +115,21 @@ with allocation failures, white-box).
 
 ## Next steps
 
-1. Part 2 of the coverage work is done on branch `part2-finish` (on top of
-   `part2-unparsed`), draft PR #18 (open, not merged; not to be merged
-   while the owner's no-merge rule holds): unparsed-entity handler,
+1. DV-1 parity (D-034): stages 1-8 done (sizes, pool model, creation,
+   untracked allocations, raw names, ELEMENT_TYPE/NS_ATT, release,
+   refusal paths); the fuzz relation is exact. Not modelled (no reachable
+   document): `m_unknownEncodingMem`, the once-per-run base copy of
+   `copyEntityTable`; the child encoding-name charge needs a test (module
+   12 handlers).
+2. Module 11: the remaining gaps listed in REPORT.md (module 11 summary).
+   `XML_UnparsedEntityDeclHandler` and `m_nsAtts` growth are compared since
+   PR #18, the encoding argument of external entity parsers since PR #19
+   (docs/EXTERNAL-ENTITY-ENCODING.md, `ext_encoding_diff`, no difference).
+   Remaining: per-point allocation refusals (OOM fault injection per
+   allocation point, unblocked now that PR #16 has merged); the
+   unknown-encoding handler branch waits for module 12.
+3. Part 2 of the coverage work is done on branch `part2-finish` (on top of
+   `part2-unparsed`), PR #18: unparsed-entity handler,
    external entity bodies incl. `entityValueProcessor`, `m_nsAtts` growth
    vs C, quadratic namespaced duplicate check fixed, scaling test measured
    against C. The C-relative scaling test `ns_duplicate_check_scales_like_c`
@@ -127,12 +142,8 @@ with allocation failures, white-box).
    error path of the upload step, artifact names on a job re-run, the
    effect of the changed measurement order; the timing test keeps a low
    but non-zero flakiness risk (same section).
-2. Compare the encoding argument of external entity parsers with C
-   (independent of PR #16).
-3. Full corpus merge of the Part 2 fuzz finds (only 40 curated
+4. Full corpus merge of the Part 2 fuzz finds (only 40 curated
    `parse_trace` inputs for the namespaced duplicate check are committed).
-4. OOM fault injection per allocation point, after PR #16 (DV-1 parity
-   phase 2) merges, so that the port's allocation points are final.
 5. Coverage (CI, `crates/expat` lines, full suite): main CI run
    38240812899 on a990a8ca measured 94.86 % (7,218 / 7,609, Linux); this
    branch (PR #18, CI run 38289234285) 95.10 % on Linux and macOS
@@ -147,14 +158,10 @@ with allocation failures, white-box).
    and lcov calls are unchanged. CI run 38299714072 on 1445f800: all 9
    jobs green, the Ubuntu coverage `-dump` step completed without SIGABRT,
    95.10 % lines. One successful run does not prove the race is gone (the
-   earlier failure was intermittent).
-6. DV-1 parity (D-034, owner decision 2026-10-12): phase 1 (sizes from
-   the C layout, R1 fixed, `tracker_sizes` on every CI platform) done;
-   then steps 2-6 (pool slack, creation charge, untracked C allocations,
-   raw-name timing, ELEMENT_TYPE) gated by a per-allocation-event
-   comparison with the oracle (PR #16).
-7. Module 12: public `expat::Parser` on top of `parse::Parser`: default
+   earlier failure was intermittent). Integrated tree (PR #16 + #19 + #18):
+   <TBD: coverage from the CI run on the integrated tree>.
+6. Module 12: public `expat::Parser` on top of `parse::Parser`: default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt
    from an entropy source behind `std`.
-8. Phase 4: long fuzzing runs, coverage, benchmarks against C.
+7. Phase 4: long fuzzing runs, coverage, benchmarks against C.

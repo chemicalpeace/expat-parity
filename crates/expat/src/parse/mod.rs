@@ -64,7 +64,7 @@ mod tracker;
 mod tests;
 
 pub use accounting::{Account, Accounting};
-pub use tracker::{AllocTracker, PoolShadow, TableShadow, Tracker, TrackerHeap, TRACKER_SIZES};
+pub use tracker::{AllocTracker, PoolShadow, TableShadow, Tracker, TrackerEvent, TrackerHeap, CREATION_CHARGE, TRACKER_SIZES};
 pub use dtd::{
     AttributeId, Binding, BindingId, DefaultAttribute, Dtd, ElementType, Entity, EntityRef, Prefix,
     PrefixId,
@@ -655,18 +655,50 @@ impl Parser {
         &self.tracker.t
     }
 
-    /// Charges the growth of the current string of pool `pool` to `len`
-    /// characters (C appends to the pool as it goes; the port charges after
-    /// each token, before the next amplification check).
-    pub(crate) fn charge_current(&mut self, pool: tracker::Pool, len: usize) -> Result<(), Stop> {
-        if len > self.charged_len {
+    /// Starts (or stops) recording the tracker's events
+    /// ([`AllocTracker::log_events`], D-034).
+    pub fn log_tracker_events(&mut self, on: bool) {
+        self.tracker.t.log_events(on);
+    }
+
+    /// The number of tracker events recorded so far.
+    pub fn tracker_events_len(&self) -> usize {
+        self.tracker.t.events.as_ref().map_or(0, Vec::len)
+    }
+
+    /// The tracker events recorded so far (and stops recording).
+    pub fn take_tracker_events(&mut self) -> Vec<tracker::TrackerEvent> {
+        self.tracker.t.events.take().unwrap_or_default()
+    }
+
+    /// Charges the characters of `out` (the current string of pool
+    /// `pool`) not charged yet: converted by `poolAppend` (`converted`,
+    /// whole characters per block) or appended by `poolAppendChar`. C
+    /// appends to the pool as it goes; the port charges after each token,
+    /// before the next amplification check, with that token's mode.
+    pub(crate) fn charge_current(&mut self, pool: tracker::Pool, out: &[u8], converted: bool) -> Result<(), Stop> {
+        if out.len() > self.charged_len {
             let direct = self.direct();
+            let tail = out.get(self.charged_len..).unwrap_or_default();
             let (p, mut heap) = self.tracker.pool(pool, direct);
-            p.append(&mut heap, len - self.charged_len)
-                .map_err(|_| Stop::Error(XmlError::NoMemory))?;
-            self.charged_len = len;
+            let r = if converted {
+                p.append_text(&mut heap, tail)
+            } else {
+                p.append_chars(&mut heap, tail.len())
+            };
+            r.map_err(|_| Stop::Error(XmlError::NoMemory))?;
+            self.charged_len = out.len();
         }
         Ok(())
+    }
+
+    /// `poolChop` of the current string of pool `pool` (a trailing space
+    /// already charged).
+    pub(crate) fn chop_current(&mut self, pool: tracker::Pool) {
+        let direct = self.direct();
+        let (p, _) = self.tracker.pool(pool, direct);
+        p.chop();
+        self.charged_len = self.charged_len.saturating_sub(1);
     }
 
     /// Ends the current string of pool `pool`: its NUL (if `nul`), then
@@ -676,7 +708,7 @@ impl Parser {
         let (p, mut heap) = self.tracker.pool(pool, direct);
         self.charged_len = 0;
         if nul {
-            p.append(&mut heap, 1).map_err(|_| Stop::Error(XmlError::NoMemory))?;
+            p.append_chars(&mut heap, 1).map_err(|_| Stop::Error(XmlError::NoMemory))?;
         }
         if keep {
             p.finish();
@@ -807,14 +839,14 @@ impl Parser {
 
     /// `startParsing`: the implicit `xml` prefix binding when namespace
     /// processing is on (the salt is always set, see [`Parser::new`]).
-    fn start_parsing<H: Handler>(&mut self, h: &mut H) -> bool {
+    fn start_parsing(&mut self) -> bool {
         // The implicit context is only set for the root parser; external
         // entity parsers inherit it (C skips `startParsing` for them).
         if self.is_child {
             return true;
         }
         if self.ns {
-            return self.set_implicit_context(h);
+            return self.set_implicit_context();
         }
         true
     }
@@ -835,7 +867,7 @@ impl Parser {
                 return Status::Error;
             }
             Parsing::Initialized => {
-                if !self.start_parsing(h) {
+                if !self.start_parsing() {
                     self.error_code = XmlError::NoMemory.into();
                     return Status::Error;
                 }
@@ -966,7 +998,7 @@ impl Parser {
                     self.error_code = XmlError::NoBuffer.into();
                     return Status::Error;
                 }
-                if !self.start_parsing(h) {
+                if !self.start_parsing() {
                     self.error_code = XmlError::NoMemory.into();
                     return Status::Error;
                 }

@@ -1,0 +1,40 @@
+# libFuzzer log, trimmed: 184 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.04s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.04s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=90 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3844166334
+INFO: Loaded 1 modules   (77899 inline 8-bit counters): 77899 [0xaaaae9e3d510, 0xaaaae9e5055b), 
+INFO: Loaded 1 PC tables (77899 PCs): 77899 [0xaaaae9e50560,0xaaaae9f80a10), 
+INFO:    14636 files found in <corpus>
+INFO: seed corpus: files: 14636 min: 1b max: 11931b total: 5318248b rss: 42Mb
+#4096	pulse  cov: 8643 ft: 23820 corp: 3978/40Kb exec/s: 1365 rss: 245Mb
+#8192	pulse  cov: 13346 ft: 45501 corp: 7776/191Kb exec/s: 1365 rss: 254Mb
+#14638	INITED cov: 17958 ft: 81430 corp: 13357/4086Kb exec/s: 311 rss: 466Mb
+#16384	pulse  cov: 17958 ft: 81431 corp: 13358/4086Kb lim: 11944 exec/s: 341 rss: 495Mb
+#32768	pulse  cov: 17962 ft: 81456 corp: 13372/4084Kb lim: 11944 exec/s: 528 rss: 514Mb
+#63909	DONE   cov: 17969 ft: 81503 corp: 13390/4095Kb lim: 11957 exec/s: 702 rss: 514Mb
+###### Recommended dictionary. ######
+"attr" # Uses: 1008
+"\377\020\000\000" # Uses: 471
+"\002\000" # Uses: 433
+"limit bl-th" # Uses: 319
+"accounting " # Uses: 328
+"limit at-am" # Uses: 252
+"result erro" # Uses: 204
+"\001\000\000\000\000\000\000\010" # Uses: 165
+"\012\000\000\000" # Uses: 165
+"limit bl-am" # Uses: 116
+"\001\000\000\000\000\000\000\003" # Uses: 111
+"\377\377\377\377" # Uses: 75
+"}\000" # Uses: 47
+"\011\000\000\000\000\000\000\000" # Uses: 53
+"\201\377\377\222\377\373\000\000" # Uses: 47
+"\377\377\377\377\377\377\377\000" # Uses: 38
+###### End of recommended dictionary. ######
+Done 63909 runs in 91 second(s)
+stat::number_of_executed_units: 63909
+stat::average_exec_per_sec:     702
+stat::new_units_added:          184
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              514

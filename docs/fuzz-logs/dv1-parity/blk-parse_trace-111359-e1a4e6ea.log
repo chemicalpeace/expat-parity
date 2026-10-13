@@ -1,0 +1,50 @@
+# libFuzzer log, trimmed: 356 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2755569974
+INFO: Loaded 1 modules   (77899 inline 8-bit counters): 77899 [0xaaaad976d510, 0xaaaad978055b), 
+INFO: Loaded 1 PC tables (77899 PCs): 77899 [0xaaaad9780560,0xaaaad98b0a10), 
+INFO:    13869 files found in <corpus>
+INFO: seed corpus: files: 13869 min: 1b max: 11931b total: 4860711b rss: 42Mb
+#8192	pulse  cov: 14111 ft: 48240 corp: 8022/213Kb exec/s: 2730 rss: 259Mb
+#13871	INITED cov: 17935 ft: 81065 corp: 13199/3954Kb exec/s: 396 rss: 459Mb
+Loaded 1024/13877 files from <corpus>
+Loaded 2048/13877 files from <corpus>
+Loaded 4096/13877 files from <corpus>
+Loaded 8192/13877 files from <corpus>
+#16384	pulse  cov: 17935 ft: 81069 corp: 13202/3955Kb lim: 11944 exec/s: 390 rss: 597Mb
+#32768	pulse  cov: 17935 ft: 81106 corp: 13228/3981Kb lim: 11957 exec/s: 585 rss: 597Mb
+#65536	pulse  cov: 17936 ft: 81159 corp: 13264/4005Kb lim: 11983 exec/s: 862 rss: 597Mb
+#104406	DONE   cov: 17951 ft: 81302 corp: 13311/4059Kb lim: 11996 exec/s: 1033 rss: 597Mb
+###### Recommended dictionary. ######
+"\377\377\377\377\377\377\377\000" # Uses: 1856
+"\377\377\377\377" # Uses: 1359
+"\001\000\000\000" # Uses: 697
+"\001\000\000\000\000\000\000\005" # Uses: 552
+"\001\000\000\000\000\000\000\013" # Uses: 512
+"entity g0 0" # Uses: 417
+"\001\000" # Uses: 370
+"\376\377\377\377" # Uses: 333
+"\000\000\000\000\000\000\000\000" # Uses: 273
+"\001\371N\260\377\373\000\000" # Uses: 188
+"\377\377\377\371" # Uses: 192
+"\377\030" # Uses: 198
+"doctype" # Uses: 142
+"extend 0 1 " # Uses: 143
+"limit bl-am" # Uses: 119
+"\377\377\377\017" # Uses: 113
+"start" # Uses: 83
+"\001\000\000\000\000\000\000C" # Uses: 66
+"\012\000\000\000\000\000\000\000" # Uses: 35
+"\001\000\000\000\000\000\000\000" # Uses: 10
+"\000\001" # Uses: 3
+".\2771\330\324Q\000\000" # Uses: 5
+###### End of recommended dictionary. ######
+Done 104406 runs in 101 second(s)
+stat::number_of_executed_units: 104406
+stat::average_exec_per_sec:     1033
+stat::new_units_added:          356
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              597

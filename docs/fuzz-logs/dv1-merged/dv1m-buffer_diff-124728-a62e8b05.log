@@ -1,0 +1,49 @@
+# libFuzzer log, trimmed: 535 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3168903504
+INFO: Loaded 1 modules   (77899 inline 8-bit counters): 77899 [0xaaaab7bbd510, 0xaaaab7bd055b), 
+INFO: Loaded 1 PC tables (77899 PCs): 77899 [0xaaaab7bd0560,0xaaaab7d00a10), 
+INFO:    11266 files found in <corpus>
+INFO: seed corpus: files: 11266 min: 1b max: 30663b total: 3133963b rss: 41Mb
+#8192	pulse  cov: 11538 ft: 35113 corp: 7911/329Kb exec/s: 2730 rss: 421Mb
+#11267	INITED cov: 12963 ft: 50336 corp: 10654/2694Kb exec/s: 1877 rss: 426Mb
+#16384	pulse  cov: 12964 ft: 50337 corp: 10655/2694Kb lim: 30719 exec/s: 2730 rss: 494Mb
+#32768	pulse  cov: 12964 ft: 50340 corp: 10656/2694Kb lim: 30789 exec/s: 4096 rss: 520Mb
+#65536	pulse  cov: 12964 ft: 50343 corp: 10657/2694Kb lim: 30971 exec/s: 5041 rss: 535Mb
+#131072	pulse  cov: 12965 ft: 50353 corp: 10663/2692Kb lim: 31307 exec/s: 5698 rss: 535Mb
+#262144	pulse  cov: 12965 ft: 50361 corp: 10668/2679Kb lim: 32021 exec/s: 6096 rss: 535Mb
+#524288	pulse  cov: 12965 ft: 50411 corp: 10689/2688Kb lim: 33392 exec/s: 6553 rss: 535Mb
+#670945	DONE   cov: 12965 ft: 50435 corp: 10702/2694Kb lim: 34172 exec/s: 6643 rss: 535Mb
+###### Recommended dictionary. ######
+"\005\000" # Uses: 8028
+"\0008" # Uses: 6561
+"id" # Uses: 5765
+"\000\000\000\000" # Uses: 4952
+"\376\377\377\377\377\377\377\377" # Uses: 5085
+"\004\000\000\000\000\000\000\000" # Uses: 4039
+"\000\035" # Uses: 3720
+"\000\027" # Uses: 2790
+"\361\362\362\362" # Uses: 2705
+"c6" # Uses: 2488
+"b6" # Uses: 2363
+"\377\377\377\377\377\377\377\015" # Uses: 1110
+"\015\277" # Uses: 1076
+"\001\000" # Uses: 725
+"\002\011\000\000" # Uses: 683
+"B\000" # Uses: 639
+"e6" # Uses: 570
+"\000\000\000\001" # Uses: 539
+"\001\013" # Uses: 437
+"d8" # Uses: 385
+"\002\000\000\000\000\000\000\000" # Uses: 267
+"\252\252\252\252\252\252\252\012" # Uses: 205
+###### End of recommended dictionary. ######
+Done 670945 runs in 101 second(s)
+stat::number_of_executed_units: 670945
+stat::average_exec_per_sec:     6643
+stat::new_units_added:          535
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              535

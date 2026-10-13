@@ -1,0 +1,34 @@
+# libFuzzer log, trimmed: 183 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=90 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2812077501
+INFO: Loaded 1 modules   (77899 inline 8-bit counters): 77899 [0xaaaac58ed510, 0xaaaac590055b), 
+INFO: Loaded 1 PC tables (77899 PCs): 77899 [0xaaaac5900560,0xaaaac5a30a10), 
+INFO:    12800 files found in <corpus>
+INFO: seed corpus: files: 12800 min: 1b max: 30663b total: 3969256b rss: 42Mb
+#8192	pulse  cov: 10836 ft: 32296 corp: 7387/262Kb exec/s: 1638 rss: 425Mb
+#12801	INITED cov: 12970 ft: 50645 corp: 10713/2601Kb exec/s: 1280 rss: 427Mb
+#16384	pulse  cov: 12970 ft: 50645 corp: 10713/2601Kb lim: 30691 exec/s: 1489 rss: 489Mb
+#32768	pulse  cov: 12971 ft: 50646 corp: 10714/2600Kb lim: 30817 exec/s: 2520 rss: 509Mb
+#65536	pulse  cov: 12971 ft: 50661 corp: 10719/2616Kb lim: 31055 exec/s: 3120 rss: 509Mb
+#131072	pulse  cov: 12971 ft: 50670 corp: 10720/2616Kb lim: 31461 exec/s: 2674 rss: 509Mb
+#262144	pulse  cov: 12973 ft: 50683 corp: 10729/2625Kb lim: 32161 exec/s: 3084 rss: 509Mb
+#286658	DONE   cov: 12973 ft: 50683 corp: 10729/2625Kb lim: 32357 exec/s: 3150 rss: 509Mb
+###### Recommended dictionary. ######
+"d1" # Uses: 12193
+"\021\000\000\000\000\000\000\000" # Uses: 3032
+"\000\001" # Uses: 2956
+"c8" # Uses: 1547
+"\377?" # Uses: 1267
+"xmlns:" # Uses: 1016
+"d18" # Uses: 725
+"\001\000\000\000\000\000\000\026" # Uses: 655
+###### End of recommended dictionary. ######
+Done 286658 runs in 91 second(s)
+stat::number_of_executed_units: 286658
+stat::average_exec_per_sec:     3150
+stat::new_units_added:          183
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              509

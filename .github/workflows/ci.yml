@@ -42,10 +42,12 @@ jobs:
       - run: cargo test --workspace --all-features
       - run: cargo test -p expat --no-default-features
       # D-034: the tracker's structure sizes against this platform's C
-      # compiler and the DV-1 / R1 window boundaries, printed for the
-      # per-platform report (both also run in the step above).
-      - name: tracker sizes and DV-1 windows (per-platform report)
-        run: cargo test --release -p expat-difftest --test tracker_sizes --test dv1_windows -- --nocapture
+      # compiler, the DV-1 / R1 window boundaries and the per-event
+      # comparison with C's tracker (creation, parse, release, limit
+      # outcomes), printed for the per-platform report (all also run in
+      # the step above).
+      - name: tracker sizes, events and DV-1 windows (per-platform report)
+        run: cargo test --release -p expat-difftest --test tracker_sizes --test tracker_events --test tracker_stages --test dv1_windows -- --nocapture
       # The namespaced-attribute duplicate-check scaling against C, printed
       # and kept as an artifact on success too (also runs in the first step).
       - name: ns duplicate-check scaling (per-platform report)

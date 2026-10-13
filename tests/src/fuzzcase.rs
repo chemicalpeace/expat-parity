@@ -23,8 +23,10 @@ use expat_oracle::BufferOp;
 /// handler then reads (`ExtHandler::Read`, module 11d;
 /// [`crate::docgen::split_external_input`]). The C trace must be well
 /// formed and equal to the port's trace; then the allocation-tracker
-/// relation must hold ([`crate::tracker::check_from`]: two more runs with
-/// tight tracker limits). Inputs shorter than two bytes pass.
+/// relation must hold exactly ([`crate::tracker::check_from`]: equal
+/// counts, and two more runs with tight tracker limits whose traces and
+/// tracker events must be equal from creation through `XML_ParserFree`).
+/// Inputs shorter than two bytes pass.
 pub fn parse_trace_case(data: &[u8]) -> Result<(), String> {
     let [sel, sel2, doc @ ..] = data else {
         return Ok(());
@@ -51,9 +53,9 @@ pub fn parse_trace_case(data: &[u8]) -> Result<(), String> {
             "trace mismatch at line {line}: C `{l}` port `{r}` ({opts:?})"
         ));
     }
-    // Module 11c: the allocation tracker relation (the port's count at
-    // least C's, and the port fails whenever C fails with tight tracker
-    // limits).
+    // The allocation tracker relation (module 11c, exact since D-034:
+    // equal counts, and equal traces and tracker events with tight
+    // limits; the port refusing where C accepts is a failure).
     let base = crate::tracker::Run {
         c,
         port,

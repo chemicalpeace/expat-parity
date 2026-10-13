@@ -2,6 +2,19 @@
 
 use std::ffi::{c_char, c_int, c_longlong, c_uint, c_ulonglong, c_ushort, c_void};
 
+/// Mirror of `struct oracle_tracker_event`.
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct OracleTrackerEvent {
+    pub(crate) size: c_ulonglong,
+    pub(crate) total: c_ulonglong,
+    pub(crate) peak: c_ulonglong,
+    pub(crate) direct: c_ulonglong,
+    pub(crate) line: c_int,
+    pub(crate) op: c_char,
+    pub(crate) refused: c_char,
+}
+
 /// Mirror of `struct oracle_options`.
 #[repr(C)]
 pub(crate) struct OracleOptions {
@@ -29,6 +42,7 @@ pub(crate) struct OracleOptions {
     pub(crate) unparsed_handler: c_int,
     pub(crate) ext_data: *const u8,
     pub(crate) ext_len: usize,
+    pub(crate) ext_encoding: *const c_char,
 }
 
 /// Mirror of `struct oracle_role_state`.
@@ -175,6 +189,13 @@ unsafe extern "C" {
     pub(crate) fn oracle_last_heap_peak() -> usize;
     pub(crate) fn oracle_last_tracker(created: *mut u64, end: *mut u64);
     pub(crate) fn oracle_c_sizes(out: *mut usize, n: usize) -> usize;
+    pub(crate) fn oracle_c_compiler() -> *const core::ffi::c_char;
+    pub(crate) fn oracle_tracker_events_capture(on: c_int);
+    pub(crate) fn oracle_tracker_events_take(
+        out: *mut *mut OracleTrackerEvent,
+        complete: *mut c_int,
+        at_end: *mut usize,
+    ) -> usize;
     pub(crate) fn oracle_free(p: *mut c_void);
     pub(crate) fn oracle_core_run(
         prog: *const u8,

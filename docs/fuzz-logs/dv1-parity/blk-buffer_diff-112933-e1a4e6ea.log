@@ -1,0 +1,36 @@
+# libFuzzer log, trimmed: 411 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=90 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 732391329
+INFO: Loaded 1 modules   (77899 inline 8-bit counters): 77899 [0xaaaac17dd510, 0xaaaac17f055b), 
+INFO: Loaded 1 PC tables (77899 PCs): 77899 [0xaaaac17f0560,0xaaaac1920a10), 
+INFO:    11666 files found in <corpus>
+INFO: seed corpus: files: 11666 min: 1b max: 30663b total: 3368817b rss: 41Mb
+#8192	pulse  cov: 11396 ft: 34469 corp: 7760/308Kb exec/s: 2730 rss: 423Mb
+#11667	INITED cov: 12966 ft: 50426 corp: 10671/2608Kb exec/s: 1944 rss: 424Mb
+#16384	pulse  cov: 12966 ft: 50433 corp: 10672/2608Kb lim: 30677 exec/s: 2340 rss: 492Mb
+#32768	pulse  cov: 12966 ft: 50433 corp: 10672/2608Kb lim: 30775 exec/s: 3640 rss: 530Mb
+#65536	pulse  cov: 12966 ft: 50435 corp: 10674/2608Kb lim: 30929 exec/s: 4681 rss: 536Mb
+#131072	pulse  cov: 12967 ft: 50439 corp: 10678/2609Kb lim: 31293 exec/s: 5242 rss: 536Mb
+#262144	pulse  cov: 12967 ft: 50451 corp: 10683/2609Kb lim: 32161 exec/s: 5698 rss: 536Mb
+#524288	pulse  cov: 12967 ft: 50475 corp: 10692/2625Kb lim: 33512 exec/s: 6096 rss: 536Mb
+#552942	DONE   cov: 12967 ft: 50518 corp: 10695/2627Kb lim: 33617 exec/s: 6076 rss: 536Mb
+###### Recommended dictionary. ######
+"\377\377\372\377\230h\352\000" # Uses: 12052
+"\033\000\000\000" # Uses: 11416
+"vZvvvvvvvv" # Uses: 10644
+"Zvvvvvvv" # Uses: 2860
+"vwvvvvvvvv" # Uses: 1740
+"c1" # Uses: 1198
+"a4" # Uses: 1056
+"\015\000\000\000\000\000\000\000" # Uses: 432
+"\001\000\000\000\000\000\000\000" # Uses: 411
+###### End of recommended dictionary. ######
+Done 552942 runs in 91 second(s)
+stat::number_of_executed_units: 552942
+stat::average_exec_per_sec:     6076
+stat::new_units_added:          411
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              536
