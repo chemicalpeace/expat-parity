@@ -205,9 +205,9 @@ fn ns_atts_tracker_relation() {
                     Ok((Relation::BothNoMemory, _)) => failures.push(format!(
                         "{id} thr={thr}: C and the port both refuse but stop differently"
                     )),
-                    Ok((Relation::PortStricter, _)) => failures.push(format!(
-                        "{id} thr={thr}: the port refuses where C accepts"
-                    )),
+                    Ok((Relation::PortStricter, _)) => {
+                        failures.push(format!("{id} thr={thr}: the port refuses where C accepts"))
+                    }
                     Err(e) => failures.push(format!("{id} thr={thr}: {e}")),
                 }
             };
