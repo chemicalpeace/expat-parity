@@ -48,6 +48,19 @@ jobs:
       # the step above).
       - name: tracker sizes, events and DV-1 windows (per-platform report)
         run: cargo test --release -p expat-difftest --test tracker_sizes --test tracker_events --test tracker_stages --test dv1_windows -- --nocapture
+      # The namespaced-attribute duplicate-check scaling against C, printed
+      # and kept as an artifact on success too (also runs in the first step).
+      - name: ns duplicate-check scaling (per-platform report)
+        shell: bash
+        env:
+          NS_SCALING_REPORT: ${{ github.workspace }}/ns-scaling-${{ matrix.os }}.json
+        run: cargo test -p expat-difftest --test ns_atts_diff ns_duplicate_check_scales_like_c -- --nocapture --exact
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ns-scaling-${{ matrix.os }}
+          path: ns-scaling-${{ matrix.os }}.json
+          if-no-files-found: error
 
   coverage:
     name: coverage (${{ matrix.os }})

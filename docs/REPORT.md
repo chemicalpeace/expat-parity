@@ -773,10 +773,24 @@ Notable uncovered areas (from `--show-missing-lines`):
   in aggregate, but not each point.
 - **`m_nsAtts` growth** (`Tracker::ns_atts` realloc beyond 8 slots, and
   the `m_nsAtts` term of `Tracker::own_bytes`, which an external parameter
-  entity parser never has).
-- **`XML_UnparsedEntityDeclHandler`** (`decl.rs` 487-493): the harness
-  traces unparsed entities through `XML_EntityDeclHandler` only, so the
-  port's call site of the unparsed-entity handler is not compared.
+  entity parser never has). Uncovered on ccf66a1. Since PR #18 (Part 2,
+  "`m_nsAtts` growth", `ns_atts_diff.rs`) the growth is compared by trace
+  (350 documents x 9 option sets = 3,150 comparisons) and its tracker
+  charge one way by a threshold sweep (9 documents, both namespace
+  separators: wherever C stops with `XML_ERROR_NO_MEMORY` the port stops
+  too; the port may stop earlier). Still not compared: the table's size
+  itself, an injected refusal at the table's own reallocation, and the
+  `m_nsAtts` term of `Tracker::own_bytes` (`tracker.rs` 560, 0 hits in
+  PR #18's CI coverage run 38299714072).
+- **`XML_UnparsedEntityDeclHandler`** (`decl.rs` 487-493): on ccf66a1 the
+  harness traced unparsed entities through `XML_EntityDeclHandler` only,
+  so the port's call site of the unparsed-entity handler was not compared.
+  Since PR #18 (Part 2, "`XML_UnparsedEntityDeclHandler`",
+  `unparsed_diff.rs`) it is compared with `ParseOptions::unparsed_handler`
+  on and off: 20 internal-subset documents x 7 option sets, and 4
+  external-subset / external parameter entity documents x 7 option sets x
+  3 parameter-entity modes. Only these tests set the handler; the
+  generated tests and the fuzz targets leave it off.
 - **Error branches of the external processors**: invalid, partial and
   partial-character tokens right after a text declaration in
   `entityValueInitProcessor` and `externalParEntInitProcessor`, an
@@ -903,8 +917,10 @@ The CI job therefore measures without doctests; `scripts/coverage.sh DIR
 nightly-doctests` (and `nightly` as the control) remain for a later
 nightly.
 
-**Below 95 % lines.** Corrected, `crates/expat` is at 94.95 % lines on
-Linux and macOS (4 lines short of 95 %) and 94.93 % on Windows; regions
+**Below 95 % lines** (PR #13's tree, 7,552 lines; current figures are in
+Part 2, "Coverage on this branch"). Corrected, `crates/expat` was at
+94.95 % lines on Linux and macOS (4 lines short of 95 %) and 94.93 % on
+Windows; regions
 are above 95 % everywhere, functions at 92.27 %. Nothing was excluded or
 skipped to get there. The uncovered lines (`docs/coverage/ci-2f6a37a-linux.txt`,
 381 lines) by area:
@@ -920,7 +936,9 @@ skipped to get there. The uncovered lines (`docs/coverage/ci-2f6a37a-linux.txt`,
   `dtdCopy`, `setContext`, child creation, `storeEntityValue`, tag /
   binding / `m_nsAtts` / scaffold growth), compared only in aggregate.
 - `XML_UnparsedEntityDeclHandler` call site (`decl.rs` 487-493), not
-  compared by the harness.
+  compared by the harness on that tree; compared since PR #18 by
+  `unparsed_diff.rs` only (handler off in the generated tests and fuzz
+  targets). `m_nsAtts` growth: see module 11 step E above.
 - Error branches of the external processors after a text declaration and
   late encoding detection (`external.rs`), defensive
   `XML_ERROR_UNEXPECTED_STATE` returns and `None` lookups.
@@ -941,7 +959,9 @@ reproduces on aarch64 Linux with the pinned toolchain, so it is a port
 divergence in `toAscii` / pseudo-attribute parsing for unknown encodings,
 not a Windows or nightly effect. It is recorded in `docs/STATE.md` as an
 open finding; fixing it changes library behaviour and is left to a
-separate change.
+separate change. **Fixed** by PR #15 (merged as main a990a8c, D-035, section "Q-5"
+below); post-merge main CI 38240812899 green on every job, including
+`init_diff` on all three platforms.
 
 ### Module 11 summary: all test groups
 
@@ -978,14 +998,37 @@ behaviour and defaults are C's (D-026).
    exercised (both test handlers passed NULL); since `ext_encoding_diff`
    it is (docs/EXTERNAL-ENTITY-ENCODING.md, no difference). The
    unknown-encoding handler branch remains module 12.
-4. `XML_UnparsedEntityDeclHandler` is not compared.
+4. `XML_UnparsedEntityDeclHandler` is compared on this branch (PR #18;
+   Part 2, "`XML_UnparsedEntityDeclHandler`", `unparsed_diff.rs`): with
+   `ParseOptions::unparsed_handler` the shim and the port both trace
+   `unparsed <name> <base> <systemId> <publicId> <notation>`, compared by
+   canonical trace with the handler on and off, for 20 hand-written
+   internal-subset documents under the option matrix (7 sets) and 4
+   documents with an external subset or external parameter entity read
+   through the test handler (7 option sets x 3 parameter-entity modes).
+   Limits: only these hand-written documents set the handler; the
+   generated tests and the fuzz targets leave it unset, so there
+   unparsed entities still reach the entity declaration handler.
 5. Allocation refusals are compared in aggregate (relation, sweeps), not
-   at each allocation point; `m_nsAtts` growth is uncovered.
+   at each allocation point (per-point fault injection: Part 2, "Not done
+   here"). `m_nsAtts` growth is compared on this branch (PR #18; Part 2,
+   "`m_nsAtts` growth", `ns_atts_diff.rs`): 350 documents (1-1,100
+   prefixed attributes around each power of two to 1,024, with and
+   without a duplicate expanded name, a grow-and-shrink and a nested
+   document) x 9 option sets = 3,150 trace comparisons; the tracker's
+   charge for the table's growth is checked one way by a threshold sweep
+   on 9 of these documents with both namespace separators (wherever C
+   stops with `XML_ERROR_NO_MEMORY`, the port stops too). Limits: the
+   table's size is not observed directly, only its effect on the trace
+   and on tracker refusals; a refusal at the table's own reallocation is
+   not injected.
 6. libexpat does not cap the number or depth of external entity parsers;
    the port replicates that (an application must cap them in its handler).
-7. Coverage (CI, full suite, corrected for an llvm-cov artefact):
-   94.95 % lines on Linux and macOS, 94.93 % on Windows, below the Phase 4
-   target of 95 %; regions 95.16 % / 95.13 %, functions 92.27 %. Doctests
+7. Coverage (CI, full suite, corrected for an llvm-cov artefact, PR #13's
+   tree of 7,552 lines): 94.95 % lines on Linux and macOS, 94.93 % on
+   Windows, below the Phase 4 target of 95 % (for the current figures,
+   94.86 % on main and 95.10 % / 95.07 % on PR #18, see Part 2,
+   "Coverage on this branch"); regions 95.16 % / 95.13 %, functions 92.27 %. Doctests
    are not measured (nightly coverage unusable; on nightly they add no
    covered line).
 8. Out of scope: `XML_UNICODE` builds (D-002).
@@ -1279,6 +1322,195 @@ name makes the declared encoding irrelevant; a parameter entity inside an
 entity value takes XML-declaration rules for its text declaration
 (`processXmlDecl(parser, 0, ...)`). Not covered: the unknown-encoding
 handler (module 12).
+
+### Part 2: remaining C behaviour (branch `part2-finish`, PR #18)
+
+Branch `part2-finish` (on top of `part2-unparsed`), PR #18, integrated
+after PR #16 (merged as main `4a6cd19f`, CI run 38402332452) and PR #19
+(merged as main `ecdec368`, CI run 38412206267).
+Measured against the vendored libexpat 2.9.0 by canonical trace (events,
+error code, line, column, byte index), under `diff::option_matrix` unless
+stated. No library code was changed except the duplicate check below.
+
+**`XML_UnparsedEntityDeclHandler`** (`tests/tests/unparsed_diff.rs`, 2
+tests). C behaviour: with the handler set, an `NDATA` entity is reported
+as `unparsed <name> <base> <systemId> <publicId> <notation>` and not to
+the entity declaration handler; without it, the entity declaration handler
+gets the notation; a duplicate declaration is not reported; the notation
+is not checked (non-validating); declarations after an unread parameter
+entity are skipped. 20 internal-subset documents (PUBLIC/SYSTEM, empty
+system id, undeclared notation, duplicates in both orders, references in
+content and attribute values, `NDATA` on a parameter entity, missing or
+extra names, missing space, prefixed names, non-ASCII) with and without
+the handler; an external subset and an external parameter entity read
+through the test handler, 4 documents x 7 option sets x 3
+parameter-entity modes x handler on/off. Shim: `ParseOptions::unparsed_handler`.
+Reaches `decl.rs` 487-493 (the port's call site was never compared).
+Mutation check: reporting entities named `u` to the entity handler
+instead fails the test. Policy: replicate. No divergence.
+
+**External entity bodies** (`tests/tests/external_body_diff.rs`). 76
+bodies (empty, BOM only, text declaration complete or cut, unclosed
+comment / tag / PI, partial and invalid characters, UTF-16 with and
+without BOM, a start tag where only declarations are allowed, literals,
+and 23 bodies that start with an XML declaration) read through the test
+handler in 6 documents: referenced inside an entity value literal of the
+external subset (`s.dtd`: the child starts in `entityValueInitProcessor`
+because `storeEntityValue` sets `inEntityValue`), in place of an entity
+value (`v.dtd`: an inner parameter-entity reference, so
+`externalParEntInitProcessor`, not the entity-value processor), the
+external subset itself, an external parameter entity in the internal
+subset, and an external general entity in content (once and twice); 7
+option sets (the child is fed in the same chunks) x 3 parameter-entity
+modes = 9,576 comparisons, every one equal; more than a quarter end in a
+child error by construction (asserted). C behaviour worth noting: inside
+an entity value C calls `processXmlDecl(parser, 0, ..)`, so the
+declaration is an **XML** declaration, not a text declaration: `version`
+is required (`<?xml encoding='UTF-8'?>` fails with
+`XML_ERROR_XML_DECL`, error 30, column 6 of the child) and `standalone`
+is accepted. After it, `entityValueProcessor` (`external.rs` 750-778)
+handles complete literals, an invalid byte (`XML_ERROR_INVALID_TOKEN`),
+an unclosed comment or literal (`UNCLOSED_TOKEN`), a partial character
+(`PARTIAL_CHAR`), the start of an element (`XML_ERROR_SYNTAX`) and, in
+chunked parses, a token cut by the end of a chunk (it returns for more
+input); every one of these branches was checked to run (temporary probes,
+removed) and matches C. Also reaches `external.rs` 705-706, 792-793
+(nothing scanned in a known encoding: empty value) and 819. Policy:
+replicate. No divergence.
+
+**`m_nsAtts` growth** (`tests/tests/ns_atts_diff.rs`, 3 tests). C
+behaviour: the namespaced-attribute table doubles while `(nPrefixes << 1)
+>> m_nsAttsPower` is non-zero and is reused across start tags through a
+version counter; a duplicate expanded name (two prefixes bound to one URI)
+is found only through it and reported as `XML_ERROR_DUPLICATE_ATTRIBUTE`
+at the start tag. Start tags with 1-1,100 prefixed attributes, at, below
+and above every power of two to 1,024, over 1, 3 and 17 prefixes, with no
+duplicate or a duplicate first, in the middle or last; a document whose
+start tags grow and shrink (stale entries of a reused table must not
+count) and nested tags with the same names; 9 option sets (the option
+matrix plus triplets with 64-byte chunks and the buffer API with 7-byte
+chunks): 350 documents, 3,150 comparisons, every one equal, and every duplicate document
+fails with error 8 under each namespace option set (1,036 such runs,
+asserted). The
+tracker charges the table's growth (`Tracker::ns_atts`): a threshold sweep
+(amplification 1.0, geometric grid 1 KiB-4 MiB x 9/8 plus a binary search
+for C's boundary, both namespace separators) on the 1,025- and
+513-attribute tags and the grow-and-shrink document: wherever C stops with
+`XML_ERROR_NO_MEMORY` the port stops too (module 11c relation; C refused
+in 256 of the sweep runs, the port in each). Injected
+bugs: comparing names with `==` instead of C's prefix test (triplets) and
+growing the table one step late in the tracker are both caught.
+
+**Finding (fixed here): quadratic duplicate check.** The port checked
+each prefixed attribute's expanded name against a list of all earlier
+ones (`content.rs`, storeAtts), where C uses a hash table: one start tag
+with 80,000 prefixed attributes (1 MB) took 1.48 s in the port against
+47 ms in C, 20 s at 4 MB, so input size bought quadratic CPU time (a
+denial-of-service risk C does not have). The names are now grouped by
+their SipHash in a `BTreeMap` (same duplicate rule: equal hash and the
+stored name starts with the new one): 84 ms for the same tag.
+Unprefixed attributes were not affected (they use attribute-id flags, as
+in C). Regression test `ns_duplicate_check_scales_like_c`, measured against C
+on the same machine: from 10,000 to 160,000 prefixed attributes (16
+times) the port's time may grow at most three times as much as C's (best
+of three runs each). aarch64 Linux: C x24.3-25.4, the fixed port
+0.98-1.03 of C's factor in debug and release builds; the old list x214.9
+(8.75 of C's factor), which fails. (A first, self-relative version of the
+test -- 4x the attributes in under 9x the time -- measured x4.8-5.2 after
+the fix and x15.6 before it: too close to its bound to be stable on loaded
+CI runners, so it was replaced.) Behaviour is unchanged:
+the full suite and the new C-differential tests pass. Injected bugs in
+the new check (`ns_atts_diff`, `parse_diff`; logs kept outside the repo):
+N1 exact equality instead of C's prefix test -- caught by
+`ns_atts_growth_matches_c` and `parse_diff::namespace_triplets_match_c`;
+N2 duplicate check removed -- caught by both of those and
+`ns_atts_tracker_relation`; N3 names filed under a wrong hash key --
+caught by the same three; N4 the old quadratic list -- caught by
+`ns_duplicate_check_scales_like_c` only (no output changes); the scaling
+test on the CI runners is under "Scaling report" below. The
+committed fuzz corpora (`fuzz_corpus` replay) caught none of N1-N3: they
+held no start tag with two prefixes bound to one URI. 40 curated
+`parse_trace` inputs for this were added (`docs/FUZZING.md`, Part 2);
+with them the replay test `parse_trace_corpus_matches_c` catches N1, N2
+and N3 as well. No divergence
+number is needed (no observable output changed); listed here as a
+finding.
+
+**CI note.** In PR #15's run 38237867506 (attempt 1) the ubuntu coverage
+job aborted inside the `llvm-cov report -dump` diagnostic of
+`scripts/coverage.sh` (glibc `corrupted size vs. prev_size`, SIGABRT)
+after the reports were written; the re-run of the same commit (job
+114777514198) and post-merge main 38240812899 were green. The root cause was
+found later on branch `q5-verification` (PR #17, open, not merged): a
+data race in `llvm-cov report -dump`. `scripts/coverage.sh` on this branch
+(PR #18) now runs that diagnostic with `-dump -num-threads=1` (commit
+1445f800, cherry-picked from PR #17's ec9cf645; only the evidence comment
+differs, pointing to PR #17, branch `q5-verification`,
+`docs/evidence/llvm-cov-dump-race/`). PR #17 still holds the original
+commit and the evidence. The summary, missing-lines, JSON and lcov calls
+are unchanged. PR #18's CI run 38299714072 on that commit: all 9 jobs
+green; the Ubuntu coverage `-dump` step completed without SIGABRT; 95.10 %
+lines. A single successful run does not prove that the race is gone, since
+the earlier failure was intermittent.
+
+**Scaling report** (`ns_duplicate_check_scales_like_c`). The test prints
+one `ns-scaling:` line on stderr on every run (input sizes, best-of-3 C
+and port times, growth factors, port/C ratio, limit, runner; visible on a
+passing run only with `--nocapture`). When the environment variable
+`NS_SCALING_REPORT` names a file, it writes the same values as JSON:
+`test`, `attributes` and `input_bytes` (`small`, `large`), `c_seconds` and
+`port_seconds` (`small`, `large`), `growth` (`port`, `c`, `port_over_c`,
+`limit_port_over_c`), `passed`, `runs_per_measurement`, `statistic`
+(minimum wall-clock seconds of the runs) and `runner` (`os`, `arch`,
+`family`, `cpu`, `available_parallelism`, `debug_assertions`). The limit
+is one constant (`LIMIT_FACTOR` = 3.0) used for the check and the report.
+CI: the `test` job (all three OSes) has a step that runs this test alone
+with `--nocapture` and `NS_SCALING_REPORT`, followed by
+`actions/upload-artifact@v4` with artifact `ns-scaling-<os>`,
+`if: always()` and `if-no-files-found: error`. Failure modes, verified
+locally (aarch64 Linux, scratch changes reverted): if the JSON cannot be
+written the test fails; if both the check and the write fail, the
+original assertion message is kept with the write error appended as
+"(also: ...)"; a failed check still writes `passed: false`.
+
+CI run 38289234285 (PR #18, debug build, best of 3, 10,000 -> 160,000
+prefixed attributes, 118,910 -> 2,128,910 bytes), from the JSON
+artifacts:
+
+| Runner | C small / large | Port small / large | C growth | Port growth | Port / C (limit 3.0) |
+|---|---|---|---|---|---|
+| ubuntu-latest (x86_64, AMD EPYC 7763, 4 threads) | 6.105 / 141.586 ms | 11.606 / 227.421 ms | x23.2 | x19.6 | 0.84 |
+| macos-latest (aarch64, Apple M2 Pro (Virtual), 5 threads) | 3.690 / 83.492 ms | 6.070 / 134.180 ms | x22.6 | x22.1 | 0.98 |
+| windows-latest (x86_64, AMD Family 25, 4 threads) | 5.182 / 124.887 ms | 11.702 / 289.651 ms | x24.1 | x24.8 | 1.03 |
+
+The test passed on all three. Not tested: the missing-report path of
+`if-no-files-found: error` was never executed (checked only against the
+`action.yml` documentation of upload-artifact v4); whether the artifact
+name collides when a job is re-run; the measurement order changed with
+the report (small input first, then large; before, large first) and its
+effect was not measured. The timing test keeps a low but non-zero risk
+of flaking: in 20 local runs (aarch64 Linux) the ratio ranged 0.54-1.42
+against the limit of 3.0 (the old quadratic check measured 8.72 locally).
+
+**Coverage on this branch** (CI run 38289234285, `crates/expat`, full
+suite, same pipeline as main): lines 95.10 % on Linux and macOS
+(7,238 / 7,611) and 95.07 % on Windows (7,233 / 7,608); main CI run
+38240812899 on a990a8ca measured 94.86 % (7,218 / 7,609, Linux). The
+94.95 % of "Coverage on every CI platform" was measured on an older tree
+(7,552 lines) and is not comparable with these figures.
+
+**Fuzzing** (with the duplicate-check fix, `docs/fuzz-logs/part2`):
+`parse_trace` 7 slices, 677 s, 783,495 executions (committed corpus plus
+40 working-corpus seeds of start tags with two prefixes bound to one
+URI, with and without triplets); `buffer_diff` 7 slices, 672 s, 4,296,352
+executions. No crash, no mismatch. aarch64 Linux only.
+
+**Not done here.** OOM fault injection per allocation point
+(PR #16, DV-1 parity phase 2, has merged, so the port's allocation
+points are final; not started). A libFuzzer merge of the Part 2
+runs' working corpora into `fuzz/corpus` (only the 40 curated inputs
+were added). Suspend/resume: see "Remaining uncovered
+lines".
 
 ## Divergences
 

@@ -7,7 +7,7 @@
 use std::fmt::Write as _;
 
 /// Event tags that may start a trace line.
-pub const TAGS: [&str; 26] = [
+pub const TAGS: [&str; 27] = [
     "xmldecl",
     "doctype",
     "enddoctype",
@@ -21,6 +21,7 @@ pub const TAGS: [&str; 26] = [
     "endcdata",
     "entity",
     "notation",
+    "unparsed",
     "element",
     "attlist",
     "nsstart",
@@ -257,6 +258,22 @@ impl TraceWriter {
             push_field(&mut self.out, f);
         }
         self.out.push('\n');
+    }
+
+    /// `XML_UnparsedEntityDeclHandler`.
+    pub fn unparsed(
+        &mut self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+        notation: &[u8],
+    ) {
+        self.line(
+            "unparsed",
+            &[Some(name), base, sysid, pubid, Some(notation)],
+            &[],
+        );
     }
 
     /// `XML_NotationDeclHandler`.

@@ -1,0 +1,1 @@
+H<!DOCTYPE d [<!ATTLIST d a:x CDATA 'v' b:x CDATA 'w'>]><d xmlns:a='u' xmlns:b='u'/>

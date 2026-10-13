@@ -19,12 +19,18 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   92.27 % functions on Linux and macOS, 94.93 % / 95.13 % / 92.27 % on
   Windows, after correcting an llvm-cov artefact that had hidden 7 covered
   lines (raw step E figure 94.86 %). DV-1 (tracker refusing earlier than
-  C) is removed by exact per-allocation parity (D-034 stages 1-8, branch
-  `dv1-parity-events`, PR #16): equal tracker streams, traces, W1/W2/R1
-  boundaries and structure sizes on aarch64 Linux, x86_64 Linux, aarch64
-  macOS and x86_64 Windows, CI run 38245716778; REPORT.md "DV-1
-  parity, stages 2-8". Next:
-  module 12.
+  C) is removed by exact per-allocation parity (D-034 stages 1-8, PR #16):
+  equal tracker streams, traces, W1/W2/R1 boundaries and structure sizes
+  on aarch64 Linux, x86_64 Linux, aarch64 macOS and x86_64 Windows, CI run
+  38245716778; REPORT.md "DV-1 parity, stages 2-8". Q-5 fixed (PR #15, D-035). Part 2 of the
+  coverage work (PR #18): unparsed-entity handler, external entity bodies
+  incl. `entityValueProcessor`, `m_nsAtts` growth vs C; quadratic
+  namespaced duplicate check fixed; its C-relative scaling test passed on
+  all three CI runners (CI run 38289234285). The encoding argument of
+  external entity parsers is compared (PR #19, no difference). The
+  coverage figures above are PR #13's tree (7,552 lines); see "Next steps"
+  5 for the current ones. Next: OOM fault injection per allocation point,
+  then module 12.
 - **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
@@ -40,13 +46,10 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 
 ## Blockers
 
-None. The unknown-encoding `XmlParseXmlDecl` position finding that made
-`init_diff::xml_decl_in_every_builtin_encoding` fail intermittently
-(seeds `0x52f43d23123766f6`, port 7 / C 8, and `0xfe8d9b29cbd0ff22`, port
-9 / C 11) is fixed on branch `fix-unknown-xmldecl-position` (D-035,
-DIVERGENCES.md Q-5): the port now converts like C's `unknown_toUtf8`
-inside the data and stops where C reads past it (an out-of-bounds read in
-libexpat 2.9.0, `docs/evidence/q5`).
+None. The unknown-encoding `XmlParseXmlDecl` position finding (Q-5) that
+made `init_diff::xml_decl_in_every_builtin_encoding` fail intermittently
+is fixed and merged (PR #15, main a990a8c, D-035); post-merge main CI
+38240812899 green on every job.
 
 ## Module Definition of Done
 
@@ -118,14 +121,50 @@ with allocation failures, white-box).
    document): `m_unknownEncodingMem`, the once-per-run base copy of
    `copyEntityTable`; the child encoding-name charge needs a test (module
    12 handlers).
-2. Module 11: the remaining gaps listed in
-   REPORT.md (module 11 summary) that do not depend on module 12
-   (`XML_UnparsedEntityDeclHandler`, per-point allocation refusals,
-   `m_nsAtts` growth). The encoding argument of external entity parsers
-   is compared (docs/EXTERNAL-ENTITY-ENCODING.md, `ext_encoding_diff`, no
-   difference); its unknown-encoding handler branch waits for module 12.
-3. Module 12: public `expat::Parser` on top of `parse::Parser`: default
+2. Module 11: the remaining gaps listed in REPORT.md (module 11 summary).
+   `XML_UnparsedEntityDeclHandler` and `m_nsAtts` growth are compared since
+   PR #18, the encoding argument of external entity parsers since PR #19
+   (docs/EXTERNAL-ENTITY-ENCODING.md, `ext_encoding_diff`, no difference).
+   Remaining: per-point allocation refusals (OOM fault injection per
+   allocation point, unblocked now that PR #16 has merged); the
+   unknown-encoding handler branch waits for module 12.
+3. Part 2 of the coverage work is done on branch `part2-finish` (on top of
+   `part2-unparsed`), PR #18: unparsed-entity handler,
+   external entity bodies incl. `entityValueProcessor`, `m_nsAtts` growth
+   vs C, quadratic namespaced duplicate check fixed, scaling test measured
+   against C. The C-relative scaling test `ns_duplicate_check_scales_like_c`
+   passed on ubuntu, macOS and Windows in CI run 38289234285 (debug build,
+   best of 3, 10,000 -> 160,000 prefixed attributes, 118,910 -> 2,128,910
+   bytes; port/C growth ratio 0.84 / 0.98 / 1.03, limit 3.0). It reports
+   its measurement through `NS_SCALING_REPORT` (JSON) and an `ns-scaling:`
+   stderr line; CI keeps the JSON as artifact `ns-scaling-<os>`
+   (REPORT.md, Part 2, "Scaling report"). Not tested: the missing-report
+   error path of the upload step, artifact names on a job re-run, the
+   effect of the changed measurement order; the timing test keeps a low
+   but non-zero flakiness risk (same section).
+4. Full corpus merge of the Part 2 fuzz finds (only 40 curated
+   `parse_trace` inputs for the namespaced duplicate check are committed).
+5. Coverage (CI, `crates/expat` lines, full suite): main CI run
+   38240812899 on a990a8ca measured 94.86 % (7,218 / 7,609, Linux); this
+   branch (PR #18, CI run 38289234285) 95.10 % on Linux and macOS
+   (7,238 / 7,611) and 95.07 % on Windows (7,233 / 7,608). The older
+   94.95 % (REPORT.md, PR #13) was measured on an older tree (7,552 lines)
+   and is not comparable with these. `scripts/coverage.sh` on this branch
+   now runs the llvm-cov `report -dump` diagnostic with `-num-threads=1`
+   (commit 1445f800, cherry-picked from PR #17's ec9cf645; only the
+   evidence comment differs: PR #17, branch `q5-verification`,
+   `docs/evidence/llvm-cov-dump-race/`). PR #17 (not merged) still holds
+   the original commit and the evidence; the summary, missing-lines, JSON
+   and lcov calls are unchanged. CI run 38299714072 on 1445f800: all 9
+   jobs green, the Ubuntu coverage `-dump` step completed without SIGABRT,
+   95.10 % lines. One successful run does not prove the race is gone (the
+   earlier failure was intermittent). Integrated tree (PR #16 + #19 + #18,
+   d655b6e3), CI run 38424278882 (all 9 jobs green): 95.12 % lines,
+   95.39 % regions on ubuntu, macOS and Windows; 93.26 % functions on
+   Linux and macOS, 93.25 % on Windows (lines 7,738 / 8,135 on Linux and
+   macOS, 7,734 / 8,131 on Windows).
+6. Module 12: public `expat::Parser` on top of `parse::Parser`: default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt
    from an entropy source behind `std`.
-4. Phase 4: long fuzzing runs, coverage, benchmarks against C.
+7. Phase 4: long fuzzing runs, coverage, benchmarks against C.

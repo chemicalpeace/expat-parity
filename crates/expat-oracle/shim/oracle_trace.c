@@ -356,6 +356,20 @@ on_entity(void *ud, const XML_Char *name, int is_param, const XML_Char *value,
 }
 
 static void XMLCALL
+on_unparsed(void *ud, const XML_Char *name, const XML_Char *base,
+            const XML_Char *sysid, const XML_Char *pubid,
+            const XML_Char *notation) {
+  struct start_ctx *c = ud;
+  struct tracer *t = begin(c->t, "unparsed");
+  buf_field(&t->out, name);
+  buf_field(&t->out, base);
+  buf_field(&t->out, sysid);
+  buf_field(&t->out, pubid);
+  buf_field(&t->out, notation);
+  end_line(t);
+}
+
+static void XMLCALL
 on_notation(void *ud, const XML_Char *name, const XML_Char *base,
             const XML_Char *sysid, const XML_Char *pubid) {
   struct start_ctx *c = ud;
@@ -711,6 +725,8 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
     XML_SetExternalEntityRefHandler(p, on_extref);
   if (opts->not_standalone)
     XML_SetNotStandaloneHandler(p, on_not_standalone);
+  if (opts->unparsed_handler)
+    XML_SetUnparsedEntityDeclHandler(p, on_unparsed);
   if (opts->use_foreign_dtd)
     XML_UseForeignDTD(p, XML_TRUE);
   if (opts->no_reparse_deferral)

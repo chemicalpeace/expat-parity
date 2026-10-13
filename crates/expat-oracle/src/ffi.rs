@@ -39,6 +39,7 @@ pub(crate) struct OracleOptions {
     pub(crate) ext_handler: c_int,
     pub(crate) not_standalone: c_int,
     pub(crate) use_foreign_dtd: c_int,
+    pub(crate) unparsed_handler: c_int,
     pub(crate) ext_data: *const u8,
     pub(crate) ext_len: usize,
     pub(crate) ext_encoding: *const c_char,

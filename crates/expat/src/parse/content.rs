@@ -963,9 +963,12 @@ impl Parser {
             // C keeps the expanded names in a hash table keyed by SipHash
             // of URI and local part and reports a duplicate when a stored
             // name with the same hash starts with the new one; entries with
-            // equal hashes share a probe sequence, so this list finds the
-            // same ones.
-            let mut seen: Vec<(c_ulong, Vec<u8>)> = Vec::new();
+            // equal hashes share a probe sequence, so grouping the names by
+            // hash finds the same ones. A map keeps the check O(log n) per
+            // attribute like C's O(1) table (a list made a 1 MB start tag
+            // take ~30 times longer than in C: `ns_atts_diff`).
+            let mut seen: alloc::collections::BTreeMap<c_ulong, Vec<Vec<u8>>> =
+                alloc::collections::BTreeMap::new();
             while i < app.len() {
                 let Some(att) = app.get_mut(i) else { break };
                 let id = att.id;
@@ -990,8 +993,8 @@ impl Parser {
                     expanded.extend_from_slice(att.name.get(local_start..).unwrap_or_default());
                     let hash = siphash24(&expanded, &salt) as c_ulong;
                     if seen
-                        .iter()
-                        .any(|(h2, s2)| *h2 == hash && s2.starts_with(&expanded))
+                        .get(&hash)
+                        .is_some_and(|same| same.iter().any(|s2| s2.starts_with(&expanded)))
                     {
                         return Err(XmlError::DuplicateAttribute.into());
                     }
@@ -1010,7 +1013,7 @@ impl Parser {
                     self.tracker
                         .copy(Pool::Temp, expanded.len(), direct)
                         .map_err(no_mem)?;
-                    seen.push((hash, expanded.clone()));
+                    seen.entry(hash).or_default().push(expanded.clone());
                     att.name = expanded;
                     n_prefixes -= 1;
                     if n_prefixes == 0 {

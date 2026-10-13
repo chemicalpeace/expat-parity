@@ -1,0 +1,41 @@
+# libFuzzer log, trimmed: 268 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=95 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1730195339
+INFO: Loaded 1 modules   (75875 inline 8-bit counters): 75875 [0xaaaad882cef0, 0xaaaad883f753), 
+INFO: Loaded 1 PC tables (75875 PCs): 75875 [0xaaaad883f758,0xaaaad8967d88), 
+INFO:    15082 files found in <corpus>
+INFO: seed corpus: files: 15082 min: 1b max: 11931b total: 5467149b rss: 42Mb
+#8192	pulse  cov: 12432 ft: 41723 corp: 7636/178Kb exec/s: 2730 rss: 421Mb
+#15083	INITED cov: 17322 ft: 76584 corp: 13677/4519Kb exec/s: 558 rss: 525Mb
+#16384	pulse  cov: 17322 ft: 76584 corp: 13677/4518Kb lim: 11944 exec/s: 585 rss: 533Mb
+#32768	pulse  cov: 17323 ft: 76587 corp: 13680/4518Kb lim: 11944 exec/s: 697 rss: 550Mb
+#65536	pulse  cov: 17327 ft: 76599 corp: 13690/4529Kb lim: 11957 exec/s: 873 rss: 550Mb
+#99051	DONE   cov: 17329 ft: 76627 corp: 13704/4536Kb lim: 11970 exec/s: 1031 rss: 559Mb
+###### Recommended dictionary. ######
+"extend 0 1 " # Uses: 1040
+"\377\020\000\000" # Uses: 1158
+"limit" # Uses: 717
+"\001\000\000\000\000\000\000\000" # Uses: 705
+"\377\370\377\377" # Uses: 694
+"\377\377\377\377\377\377\377," # Uses: 526
+"\001\000" # Uses: 437
+"\026\000" # Uses: 308
+"\377\377\377\004" # Uses: 292
+"\000\356\356\000" # Uses: 158
+"\377\377\377\377\377\377\377\377" # Uses: 140
+",\000\000\000\000\000\000\000" # Uses: 119
+"\001\000\000\000" # Uses: 123
+"C\000\000\000\000\000\000\000" # Uses: 93
+",\000\000\000" # Uses: 93
+"\004\000\000\000\000\000\000\000" # Uses: 41
+"\377\377\377\377\377\377\377\007" # Uses: 45
+###### End of recommended dictionary. ######
+Done 99051 runs in 96 second(s)
+stat::number_of_executed_units: 99051
+stat::average_exec_per_sec:     1031
+stat::new_units_added:          268
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              559
