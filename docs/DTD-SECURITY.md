@@ -189,30 +189,32 @@ and FNV-1a hash), so traces stay small.
 
 ### What the port does (D-030, D-034)
 
-- The port charges its tracker (`parse::tracker`) at C's allocation points
-  or earlier: C's sizes for the pools (`PoolShadow` replays `poolGrow` on
-  lengths), hash tables, tags, bindings, attribute arrays, open-entity
-  records, default-attribute arrays and the scaffold, with every
-  structure size computed from C's field list for the target
-  (`parse::c_layout`) and compared with the C compiler's `sizeof` on every
-  CI platform (`tests/tests/tracker_sizes.rs`); an upper bound of 16 KiB
-  for the parser creation and the small fixed allocations (C: 3,040-3,059
-  bytes).
+- The port's tracker (`parse::tracker`) replays C's allocations event by
+  event (D-034): the parser's creation and `XML_ParserFree` as C's
+  individual allocations, the string pools (`PoolShadow`: `poolGrow`,
+  `poolAppend` writing whole characters, `poolAppendChars`), hash tables,
+  tags and their buffers (`storeRawNames`), bindings, attribute arrays,
+  open-entity records, default-attribute arrays, the scaffold and every
+  external entity parser, with every structure size computed from C's
+  field list for the target (`parse::c_layout`) and compared with the C
+  compiler's `sizeof` on every CI platform (`tests/tests/tracker_sizes.rs`).
 - Like C, the port does **not** charge the input buffer, and it does not
   charge expanded character data in content.
 - Setters with C's validation (`Parser::set_alloc_tracker_*`); defaults
   100.0 and 64 MiB, unchanged (D-026).
-- Relation: whenever C refuses through its tracker, the port must refuse.
-  This was violated until 2026-10-12 by two structure sizes 8 bytes below
-  C's (DIVERGENCES.md R1: 10,000 attribute defaults, ~687 KB, C refuses
-  at the default limits, the port accepted); fixed by D-034 and pinned by
-  `tests/tests/dv1_windows.rs`.
-- The port may still refuse where C does not (DV-1, fail-closed): within
-  the creation-bound margin (11,764-13,352 bytes) and, through the pool
-  shadow's 4-character slack, by a whole pool block (up to 32 MiB). At
-  the default limits both are reachable with documents of 340-690 KB
-  (W1, W2 in DIVERGENCES.md). D-034 removes them in stages with a
-  per-allocation-event comparison against the oracle.
+- Where C tolerates a refused allocation, so does the port (an `xmlns:`
+  prefix whose `lookup` C does not check, `xmlparse.c` 7650-7652); where
+  C reports partial state after a refusal, the port reports the same (the
+  entity value handed to the declaration handler, 5935-5958).
+- Relation: C and the port refuse exactly the same documents at the same
+  allocation with the same running totals (`tracker_events.rs`,
+  `tracker_stages.rs`, the fuzz targets' relation in
+  `tests/src/tracker.rs`). This was violated in both directions before
+  D-034: R1 (two sizes 8 bytes below C's: C refused ~687 KB documents
+  the port accepted) and DV-1 (the port refused documents C accepted, W1
+  and W2); `tests/tests/dv1_windows.rs` pins the boundaries, which are
+  now equal. Per-platform results: `docs/REPORT.md`, "DV-1 parity,
+  stages 2-8".
 
 ## 6. Error codes and positions relevant to the DTD
 

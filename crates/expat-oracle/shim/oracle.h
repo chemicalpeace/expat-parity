@@ -202,6 +202,34 @@ void oracle_last_tracker(unsigned long long *created, unsigned long long *end);
    ORACLE_C_SIZE_NAMES in src/lib.rs; returns the number written. */
 size_t oracle_c_sizes(size_t *out, size_t n);
 
+/* Allocation tracker events of the full parser (shim/oracle_xmlparse.c,
+   D-034): every granted malloc / realloc / free of the tracker, and every
+   refusal, of parsers created on the calling thread while a capture is on.
+   `size` is the reported change (header included for malloc and free, the
+   size difference for realloc), `total` the live count after the event
+   (unchanged by a refusal), `peak` peakBytesAllocated, `direct` the root's
+   countBytesDirect, `line` the xmlparse.c line, `op` '+' or '-'. */
+struct oracle_tracker_event {
+  unsigned long long size;
+  unsigned long long total;
+  unsigned long long peak;
+  unsigned long long direct;
+  int line;
+  char op;
+  char refused;
+};
+/* Starts (on != 0) or stops a capture on the calling thread; discards
+   the events kept so far. Must be on before XML_ParserCreate. */
+void oracle_tracker_events_capture(int on);
+/* Records the number of events so far as the end of the parse (called by
+   oracle_parse_trace just before XML_ParserFree). */
+void oracle_tracker_events_mark_end(void);
+/* Hands over the events (free with oracle_free) and stops the capture;
+   *complete is 0 when events were dropped (memory); *at_end is the number
+   of events before XML_ParserFree. */
+size_t oracle_tracker_events_take(struct oracle_tracker_event **out,
+                                  int *complete, size_t *at_end);
+
 /* xmlparse.c string pool and hash table (shim/oracle_core.c). Runs a
  * program of pool or hash table operations (format: tests/src/core.rs) and
  * writes the text trace into a malloc'd buffer. Not thread-safe: callers

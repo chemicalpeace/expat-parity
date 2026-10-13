@@ -4,16 +4,15 @@
 //! (decision D-034; runs in the `test` job of every CI platform).
 //!
 //! A size below C's lets the port accept documents C refuses at the
-//! default limits (docs/DIVERGENCES.md R1): it always fails. A size above
-//! C's is allowed only for the over-counts listed in [`KNOWN_OVER_COUNTS`],
-//! which the size-parity stage of D-034 removes.
+//! default limits (docs/DIVERGENCES.md R1): it always fails. Since stage 6
+//! of D-034 a size above C's fails too ([`KNOWN_OVER_COUNTS`] is empty).
 
 use expat::internal::parse::TRACKER_SIZES;
 
-/// Sizes the port still charges above C's on some platform (never below):
-/// `ELEMENT_TYPE` (12 words, C 88 bytes on 64-bit targets) and `NS_ATT`
-/// (three 8-byte words; C has 4-byte `unsigned long` on Windows).
-const KNOWN_OVER_COUNTS: [&str; 2] = ["ELEMENT_TYPE", "NS_ATT"];
+/// Sizes the port may still charge above C's (never below). Empty since
+/// stage 6 of D-034 (`ELEMENT_TYPE` was 96 against 88, `NS_ATT` 24 against
+/// 16 on Windows).
+const KNOWN_OVER_COUNTS: [&str; 0] = [];
 
 #[test]
 fn tracker_sizes_match_the_c_compiler() {
@@ -38,6 +37,16 @@ fn tracker_sizes_match_the_c_compiler() {
         std::env::consts::OS,
         std::env::consts::FAMILY
     );
+    let compiler = expat_oracle::c_compiler();
+    println!("SIZES {target} C compiler: {compiler}");
+    // The Windows CI job builds the oracle for x86_64-pc-windows-msvc: its
+    // sizes must come from an MSVC-ABI compiler (cl.exe, or clang-cl).
+    if cfg!(target_env = "msvc") {
+        assert!(
+            compiler.contains("MSVC") || compiler.contains("_MSC_VER"),
+            "{target}: oracle not built by an MSVC-ABI compiler: {compiler}"
+        );
+    }
     let mut failures = Vec::new();
     for &(name, c_size) in &c {
         let port = TRACKER_SIZES

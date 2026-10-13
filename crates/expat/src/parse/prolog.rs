@@ -6,7 +6,6 @@
 use alloc::vec::Vec;
 
 use super::accounting::Account;
-use super::dtd::PrefixId;
 use super::error::{Stop, XmlError};
 use super::tracker::Pool;
 use super::{Enc, Handler, ParamEntityParsing, Parser, Parsing, Processor};
@@ -367,10 +366,10 @@ impl Parser {
             let direct = self.direct();
             let no_mem = |_| Stop::Error(XmlError::NoMemory);
             if let Some(n) = &enc_name {
-                self.tracker.store(Pool::Temp2, n.len(), direct).map_err(no_mem)?;
+                self.tracker.store_text(Pool::Temp2, n, direct).map_err(no_mem)?;
             }
             if let Some(v) = &version {
-                self.tracker.store(Pool::Temp2, v.len(), direct).map_err(no_mem)?;
+                self.tracker.store_text(Pool::Temp2, v, direct).map_err(no_mem)?;
             }
             h.xml_decl(version.as_deref(), enc_name.as_deref(), standalone);
         }
@@ -413,9 +412,10 @@ impl Parser {
                         // `poolStoreString(&parser->m_temp2Pool, ...)` of
                         // the name for `handleUnknownEncoding`.
                         let n = name_length(enc, buf, p);
+                        let name = to_utf8(enc, buf.get(p..p + n).unwrap_or_default());
                         let direct = self.direct();
                         self.tracker
-                            .store(Pool::Temp2, n, direct)
+                            .store_text(Pool::Temp2, &name, direct)
                             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
                     }
                     // handleUnknownEncoding without a handler (module 12).
@@ -427,19 +427,13 @@ impl Parser {
         }
     }
 
-    /// `setContext(parser, implicitContext)`: binds the `xml` prefix.
-    pub(crate) fn set_implicit_context<H: Handler>(&mut self, h: &mut H) -> bool {
-        let salt = self.salt;
-        let direct = self.direct();
-        let Ok(prefix) = self.dtd.lookup_prefix(&salt, &mut self.tracker, direct, b"xml") else {
-            return false;
-        };
-        let mut inherited = self.inherited_bindings;
-        let ok = self
-            .add_binding(h, prefix, None, XML_NAMESPACE, &mut inherited)
-            .is_ok();
-        self.inherited_bindings = inherited;
-        debug_assert!(matches!(prefix, PrefixId::Named(_)));
-        ok
+    /// `setContext(parser, implicitContext)`: binds the `xml` prefix,
+    /// through the same `m_tempPool` and `dtd->pool` steps as any context
+    /// (D-034 stage 4: C's first `m_tempPool` block comes from here).
+    pub(crate) fn set_implicit_context(&mut self) -> bool {
+        let mut context = alloc::vec::Vec::with_capacity(4 + XML_NAMESPACE.len());
+        context.extend_from_slice(b"xml=");
+        context.extend_from_slice(XML_NAMESPACE);
+        self.set_context(&context)
     }
 }

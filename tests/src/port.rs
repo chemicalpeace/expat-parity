@@ -279,6 +279,28 @@ std::thread_local! {
     };
 }
 
+std::thread_local! {
+    static LOG_EVENTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static LAST_EVENTS: std::cell::RefCell<(Vec<expat::internal::parse::TrackerEvent>, usize)> =
+        const { std::cell::RefCell::new((Vec::new(), 0)) };
+}
+
+/// A [`port_trace`] that also returns the port tracker's events (D-034):
+/// the parser's creation allocations, everything during the parse, and
+/// then the releases of `XML_ParserFree`
+/// ([`Parser::release_tracked_allocations`]); the third value is the
+/// number of events up to the end of the parse (before the releases).
+pub fn port_trace_with_tracker_events(
+    doc: &[u8],
+    opts: &ParseOptions,
+) -> (Vec<u8>, Vec<expat::internal::parse::TrackerEvent>, usize) {
+    LOG_EVENTS.with(|c| c.set(true));
+    let t = port_trace(doc, opts);
+    LOG_EVENTS.with(|c| c.set(false));
+    let (events, at_end) = LAST_EVENTS.with(|e| std::mem::take(&mut *e.borrow_mut()));
+    (t, events, at_end)
+}
+
 /// [`PortTracker`] of the calling thread's last [`port_trace`].
 pub fn last_port_tracker() -> PortTracker {
     LAST_TRACKER.with(std::cell::Cell::get)
@@ -291,6 +313,9 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
         opts.ns_separator,
         ORACLE_HASH_SALT,
     );
+    if LOG_EVENTS.with(std::cell::Cell::get) {
+        p.log_tracker_events(true);
+    }
     p.set_handlers(HandlerSet {
         external_entity_ref: opts.ext_handler != ExtHandler::None,
         not_standalone: opts.not_standalone.is_some(),
@@ -362,6 +387,12 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
             peak: p.alloc_tracker().peak_bytes_allocated,
         });
     });
+    if LOG_EVENTS.with(std::cell::Cell::get) {
+        let at_end = p.tracker_events_len();
+        p.release_tracked_allocations();
+        let events = p.take_tracker_events();
+        LAST_EVENTS.with(|e| *e.borrow_mut() = (events, at_end));
+    }
     let Stop::Error(e) = p.error_code();
     let code = e.to_c();
     // The shim writes `ok` only for XML_STATUS_OK.

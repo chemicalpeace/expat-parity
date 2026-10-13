@@ -1,0 +1,41 @@
+# libFuzzer log, trimmed: 410 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3837297098
+INFO: Loaded 1 modules   (77899 inline 8-bit counters): 77899 [0xaaaac1dcd510, 0xaaaac1de055b), 
+INFO: Loaded 1 PC tables (77899 PCs): 77899 [0xaaaac1de0560,0xaaaac1f10a10), 
+INFO:    13219 files found in <corpus>
+INFO: seed corpus: files: 13219 min: 1b max: 30663b total: 4269157b rss: 42Mb
+#8192	pulse  cov: 10723 ft: 31741 corp: 7306/252Kb exec/s: 2730 rss: 427Mb
+#13220	INITED cov: 12970 ft: 50963 corp: 10735/2639Kb exec/s: 1888 rss: 430Mb
+#16384	pulse  cov: 12970 ft: 50963 corp: 10735/2639Kb lim: 30677 exec/s: 2340 rss: 492Mb
+#32768	pulse  cov: 12970 ft: 50974 corp: 10736/2640Kb lim: 30789 exec/s: 3640 rss: 522Mb
+#65536	pulse  cov: 12970 ft: 50977 corp: 10737/2640Kb lim: 30985 exec/s: 5041 rss: 532Mb
+#131072	pulse  cov: 12970 ft: 50988 corp: 10741/2640Kb lim: 31335 exec/s: 5698 rss: 532Mb
+#262144	pulse  cov: 12972 ft: 50994 corp: 10747/2643Kb lim: 32147 exec/s: 5957 rss: 532Mb
+#524288	pulse  cov: 12972 ft: 51012 corp: 10760/2653Kb lim: 33782 exec/s: 6316 rss: 532Mb
+#643112	DONE   cov: 12974 ft: 51024 corp: 10768/2653Kb lim: 34472 exec/s: 6367 rss: 532Mb
+###### Recommended dictionary. ######
+"d8" # Uses: 9373
+"\377\377Q\244\3076\036y" # Uses: 9458
+"\377\377\377\377\377\377\377\001" # Uses: 9079
+"\221g\000\000" # Uses: 7333
+"\001\000\015\346" # Uses: 6361
+"xm:lla" # Uses: 4968
+"\377*" # Uses: 3080
+"a4" # Uses: 2333
+"d7" # Uses: 1202
+"\006\000" # Uses: 862
+"eee" # Uses: 714
+"\001\000\000\000\000\000\000\000" # Uses: 576
+"c1" # Uses: 132
+"\001*" # Uses: 22
+###### End of recommended dictionary. ######
+Done 643112 runs in 101 second(s)
+stat::number_of_executed_units: 643112
+stat::average_exec_per_sec:     6367
+stat::new_units_added:          410
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              532

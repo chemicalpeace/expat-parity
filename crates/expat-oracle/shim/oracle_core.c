@@ -843,9 +843,36 @@ oracle_c_sizes(size_t *out, size_t n) {
       sizeof(NAMED *),
       sizeof(size_t) + EXPAT_MALLOC_PADDING,
       sizeof(int),
+      sizeof(struct XML_ParserStruct),
+      sizeof(DTD),
+      offsetof(struct XML_ParserStruct, m_position),
+      sizeof(ACCOUNTING),
+      sizeof(MALLOC_TRACKER),
+      sizeof(ENTITY_STATS),
   };
   size_t i;
   for (i = 0; i < n && i < sizeof(v) / sizeof(v[0]); i++)
     out[i] = v[i];
   return i;
+}
+
+/* The compiler that built the vendored xmlparse.c (and so took the sizes
+ * above), from its predefined macros: "MSVC _MSC_FULL_VER=..." for cl.exe,
+ * "clang ..." (with "_MSC_VER=..." for clang-cl), "gcc ..." otherwise. */
+#define ORACLE_STR2(x) #x
+#define ORACLE_STR(x) ORACLE_STR2(x)
+const char *
+oracle_c_compiler(void) {
+#if defined(__clang__) && defined(_MSC_VER)
+  return "clang " __clang_version__ " (clang-cl, _MSC_VER=" ORACLE_STR(
+      _MSC_VER) ")";
+#elif defined(__clang__)
+  return "clang " __clang_version__;
+#elif defined(_MSC_VER)
+  return "MSVC _MSC_FULL_VER=" ORACLE_STR(_MSC_FULL_VER) " (cl.exe)";
+#elif defined(__GNUC__)
+  return "gcc " __VERSION__;
+#else
+  return "unknown";
+#endif
 }

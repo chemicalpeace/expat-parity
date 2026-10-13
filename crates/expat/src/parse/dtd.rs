@@ -190,10 +190,10 @@ pub struct Dtd {
 /// ([`super::c_layout`]).
 pub(crate) const PREFIX_SIZE: usize = super::c_layout::PREFIX;
 pub(crate) const ATTRIBUTE_ID_SIZE: usize = super::c_layout::ATTRIBUTE_ID;
-/// `sizeof(ELEMENT_TYPE)` bound: twelve pointer-sized words, 8 bytes more
-/// than C's 88 on 64-bit targets ([`super::c_layout::ELEMENT_TYPE`]). An
-/// over-count, kept until the size-parity stage of D-034.
-pub(crate) const ELEMENT_TYPE_SIZE: usize = 12 * crate::heap::POINTER_SIZE;
+/// `sizeof(ELEMENT_TYPE)` ([`super::c_layout::ELEMENT_TYPE`]: 88 bytes on
+/// 64-bit targets). Before stage 6 of D-034 the port charged twelve
+/// pointer-sized words, 8 bytes more than C.
+pub(crate) const ELEMENT_TYPE_SIZE: usize = super::c_layout::ELEMENT_TYPE;
 /// `sizeof(ENTITY)` ([`super::c_layout::ENTITY`]).
 pub(crate) const ENTITY_SIZE: usize = super::c_layout::ENTITY;
 
@@ -262,7 +262,8 @@ impl Dtd {
     }
 
     /// `lookup(parser, &dtd->prefixes, name, sizeof(PREFIX))`, with the
-    /// name built in `dtd->pool` first (kept when the prefix is new).
+    /// name and a NUL appended to `dtd->pool` one character at a time
+    /// first (kept when the prefix is new).
     pub fn lookup_prefix(
         &mut self,
         salt: &SipKey,
@@ -270,13 +271,29 @@ impl Dtd {
         direct: u64,
         name: &[u8],
     ) -> Result<PrefixId, NoMemory> {
-        tr.store_discard(Pool::Dtd, name.len(), direct)?;
+        tr.copy_discard(Pool::Dtd, name.len(), direct)?;
         let (id, l) =
             self.prefixes
                 .lookup_or_insert(salt, &mut tr.heap(direct), name, PREFIX_SIZE, Prefix::default)?;
         if l == Lookup::Inserted {
-            tr.store(Pool::Dtd, name.len(), direct)?;
+            tr.copy(Pool::Dtd, name.len(), direct)?;
         }
+        Ok(PrefixId::Named(id))
+    }
+
+    /// `lookup(parser, &dtd->prefixes, name + 6, sizeof(PREFIX))` of an
+    /// `xmlns:` attribute id: the prefix's name is the attribute id's own
+    /// (nothing in `dtd->pool`).
+    fn lookup_xmlns_prefix(
+        &mut self,
+        salt: &SipKey,
+        tr: &mut Tracker,
+        direct: u64,
+        name: &[u8],
+    ) -> Result<PrefixId, NoMemory> {
+        let (id, _) = self
+            .prefixes
+            .lookup_or_insert(salt, &mut tr.heap(direct), name, PREFIX_SIZE, Prefix::default)?;
         Ok(PrefixId::Named(id))
     }
 
@@ -295,7 +312,7 @@ impl Dtd {
             return Ok(id);
         }
         // `poolCopyString(&dtd->pool, tagNamePtr->str)`
-        tr.store(Pool::Dtd, name.len(), direct)?;
+        tr.copy(Pool::Dtd, name.len(), direct)?;
         let (id, _) = self.element_types.lookup_or_insert(
             salt,
             &mut tr.heap(direct),
@@ -310,17 +327,16 @@ impl Dtd {
     }
 
     /// `getElementType`: the element type `name`, created (with
-    /// `setElementTypePrefix` when namespace processing is on) if new.
+    /// `setElementTypePrefix`, whatever the namespace mode) if new.
     pub fn element_type(
         &mut self,
         salt: &SipKey,
         tr: &mut Tracker,
         direct: u64,
-        ns: bool,
         name: &[u8],
     ) -> Result<EntryId, NoMemory> {
         // `poolStoreString(&dtd->pool, ...)`, discarded for a known name.
-        tr.store_discard(Pool::Dtd, name.len(), direct)?;
+        tr.store_text_discard(Pool::Dtd, name, direct)?;
         let (id, l) = self.element_types.lookup_or_insert(
             salt,
             &mut tr.heap(direct),
@@ -329,10 +345,12 @@ impl Dtd {
             ElementType::default,
         )?;
         if l == Lookup::Inserted {
-            tr.store(Pool::Dtd, name.len(), direct)?;
-            if ns {
-                self.set_element_type_prefix(salt, tr, direct, id, name)?;
-            }
+            tr.store_text(Pool::Dtd, name, direct)?;
+            // Unconditional in C's `getElementType`, also without namespace
+            // processing (only `storeAtts` reads the prefix, and only with
+            // it); its `dtd->pool` string and `dtd->prefixes` entry are
+            // charged either way (D-034 stage 4).
+            self.set_element_type_prefix(salt, tr, direct, id, name)?;
         }
         Ok(id)
     }
@@ -353,10 +371,10 @@ impl Dtd {
             &mut self.general_entities
         };
         // `poolStoreString(&dtd->pool, ...)`, discarded for a known name.
-        tr.store_discard(Pool::Dtd, name.len(), direct)?;
+        tr.store_text_discard(Pool::Dtd, name, direct)?;
         let (id, l) = table.lookup_or_insert(salt, &mut tr.heap(direct), name, ENTITY_SIZE, Entity::default)?;
         if l == Lookup::Inserted {
-            tr.store(Pool::Dtd, name.len(), direct)?;
+            tr.store_text(Pool::Dtd, name, direct)?;
         }
         let r = if is_param {
             EntityRef::Param(id)
@@ -364,6 +382,25 @@ impl Dtd {
             EntityRef::General(id)
         };
         Ok((r, l == Lookup::Inserted))
+    }
+
+    /// `lookup(parser, &dtd->paramEntities, externalSubsetName,
+    /// sizeof(ENTITY))`: the external subset's entity, whose name is C's
+    /// static `"#"` (no copy into `dtd->pool`, unlike [`Dtd::declare_entity`]).
+    pub fn external_subset_entity(
+        &mut self,
+        salt: &SipKey,
+        tr: &mut Tracker,
+        direct: u64,
+    ) -> Result<EntityRef, NoMemory> {
+        let (id, _) = self.param_entities.lookup_or_insert(
+            salt,
+            &mut tr.heap(direct),
+            super::decl::EXTERNAL_SUBSET_NAME,
+            ENTITY_SIZE,
+            Entity::default,
+        )?;
+        Ok(EntityRef::Param(id))
     }
 
     /// The entity `r`.
@@ -487,9 +524,14 @@ impl Dtd {
         ns: bool,
         name: &[u8],
     ) -> Result<EntryId, NoMemory> {
-        // The flag character, the name and a NUL in `dtd->pool`, discarded
-        // for a known name.
-        tr.store_discard(Pool::Dtd, name.len() + 1, direct)?;
+        // The flag character (`poolAppendChar`), the converted name and a
+        // NUL (`poolStoreString`) in `dtd->pool`, discarded for a known
+        // name.
+        {
+            let (p, mut h) = tr.pool(Pool::Dtd, direct);
+            p.append_chars(&mut h, 1)?;
+            p.store_text_discard(&mut h, name)?;
+        }
         let (id, l) = self.attribute_ids.lookup_or_insert(
             salt,
             &mut tr.heap(direct),
@@ -500,14 +542,32 @@ impl Dtd {
         if l == Lookup::Found {
             return Ok(id);
         }
-        tr.store(Pool::Dtd, name.len() + 1, direct)?;
+        {
+            let (p, mut h) = tr.pool(Pool::Dtd, direct);
+            p.append_chars(&mut h, 1)?;
+            p.store_text(&mut h, name)?;
+        }
         if !ns {
             return Ok(id);
         }
         let prefix = if name == b"xmlns" {
             Some((PrefixId::Default, true))
         } else if let Some(rest) = name.strip_prefix(b"xmlns:") {
-            Some((self.lookup_prefix(salt, tr, direct, rest)?, true))
+            // C does not check this lookup (xmlparse.c 7650-7652): when the
+            // tracker refuses the prefix entry (or the table's growth), the
+            // id keeps `prefix == NULL` with `xmlns` set and the parse goes
+            // on; `storeAtts` then treats the attribute as an unprefixed
+            // one (4262, 4295) and `dtdCopy` copies `xmlns` only with a
+            // prefix (8011). The port records the same state (D-034).
+            match self.lookup_xmlns_prefix(salt, tr, direct, rest) {
+                Ok(p) => Some((p, true)),
+                Err(NoMemory) => {
+                    if let Some(v) = self.attribute_ids.value_mut(id) {
+                        v.xmlns = true;
+                    }
+                    return Ok(id);
+                }
+            }
         } else if let Some(colon) = name.iter().position(|&c| c == b':') {
             // Attributes without a prefix are *not* in the default namespace.
             Some((self.lookup_prefix(salt, tr, direct, name.get(..colon).unwrap_or_default())?, false))

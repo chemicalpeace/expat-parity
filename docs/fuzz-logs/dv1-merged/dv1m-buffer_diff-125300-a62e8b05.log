@@ -1,0 +1,45 @@
+# libFuzzer log, trimmed: 469 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running `target/aarch64-unknown-linux-gnu/release/buffer_diff -artifact_prefix=<fuzz>/artifacts/buffer_diff/ -max_total_time=100 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3624542535
+INFO: Loaded 1 modules   (77899 inline 8-bit counters): 77899 [0xaaaab9e1d510, 0xaaaab9e3055b), 
+INFO: Loaded 1 PC tables (77899 PCs): 77899 [0xaaaab9e30560,0xaaaab9f60a10), 
+INFO:    12757 files found in <corpus>
+INFO: seed corpus: files: 12757 min: 1b max: 30663b total: 3952273b rss: 41Mb
+#8192	pulse  cov: 10875 ft: 32467 corp: 7422/265Kb exec/s: 2730 rss: 425Mb
+#12758	INITED cov: 12967 ft: 50584 corp: 10717/2629Kb exec/s: 2126 rss: 429Mb
+#16384	pulse  cov: 12967 ft: 50584 corp: 10717/2629Kb lim: 30705 exec/s: 2340 rss: 495Mb
+#32768	pulse  cov: 12967 ft: 50584 corp: 10717/2629Kb lim: 30803 exec/s: 3640 rss: 527Mb
+#65536	pulse  cov: 12968 ft: 50591 corp: 10721/2635Kb lim: 30943 exec/s: 4681 rss: 534Mb
+#131072	pulse  cov: 12968 ft: 50593 corp: 10722/2629Kb lim: 31321 exec/s: 5698 rss: 534Mb
+#262144	pulse  cov: 12968 ft: 50605 corp: 10728/2631Kb lim: 31965 exec/s: 5825 rss: 534Mb
+#524288	pulse  cov: 12970 ft: 50951 corp: 10745/2640Kb lim: 33512 exec/s: 6241 rss: 534Mb
+#643291	DONE   cov: 12970 ft: 50963 corp: 10752/2643Kb lim: 34142 exec/s: 6369 rss: 534Mb
+###### Recommended dictionary. ######
+"U\000" # Uses: 11675
+"X\375" # Uses: 6153
+"a5" # Uses: 6091
+"b6" # Uses: 4659
+"\001\014" # Uses: 4087
+"\000\013" # Uses: 4004
+"\017\000" # Uses: 3055
+"\345\234\250" # Uses: 2827
+"\377\377\377\377\377\377\377\377" # Uses: 2659
+"d1" # Uses: 1830
+"\034\000" # Uses: 1726
+"\377\377\377\377" # Uses: 1488
+"b1" # Uses: 1399
+"xmln\346\210" # Uses: 1134
+"\376\000\000\000" # Uses: 1038
+"Zvvvv6vv" # Uses: 770
+"\020\000" # Uses: 621
+"\001\000\000\000\000\000\000\006" # Uses: 209
+###### End of recommended dictionary. ######
+Done 643291 runs in 101 second(s)
+stat::number_of_executed_units: 643291
+stat::average_exec_per_sec:     6369
+stat::new_units_added:          469
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              534

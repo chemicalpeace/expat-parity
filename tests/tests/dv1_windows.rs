@@ -5,22 +5,26 @@
 //! bytes of difference between the port's and C's counts decide the
 //! outcome.
 //!
-//! - **W1** (creation charge): `pad` spaces before a DTD with a 395-character
-//!   entity referenced 85,000 times in one attribute. C accepts from pad
-//!   330,746; the port's creation charge (16,384 against C's 3,040) makes
-//!   it refuse up to pad 330,878.
-//! - **W2** (pool slack): 84,947 references and `tail` literal characters,
-//!   no padding. C fills its 32 MiB pool block to the last byte; the port's
-//!   `POOL_SLACK` of 4 makes it double the block to 64 MiB for tails
-//!   363-366.
+//! - **W1** (creation charge, closed by stage 3 of D-034): `pad` spaces
+//!   before a DTD with a 395-character entity referenced 85,000 times in
+//!   one attribute. C accepts from pad 330,746 on 64-bit Linux (330,745 on
+//!   Windows x64); the port's former creation charge (16,384 against C's
+//!   3,040) made it refuse up to pad 330,878. Since stage 3 it charges C's
+//!   creation allocations and accepts from C's pad.
+//! - **W2** (pool slack, closed by stage 2 of D-034): 84,947 references and
+//!   `tail` literal characters, no padding. C fills its 32 MiB pool block to
+//!   the last byte; the port's former `POOL_SLACK` of 4 made it double the
+//!   block to 64 MiB for tails 363-366. Since stage 2 the port's pool model
+//!   is exact and both refuse from the same tail.
 //! - **R1** (reverse violation, fixed by D-034): the W1 document with 10,000
 //!   attribute defaults on an unused element type. With `BINDING` and
 //!   `NAME_AND_DEFAULT_ATTRIBUTE` 8 bytes below C's `sizeof`, the port
 //!   accepted documents of 686,993-687,658 bytes that C refuses with
-//!   `XML_ERROR_NO_MEMORY`.
+//!   `XML_ERROR_NO_MEMORY`. Since stage 3 both boundaries coincide.
 //!
 //! C's boundary depends on the platform (its creation allocations differ:
-//! 3,040 bytes on 64-bit Linux and macOS, 32 fewer on Windows x64), so the
+//! 3,040 bytes on 64-bit Linux and macOS, 32 fewer on Windows x64, whose
+//! parser structure has four 4-byte `unsigned long` members), so the
 //! tests find both boundaries by bisection on each platform and assert:
 //! the port never accepts a document C refuses (on both sides of each
 //! boundary), and the width of the window where only C accepts equals the
@@ -206,28 +210,39 @@ fn r1_attribute_defaults() {
         let r = run("R1", &window_doc(pad, 10_000));
         assert!(!r.c && !r.port, "R1 pad {pad}: both must refuse");
     }
-    // Pinned at the current stage of D-034: the creation-charge window
-    // (W1 shape) is still open, the reverse one is closed.
-    assert!(
-        p_from > c_from,
-        "R1: DV-1 window closed; update the stage pin"
+    // Since stage 3 of D-034 (exact creation charge) both trackers are
+    // equal at the deciding doubling, so both accept from the same pad.
+    let both = run("R1", &window_doc(c_from, 10_000));
+    assert_eq!(
+        both.port_end, both.c_end,
+        "R1: tracker counts differ at C's boundary"
     );
+    assert_eq!(p_from, c_from, "R1: the port's boundary differs from C's");
 }
 
-/// W1: the creation-charge window (DV-1), pinned open until step 3 of
-/// D-034.
+/// W1: the creation-charge window (DV-1), closed by stage 3 of D-034: the
+/// port charges C's creation allocations (the parser structure, `m_atts`,
+/// `m_dataBuf`, the DTD; sizes from the target's C layout), so its count
+/// at the deciding pool doubling equals C's and both accept from the same
+/// pad on every platform, whatever C's creation size there.
 #[test]
 fn w1_creation_charge() {
     let (c_from, p_from) = accept_window("W1", 330_000, 332_000, &|pad| window_doc(pad, 0));
-    assert!(
-        p_from > c_from,
-        "W1: DV-1 window closed; update the stage pin"
+    let both = run("W1", &window_doc(c_from, 0));
+    assert_eq!(
+        both.port_end, both.c_end,
+        "W1: tracker counts differ at C's boundary"
+    );
+    assert_eq!(
+        p_from, c_from,
+        "W1: DV-1 window open: the port refuses documents C accepts"
     );
 }
 
-/// W2: the pool-slack window (DV-1), pinned open until step 2 of D-034.
-/// The tail grows the expanded value, so documents become refused as it
-/// grows: C accepts up to the tail that fills its 32 MiB block exactly.
+/// W2: the pool-slack window (DV-1), closed by stage 2 of D-034 (exact
+/// pool model). The tail grows the expanded value, so documents become
+/// refused as it grows: C accepts up to the tail that fills its 32 MiB
+/// block exactly, and so does the port.
 #[test]
 fn w2_pool_slack() {
     let doc = |tail| slack_doc(84_947, tail);
@@ -246,11 +261,10 @@ fn w2_pool_slack() {
         p_refuses_from <= c_refuses_from,
         "W2: the port accepts what C refuses"
     );
-    // C's last accepted tail fills the block exactly; the port's 4-character
-    // slack doubles the block 4 tails earlier.
+    // C's last accepted tail fills the block exactly; so does the port's
+    // (it doubled the block 4 tails earlier while it had `POOL_SLACK`).
     assert_eq!(
-        c_refuses_from - p_refuses_from,
-        4,
-        "W2: DV-1 slack window changed; update the stage pin"
+        c_refuses_from, p_refuses_from,
+        "W2: the pool-slack window must stay closed"
     );
 }
