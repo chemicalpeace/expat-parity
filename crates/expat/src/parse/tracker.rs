@@ -11,25 +11,24 @@
 //! `total / countBytesDirect` exceeds the maximum amplification (100.0).
 //!
 //! The port does not allocate the C data structures, so it cannot count
-//! C's allocations directly. Instead it *charges* the tracker, at the same
-//! point of the parse or earlier, at least the bytes C allocates (decision
-//! D-030, `docs/DTD-SECURITY.md` section 5):
+//! C's allocations directly. Instead it *charges* the tracker with C's
+//! allocations, one event per C `MALLOC`, `REALLOC` and `FREE`, at the
+//! same point of the parse and with this target's C sizes (decision
+//! D-034, replacing D-030's upper bound; `docs/DTD-SECURITY.md` section 5):
 //!
-//! - exactly C's sizes where the port keeps C's structure: the attribute
-//!   array, the hash tables (through [`Heap`]),
-//!   the string pools (simulated by [`PoolShadow`], which replays C's block
-//!   strategy on lengths only), tag buffers and their free list, namespace
-//!   bindings, open-entity records, default-attribute arrays and their
-//!   per-element hash tables, the content-model scaffold;
-//! - an upper bound for the parser creation and for the small fixed
-//!   allocations (data buffer, group connector, XML declaration strings):
-//!   [`CREATION_CHARGE`].
+//! - the parser's creation and `XML_ParserFree` as C's individual
+//!   allocations ([`CREATION_CHARGE`] is their sum);
+//! - the attribute array and the hash tables (through [`Heap`]);
+//! - the string pools (simulated by [`PoolShadow`], which replays C's block
+//!   strategy on lengths and where `XmlConvert` stops before a growth),
+//!   tag buffers and their free list, namespace bindings, open-entity
+//!   records, default-attribute arrays and their per-element hash tables,
+//!   the content-model scaffold, external entity parsers.
 //!
-//! Charging earlier or more than C makes the port at least as strict: the
-//! amplification `total / direct` can only be higher at any point of the
-//! parse, because both sides count the same direct bytes
-//! ([`super::Accounting`]). The differential tests check that the port
-//! fails with `XML_ERROR_NO_MEMORY` whenever C does (`tracker_diff.rs`).
+//! The differential tests compare the two event streams event by event
+//! (direction, size, refusal, running total, peak) from creation through
+//! `XML_ParserFree` (`tracker_events.rs`, `tracker_stages.rs`), and the
+//! fuzz targets require the same traces and events under tight limits.
 //!
 //! ```
 //! # #[cfg(feature = "internal-api")] {
@@ -56,29 +55,62 @@ pub const ALLOC_MAXIMUM_AMPLIFICATION_DEFAULT: f32 = 100.0;
 /// `EXPAT_ALLOC_TRACKER_ACTIVATION_THRESHOLD_DEFAULT` (64 MiB).
 pub const ALLOC_ACTIVATION_THRESHOLD_DEFAULT: u64 = 67_108_864;
 
-/// Charged when the parser is created: an upper bound of what
-/// `parserCreate` allocates (the parser structure, `m_atts`, `m_dataBuf`,
-/// the DTD, the implicit namespace context; 3,040 bytes on 64-bit Linux,
-/// measured through the oracle) plus the small fixed allocations C makes
-/// later that the port does not replay one by one (`m_groupConnector`'s
-/// first 32 bytes, the XML declaration's version and encoding in
-/// `m_temp2Pool`, `m_unknownEncodingMem`). `tracker_diff.rs` checks it
-/// against C's count after creation on every CI platform.
-pub const CREATION_CHARGE: u64 = 16_384;
+/// What `parserCreate` allocates after the parser structure, in C's
+/// order: `m_atts` (`INIT_ATTS_SIZE` `ATTRIBUTE`s, `xmlparse.c` 1405) and
+/// `m_dataBuf` (`INIT_DATA_BUF_SIZE` characters, 1410).
+const CREATION_ARRAYS: [usize; 2] = [
+    super::INIT_ATTS_SIZE * c_layout::ATTRIBUTE,
+    super::INIT_DATA_BUF_SIZE,
+];
+
+/// `dtdCreate`'s allocation (`xmlparse.c` 7865): the DTD structure. A
+/// parameter entity parser shares its parent's DTD and allocates none.
+const CREATION_DTD: usize = c_layout::DTD;
+
+/// What `parserCreate` charges to the tracker for a parser with its own
+/// DTD and no protocol encoding name: the parser structure (counted
+/// directly, `xmlparse.c` 1304-1395), `m_atts`, `m_dataBuf` and the DTD,
+/// each with its `MALLOC_HEADER`. Derived from the C layout of the
+/// target ([`c_layout::PARSER`], [`c_layout::DTD`]): 3,040 bytes on 64-bit
+/// Unix, 3,008 on 64-bit Windows (its parser structure is 32 bytes
+/// smaller, four `unsigned long` members). Since stage 3 of D-034 it is
+/// charged as C's four separate allocations; `tracker_sizes.rs` checks the
+/// sizes against the C compiler and `tracker_events.rs` the events against
+/// C's on every CI platform.
+///
+/// Rollback (D-034): setting this to 16,384 restores the old upper bound;
+/// the excess is then charged with the parser structure.
+pub const CREATION_CHARGE: u64 = (c_layout::PARSER + CREATION_ARRAYS[0] + CREATION_ARRAYS[1] + CREATION_DTD) as u64
+    + 4 * MALLOC_HEADER;
+
+/// The parser structure's charge: `CREATION_CHARGE` minus the arrays and
+/// the DTD (exactly `sizeof(struct XML_ParserStruct)` plus the header
+/// unless the rollback is in effect).
+const PARSER_STRUCT_CHARGE: u64 =
+    CREATION_CHARGE - (CREATION_ARRAYS[0] + CREATION_ARRAYS[1] + CREATION_DTD) as u64 - 3 * MALLOC_HEADER;
 
 /// `INIT_BLOCK_SIZE` of the string pools.
 const INIT_BLOCK_SIZE: i64 = 1024;
 
-/// Characters a pool string is assumed to need beyond its final length:
-/// C converts into the pool with `XmlConvert`, which stops up to three
-/// bytes before the end of a block when the next UTF-8 character does not
-/// fit, and `storeAttributeValue` may append a trailing space that it
-/// chops afterwards. Growing a little earlier than C can only make the
-/// simulated pool larger.
-const POOL_SLACK: i64 = 4;
+
+/// One change of the tracker's count, for the per-event comparison with
+/// libexpat's tracker (D-034): what `expat_heap_stat` reports in C.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TrackerEvent {
+    /// An increase (charge) rather than a decrease (release).
+    pub increase: bool,
+    /// The increase was refused; the count did not change.
+    pub refused: bool,
+    /// Bytes of the change.
+    pub size: u64,
+    /// `bytes_allocated` after the event.
+    pub total: u64,
+    /// `peak_bytes_allocated` after the event.
+    pub peak: u64,
+}
 
 /// `MALLOC_TRACKER` of the root parser.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AllocTracker {
     /// `bytesAllocated`: what the port has charged and not released.
     pub bytes_allocated: u64,
@@ -88,6 +120,14 @@ pub struct AllocTracker {
     pub maximum_amplification_factor: f32,
     /// `activationThresholdBytes`
     pub activation_threshold_bytes: u64,
+    /// Every change of the count while enabled ([`AllocTracker::log_events`]),
+    /// for the per-event comparison with C (tests only; `None` normally).
+    pub events: Option<alloc::vec::Vec<TrackerEvent>>,
+    /// The increases [`AllocTracker::charge_creation`] made, in order
+    /// (the parser structure, `m_atts`, `m_dataBuf`, the DTD, the encoding
+    /// name), so that [`AllocTracker::log_events`], switched on after the
+    /// parser exists, can report them as C does: one event each.
+    creation: [u64; 5],
 }
 
 impl Default for AllocTracker {
@@ -97,11 +137,78 @@ impl Default for AllocTracker {
             peak_bytes_allocated: 0,
             maximum_amplification_factor: ALLOC_MAXIMUM_AMPLIFICATION_DEFAULT,
             activation_threshold_bytes: ALLOC_ACTIVATION_THRESHOLD_DEFAULT,
+            events: None,
+            creation: [0; 5],
         }
     }
 }
 
 impl AllocTracker {
+    /// Starts (or stops, discarding them) recording every change of the
+    /// count as a [`TrackerEvent`].
+    /// The parser's creation allocations are recorded first, one event
+    /// each as [`AllocTracker::charge_creation`] charged them; anything
+    /// charged after them and before this call as one more event.
+    pub fn log_events(&mut self, on: bool) {
+        self.events = on.then(alloc::vec::Vec::new);
+        if !on {
+            return;
+        }
+        let (now, peak) = (self.bytes_allocated, self.peak_bytes_allocated);
+        let mut total = 0u64;
+        let mut events = alloc::vec::Vec::new();
+        for size in self.creation.into_iter().take_while(|&s| s > 0) {
+            total = total.saturating_add(size);
+            events.push(TrackerEvent {
+                increase: true,
+                refused: false,
+                size,
+                total,
+                peak: total,
+            });
+        }
+        if now > total {
+            events.push(TrackerEvent {
+                increase: true,
+                refused: false,
+                size: now - total,
+                total: now,
+                peak,
+            });
+        }
+        self.events = Some(events);
+    }
+
+    fn record(&mut self, increase: bool, refused: bool, size: u64) {
+        let (total, peak) = (self.bytes_allocated, self.peak_bytes_allocated);
+        if let Some(e) = self.events.as_mut() {
+            e.push(TrackerEvent {
+                increase,
+                refused,
+                size,
+                total,
+                peak,
+            });
+        }
+    }
+
+    /// Lowers the count by `size` (a release), recorded as an event.
+    pub fn release(&mut self, size: u64) {
+        self.bytes_allocated = self.bytes_allocated.saturating_sub(size);
+        if size > 0 {
+            self.record(false, false, size);
+        }
+    }
+
+    /// `increase_tolerable` that records a refusal.
+    fn tolerable(&mut self, increase: u64, direct: u64) -> bool {
+        let ok = self.increase_tolerable(increase, direct);
+        if !ok {
+            self.record(true, true, increase);
+        }
+        ok
+    }
+
     /// `setAllocTrackerMaximumAmplification` on a root parser: `false`,
     /// and no change, for NaN or a value below 1.0.
     pub fn set_maximum_amplification(&mut self, factor: f32) -> bool {
@@ -140,6 +247,7 @@ impl AllocTracker {
         if self.bytes_allocated > self.peak_bytes_allocated {
             self.peak_bytes_allocated = self.bytes_allocated;
         }
+        self.record(true, false, increase);
     }
 
     /// Charges `MALLOC(size)`; `false` = C's `expat_malloc` returns
@@ -151,7 +259,7 @@ impl AllocTracker {
         else {
             return false;
         };
-        if !self.increase_tolerable(increase, direct) {
+        if !self.tolerable(increase, direct) {
             return false;
         }
         self.add(increase);
@@ -164,52 +272,97 @@ impl AllocTracker {
     pub fn realloc(&mut self, old: usize, size: usize, direct: u64) -> bool {
         let (old, size) = (old as u64, size as u64);
         if size > old {
-            if !self.increase_tolerable(size - old, direct) {
+            if !self.tolerable(size - old, direct) {
                 return false;
             }
             self.add(size - old);
         } else {
-            self.bytes_allocated = self.bytes_allocated.saturating_sub(old - size);
+            self.release(old - size);
         }
         true
     }
 
     /// Releases a charged allocation of `size` bytes (`FREE`).
     pub fn free(&mut self, size: usize) {
-        self.bytes_allocated = self
-            .bytes_allocated
-            .saturating_sub((size as u64).saturating_add(MALLOC_HEADER));
+        self.release((size as u64).saturating_add(MALLOC_HEADER));
     }
 
-    /// Charges the creation of an external entity parser (the same bound
-    /// as a root parser's creation, `CREATION_CHARGE`, plus the encoding
-    /// name), checked against the root parser's limits like C's
-    /// `parserCreate` with a parent; `false` = refused, nothing charged.
-    pub fn charge_child_creation(&mut self, encoding_name_len: Option<usize>, direct: u64) -> bool {
-        let increase = CREATION_CHARGE
-            .saturating_add(encoding_name_len.map_or(0, |n| (n as u64).saturating_add(1 + MALLOC_HEADER)));
-        if !self.increase_tolerable(increase, direct) {
+    /// `parserCreate` of an external entity parser (`xmlparse.c`
+    /// 1298-1470), checked against the root parser's limits: the parser
+    /// structure is checked before it is counted (1304-1311), then
+    /// `m_atts`, `m_dataBuf`, the DTD of a general entity parser
+    /// (`own_dtd`; a parameter entity parser shares its parent's) and the
+    /// copy of the encoding name are allocated in this order. On a refusal
+    /// C frees what it allocated (the arrays in reverse order, then the
+    /// structure; after a refused encoding name `XML_ParserFree` releases
+    /// the DTD, `m_atts`, `m_dataBuf` and the structure) and returns
+    /// `NULL`: `false`, the count back where it was.
+    pub fn charge_child_creation(&mut self, encoding_name_len: Option<usize>, own_dtd: bool, direct: u64) -> bool {
+        if !self.tolerable(PARSER_STRUCT_CHARGE, direct) {
             return false;
         }
-        self.add(increase);
+        self.add(PARSER_STRUCT_CHARGE);
+        if !self.alloc(CREATION_ARRAYS[0], direct) {
+            self.release(PARSER_STRUCT_CHARGE);
+            return false;
+        }
+        if !self.alloc(CREATION_ARRAYS[1], direct) {
+            self.free(CREATION_ARRAYS[0]);
+            self.release(PARSER_STRUCT_CHARGE);
+            return false;
+        }
+        if own_dtd && !self.alloc(CREATION_DTD, direct) {
+            self.free(CREATION_ARRAYS[1]);
+            self.free(CREATION_ARRAYS[0]);
+            self.release(PARSER_STRUCT_CHARGE);
+            return false;
+        }
+        if let Some(n) = encoding_name_len
+            && !self.alloc(n.saturating_add(1), direct)
+        {
+            // `XML_ParserFree` of the new parser (1925-1941): the DTD
+            // (its tables have no slots yet), `m_atts`, `m_dataBuf`,
+            // the structure.
+            if own_dtd {
+                self.free(CREATION_DTD);
+            }
+            self.free(CREATION_ARRAYS[0]);
+            self.free(CREATION_ARRAYS[1]);
+            self.release(PARSER_STRUCT_CHARGE);
+            return false;
+        }
         true
     }
 
-    /// Releases what [`AllocTracker::charge_child_creation`] charged
-    /// (`XML_ParserFree` of the external entity parser).
-    pub fn release_child_creation(&mut self, encoding_name_len: Option<usize>) {
-        let charge = CREATION_CHARGE
-            .saturating_add(encoding_name_len.map_or(0, |n| (n as u64).saturating_add(1 + MALLOC_HEADER)));
-        self.bytes_allocated = self.bytes_allocated.saturating_sub(charge);
+    /// `FREE(parser, p)` of `dtdDestroy`: the DTD structure.
+    pub fn release_dtd(&mut self) {
+        self.free(CREATION_DTD);
     }
 
-    /// Charges the parser creation (`CREATION_CHARGE` plus the copy of
-    /// the protocol encoding name, `copyString`). Never refused: C checks
-    /// nothing for a root parser's own structure.
+    /// `FREE(parser, parser)` at the end of `XML_ParserFree`: the parser
+    /// structure.
+    pub fn release_parser_struct(&mut self) {
+        self.release(PARSER_STRUCT_CHARGE);
+    }
+
+    /// `parserCreate` of a root parser: the parser structure (counted
+    /// without a check, 1386-1395), then `m_atts`, `m_dataBuf`, the DTD
+    /// and the copy of the protocol encoding name (`copyString` in
+    /// `parserInit`) as separate allocations. Nothing can be refused: the
+    /// count stays far below the activation threshold, which only the
+    /// parser being created could lower.
     pub fn charge_creation(&mut self, encoding_name_len: Option<usize>) {
-        self.add(CREATION_CHARGE);
-        if let Some(n) = encoding_name_len {
-            self.add((n as u64).saturating_add(1 + MALLOC_HEADER));
+        self.add(PARSER_STRUCT_CHARGE);
+        self.creation = [PARSER_STRUCT_CHARGE, 0, 0, 0, 0];
+        let mut sizes = [Some(CREATION_ARRAYS[0]), Some(CREATION_ARRAYS[1]), Some(CREATION_DTD), None];
+        sizes[3] = encoding_name_len.map(|n| n.saturating_add(1));
+        for (k, size) in (1..).zip(sizes.into_iter().flatten()) {
+            let before = self.bytes_allocated;
+            let granted = self.alloc(size, 0);
+            debug_assert!(granted, "parser creation refused");
+            if let Some(slot) = self.creation.get_mut(k) {
+                *slot = self.bytes_allocated - before;
+            }
         }
     }
 }
@@ -278,6 +431,20 @@ impl PoolShadow {
         (self.total_block_bytes() as u64).saturating_add(blocks.saturating_mul(MALLOC_HEADER))
     }
 
+    /// `poolDestroy` (`xmlparse.c` 8433-8446) on the tracker: the blocks in
+    /// use, newest (C's list head) first, then the free blocks, head first;
+    /// the pool is empty afterwards.
+    pub fn destroy(&mut self, t: &mut AllocTracker) {
+        for size in core::mem::take(&mut self.blocks).into_iter().rev() {
+            t.free(block_bytes(size));
+        }
+        for size in core::mem::take(&mut self.free_blocks).into_iter().rev() {
+            t.free(block_bytes(size));
+        }
+        self.start = 0;
+        self.ptr = 0;
+    }
+
     /// `poolGrow`.
     fn grow<H: Heap + ?Sized>(&mut self, heap: &mut H) -> Result<(), NoMemory> {
         let used = self.end() - self.start;
@@ -323,18 +490,87 @@ impl PoolShadow {
         Ok(())
     }
 
-    /// Appends `len` characters to the current string, growing like C
-    /// (with `POOL_SLACK`).
-    pub fn append<H: Heap + ?Sized>(&mut self, heap: &mut H, len: usize) -> Result<(), NoMemory> {
-        let len = i64::try_from(len).map_err(|_| NoMemory)?;
+    /// `poolAppend` of a converted text of `text.len()` UTF-8 bytes: an
+    /// empty pool grows first, even for an empty text (`! pool->ptr`), then
+    /// the pool grows while the rest of the text does not fit.
+    ///
+    /// `XmlConvert` writes whole characters only and stops up to three
+    /// bytes before the end of a block when the next character does not
+    /// fit, but that changes no allocation: it reports
+    /// `XML_CONVERT_OUTPUT_EXHAUSTED` exactly when the rest of the text is
+    /// longer than the room left (`utf8_toUtf8` compares the lengths; the
+    /// Latin-1, ASCII and UTF-16 converters stop at the first character
+    /// that does not fit, which exists exactly then), and `poolGrow` sizes
+    /// the new block from `end - start`, not from where the conversion
+    /// stopped; the characters left over are written after the growth.
+    /// The shadow therefore needs only the length (D-034 stage 2; the unit
+    /// test checks it against the character-level pool on multi-byte
+    /// texts).
+    ///
+    /// Before each growth the shadow advances over the whole characters
+    /// `XmlConvert` wrote into the room left, so that after a refused
+    /// growth the current string is as long as C's (`storeEntityValue`'s
+    /// caller hands it to the entity declaration handler before returning
+    /// the error, `xmlparse.c` 5929-5958).
+    pub fn append_text<H: Heap + ?Sized>(&mut self, heap: &mut H, text: &[u8]) -> Result<(), NoMemory> {
         if self.blocks.is_empty() {
             self.grow(heap)?;
         }
-        while self.end() - self.ptr < len + POOL_SLACK {
+        let mut rest = text;
+        loop {
+            let room = usize::try_from(self.end() - self.ptr).unwrap_or(0);
+            if rest.len() <= room {
+                self.ptr += i64::try_from(rest.len()).map_err(|_| NoMemory)?;
+                return Ok(());
+            }
+            // The longest prefix of whole UTF-8 characters that fits.
+            let mut k = room;
+            while k > 0 && rest.get(k).is_some_and(|&b| b & 0xC0 == 0x80) {
+                k -= 1;
+            }
+            self.ptr += i64::try_from(k).map_err(|_| NoMemory)?;
+            rest = rest.get(k..).unwrap_or_default();
             self.grow(heap)?;
         }
-        self.ptr += len;
+    }
+
+    /// Whether the pool has a block in use (`poolStart(pool) != NULL`).
+    pub fn has_block(&self) -> bool {
+        !self.blocks.is_empty()
+    }
+
+    /// `poolLength`: characters of the current string.
+    pub fn current_len(&self) -> usize {
+        usize::try_from(self.ptr - self.start).unwrap_or(0)
+    }
+
+    /// `if (! pool->blocks) poolGrow(pool)`: a block for a pool that has
+    /// none in use.
+    pub fn ensure_block<H: Heap + ?Sized>(&mut self, heap: &mut H) -> Result<(), NoMemory> {
+        if self.blocks.is_empty() {
+            self.grow(heap)?;
+        }
         Ok(())
+    }
+
+    /// `poolAppendChars` (`poolGrowUntil`, then the copy) of `n`
+    /// characters; the same allocations as `n` calls of `poolAppendChar`.
+    /// Nothing is written when a growth is refused (character references
+    /// in entity and attribute values, `xmlparse.c` 6970, 7257).
+    pub fn append_chars<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {
+        let n = i64::try_from(n).map_err(|_| NoMemory)?;
+        while self.end() - self.ptr < n {
+            self.grow(heap)?;
+        }
+        self.ptr += n;
+        Ok(())
+    }
+
+    /// `poolChop`: drops the last character of the current string.
+    pub fn chop(&mut self) {
+        if self.ptr > self.start {
+            self.ptr -= 1;
+        }
     }
 
     /// `poolFinish`.
@@ -347,19 +583,46 @@ impl PoolShadow {
         self.ptr = self.start;
     }
 
-    /// Appends a string of `len` characters plus its NUL and finishes it
-    /// (`poolStoreString` + `poolFinish`, `poolCopyString`).
-    pub fn store<H: Heap + ?Sized>(&mut self, heap: &mut H, len: usize) -> Result<(), NoMemory> {
-        self.append(heap, len.saturating_add(1))?;
+    /// `poolStoreString` + `poolFinish`: the converted `text`, then its NUL.
+    pub fn store_text<H: Heap + ?Sized>(&mut self, heap: &mut H, text: &[u8]) -> Result<(), NoMemory> {
+        self.append_text(heap, text)?;
+        self.append_chars(heap, 1)?;
         self.finish();
         Ok(())
     }
 
-    /// Appends a string of `len` characters plus its NUL and discards it
-    /// (`poolStoreString` of a name that is then found in a table).
-    pub fn store_discard<H: Heap + ?Sized>(&mut self, heap: &mut H, len: usize) -> Result<(), NoMemory> {
-        self.append(heap, len.saturating_add(1))?;
+    /// `poolStoreString` + `poolDiscard` (a name looked up in a table and
+    /// found there, or not kept).
+    pub fn store_text_discard<H: Heap + ?Sized>(&mut self, heap: &mut H, text: &[u8]) -> Result<(), NoMemory> {
+        self.append_text(heap, text)?;
+        self.append_chars(heap, 1)?;
         self.discard();
+        Ok(())
+    }
+
+    /// `poolCopyString`: `n` characters and a NUL, finished.
+    pub fn copy<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {
+        self.append_chars(heap, n.saturating_add(1))?;
+        self.finish();
+        Ok(())
+    }
+
+    /// `poolCopyStringNoFinish` (or `n` characters and a NUL appended one
+    /// by one) + `poolDiscard`.
+    pub fn copy_discard<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {
+        self.append_chars(heap, n.saturating_add(1))?;
+        self.discard();
+        Ok(())
+    }
+
+    /// `poolCopyStringN`: `n` characters without a NUL, finished; an empty
+    /// pool grows first even for `n == 0`.
+    pub fn copy_n<H: Heap + ?Sized>(&mut self, heap: &mut H, n: usize) -> Result<(), NoMemory> {
+        if self.blocks.is_empty() {
+            self.grow(heap)?;
+        }
+        self.append_chars(heap, n)?;
+        self.finish();
         Ok(())
     }
 
@@ -388,6 +651,18 @@ pub struct TableShadow {
 }
 
 impl TableShadow {
+    /// `hashTableDestroy` on the tracker: each of the `used` entries of
+    /// `create_size` bytes, then the slot array.
+    pub fn destroy(&mut self, t: &mut AllocTracker, create_size: usize) {
+        for _ in 0..self.used {
+            t.free(create_size);
+        }
+        if self.power > 0 {
+            t.free((1usize << self.power) * POINTER_SIZE);
+        }
+        *self = TableShadow::default();
+    }
+
     /// Charges the insertion of a new entry of `create_size` bytes.
     pub fn insert<H: Heap + ?Sized>(&mut self, heap: &mut H, create_size: usize) -> Result<(), NoMemory> {
         if self.power == 0 {
@@ -425,11 +700,10 @@ pub const EXPAND_SPARE: usize = 24;
 pub const OPEN_ENTITY_SIZE: usize = c_layout::OPEN_INTERNAL_ENTITY;
 /// `sizeof(ATTRIBUTE)` ([`c_layout::ATTRIBUTE`]).
 pub const ATTRIBUTE_SIZE: usize = c_layout::ATTRIBUTE;
-/// `sizeof(NS_ATT)` bound: two `unsigned long`s and a pointer, counted as
-/// three 8-byte words. Equal to C ([`c_layout::NS_ATT`]) where `unsigned
-/// long` has 8 bytes; 8 bytes more than C on Windows (4-byte `unsigned
-/// long`). An over-count, kept until the size-parity stage of D-034.
-pub const NS_ATT_SIZE: usize = 3 * 8;
+/// `sizeof(NS_ATT)` ([`c_layout::NS_ATT`]: two `unsigned long`s and a
+/// pointer; 24 bytes on 64-bit Unix, 16 on Windows x64). Before stage 6 of
+/// D-034 the port charged three 8-byte words everywhere.
+pub const NS_ATT_SIZE: usize = c_layout::NS_ATT;
 /// `sizeof(DEFAULT_ATTRIBUTE)` ([`c_layout::DEFAULT_ATTRIBUTE`]).
 pub const DEFAULT_ATTRIBUTE_SIZE: usize = c_layout::DEFAULT_ATTRIBUTE;
 /// `sizeof(NAME_AND_DEFAULT_ATTRIBUTE)`
@@ -463,7 +737,26 @@ pub const TRACKER_SIZES: &[(&str, usize)] = &[
     ("NAMED_PTR", POINTER_SIZE),
     ("MALLOC_HEADER", MALLOC_HEADER as usize),
     ("INT", core::mem::size_of::<i32>()),
+    ("PARSER", c_layout::PARSER),
+    ("DTD", c_layout::DTD),
+    ("PARSER_M_POSITION", c_layout::PARSER_M_POSITION),
+    ("ACCOUNTING", c_layout::ACCOUNTING),
+    ("MALLOC_TRACKER", c_layout::MALLOC_TRACKER),
+    ("ENTITY_STATS", c_layout::ENTITY_STATS),
 ];
+
+/// A `TAG` of `m_tagStack` as far as its allocations go.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OpenTag {
+    /// Bytes of `buf` (`bufEnd - buf.raw`).
+    pub size: usize,
+    /// Bytes of the converted name (`name.strLen`).
+    pub name_len: usize,
+    /// Bytes of the raw name in the input encoding (`rawNameLength`).
+    pub raw_len: usize,
+    /// The raw name is in `buf` (`rawName == buf.raw + nameLen`).
+    pub raw_stored: bool,
+}
 
 /// The tracker with the shadows of C's structures whose allocations depend
 /// on the input.
@@ -479,8 +772,8 @@ pub struct Tracker {
     pub dtd_pool: PoolShadow,
     /// `dtd->entityValuePool`
     pub entity_value_pool: PoolShadow,
-    /// Buffer sizes of the open tags (`m_tagStack`), innermost last.
-    pub open_tags: alloc::vec::Vec<usize>,
+    /// The open tags (`m_tagStack`), innermost last.
+    pub open_tags: alloc::vec::Vec<OpenTag>,
     /// Buffer sizes of `m_freeTagList`, head last.
     pub free_tags: alloc::vec::Vec<usize>,
     /// `uriAlloc` of each binding, by binding id.
@@ -521,16 +814,28 @@ impl Tracker {
         )
     }
 
-    /// Stores and finishes a string of `len` characters in `which`.
-    pub fn store(&mut self, which: Pool, len: usize, direct: u64) -> Result<(), NoMemory> {
+    /// `poolStoreString` + `poolFinish` of the converted `text` in `which`.
+    pub fn store_text(&mut self, which: Pool, text: &[u8], direct: u64) -> Result<(), NoMemory> {
         let (p, mut h) = self.pool(which, direct);
-        p.store(&mut h, len)
+        p.store_text(&mut h, text)
     }
 
-    /// Stores and discards a string of `len` characters in `which`.
-    pub fn store_discard(&mut self, which: Pool, len: usize, direct: u64) -> Result<(), NoMemory> {
+    /// `poolStoreString` + `poolDiscard` of the converted `text` in `which`.
+    pub fn store_text_discard(&mut self, which: Pool, text: &[u8], direct: u64) -> Result<(), NoMemory> {
         let (p, mut h) = self.pool(which, direct);
-        p.store_discard(&mut h, len)
+        p.store_text_discard(&mut h, text)
+    }
+
+    /// `poolCopyString` of `n` characters in `which`.
+    pub fn copy(&mut self, which: Pool, n: usize, direct: u64) -> Result<(), NoMemory> {
+        let (p, mut h) = self.pool(which, direct);
+        p.copy(&mut h, n)
+    }
+
+    /// `n` characters and a NUL appended to `which`, then discarded.
+    pub fn copy_discard(&mut self, which: Pool, n: usize, direct: u64) -> Result<(), NoMemory> {
+        let (p, mut h) = self.pool(which, direct);
+        p.copy_discard(&mut h, n)
     }
 
     /// Bytes charged for the structures a parser owns itself and C's
@@ -545,8 +850,9 @@ impl Tracker {
         let tags = self
             .open_tags
             .iter()
-            .chain(self.free_tags.iter())
-            .map(|&b| sz(TAG_SIZE) + h + sz(b) + h)
+            .map(|t| t.size)
+            .chain(self.free_tags.iter().copied())
+            .map(|b| sz(TAG_SIZE) + h + sz(b) + h)
             .sum::<u64>();
         let bindings = self
             .binding_alloc
@@ -571,10 +877,12 @@ impl Tracker {
 
     /// The start tag of an element with a converted name of `name_len`
     /// bytes and a raw name of `raw_len` bytes: a `TAG` from the free list
-    /// or a new one, its buffer doubled until the name fits
-    /// (`doContent`, `xmlparse.c` 3750-3793), and enlarged to also hold
-    /// the raw name, as `storeRawNames` does when the input buffer moves
-    /// (3395-3439; charged at once, which is never later than C).
+    /// or a new one, its buffer doubled while the name does not fit before
+    /// `bufEnd - 1` (`doContent`, `xmlparse.c` 3750-3800; where
+    /// `XmlConvert` stops inside the buffer changes no allocation, see
+    /// [`PoolShadow::append_text`]). The raw name is copied into the buffer
+    /// later, by [`Tracker::store_raw_names`] (D-034 stage 5; the port
+    /// charged it here before).
     pub fn open_tag(&mut self, name_len: usize, raw_len: usize, direct: u64) -> Result<(), NoMemory> {
         let mut size = match self.free_tags.pop() {
             Some(s) => s,
@@ -589,33 +897,62 @@ impl Tracker {
                 INIT_TAG_BUF_SIZE
             }
         };
-        // XmlConvert writes into `buf .. bufEnd - 1` and may stop three
-        // bytes early before a multi-byte character.
-        while size < name_len.saturating_add(4) {
+        while size < name_len.saturating_add(1) {
             let new = size.saturating_mul(2);
             if !self.t.realloc(size, new, direct) {
-                self.free_tags.push(size);
+                // The tag is on `m_tagStack` already (xmlparse.c 3764-3766)
+                // when the buffer's growth is refused (3790-3792), so
+                // `XML_ParserFree` releases it first (1874-1887).
+                self.open_tags.push(OpenTag {
+                    size,
+                    name_len,
+                    raw_len,
+                    raw_stored: false,
+                });
                 return Err(NoMemory);
             }
             size = new;
         }
-        let raw_need = name_len.saturating_add(1).saturating_add(raw_len);
-        if raw_need > size {
-            if !self.t.realloc(size, raw_need, direct) {
-                self.free_tags.push(size);
-                return Err(NoMemory);
+        self.open_tags.push(OpenTag {
+            size,
+            name_len,
+            raw_len,
+            raw_stored: false,
+        });
+        Ok(())
+    }
+
+    /// `storeRawNames` (`xmlparse.c` 3395-3440), which `contentProcessor`
+    /// and `externalEntityContentProcessor` call after every successful
+    /// `doContent`: from the innermost open tag outwards, up to the first
+    /// whose raw name is already in its buffer, the buffer is enlarged to
+    /// hold the name, its NUL and the raw name.
+    pub fn store_raw_names(&mut self, direct: u64) -> Result<(), NoMemory> {
+        for tag in self.open_tags.iter_mut().rev() {
+            if tag.raw_stored {
+                break;
             }
-            size = raw_need;
+            let need = tag
+                .name_len
+                .checked_add(1)
+                .and_then(|n| n.checked_add(tag.raw_len))
+                .ok_or(NoMemory)?;
+            if need > tag.size {
+                if !self.t.realloc(tag.size, need, direct) {
+                    return Err(NoMemory);
+                }
+                tag.size = need;
+            }
+            tag.raw_stored = true;
         }
-        self.open_tags.push(size);
         Ok(())
     }
 
     /// The end tag of the innermost element: its `TAG` goes to the free
     /// list.
     pub fn close_tag(&mut self) {
-        if let Some(s) = self.open_tags.pop() {
-            self.free_tags.push(s);
+        if let Some(t) = self.open_tags.pop() {
+            self.free_tags.push(t.size);
         }
     }
 
@@ -812,10 +1149,13 @@ mod tests {
     }
 
     #[test]
-    fn shadow_grows_like_the_string_pool() -> Result<(), NoMemory> {
-        // Strings appended in one piece (the shadow's only operation) with
-        // finish, discard and clear in a deterministic mix: the shadow must
-        // request at least the pool's bytes at every step.
+    fn shadow_allocates_exactly_like_the_string_pool() -> Result<(), NoMemory> {
+        // Every pool operation the shadow replays, on random texts with
+        // one- to four-byte characters (UTF-8 and Latin-1 input) and in a
+        // deterministic mix with finish, discard, chop and clear: the
+        // shadow's allocation requests must be the real pool's (D-021's
+        // port of C's pool), request by request (D-034 stage 2).
+        use crate::tok::Normal;
         let mut seed: u32 = 12345;
         let mut next = || {
             seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12345);
@@ -825,49 +1165,97 @@ mod tests {
         let mut shadow = PoolShadow::default();
         let mut hp = Rec::default();
         let mut hs = Rec::default();
-        let total = |r: &Rec| -> i64 {
-            r.0.iter()
-                .map(|&(k, a, b)| match k {
-                    'm' => b as i64,
-                    'r' => b as i64 - a as i64,
-                    _ => -(a as i64),
-                })
-                .sum()
-        };
-        for _ in 0..3000 {
-            let op = next() % 10;
-            let len = match next() % 4 {
+        // Miri interprets every character of these texts: the full run
+        // (6,000 steps, texts up to 12,000 characters) did not finish in
+        // CI's Miri job within 80 minutes (aarch64: 64 steps took 212 s,
+        // 33 steps 112 s, about 3.4 s a step; 6,000 steps would take
+        // hours). Under Miri: the first 33 steps
+        // of the same sequence, which already make the first block, its
+        // doublings from 1,036 to 16,396 bytes and a second first block
+        // that grows (natively the full run adds seven more requests, at
+        // steps 38 to 3,003).
+        let steps = if cfg!(miri) { 33 } else { 6000 };
+        for step in 0..steps {
+            let op = next() % 14;
+            let chars = match next() % 4 {
                 0 => (next() % 8) as usize,
                 1 => (next() % 600) as usize,
                 2 => (next() % 3000) as usize,
-                _ => (next() % 20_000) as usize,
+                _ => (next() % 12_000) as usize,
             };
-            let s = alloc::vec![b'x'; len];
+            // A UTF-8 text and a Latin-1 input with its UTF-8 conversion.
+            let mut text = alloc::vec::Vec::new();
+            let mut latin1 = alloc::vec::Vec::new();
+            let mut latin1_utf8 = alloc::vec::Vec::new();
+            for _ in 0..chars {
+                let c = match next() % 8 {
+                    0 => 0xE9,
+                    1 => 0x20AC,
+                    2 => 0x1_F600,
+                    _ => 0x61 + next() % 26,
+                };
+                let mut b = [0u8; 4];
+                text.extend_from_slice(char::from_u32(c).unwrap_or('x').encode_utf8(&mut b).as_bytes());
+                let l = if c < 0x100 { c as u8 } else { 0xFC };
+                latin1.push(l);
+                latin1_utf8.extend_from_slice(char::from(l).encode_utf8(&mut b).as_bytes());
+            }
             match op {
-                0..=5 => {
-                    pool.append_chars(&mut hp, &s)?;
+                0..=3 => {
+                    pool.store_string(&mut hp, &Normal::Utf8, &text)?;
+                    pool.finish();
+                    shadow.store_text(&mut hs, &text)?;
+                }
+                4 => {
+                    pool.store_string(&mut hp, &Normal::Latin1, &latin1)?;
+                    pool.discard();
+                    shadow.store_text_discard(&mut hs, &latin1_utf8)?;
+                }
+                5 => {
+                    pool.append(&mut hp, &Normal::Utf8, &text)?;
+                    shadow.append_text(&mut hs, &text)?;
+                }
+                6 => {
+                    let ascii = alloc::vec![b'y'; chars];
+                    pool.copy_string(&mut hp, &ascii)?;
+                    shadow.copy(&mut hs, chars)?;
+                }
+                7 => {
+                    let ascii = alloc::vec![b'y'; chars];
+                    pool.copy_string_no_finish(&mut hp, &ascii)?;
+                    pool.discard();
+                    shadow.copy_discard(&mut hs, chars)?;
+                }
+                8 => {
+                    let ascii = alloc::vec![b'y'; chars];
+                    pool.copy_string_n(&mut hp, &ascii)?;
+                    shadow.copy_n(&mut hs, chars)?;
+                }
+                9 => {
+                    let ascii = alloc::vec![b'z'; chars % 5];
+                    pool.append_chars(&mut hp, &ascii)?;
+                    shadow.append_chars(&mut hs, chars % 5)?;
+                }
+                10 => {
+                    pool.chop();
+                    shadow.chop();
+                }
+                11 => {
                     pool.append_char(&mut hp, 0)?;
                     pool.finish();
-                    shadow.store(&mut hs, len)?;
-                }
-                6 | 7 => {
-                    pool.append_chars(&mut hp, &s)?;
-                    pool.append_char(&mut hp, 0)?;
-                    pool.discard();
-                    shadow.store_discard(&mut hs, len)?;
+                    shadow.append_chars(&mut hs, 1)?;
+                    shadow.finish();
                 }
                 _ => {
                     pool.clear();
                     shadow.clear();
                 }
             }
-            assert!(
-                total(&hs) >= total(&hp),
-                "shadow {} < pool {}",
-                total(&hs),
-                total(&hp)
-            );
+            assert_eq!(hs.0, hp.0, "step {step} op {op}");
         }
+        // The shortened run must still cross blocks: the first block's
+        // four doublings and the growth of a second one.
+        assert!(hp.0.iter().filter(|r| r.0 == 'r').count() >= 5);
         Ok(())
     }
 

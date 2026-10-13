@@ -96,8 +96,10 @@ enum DataIn {
 }
 
 impl Parser {
-    /// `contentProcessor` (`storeRawNames` is not needed: open tags keep a
-    /// copy of their raw name from the start).
+    /// `contentProcessor` and `externalEntityContentProcessor`: `doContent`,
+    /// then `storeRawNames` after a successful one (the port's tags keep
+    /// their raw names anyway; the tracker charges the copy where C makes
+    /// it, D-034 stage 5).
     pub(crate) fn content_processor<H: Handler>(
         &mut self,
         h: &mut H,
@@ -111,13 +113,18 @@ impl Parser {
         // because none of its bytes are direct).
         let start_tag_level = i32::from(self.is_child);
         let have_more = !self.final_buffer;
-        let k = match self.enc {
-            Enc::Known(k) => k,
+        match self.enc {
+            Enc::Known(k) => {
+                with_known!(k, e => self.do_content(h, e, start_tag_level, buf, s, next_ptr, have_more, Account::Direct))?;
+            }
             // Only an external entity can reach content before its
             // encoding is known (an empty or very short entity).
-            Enc::Init(init) => return self.content_undecided(h, init, buf, s, next_ptr, have_more, start_tag_level),
-        };
-        with_known!(k, e => self.do_content(h, e, start_tag_level, buf, s, next_ptr, have_more, Account::Direct))
+            Enc::Init(init) => self.content_undecided(h, init, buf, s, next_ptr, have_more, start_tag_level)?,
+        }
+        let direct = self.direct();
+        self.tracker
+            .store_raw_names(direct)
+            .map_err(|_| Stop::Error(XmlError::NoMemory))
     }
 
     /// `cdataSectionProcessor`.
@@ -372,7 +379,7 @@ impl Parser {
                         // The name is stored in `dtd->pool` for the lookup.
                         let direct = self.direct();
                         self.tracker
-                            .store_discard(Pool::Dtd, name.len(), direct)
+                            .store_text_discard(Pool::Dtd, &name, direct)
                             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
                         let entity = self.dtd.general_entities.find(&self.salt, &name);
                         // First, determine if a check for an existing
@@ -454,7 +461,7 @@ impl Parser {
                     // C keeps the name in `m_tempPool`.
                     let direct = self.direct();
                     self.tracker
-                        .store(Pool::Temp, name.len(), direct)
+                        .store_text(Pool::Temp, &name, direct)
                         .map_err(|_| Stop::Error(XmlError::NoMemory))?;
                     // The token spans the whole start tag, which the
                     // accounting above has counted already.
@@ -735,8 +742,8 @@ impl Parser {
         // Target and data in `m_tempPool`, cleared after the handler.
         let direct = self.direct();
         let no_mem = |_| Stop::Error(XmlError::NoMemory);
-        self.tracker.store(Pool::Temp, target.len(), direct).map_err(no_mem)?;
-        self.tracker.store(Pool::Temp, data.len(), direct).map_err(no_mem)?;
+        self.tracker.store_text(Pool::Temp, &target, direct).map_err(no_mem)?;
+        self.tracker.store_text(Pool::Temp, &data, direct).map_err(no_mem)?;
         normalize_lines(&mut data);
         h.processing_instruction(&target, &data);
         self.tracker.temp_pool.clear();
@@ -760,7 +767,7 @@ impl Parser {
         // The text in `m_tempPool`, cleared after the handler.
         let direct = self.direct();
         self.tracker
-            .store(Pool::Temp, data.len(), direct)
+            .store_text(Pool::Temp, &data, direct)
             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
         normalize_lines(&mut data);
         h.comment(&data);
@@ -875,7 +882,7 @@ impl Parser {
                 // needed normalising was charged while it was built.
                 let direct = self.direct();
                 self.tracker
-                    .store(Pool::Temp, value.len(), direct)
+                    .store_text(Pool::Temp, &value, direct)
                     .map_err(no_mem)?;
             }
             match a.prefix {
@@ -995,10 +1002,13 @@ impl Parser {
                             self.dtd.prefix_name(binding.prefix).unwrap_or_default(),
                         );
                     }
-                    // The expanded name is built in `m_tempPool`.
+                    // The expanded name is built in `m_tempPool` with
+                    // `poolAppendChar`: the URI, the local part and its
+                    // NUL (with triplets the NUL becomes the separator,
+                    // then the prefix and a NUL).
                     let direct = self.direct();
                     self.tracker
-                        .store(Pool::Temp, expanded.len(), direct)
+                        .copy(Pool::Temp, expanded.len(), direct)
                         .map_err(no_mem)?;
                     seen.push((hash, expanded.clone()));
                     att.name = expanded;
@@ -1191,10 +1201,16 @@ impl Parser {
         let m = E::MINBPC;
         let mut ptr = ptr;
         let pool = if in_prolog { Pool::Dtd } else { Pool::Temp };
+        // How the previous token's characters reached the pool: converted
+        // (`poolAppend`, data characters) or appended one by one
+        // (`poolAppendChar`: character references, spaces, predefined
+        // entities).
+        let mut converted = false;
         loop {
             // The pool grows with each token's characters (C: before the
             // next token is checked).
-            self.charge_current(pool, out.len())?;
+            self.charge_current(pool, out, converted)?;
+            converted = false;
             let r = attribute_value_tok(enc, buf, ptr);
             let mut next = r.next.unwrap_or(ptr);
             if !self.diff_tolerated(r.scan, next.saturating_sub(ptr), account)
@@ -1228,6 +1244,7 @@ impl Parser {
                 }
                 Scan::Token(Tok::DataChars) => {
                     out.extend_from_slice(&to_utf8(enc, bytes(buf, ptr, next)));
+                    converted = true;
                 }
                 Scan::TrailingCr | Scan::Token(Tok::AttributeValueS | Tok::DataNewline) => {
                     if r.scan == Scan::TrailingCr {
@@ -1252,7 +1269,7 @@ impl Parser {
                         // The name is stored in `m_temp2Pool` for the lookup.
                         let direct = self.direct();
                         self.tracker
-                            .store_discard(Pool::Temp2, name.len(), direct)
+                            .store_text_discard(Pool::Temp2, &name, direct)
                             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
                         let entity = self.dtd.general_entities.find(&self.salt, &name);
                         // First, determine if a check for an existing

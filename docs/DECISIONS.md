@@ -722,42 +722,70 @@ recorded in DIVERGENCES.md.
 
 - **Finding.** Two structure sizes were below C's `sizeof` (R1, a
   reverse violation of D-030) and DV-1 was wider than documented (the
-  pool-slack window W2 costs a whole pool block). Both were invisible to
+  pool-slack window W2 cost a whole pool block). Both were invisible to
   tests that compared only the final tracker counts of small documents.
 - **Decision (owner, option B).** The port's tracker is brought to C's
-  exact count, allocation event by allocation event, in separate commits,
-  each merged only on green CI on every platform:
-  1. sizes: every tracked structure size computed from C's field list
-     with the target's C layout (`parse::c_layout`, core::ffi types) and
-     compared with the C compiler's `sizeof`/`offsetof` on every CI
-     platform (`tests/tests/tracker_sizes.rs`); under-counts fixed
-     (`BINDING` 56, `NAME_AND_DEFAULT_ATTRIBUTE` 24); over-counts
-     (`ELEMENT_TYPE` 96 vs 88, `NS_ATT` on Windows 24 vs 16) kept until
-     step 6;
-  2. `POOL_SLACK` 0 with an exact model of where `XmlConvert` stops at a
-     block boundary;
-  3. the creation charge equal to C's creation allocations (3,040 bytes
-     on 64-bit Linux), per platform from the oracle where it differs;
-  4. every C allocation the port does not yet shadow, one by one;
-  5. the raw tag name charged when C stores it (`storeRawNames`);
-  6. `ELEMENT_TYPE` (and `NS_ATT`) size parity.
-- **Gate for steps 2-6.** The oracle emits C's tracker events (malloc,
-  realloc, free: size, `xmlparse.c` line, running `bytesAllocated`, peak)
-  and the port emits the matching stream; the tests require equal running
-  totals at every event, equal peaks, equal release behaviour (nested
-  external parsers included) and equal limit outcomes (error code and
-  position). W1, W2 and R1 stay as permanent regressions
-  (`tests/tests/dv1_windows.rs`).
-- **Never looser.** The port must never accept a document C refuses. If a
-  stage shows C-refuses / port-accepts, or the reverse, and the cause is
-  not fixed in the same stage, `CREATION_CHARGE` returns to 16,384 and
-  `POOL_SLACK` to 4 (one line each); the size fixes stay.
+  exact count, allocation event by allocation event, in separate commits;
+  limits are never loosened and no fake charge is added to make streams
+  match. The stages as done:
+  1. sizes from C's field lists with the target's C layout
+     (`parse::c_layout`), compared with the C compiler's
+     `sizeof`/`offsetof` on every CI platform (`tracker_sizes.rs`);
+     `BINDING` 56 and `NAME_AND_DEFAULT_ATTRIBUTE` 24 (R1 closed; PR #14);
+  2. exact pool model, `POOL_SLACK` removed: `PoolShadow` replays
+     `poolAppend` (whole characters, growth while the rest does not fit),
+     `poolAppendChar(s)`, `poolCopyString(N|NoFinish)`, `poolChop`, at
+     every pool call site in C's order (W2 closed);
+  3. creation as C's allocations: the parser structure, `m_atts`,
+     `m_dataBuf`, the DTD and the protocol encoding name, with this
+     target's C sizes (3,040 bytes on 64-bit Unix, 3,008 on Windows x64,
+     whose `XML_ParserStruct` has four 4-byte `unsigned long` members);
+     an external entity parser's creation charged allocation by
+     allocation with C's frees on a refusal (W1 closed);
+  4. the allocations the old creation bound covered: the implicit
+     namespace context through `setContext`, the external subset's
+     entity under C's static name, `setElementTypePrefix` unconditional;
+     4b: `dtd->entityValuePool`'s first block at the start of
+     `storeEntityValue`;
+  5. the raw tag name charged where C copies it (`storeRawNames` after
+     every successful `doContent`), the tag buffer doubled only while
+     smaller than the name length plus one;
+  6. `ELEMENT_TYPE` and `NS_ATT` at C's sizes;
+  7. `XML_ParserFree` replayed event by event in C's order for the root
+     and every child parser;
+  8. refusal paths at C's state, found when the fuzz relation was made
+     exact: C does not check the `lookup` of an `xmlns:` prefix in
+     `getAttributeId` (`xmlparse.c` 7650-7652; the id keeps a NULL
+     prefix and the parse goes on), `XML_ROLE_ENTITY_VALUE` hands the
+     handler what `entityValuePool` holds after a refused growth (NULL
+     without a first block, otherwise the whole characters `poolAppend`
+     wrote), and a tag whose buffer cannot grow is already on
+     `m_tagStack`.
+- **Gate.** The oracle emits C's tracker events (malloc, realloc, free,
+  refusals: size, `xmlparse.c` line, running `bytesAllocated`, peak) and
+  the port the matching stream. `tracker_events.rs` and
+  `tracker_stages.rs` require equal streams from creation through
+  `XML_ParserFree`, both ending at 0, and equal traces; the fuzz targets
+  and every corpus relation (`tests/src/tracker.rs`) require equal traces
+  under the caller's options and, with the threshold at C's final count
+  and at half of it (amplification 1.0), equal traces and equal event
+  streams. "Port refuses, C accepts" is a failure like the reverse.
+- **Never looser.** The port must never accept a document C refuses; a
+  stream difference in that direction is a security defect to be fixed
+  before merging, never an accepted divergence. The old fallback (return
+  to a creation upper bound and a pool slack) no longer exists in the
+  code; a difference in the "port refuses" direction is fixed at its
+  cause too.
 - **Why derive rather than hard-code.** The library cannot link the C
   oracle (it is safe Rust without a C build), so the sizes are computed
   in Rust from the same field lists; the oracle comparison in CI makes a
   mismatch on any platform a test failure instead of a silent
   under-count.
-
+- **Not modelled (no reachable document):** `m_unknownEncodingMem` (no
+  unknown-encoding handler before module 12); the external entity base
+  copied once per run of equal base pointers in `copyEntityTable` (the
+  port copies each, an over-count; bases are always NULL without a base
+  setter). The child encoding-name charge has no test.
 
 ## D-035 Unknown-encoding `toAscii` reads past `fromLim`: replicate inside the data, never outside it (Q-5, 2026-10-12)
 

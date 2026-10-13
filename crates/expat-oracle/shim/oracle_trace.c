@@ -747,6 +747,7 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   buf_push(&t.out, "\n", 1);
 
   tracker_end = oracle_tracker_bytes(p);
+  oracle_tracker_events_mark_end();
   XML_ParserFree(p);
   free(t.text.data);
   if (t.out.failed) {

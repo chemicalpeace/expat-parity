@@ -837,9 +837,9 @@ fn billion_laughs_across_external_entities() {
 }
 
 /// The allocation tracker relation across nested external entity parsers
-/// (`expat_difftest::tracker`): whenever C refuses with tight tracker
-/// limits, the port refuses too; at the default limits the port never
-/// refuses a document C accepts.
+/// (`expat_difftest::tracker`, exact since D-034): equal traces and
+/// counts, and with tight tracker limits equal traces and tracker events
+/// from creation through `XML_ParserFree`.
 #[test]
 fn tracker_relation_across_external_parsers() {
     let mut r = Rng::new(0x11d2_7ac4);
@@ -882,7 +882,7 @@ fn tracker_relation_across_external_parsers() {
 /// Allocations an external subset makes in the shared DTD stay charged to
 /// the root parser after its parser is freed (C: they belong to the root's
 /// DTD): a subset declaring 3,000 entities, then content that references
-/// the last one. The relation's end check (the port's count at least C's)
+/// the last one. The relation's end check (the port's count equal to C's)
 /// and the tight runs see the subset's growth.
 #[test]
 fn tracker_keeps_external_subset_growth() {

@@ -57,11 +57,11 @@ use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
 
 use super::accounting::Account;
-use super::dtd::{Dtd, PrefixId};
+use super::dtd::{BindingId, Dtd, PrefixId};
 use super::error::{Stop, XmlError};
 use super::prolog::{PrologDone, with_known};
-use super::tracker::{ATTRIBUTE_SIZE, MALLOC_HEADER, OPEN_ENTITY_SIZE, Pool};
-use super::{Enc, Handler, INIT_ATTS_SIZE, Parser, Parsing, Processor};
+use super::tracker::Pool;
+use super::{Enc, Handler, Parser, Parsing, Processor};
 use crate::tok::{Encoding, InitEncoding, Normal, Scan, Scanned, State, Tok, ignore_section_tok, init_scan};
 
 /// `CONTEXT_SEP`: separates the items of a context string.
@@ -141,17 +141,17 @@ impl Dtd {
     /// port copies its values.
     pub(crate) fn copy_for_child(
         &self,
+        n: &mut Dtd,
         salt: &crate::siphash::SipKey,
         tr: &mut super::Tracker,
         direct: u64,
-    ) -> Result<Dtd, crate::heap::NoMemory> {
+    ) -> Result<(), crate::heap::NoMemory> {
         use super::dtd::{AttributeId, ElementType, Entity, Prefix};
         use super::tracker::{DEFAULT_ATTRIBUTE_SIZE, NAME_AND_DEFAULT_ATTRIBUTE_SIZE};
-        let mut n = Dtd::new();
         // Copy the prefix table.
         for id in self.prefixes.iter() {
             let name = self.prefixes.key(id).unwrap_or_default();
-            tr.store(Pool::Dtd, name.len(), direct)?;
+            tr.copy(Pool::Dtd, name.len(), direct)?;
             n.prefixes
                 .lookup_or_insert(salt, &mut tr.heap(direct), name, super::dtd::PREFIX_SIZE, Prefix::default)?;
         }
@@ -170,9 +170,10 @@ impl Dtd {
             let old = self.attribute_ids.value(id).copied().unwrap_or_default();
             {
                 let (p, mut h) = tr.pool(Pool::Dtd, direct);
-                p.append(&mut h, 1)?;
-                p.append(&mut h, name.len() + 1)?;
-                p.finish();
+                // `poolAppendChar(&(newDtd->pool), '\0')`, then
+                // `poolCopyString`.
+                p.append_chars(&mut h, 1)?;
+                p.copy(&mut h, name.len())?;
             }
             let (nid, _) = n.attribute_ids.lookup_or_insert(
                 salt,
@@ -181,7 +182,7 @@ impl Dtd {
                 super::dtd::ATTRIBUTE_ID_SIZE,
                 AttributeId::default,
             )?;
-            let prefix = map_prefix(&n, old.prefix);
+            let prefix = map_prefix(n, old.prefix);
             if let Some(a) = n.attribute_ids.value_mut(nid) {
                 a.maybe_tokenized = old.maybe_tokenized;
                 if old.prefix.is_some() {
@@ -198,7 +199,7 @@ impl Dtd {
         for id in self.element_types.iter() {
             let name = self.element_types.key(id).unwrap_or_default();
             let Some(old) = self.element_types.value(id) else { continue };
-            tr.store(Pool::Dtd, name.len(), direct)?;
+            tr.copy(Pool::Dtd, name.len(), direct)?;
             let (nid, _) = n.element_types.lookup_or_insert(
                 salt,
                 &mut tr.heap(direct),
@@ -212,19 +213,31 @@ impl Dtd {
                 if !tr.t.alloc(bytes, direct) {
                     return Err(crate::heap::NoMemory);
                 }
+                // `newE->defaultAtts` exists from here on: `dtdDestroy`
+                // frees it even if the copy fails below.
+                if let Some(e) = n.element_types.value_mut(nid) {
+                    e.alloc_default_atts = count;
+                }
             }
-            let id_att = old.id_att.and_then(|a| map_att(&n, a));
-            let prefix = map_prefix(&n, old.prefix);
+            let id_att = old.id_att.and_then(|a| map_att(n, a));
+            let prefix = map_prefix(n, old.prefix);
             let mut default_atts = Vec::with_capacity(count);
             let mut table = super::tracker::TableShadow::default();
             let mut for_name = alloc::collections::BTreeMap::new();
+            let mut failed = false;
             for (i, d) in old.default_atts.iter().enumerate() {
-                let Some(att) = map_att(&n, d.id) else { continue };
-                if let Some(v) = &d.value {
-                    tr.store(Pool::Dtd, v.len(), direct)?;
+                let Some(att) = map_att(n, d.id) else { continue };
+                if let Some(v) = &d.value
+                    && tr.copy(Pool::Dtd, v.len(), direct).is_err()
+                {
+                    failed = true;
+                    break;
                 }
                 if let alloc::collections::btree_map::Entry::Vacant(e) = for_name.entry(att) {
-                    table.insert(&mut tr.heap(direct), NAME_AND_DEFAULT_ATTRIBUTE_SIZE)?;
+                    if table.insert(&mut tr.heap(direct), NAME_AND_DEFAULT_ATTRIBUTE_SIZE).is_err() {
+                        failed = true;
+                        break;
+                    }
                     e.insert(i);
                 }
                 default_atts.push(super::dtd::DefaultAttribute {
@@ -233,6 +246,8 @@ impl Dtd {
                     value: d.value.clone(),
                 });
             }
+            // The partial copy stays in the new DTD (C fills `newE` in
+            // place), so that releasing it frees what was allocated.
             if let Some(e) = n.element_types.value_mut(nid) {
                 e.id_att = id_att;
                 e.prefix = prefix;
@@ -240,6 +255,9 @@ impl Dtd {
                 e.default_att_for_name = for_name;
                 e.alloc_default_atts = count;
                 e.default_att_table = table;
+            }
+            if failed {
+                return Err(crate::heap::NoMemory);
             }
         }
         // Copy the entity tables.
@@ -252,7 +270,7 @@ impl Dtd {
             for id in old_table.iter() {
                 let name = old_table.key(id).unwrap_or_default();
                 let Some(e) = old_table.value(id) else { continue };
-                tr.store(Pool::Dtd, name.len(), direct)?;
+                tr.copy(Pool::Dtd, name.len(), direct)?;
                 let (nid, _) = new_table.lookup_or_insert(
                     salt,
                     &mut tr.heap(direct),
@@ -261,24 +279,23 @@ impl Dtd {
                     Entity::default,
                 )?;
                 if let Some(sys) = &e.system_id {
-                    tr.store(Pool::Dtd, sys.len(), direct)?;
+                    tr.copy(Pool::Dtd, sys.len(), direct)?;
                     // C copies a base once per run of entities sharing the
                     // same pointer; the port copies it every time (at
                     // least C's bytes).
                     if let Some(b) = &e.base {
-                        tr.store(Pool::Dtd, b.len(), direct)?;
+                        tr.copy(Pool::Dtd, b.len(), direct)?;
                     }
                     if let Some(p) = &e.public_id {
-                        tr.store(Pool::Dtd, p.len(), direct)?;
+                        tr.copy(Pool::Dtd, p.len(), direct)?;
                     }
                 } else {
                     // `poolCopyStringN`: the text without a NUL.
                     let (p, mut h) = tr.pool(Pool::Dtd, direct);
-                    p.append(&mut h, e.text.as_ref().map_or(0, |t| t.len()))?;
-                    p.finish();
+                    p.copy_n(&mut h, e.text.as_ref().map_or(0, |t| t.len()))?;
                 }
                 if let Some(nt) = &e.notation {
-                    tr.store(Pool::Dtd, nt.len(), direct)?;
+                    tr.copy(Pool::Dtd, nt.len(), direct)?;
                 }
                 if let Some(ne) = new_table.value_mut(nid) {
                     *ne = Entity {
@@ -307,7 +324,7 @@ impl Dtd {
         n.scaff_count = self.scaff_count;
         n.scaff_level = self.scaff_level;
         n.scaff_index = self.scaff_index.clone();
-        Ok(n)
+        Ok(())
     }
 }
 
@@ -317,12 +334,14 @@ impl Parser {
     fn external_entity_parser_create(&mut self, context: Option<&[u8]>, encoding: Option<&[u8]>) -> Option<(Parser, u64)> {
         let bytes_before = self.tracker.t.bytes_allocated;
         let direct = self.direct();
-        let mut t = self.tracker.t;
+        // The root's tracker moves into the child and back when the child
+        // is dropped (D-032).
+        let mut t = core::mem::take(&mut self.tracker.t);
         // C checks the new parser structure against the root parser's
         // tracker and then allocates its arrays, the DTD (general
-        // entities) and the encoding name through it; the port charges its
-        // creation bound with one check.
-        if !t.charge_child_creation(encoding.map(<[u8]>::len), direct) {
+        // entities only) and the encoding name through it, one by one.
+        if !t.charge_child_creation(encoding.map(<[u8]>::len), context.is_some(), direct) {
+            self.tracker.t = t;
             return None;
         }
         let ns_sep = self.ns.then_some(self.namespace_separator);
@@ -340,11 +359,18 @@ impl Parser {
         match context {
             Some(context) => {
                 let salt = self.salt;
-                let dtd = self.dtd.copy_for_child(&salt, &mut child.tracker, direct).ok()?;
+                let mut dtd = Dtd::new();
+                let copied = self.dtd.copy_for_child(&mut dtd, &salt, &mut child.tracker, direct);
                 child.dtd = dtd;
                 child.tracker.scaff_size = self.tracker.scaff_size;
                 child.tracker.scaff_index_size = self.tracker.scaff_index_size;
-                if !child.set_context(context) {
+                let ok = copied.is_ok() && child.set_context(context);
+                if !ok {
+                    // C frees the partly created parser (`XML_ParserFree`):
+                    // the root's count returns to its value before the
+                    // creation.
+                    child.release_tracked_allocations();
+                    self.tracker.t = core::mem::take(&mut child.tracker.t);
                     return None;
                 }
                 child.processor = Processor::ExternalEntityInit;
@@ -375,7 +401,13 @@ impl Parser {
     /// the structures the child owns itself (`Tracker::own_bytes`), which
     /// C frees with the child.
     fn external_entity_parser_free(&mut self, child: &mut Parser, bytes_before: u64) {
-        let mut t = child.tracker.t;
+        // `XML_ParserFree` of the child, through the root's tracker, in
+        // C's order; a general entity parser returns the count to its
+        // value before the creation, a parameter entity parser leaves the
+        // shared DTD's growth.
+        child.release_tracked_allocations();
+        let t = core::mem::take(&mut child.tracker.t);
+        debug_assert!(child.is_param_entity || t.bytes_allocated == bytes_before);
         if child.is_param_entity {
             self.dtd = core::mem::take(&mut child.dtd);
             self.tracker.dtd_pool = core::mem::take(&mut child.tracker.dtd_pool);
@@ -384,34 +416,114 @@ impl Parser {
             self.tracker.scaff_index_size = child.tracker.scaff_index_size;
             self.pending_value = core::mem::take(&mut child.pending_value);
             self.charged_len = child.charged_len;
-            t.release_child_creation(child.protocol_encoding_name.as_ref().map(Vec::len));
-            t.bytes_allocated = t.bytes_allocated.saturating_sub(child.own_charged_bytes());
-        } else {
-            t.bytes_allocated = bytes_before;
         }
         self.tracker.t = t;
         self.accounting = child.accounting;
     }
 
-    /// What the port charged for structures this parser owns beyond its
-    /// creation charge and C's `XML_ParserFree` releases with it: the
-    /// tracker's shadows ([`super::Tracker::own_bytes`]), the
-    /// `OPEN_INTERNAL_ENTITY` structures (free list and open lists) and
-    /// the growth of `m_atts`. The shared DTD is not included.
-    fn own_charged_bytes(&self) -> u64 {
-        let open = self.free_entities
-            + self.open_internal_entities.len()
+    /// `XML_ParserFree` (`xmlparse.c` 1865-1942) on the allocation
+    /// tracker: releases everything this parser charged, one event per C
+    /// `FREE`, in C's order: the open tags then the free tag list (each
+    /// tag's buffer, its bindings' URIs and structures, the tag), the
+    /// open-entity records, the free binding list and the inherited
+    /// bindings, `m_tempPool` and `m_temp2Pool` (blocks in use, newest
+    /// first, then free blocks), the protocol encoding name, the DTD unless
+    /// it is a parameter entity parser's shared one (`dtdDestroy`: each
+    /// element type's `defaultAttForName` entries and table and its
+    /// `defaultAtts`, in slot order; the general entity, parameter entity,
+    /// element type, attribute id and prefix tables; `dtd->pool` and
+    /// `entityValuePool`; for the document entity's DTD the scaffold index
+    /// and scaffold; the DTD structure), `m_atts`, `m_groupConnector`,
+    /// `m_dataBuf`, `m_nsAtts` and the parser structure. (`m_buffer` is
+    /// not tracked; `m_unknownEncodingMem` is never allocated: the port has
+    /// no unknown-encoding handler yet.) Afterwards this parser's shadows
+    /// are empty. A root parser's count ends at 0.
+    pub fn release_tracked_allocations(&mut self) {
+        use super::tracker::{
+            ATTRIBUTE_SIZE, CONTENT_SCAFFOLD_SIZE, DEFAULT_ATTRIBUTE_SIZE, NAME_AND_DEFAULT_ATTRIBUTE_SIZE,
+            NS_ATT_SIZE, OPEN_ENTITY_SIZE, TAG_SIZE,
+        };
+        let tr = &mut self.tracker;
+        let dtd = &mut self.dtd;
+        // Tags: the stack (innermost first), then the free list (head
+        // first).
+        let open = core::mem::take(&mut tr.open_tags);
+        for (k, tag) in open.iter().enumerate().rev() {
+            tr.t.free(tag.size);
+            let bindings = self.tag_stack.get(k).and_then(|t| t.bindings);
+            destroy_bindings(tr, dtd, bindings);
+            tr.t.free(TAG_SIZE);
+        }
+        for size in core::mem::take(&mut tr.free_tags).into_iter().rev() {
+            tr.t.free(size);
+            tr.t.free(TAG_SIZE);
+        }
+        let entities = self.open_internal_entities.len()
             + self.open_attribute_entities.len()
-            + self.open_value_entities.len();
-        let entities = (open as u64).saturating_mul(OPEN_ENTITY_SIZE as u64 + MALLOC_HEADER);
-        let atts = (self.atts.len().saturating_sub(INIT_ATTS_SIZE) as u64).saturating_mul(ATTRIBUTE_SIZE as u64);
-        self.tracker.own_bytes().saturating_add(entities).saturating_add(atts)
+            + self.open_value_entities.len()
+            + self.free_entities;
+        for _ in 0..entities {
+            tr.t.free(OPEN_ENTITY_SIZE);
+        }
+        self.free_entities = 0;
+        // `m_freeBindingList` (head first), then `m_inheritedBindings`.
+        for id in core::mem::take(&mut dtd.free_bindings).into_iter().rev() {
+            destroy_one_binding(tr, id);
+        }
+        destroy_bindings(tr, dtd, self.inherited_bindings.take());
+        tr.temp_pool.destroy(&mut tr.t);
+        tr.temp2_pool.destroy(&mut tr.t);
+        if let Some(name) = &self.protocol_encoding_name {
+            tr.t.free(name.len().saturating_add(1));
+        }
+        if !self.is_param_entity {
+            // `dtdDestroy`.
+            let ids: Vec<crate::hash::EntryId> = dtd.element_types.iter().collect();
+            for id in ids {
+                if let Some(e) = dtd.element_types.value_mut(id) {
+                    e.default_att_table.destroy(&mut tr.t, NAME_AND_DEFAULT_ATTRIBUTE_SIZE);
+                    if e.alloc_default_atts > 0 {
+                        tr.t.free(e.alloc_default_atts.saturating_mul(DEFAULT_ATTRIBUTE_SIZE));
+                        e.alloc_default_atts = 0;
+                    }
+                }
+            }
+            core::mem::take(&mut dtd.general_entities).destroy(&mut tr.heap(0));
+            core::mem::take(&mut dtd.param_entities).destroy(&mut tr.heap(0));
+            core::mem::take(&mut dtd.element_types).destroy(&mut tr.heap(0));
+            core::mem::take(&mut dtd.attribute_ids).destroy(&mut tr.heap(0));
+            core::mem::take(&mut dtd.prefixes).destroy(&mut tr.heap(0));
+            tr.dtd_pool.destroy(&mut tr.t);
+            tr.entity_value_pool.destroy(&mut tr.t);
+            if !self.is_child {
+                if tr.scaff_index_size > 0 {
+                    tr.t.free(tr.scaff_index_size.saturating_mul(core::mem::size_of::<i32>()));
+                }
+                if tr.scaff_size > 0 {
+                    tr.t.free(tr.scaff_size.saturating_mul(CONTENT_SCAFFOLD_SIZE));
+                }
+                tr.scaff_index_size = 0;
+                tr.scaff_size = 0;
+            }
+            tr.t.release_dtd();
+        }
+        tr.t.free(self.atts.len().saturating_mul(ATTRIBUTE_SIZE));
+        if tr.group_size > 0 {
+            tr.t.free(tr.group_size);
+            tr.group_size = 0;
+        }
+        tr.t.free(super::INIT_DATA_BUF_SIZE);
+        if tr.ns_atts_power > 0 {
+            tr.t.free((1usize << tr.ns_atts_power).saturating_mul(NS_ATT_SIZE));
+            tr.ns_atts_power = 0;
+        }
+        tr.t.release_parser_struct();
     }
 
     /// `setContext` (`xmlparse.c` 7771-7840): binds the prefixes of the
     /// context string (`prefix=uri`, `=uri` for the default namespace) as
     /// inherited bindings and marks the named general entities open.
-    fn set_context(&mut self, context: &[u8]) -> bool {
+    pub(crate) fn set_context(&mut self, context: &[u8]) -> bool {
         let salt = self.salt;
         let len = context.len();
         // `s` scans, `ctx` is the start of the current item, `temp` is
@@ -422,7 +534,7 @@ impl Parser {
             let c = context.get(s).copied();
             let direct = self.direct();
             if c.is_none() || c == Some(CONTEXT_SEP) {
-                if self.tracker.store_discard(Pool::Temp, temp.len(), direct).is_err() {
+                if self.tracker.copy_discard(Pool::Temp, temp.len(), direct).is_err() {
                     return false;
                 }
                 if let Some(id) = self.dtd.general_entities.find(&salt, &temp)
@@ -439,7 +551,7 @@ impl Parser {
                 let prefix = if temp.is_empty() {
                     PrefixId::Default
                 } else {
-                    if self.tracker.store_discard(Pool::Temp, temp.len(), direct).is_err() {
+                    if self.tracker.copy_discard(Pool::Temp, temp.len(), direct).is_err() {
                         return false;
                     }
                     match self.dtd.lookup_prefix(&salt, &mut self.tracker, direct, &temp) {
@@ -454,7 +566,7 @@ impl Parser {
                 }
                 let uri = context.get(s + 1..j).unwrap_or_default();
                 let direct = self.direct();
-                if self.tracker.store_discard(Pool::Temp, uri.len(), direct).is_err() {
+                if self.tracker.copy_discard(Pool::Temp, uri.len(), direct).is_err() {
                     return false;
                 }
                 let mut inherited = self.inherited_bindings;
@@ -925,5 +1037,27 @@ impl Parser {
                 Err(XmlError::UnexpectedState.into())
             }
         }
+    }
+}
+
+/// `destroyBindings` (`xmlparse.c` 1853-1862) on the tracker: the chain
+/// from `first` through `nextTagBinding`.
+fn destroy_bindings(tr: &mut super::Tracker, dtd: &Dtd, first: Option<BindingId>) {
+    let mut next = first;
+    while let Some(id) = next {
+        next = dtd.bindings.get(id.0).and_then(|b| b.next_tag_binding);
+        destroy_one_binding(tr, id);
+    }
+}
+
+/// One binding of `destroyBindings`: its URI buffer, then the structure.
+fn destroy_one_binding(tr: &mut super::Tracker, id: BindingId) {
+    if let Some(a) = tr.binding_alloc.get_mut(id.0)
+        && *a > 0
+    {
+        let size = *a;
+        *a = 0;
+        tr.t.free(size);
+        tr.t.free(super::tracker::BINDING_SIZE);
     }
 }

@@ -362,8 +362,13 @@ pub fn last_tracker_bytes() -> TrackerBytes {
 /// The C structures whose `sizeof` (`offsetof(BLOCK, s)` for
 /// `BLOCK_HEADER`, `sizeof(size_t) + EXPAT_MALLOC_PADDING` for
 /// `MALLOC_HEADER`, `sizeof(NAMED *)` for `NAMED_PTR`) [`c_sizes`]
-/// returns, in its order (D-034).
-pub const ORACLE_C_SIZE_NAMES: [&str; 16] = [
+/// returns, in its order (D-034). `PARSER` is `struct XML_ParserStruct`;
+/// `PARSER_M_POSITION` is `offsetof(struct XML_ParserStruct, m_position)`
+/// (after the `unsigned long m_nsAttsVersion`); `ACCOUNTING`,
+/// `MALLOC_TRACKER` and `ENTITY_STATS` are the parser's members with an
+/// `unsigned long debugLevel` (stage 3: the parser structure is 32 bytes
+/// smaller on 64-bit Windows).
+pub const ORACLE_C_SIZE_NAMES: [&str; 22] = [
     "TAG",
     "BINDING",
     "PREFIX",
@@ -380,6 +385,12 @@ pub const ORACLE_C_SIZE_NAMES: [&str; 16] = [
     "NAMED_PTR",
     "MALLOC_HEADER",
     "INT",
+    "PARSER",
+    "DTD",
+    "PARSER_M_POSITION",
+    "ACCOUNTING",
+    "MALLOC_TRACKER",
+    "ENTITY_STATS",
 ];
 
 /// The C compiler's sizes of the structures named in
@@ -391,6 +402,98 @@ pub fn c_sizes() -> Vec<(&'static str, usize)> {
     // at most that many values and keeps no pointer.
     let n = unsafe { ffi::oracle_c_sizes(v.as_mut_ptr(), v.len()) };
     ORACLE_C_SIZE_NAMES.iter().copied().zip(v).take(n).collect()
+}
+
+/// The C compiler that built the vendored `xmlparse.c` for the current
+/// target (and so took [`c_sizes`]), from its predefined macros: `MSVC
+/// _MSC_FULL_VER=...` for cl.exe, `clang ...` (clang-cl adds its
+/// `_MSC_VER`), `gcc ...`.
+pub fn c_compiler() -> String {
+    // SAFETY: the shim returns a pointer to a static NUL-terminated string
+    // literal.
+    unsafe { core::ffi::CStr::from_ptr(ffi::oracle_c_compiler()) }
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// One event of libexpat's allocation tracker (`expat_malloc`,
+/// `expat_realloc`, `expat_free`; D-034), as `expat_heap_stat` reports it
+/// with `EXPAT_MALLOC_DEBUG=2`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TrackerEvent {
+    /// `true` for an increase (`+`: malloc, growing realloc, or a refused
+    /// increase), `false` for a decrease (`-`: free, shrinking realloc).
+    pub increase: bool,
+    /// The increase was refused (`expat_heap_increase_tolerable` returned
+    /// false): nothing changed.
+    pub refused: bool,
+    /// Bytes of the change: `sizeof(size_t) + EXPAT_MALLOC_PADDING + size`
+    /// for malloc and free, the size difference for realloc.
+    pub size: u64,
+    /// `bytesAllocated` after the event.
+    pub total: u64,
+    /// `peakBytesAllocated` after the event.
+    pub peak: u64,
+    /// The root parser's `countBytesDirect` at the event.
+    pub direct: u64,
+    /// The `xmlparse.c` line of the `MALLOC` / `REALLOC` / `FREE`.
+    pub line: u32,
+}
+
+/// The tracker events of one [`parse_trace_with_tracker_events`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TrackerEvents {
+    /// Every event, from `XML_ParserCreate` to `XML_ParserFree` (external
+    /// entity parsers included: they count on the root's tracker).
+    pub events: Vec<TrackerEvent>,
+    /// Number of events before `XML_ParserFree` of the root parser.
+    pub at_end: usize,
+}
+
+/// A [`parse_trace`] that also returns every allocation tracker event of
+/// the parse. `Err(OutOfMemory)` when the shim dropped events.
+pub fn parse_trace_with_tracker_events(
+    doc: &[u8],
+    opts: &ParseOptions,
+) -> Result<(Vec<u8>, TrackerEvents), OracleError> {
+    // SAFETY: sets a thread-local flag of the shim.
+    unsafe { ffi::oracle_tracker_events_capture(1) };
+    let trace = parse_trace(doc, opts);
+    let mut raw: *mut ffi::OracleTrackerEvent = std::ptr::null_mut();
+    let mut complete: c_int = 0;
+    let mut at_end: usize = 0;
+    // SAFETY: valid out-pointers; the shim hands over a malloc'd array of
+    // `n` events (or NULL with n == 0) and keeps no pointer to it.
+    let n = unsafe { ffi::oracle_tracker_events_take(&mut raw, &mut complete, &mut at_end) };
+    let events = if raw.is_null() || n == 0 {
+        Vec::new()
+    } else {
+        // SAFETY: `raw` points to `n` initialised events (see above).
+        let slice = unsafe { std::slice::from_raw_parts(raw, n) };
+        slice
+            .iter()
+            .map(|e| TrackerEvent {
+                // Byte view of the C char, neutral to its signedness (c_char is u8 on aarch64, i8 on x86_64).
+                increase: u8::from_ne_bytes(e.op.to_ne_bytes()) == b'+',
+                refused: e.refused != 0,
+                size: e.size,
+                total: e.total,
+                peak: e.peak,
+                direct: e.direct,
+                line: u32::try_from(e.line).unwrap_or(0),
+            })
+            .collect()
+    };
+    if !raw.is_null() {
+        // SAFETY: allocated by the shim with malloc/realloc, freed once.
+        unsafe { ffi::oracle_free(raw.cast()) };
+    }
+    let trace = trace?;
+    if complete == 0 {
+        return Err(OracleError::OutOfMemory);
+    }
+    let at_end = if at_end == 0 { events.len() } else { at_end };
+    Ok((trace, TrackerEvents { events, at_end }))
 }
 
 /// Errors of the oracle wrapper itself (never of the parse being traced).

@@ -93,7 +93,7 @@ impl Parser {
         let salt = self.salt;
         let direct = self.direct();
         self.dtd
-            .element_type(&salt, &mut self.tracker, direct, self.ns, &name)
+            .element_type(&salt, &mut self.tracker, direct, &name)
             .map_err(|_| XmlError::NoMemory.into())
     }
 
@@ -143,7 +143,7 @@ impl Parser {
             // `)` and the NUL in `m_tempPool`, then `poolFinish`.
             let direct = self.accounting.count_bytes_direct;
             let (p, mut heap) = self.tracker.pool(Pool::Temp, direct);
-            p.append(&mut heap, 2)
+            p.append_chars(&mut heap, 2)
                 .map_err(|_| Stop::Error(XmlError::NoMemory))?;
             p.finish();
         }
@@ -183,7 +183,7 @@ impl Parser {
                     let name = to_utf8(enc, bytes(buf, s, next));
                     // `m_doctypeName` lives in `m_tempPool`.
                     let direct = self.direct();
-                    self.tracker.store(Pool::Temp, name.len(), direct).map_err(no_mem)?;
+                    self.tracker.store_text(Pool::Temp, &name, direct).map_err(no_mem)?;
                     self.doctype_name = Some(name);
                     self.doctype_pubid = None;
                 }
@@ -207,9 +207,9 @@ impl Parser {
             Role::DoctypePublicId | Role::EntityPublicId => {
                 if role == Role::DoctypePublicId {
                     self.use_foreign_dtd = false;
-                    let (r, _) = self
+                    let r = self
                         .dtd
-                        .declare_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct, true, EXTERNAL_SUBSET_NAME)
+                        .external_subset_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct)
                         .map_err(no_mem)?;
                     self.decl_entity = Some(r);
                     self.dtd.has_param_entity_refs = true;
@@ -218,16 +218,20 @@ impl Parser {
                 if role == Role::DoctypePublicId && self.handlers.start_doctype_decl {
                     let lit = Self::literal(enc, buf, s, next);
                     let direct = self.direct();
-                    self.tracker.store(Pool::Temp, lit.len(), direct).map_err(no_mem)?;
+                    self.tracker.store_text(Pool::Temp, &lit, direct).map_err(no_mem)?;
                     self.doctype_pubid = Some(normalize_public_id(&lit));
                 }
                 if self.dtd.keep_processing
                     && let Some(r) = self.decl_entity
                 {
-                    let id = normalize_public_id(&Self::literal(enc, buf, s, next));
-                    // `poolStoreString(&dtd->pool, ...)` + `poolFinish`.
+                    // `poolStoreString(&dtd->pool, ...)` of the literal,
+                    // normalised in place, then `poolFinish`: the pool
+                    // keeps the literal's length (D-034 stage 2; the port
+                    // charged the normalised length before, an under-count).
+                    let lit = Self::literal(enc, buf, s, next);
                     let direct = self.direct();
-                    self.tracker.store(Pool::Dtd, id.len(), direct).map_err(no_mem)?;
+                    self.tracker.store_text(Pool::Dtd, &lit, direct).map_err(no_mem)?;
+                    let id = normalize_public_id(&lit);
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.public_id = Some(id);
                     }
@@ -307,10 +311,12 @@ impl Parser {
                         b"("
                     };
                     let value = to_utf8(enc, bytes(buf, s, next));
-                    // The type string grows in `m_tempPool`.
+                    // The type string grows in `m_tempPool`: the prefix
+                    // (`poolAppendString`), then the value (`poolAppend`).
                     let direct = self.direct();
                     let (p, mut heap) = self.tracker.pool(Pool::Temp, direct);
-                    p.append(&mut heap, prefix.len() + value.len()).map_err(no_mem)?;
+                    p.append_chars(&mut heap, prefix.len()).map_err(no_mem)?;
+                    p.append_text(&mut heap, &value).map_err(no_mem)?;
                     let t = self.decl_attribute_type.get_or_insert_with(Vec::new);
                     t.extend_from_slice(prefix);
                     t.extend_from_slice(&value);
@@ -376,16 +382,31 @@ impl Parser {
                     let mut text = Vec::new();
                     self.charged_len = 0;
                     let result = self.call_store_entity_value(h, enc, buf, s + m, next - m, &mut text, Account::None);
-                    self.charge_current(Pool::EntityValue, text.len())?;
+                    // Every token's characters are charged by now (also
+                    // when an error stopped the value).
+                    debug_assert!(result.is_err() || self.charged_len == text.len());
+                    // C hands the handler what `dtd->entityValuePool` holds
+                    // even when storing stopped with an error (xmlparse.c
+                    // 5935-5958): after a refused growth that is the part
+                    // written before it, and NULL when the pool never got
+                    // its first block (7126-7129).
+                    let (has_block, pool_len) = {
+                        let direct = self.direct();
+                        let (p, _) = self.tracker.pool(Pool::EntityValue, direct);
+                        (p.has_block(), p.current_len())
+                    };
+                    if result.is_err() {
+                        text.truncate(pool_len);
+                    }
                     self.finish_current(Pool::EntityValue, false, self.decl_entity.is_some())?;
                     if let Some(r) = self.decl_entity {
                         if i32::try_from(text.len()).is_err() {
                             return Err(XmlError::NoMemory.into());
                         }
-                        let text: alloc::sync::Arc<[u8]> = text.into();
+                        let text: Option<alloc::sync::Arc<[u8]>> = has_block.then(|| text.into());
                         let mut info = None;
                         if let Some(e) = self.dtd.entity_mut(r) {
-                            e.text = Some(text.clone());
+                            e.text = text.clone();
                             info = Some(e.is_param);
                         }
                         if self.handlers.entity_decl
@@ -396,7 +417,7 @@ impl Parser {
                             h.entity_decl(
                                 &name,
                                 is_param,
-                                Some(&text),
+                                text.as_deref(),
                                 self.cur_base.as_deref(),
                                 None,
                                 None,
@@ -414,7 +435,7 @@ impl Parser {
                     self.doctype_sysid = Some(if self.handlers.start_doctype_decl {
                         let lit = Self::literal(enc, buf, s, next);
                         let direct = self.direct();
-                        self.tracker.store(Pool::Temp, lit.len(), direct).map_err(no_mem)?;
+                        self.tracker.store_text(Pool::Temp, &lit, direct).map_err(no_mem)?;
                         lit
                     } else {
                         // Makes m_doctypeSysid non-NULL when no start
@@ -425,9 +446,9 @@ impl Parser {
                         self.check_not_standalone(h)?;
                     }
                     if self.decl_entity.is_none() {
-                        let (r, _) = self
+                        let r = self
                             .dtd
-                            .declare_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct, true, EXTERNAL_SUBSET_NAME)
+                            .external_subset_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct)
                             .map_err(no_mem)?;
                         if let Some(e) = self.dtd.entity_mut(r) {
                             e.public_id = None;
@@ -440,7 +461,7 @@ impl Parser {
                 {
                     let sysid = Self::literal(enc, buf, s, next);
                     let direct = self.direct();
-                    self.tracker.store(Pool::Dtd, sysid.len(), direct).map_err(no_mem)?;
+                    self.tracker.store_text(Pool::Dtd, &sysid, direct).map_err(no_mem)?;
                     let base = self.cur_base.clone();
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.system_id = Some(sysid);
@@ -474,7 +495,7 @@ impl Parser {
                 {
                     let notation = to_utf8(enc, bytes(buf, s, next));
                     let direct = self.direct();
-                    self.tracker.store(Pool::Dtd, notation.len(), direct).map_err(no_mem)?;
+                    self.tracker.store_text(Pool::Dtd, &notation, direct).map_err(no_mem)?;
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.notation = Some(notation);
                     }
@@ -539,7 +560,7 @@ impl Parser {
                 if self.handlers.notation_decl {
                     let name = to_utf8(enc, bytes(buf, s, next));
                     let direct = self.direct();
-                    self.tracker.store(Pool::Temp, name.len(), direct).map_err(no_mem)?;
+                    self.tracker.store_text(Pool::Temp, &name, direct).map_err(no_mem)?;
                     self.decl_notation_name = Some(name);
                 }
             }
@@ -549,7 +570,7 @@ impl Parser {
                 if self.decl_notation_name.is_some() {
                     let lit = Self::literal(enc, buf, s, next);
                     let direct = self.direct();
-                    self.tracker.store(Pool::Temp, lit.len(), direct).map_err(no_mem)?;
+                    self.tracker.store_text(Pool::Temp, &lit, direct).map_err(no_mem)?;
                     self.decl_notation_public_id = Some(normalize_public_id(&lit));
                 }
             }
@@ -559,7 +580,7 @@ impl Parser {
                 {
                     let sysid = Self::literal(enc, buf, s, next);
                     let direct = self.direct();
-                    self.tracker.store(Pool::Temp, sysid.len(), direct).map_err(no_mem)?;
+                    self.tracker.store_text(Pool::Temp, &sysid, direct).map_err(no_mem)?;
                     self.ev_end(enc, Some(s));
                     h.notation_decl(
                         &name,
@@ -757,9 +778,9 @@ impl Parser {
     pub(crate) fn read_external_subset<H: Handler>(&mut self, h: &mut H) -> Result<(), Stop> {
         let salt = self.salt;
         let direct = self.direct();
-        let (r, _) = self
+        let r = self
             .dtd
-            .declare_entity(&salt, &mut self.tracker, direct, true, EXTERNAL_SUBSET_NAME)
+            .external_subset_entity(&salt, &mut self.tracker, direct)
             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
         if self.use_foreign_dtd {
             let base = self.cur_base.clone();
@@ -792,7 +813,7 @@ impl Parser {
         // The name is stored in `dtd->pool` for the lookup.
         let direct = self.direct();
         self.tracker
-            .store_discard(Pool::Dtd, name.len(), direct)
+            .store_text_discard(Pool::Dtd, &name, direct)
             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
         let entity = self.dtd.param_entities.find(&self.salt, &name);
         // First, determine if a check for an existing declaration is
@@ -877,13 +898,26 @@ impl Parser {
     ) -> Result<(), Stop> {
         let m = E::MINBPC;
         let mut ptr = ptr;
+        // C gives `dtd->entityValuePool` a block before anything else, so
+        // that an empty value is not NULL (`xmlparse.c` 7126-7129; D-034
+        // stage 4: the port grew it at the first character).
+        {
+            let direct = self.direct();
+            let (p, mut heap) = self.tracker.pool(Pool::EntityValue, direct);
+            p.ensure_block(&mut heap)
+                .map_err(|_| Stop::Error(XmlError::NoMemory))?;
+        }
         // Nothing to tokenize.
         if ptr >= buf.len() {
             return Ok(());
         }
+        // How the previous token's characters reached the pool (see
+        // `append_attribute_value`).
+        let mut converted = false;
         loop {
             // `dtd->entityValuePool` grows with each token's characters.
-            self.charge_current(Pool::EntityValue, out.len())?;
+            self.charge_current(Pool::EntityValue, out, converted)?;
+            converted = false;
             let r = entity_value_tok(enc, buf, ptr);
             // XmlEntityValueTok doesn't always set the last arg.
             let mut next = r.next.unwrap_or(ptr);
@@ -899,7 +933,7 @@ impl Parser {
                         // The name is stored in `m_tempPool` for the lookup.
                         let direct = self.direct();
                         self.tracker
-                            .store_discard(Pool::Temp, name.len(), direct)
+                            .store_text_discard(Pool::Temp, &name, direct)
                             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
                         let Some(id) = self.dtd.param_entities.find(&self.salt, &name) else {
                             // Not a well-formedness error - see XML 1.0:
@@ -947,6 +981,7 @@ impl Parser {
                 Scan::None => return Ok(()),
                 Scan::Token(Tok::EntityRef | Tok::DataChars) => {
                     out.extend_from_slice(&to_utf8(enc, bytes(buf, ptr, next)));
+                    converted = true;
                 }
                 Scan::TrailingCr | Scan::Token(Tok::DataNewline) => {
                     if r.scan == Scan::TrailingCr {

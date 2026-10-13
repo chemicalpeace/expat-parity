@@ -1,0 +1,36 @@
+# libFuzzer log, trimmed: 198 per-unit NEW/REDUCE lines removed; local paths replaced by <fuzz> and <corpus>.
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running `target/aarch64-unknown-linux-gnu/release/parse_trace -artifact_prefix=<fuzz>/artifacts/parse_trace/ -max_total_time=90 -max_len=65536 -rss_limit_mb=2048 -print_final_stats=1 -artifact_prefix=<artifacts>/ <corpus>`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2496053739
+INFO: Loaded 1 modules   (77899 inline 8-bit counters): 77899 [0xaaaadce7d510, 0xaaaadce9055b), 
+INFO: Loaded 1 PC tables (77899 PCs): 77899 [0xaaaadce90560,0xaaaadcfc0a10), 
+INFO:    14983 files found in <corpus>
+INFO: seed corpus: files: 14983 min: 1b max: 11931b total: 5490982b rss: 43Mb
+#8192	pulse  cov: 13164 ft: 44740 corp: 7672/182Kb exec/s: 1638 rss: 255Mb
+#14985	INITED cov: 17971 ft: 81571 corp: 13402/4087Kb exec/s: 312 rss: 469Mb
+#16384	pulse  cov: 17971 ft: 81573 corp: 13403/4087Kb lim: 11944 exec/s: 334 rss: 485Mb
+#32768	pulse  cov: 17972 ft: 81593 corp: 13414/4116Kb lim: 11944 exec/s: 564 rss: 514Mb
+#65536	pulse  cov: 17972 ft: 81616 corp: 13432/4128Kb lim: 11970 exec/s: 799 rss: 514Mb
+#73825	DONE   cov: 17972 ft: 81622 corp: 13434/4129Kb lim: 11983 exec/s: 802 rss: 514Mb
+###### Recommended dictionary. ######
+"accounting " # Uses: 957
+"\000\000\000\000\000\000\000\000" # Uses: 863
+"\000\000\000\000\000\000\000\020" # Uses: 735
+"doctype a ~" # Uses: 610
+"nsend" # Uses: 483
+"\011\000\000\000" # Uses: 459
+"\377\377\377\377\377\377\377\003" # Uses: 167
+"\003\000\000\000\000\000\000\000" # Uses: 99
+"extend 0 1 " # Uses: 53
+"comment" # Uses: 38
+"\377\376<\000" # Uses: 33
+"\0033333333" # Uses: 3
+###### End of recommended dictionary. ######
+Done 73825 runs in 92 second(s)
+stat::number_of_executed_units: 73825
+stat::average_exec_per_sec:     802
+stat::new_units_added:          198
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              514
