@@ -158,8 +158,11 @@ with allocation failures, white-box).
    and lcov calls are unchanged. CI run 38299714072 on 1445f800: all 9
    jobs green, the Ubuntu coverage `-dump` step completed without SIGABRT,
    95.10 % lines. One successful run does not prove the race is gone (the
-   earlier failure was intermittent). Integrated tree (PR #16 + #19 + #18):
-   coverage pending its first CI run.
+   earlier failure was intermittent). Integrated tree (PR #16 + #19 + #18,
+   d655b6e3), CI run 38424278882 (all 9 jobs green): 95.12 % lines,
+   95.39 % regions on ubuntu, macOS and Windows; 93.26 % functions on
+   Linux and macOS, 93.25 % on Windows (lines 7,738 / 8,135 on Linux and
+   macOS, 7,734 / 8,131 on Windows).
 6. Module 12: public `expat::Parser` on top of `parse::Parser`: default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt
