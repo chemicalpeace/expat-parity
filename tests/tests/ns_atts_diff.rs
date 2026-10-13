@@ -13,7 +13,8 @@
 //! reused table does not report stale entries. The allocation tracker
 //! charges the table's growth (`tracker.rs` `ns_atts`): a threshold sweep
 //! checks that wherever C stops with `XML_ERROR_NO_MEMORY`, the port does
-//! too (the module 11c relation, `expat_difftest::tracker`).
+//! too, at the same point and with the same trace (exact parity, D-034,
+//! `expat_difftest::tracker`).
 
 use expat_difftest::diff::option_matrix;
 use expat_difftest::port::port_trace;
@@ -160,9 +161,9 @@ fn ns_atts_growth_matches_c() {
     );
 }
 
-/// Threshold sweep (amplification 1.0) on the largest tags: every
-/// threshold at which C refuses makes the port refuse; plus the threshold
-/// just below C's tracked peak, found by binary search.
+/// Threshold sweep (amplification 1.0) on the largest tags: at every
+/// threshold the port's trace equals C's, including where C refuses; plus
+/// the threshold just below C's tracked peak, found by binary search.
 #[test]
 fn ns_atts_tracker_relation() {
     let mut failures = Vec::new();
@@ -190,12 +191,23 @@ fn ns_atts_tracker_relation() {
                 },
                 ..o.clone()
             };
+            // Exact parity (D-034): a refusal shows as equal traces, so C's
+            // refusals are counted from its trace, and both other relations
+            // are failures (as in `tracker::check_from`).
             let mut probe = |thr: u64| {
                 let oo = with(thr);
-                match tracker::run(doc, &oo).map(|r| tracker::relation(&r, &oo)) {
-                    Ok(Ok(Relation::BothNoMemory)) => c_refusals += 1,
-                    Ok(Ok(Relation::Equal | Relation::PortStricter)) => {}
-                    Ok(Err(e)) => failures.push(format!("{id} thr={thr}: {e}")),
+                match tracker::run(doc, &oo).and_then(|r| Ok((tracker::relation(&r, &oo)?, r))) {
+                    Ok((Relation::Equal, r)) => {
+                        if tracker::refused(&r.c) {
+                            c_refusals += 1;
+                        }
+                    }
+                    Ok((Relation::BothNoMemory, _)) => failures.push(format!(
+                        "{id} thr={thr}: C and the port both refuse but stop differently"
+                    )),
+                    Ok((Relation::PortStricter, _)) => failures.push(format!(
+                        "{id} thr={thr}: the port refuses where C accepts"
+                    )),
                     Err(e) => failures.push(format!("{id} thr={thr}: {e}")),
                 }
             };
