@@ -41,6 +41,7 @@ pub(crate) struct OracleOptions {
     pub(crate) use_foreign_dtd: c_int,
     pub(crate) ext_data: *const u8,
     pub(crate) ext_len: usize,
+    pub(crate) ext_encoding: *const c_char,
 }
 
 /// Mirror of `struct oracle_role_state`.

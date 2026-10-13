@@ -251,6 +251,9 @@ pub struct ParseOptions {
     /// The external entities [`ExtHandler::Read`] can read, by system
     /// identifier (in memory: nothing is ever fetched).
     pub ext_entities: Vec<(Vec<u8>, Vec<u8>)>,
+    /// The `encodingName` argument [`ExtHandler::Read`] passes to every
+    /// `XML_ExternalEntityParserCreate` call (`None`: `NULL`, the default).
+    pub ext_encoding: Option<String>,
 }
 
 /// The test external entity reference handler of a parse (module 11d).
@@ -267,7 +270,8 @@ pub enum ExtHandler {
     Accept,
     /// The handler reads the entity whose system identifier is in
     /// [`ParseOptions::ext_entities`] through an external entity parser
-    /// (`XML_ExternalEntityParserCreate`), fed like the document, traces
+    /// (`XML_ExternalEntityParserCreate` with [`ParseOptions::ext_encoding`]
+    /// as its `encodingName`), fed like the document, traces
     /// `extend <ok> <code> <line> <column> <byte index>` and returns the
     /// child's status; an unknown identifier is accepted without reading.
     /// At most [`EXT_MAX_DEPTH`] nested children (`extdepth`).
@@ -525,6 +529,10 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
         Some(e) => Some(CString::new(e.as_bytes()).map_err(|_| OracleError::EncodingHasNul)?),
         None => None,
     };
+    let ext_encoding = match &opts.ext_encoding {
+        Some(e) => Some(CString::new(e.as_bytes()).map_err(|_| OracleError::EncodingHasNul)?),
+        None => None,
+    };
     // Lives until the call returns; the shim only reads it during the parse.
     let records = ext_records(&opts.ext_entities);
     let c_opts = ffi::OracleOptions {
@@ -564,11 +572,14 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
         use_foreign_dtd: c_int::from(opts.use_foreign_dtd),
         ext_data: records.as_ptr(),
         ext_len: records.len(),
+        ext_encoding: ext_encoding
+            .as_ref()
+            .map_or(std::ptr::null(), |e| e.as_ptr()),
     };
     let mut out: *mut u8 = std::ptr::null_mut();
     let mut out_len: usize = 0;
     // SAFETY: `doc` is a live slice whose length fits in `int` (checked
-    // above); `c_opts` and the `encoding` CString it points into outlive the
+    // above); `c_opts` and the `encoding` and `ext_encoding` CStrings it points into outlive the
     // call; `out`/`out_len` are valid out-pointers.
     let rc = unsafe {
         ffi::oracle_parse_trace(doc.as_ptr(), doc.len(), &c_opts, &mut out, &mut out_len)

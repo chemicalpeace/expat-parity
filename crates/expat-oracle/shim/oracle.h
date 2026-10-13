@@ -74,7 +74,7 @@ struct oracle_options {
      ext_handler 3 (step D2): after tracing, the handler looks the system
      identifier up in ext_data (records: u32 LE length + system id, u32 LE
      length + bytes) and, if found, reads the bytes from memory through
-     XML_ExternalEntityParserCreate(p, context, NULL), fed like the
+     XML_ExternalEntityParserCreate(p, context, ext_encoding), fed like the
      document (chunk_size, buffer_api), traces
      "extend <ok> <code> <line> <column> <byteindex>" for the child and
      returns its status; not found: XML_STATUS_OK without reading. Nesting
@@ -86,6 +86,9 @@ struct oracle_options {
   int use_foreign_dtd;
   const unsigned char *ext_data;
   size_t ext_len;
+  /* The encodingName argument ext_handler 3 passes to every
+     XML_ExternalEntityParserCreate call (NULL: no name, the default). */
+  const char *ext_encoding;
 };
 
 #define ORACLE_EXT_MAX_DEPTH 16

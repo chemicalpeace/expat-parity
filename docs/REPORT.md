@@ -974,8 +974,10 @@ behaviour and defaults are C's (D-026).
    `XML_GetInputContext` are module 12; their branches in the DTD code are
    uncovered. External entity parsers exist inside `expat::parse` but have
    no public API yet.
-3. The `encoding` argument of `XML_ExternalEntityParserCreate` is never
-   exercised (both test handlers pass NULL).
+3. The `encoding` argument of `XML_ExternalEntityParserCreate` was never
+   exercised (both test handlers passed NULL); since `ext_encoding_diff`
+   it is (docs/EXTERNAL-ENTITY-ENCODING.md, no difference). The
+   unknown-encoding handler branch remains module 12.
 4. `XML_UnparsedEntityDeclHandler` is not compared.
 5. Allocation refusals are compared in aggregate (relation, sweeps), not
    at each allocation point; `m_nsAtts` growth is uncovered.
@@ -1252,6 +1254,31 @@ same sequence, which already make the first block, its doublings from
 at least five block growths (natively the full run adds seven more
 requests, at steps 38 to 3,003). With that, the CI command passes
 locally (aarch64): 49 unit tests and 16 doctests, 252 s wall time.
+
+### External entity encoding (`ext_encoding_diff`, docs/EXTERNAL-ENTITY-ENCODING.md)
+
+The harness option `ParseOptions::ext_encoding` passes an `encodingName`
+to every `XML_ExternalEntityParserCreate` of the `Read` test handler, in
+the C shim and in the port adapter alike (`None` = NULL, the previous
+behaviour). `tests/tests/ext_encoding_diff.rs` records C and the port
+separately per case and compares them: 4 entity contexts (general entity,
+external subset, parameter entity, parameter entity inside an entity
+value) x 42 bodies (UTF-8 / UTF-16LE / UTF-16BE with and without BOM,
+ISO-8859-1, consistent / inconsistent / version-only / standalone / empty /
+unknown text declarations, BOM vs declaration conflicts, child parse
+errors) x 10 names x 4 parent encodings x 3 feedings (20,160 pairs), a
+configuration matrix (parameter entity parsing, namespaces, triplets,
+foreign DTD, standalone, not-standalone handler, handler modes;
+138,252 pairs), nested children (120) and 24 pins of C's behaviour.
+**No difference.** Six library mutations (BOM rules, declaration ignored
+when a name is given, name ignored, entity-value text declaration) and a
+harness mutation were each caught. C behaviour worth knowing: the parent's
+encoding is never inherited; a UTF-16 BOM wins over an explicit UTF-8 /
+US-ASCII / other-byte-order name (except ISO-8859-1 in content); a given
+name makes the declared encoding irrelevant; a parameter entity inside an
+entity value takes XML-declaration rules for its text declaration
+(`processXmlDecl(parser, 0, ...)`). Not covered: the unknown-encoding
+handler (module 12).
 
 ## Divergences
 
