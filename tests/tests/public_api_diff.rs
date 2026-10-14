@@ -16,8 +16,13 @@
 //! - T3: calls after the end (after the final call, after an error,
 //!   including deferred calls after an error that C answers with
 //!   `XML_STATUS_OK`), on fixed cases and random call sequences; the result
-//!   and code of every call, and the position of the first error, must
-//!   equal C's.
+//!   and code of every call, and the position of every error, must equal
+//!   C's. The public API reads the position whenever it returns an error,
+//!   and each read moves C's position on (`m_positionPtr`), so the C side
+//!   is `buffer_run_with_error_positions`, which reads it after every
+//!   failed call in the same way; the oracle tests below check that this
+//!   mode is the C library's behaviour and leaves the default mode as it
+//!   was.
 
 use expat::{ErrorCode, Parser};
 use expat_difftest::docgen::{Rng, document, dtd_document};
@@ -49,6 +54,67 @@ fn c_run(doc: &[u8], ops: &[BufferOp]) -> (Vec<Call>, (u64, u64, i64)) {
         }
     }
     (calls, end.expect("end line"))
+}
+
+/// A call's result with the position read after it if it failed.
+type CallPos = (Call, Option<(u64, u64, i64)>);
+
+/// C's results with the position read after every failed call
+/// (`buffer_run_with_error_positions`), and the `end` line.
+fn c_run_error_positions(doc: &[u8], ops: &[BufferOp]) -> (Vec<CallPos>, (u64, u64, i64)) {
+    let out = expat_oracle::buffer_run_with_error_positions(doc, ops, false, true);
+    let mut calls: Vec<CallPos> = Vec::new();
+    let mut end = None;
+    for line in out.lines() {
+        let f: Vec<&str> = line.split(' ').collect();
+        let pos = || -> (u64, u64, i64) {
+            (
+                f[1].parse().expect("line"),
+                f[2].parse().expect("column"),
+                f[3].parse().expect("byte index"),
+            )
+        };
+        match f[0] {
+            "end" => end = Some(pos()),
+            "pos" => {
+                let last = calls.last_mut().expect("pos follows a call");
+                assert_eq!(last.0.0, 0, "pos only after a failed call");
+                assert!(last.1.replace(pos()).is_none(), "one pos per call");
+            }
+            _ => calls.push((
+                (f[0].parse().expect("status"), f[1].parse().expect("code")),
+                None,
+            )),
+        }
+    }
+    for (call, pos) in &calls {
+        assert_eq!(call.0 == 0, pos.is_some(), "every failed call has a pos");
+    }
+    (calls, end.expect("end line"))
+}
+
+/// The public API's results for every call, with the position of each
+/// error.
+fn port_run_error_positions(doc: &[u8], ops: &[BufferOp]) -> Vec<CallPos> {
+    let mut p = Parser::new(SALT);
+    let mut cur = 0usize;
+    let mut calls = Vec::new();
+    for op in ops {
+        let BufferOp::Parse { n, is_final } = *op else {
+            panic!("only XML_Parse operations are compared");
+        };
+        let k = usize::try_from(n).unwrap_or(0).min(doc.len() - cur);
+        let r = p.parse(&doc[cur..cur + k], is_final);
+        cur += k;
+        calls.push(match r {
+            Ok(()) => ((1, 0), None),
+            Err(e) => (
+                (0, e.code().to_c()),
+                Some((e.line(), e.column(), e.byte_index())),
+            ),
+        });
+    }
+    calls
 }
 
 /// The public API's results for the same calls (all of them, or up to the
@@ -114,17 +180,16 @@ fn check_until_first_error(id: &str, doc: &[u8], ops: &[BufferOp]) -> bool {
     }
 }
 
-/// Compares the result and code of every call of `ops`, and the position
-/// of the first error. Returns the C results.
-///
-/// Only the first error's position is compared: the public API reads the
-/// position at every error, and in C (as in the port) each read after a
-/// further failing call advances the column again from `m_positionPtr`
-/// (which `XML_Parse` resets to the start of the call) to `m_eventPtr`,
-/// while `oracle_buffer_run` reads it only once, after the last call. The
-/// two sides read the position at the same points only up to the first
-/// error.
+/// Compares the result and code of every call of `ops` and the position of
+/// every error, the first one also against a C run that reads no position
+/// before it. Returns the C results.
 fn check_all(id: &str, doc: &[u8], ops: &[BufferOp]) -> Vec<Call> {
+    let (c_pos_calls, _) = c_run_error_positions(doc, ops);
+    let p_pos_calls = port_run_error_positions(doc, ops);
+    assert_eq!(
+        p_pos_calls, c_pos_calls,
+        "{id}: results or error positions differ (left port, right C); ops {ops:?}"
+    );
     let (c_calls, _) = c_run(doc, ops);
     let (p_calls, _) = port_run(doc, ops, false);
     assert_eq!(
@@ -268,6 +333,15 @@ fn t3_final_call_after_an_error() {
     let calls = check_all("after error", doc, &ops);
     let mismatch = ErrorCode::TagMismatch.to_c();
     assert_eq!(calls, [(0, mismatch), (0, mismatch), (0, mismatch)]);
+    let positions: Vec<_> = port_run_error_positions(doc, &ops)
+        .into_iter()
+        .map(|(_, pos)| pos)
+        .collect();
+    assert_eq!(
+        positions,
+        [Some((1, 5, 5)), Some((1, 10, 5)), Some((1, 15, 5))],
+        "the column read after each repeated error advances as in C"
+    );
 }
 
 /// After an error in a non-final call, later calls that the
@@ -294,10 +368,107 @@ fn t3_deferred_call_after_an_error_is_ok() {
     assert_eq!(calls, [(1, 0), (1, 0), (0, junk), (1, 0), (1, 0)]);
 }
 
+/// The oracle's error-position mode against itself and against the C
+/// library's documented behaviour, so the expected values of the tests
+/// above are C's and not the port's.
+#[test]
+fn oracle_error_positions_mode() {
+    // 1. Repeated reads after repeated errors: `XML_Parse` resets
+    //    `m_positionPtr` to the start of each call, and each read advances
+    //    the column from there to `m_eventPtr` again (xmlparse.c,
+    //    `XML_GetCurrentColumnNumber`), so the column grows by the error's
+    //    column at every read while the line and byte index stay.
+    let doc = b"<a></b>";
+    let ops = [parse(7, true), parse(0, true), parse(0, true)];
+    let (calls, end) = c_run_error_positions(doc, &ops);
+    let mismatch = ErrorCode::TagMismatch.to_c();
+    assert_eq!(
+        calls,
+        [
+            ((0, mismatch), Some((1, 5, 5))),
+            ((0, mismatch), Some((1, 10, 5))),
+            ((0, mismatch), Some((1, 15, 5))),
+        ]
+    );
+    // The `end` read is one more read without a call in between: it moves
+    // nothing, because `m_positionPtr` already equals `m_eventPtr`.
+    assert_eq!(end, (1, 15, 5));
+    // Without per-call reads, the single `end` read sees one advance.
+    assert_eq!(c_run(doc, &ops).1, (1, 5, 5));
+
+    // 2. On many runs: the mode only adds `pos` lines and changes nothing
+    //    else a read does not change. Every per-call state line is the
+    //    default mode's up to the first failed call; after it, only the
+    //    `m_positionPtr` field (the tenth) may differ, since a read moves
+    //    it. With no failed call the outputs are identical. The first
+    //    `pos` equals the default mode's `end` after a run cut at that
+    //    call.
+    let mut r = Rng::new(0x7075_626c_6963_0004);
+    let (mut runs, mut with_errors, mut multi_errors) = (0, 0, 0);
+    for (id, doc) in documents() {
+        let mut ops = random_pieces(&mut r, &doc);
+        for _ in 0..r.below(4) {
+            ops.push(parse(
+                i32::try_from(r.below(3)).expect("small"),
+                r.one_in(2),
+            ));
+        }
+        let plain = expat_oracle::buffer_run(&doc, &ops, false, true);
+        let with = expat_oracle::buffer_run_with_error_positions(&doc, &ops, false, true);
+        let strip = |t: &str| -> Vec<String> {
+            t.lines()
+                .filter(|l| !l.starts_with("pos ") && !l.starts_with("end "))
+                .map(str::to_owned)
+                .collect()
+        };
+        let (calls, _) = c_run_error_positions(&doc, &ops);
+        let first_error = calls.iter().position(|(c, _)| c.0 == 0);
+        let (with_lines, plain_lines) = (strip(&with), strip(&plain));
+        assert_eq!(with_lines.len(), plain_lines.len());
+        for (k, (w, p)) in with_lines.iter().zip(&plain_lines).enumerate() {
+            if first_error.is_none_or(|i| k <= i) {
+                assert_eq!(w, p, "{id}: state of call {k} differs");
+            } else {
+                let without_position_ptr = |l: &str| -> Vec<String> {
+                    l.split(' ')
+                        .enumerate()
+                        .filter(|&(j, _)| j != 9)
+                        .map(|(_, f)| f.to_owned())
+                        .collect()
+                };
+                assert_eq!(
+                    without_position_ptr(w),
+                    without_position_ptr(p),
+                    "{id}: state of call {k} differs beyond m_positionPtr"
+                );
+            }
+        }
+        let errors = calls.iter().filter(|(c, _)| c.0 == 0).count();
+        if errors == 0 {
+            assert_eq!(with, plain, "{id}: no failed call, same output");
+        } else {
+            with_errors += 1;
+            multi_errors += usize::from(errors > 1);
+            let i = calls
+                .iter()
+                .position(|(c, _)| c.0 == 0)
+                .expect("a failed call");
+            assert_eq!(
+                calls[i].1,
+                Some(c_run(&doc, &ops[..=i]).1),
+                "{id}: first pos differs from the default mode"
+            );
+        }
+        runs += 1;
+    }
+    eprintln!("oracle mode: {runs} runs, {with_errors} with an error, {multi_errors} with several");
+    assert!(with_errors > 0 && multi_errors > 0 && with_errors < runs);
+}
+
 #[test]
 fn t3_random_call_sequences() {
     let mut r = Rng::new(0x7075_626c_6963_0003);
-    let (mut runs, mut after_end, mut ok_after_error) = (0, 0, 0);
+    let (mut runs, mut after_end, mut ok_after_error, mut error_calls) = (0, 0, 0, 0);
     for (id, doc) in &documents() {
         let mut ops = Vec::new();
         let mut left = doc.len();
@@ -330,13 +501,14 @@ fn t3_random_call_sequences() {
             after_end += 1;
         }
         let calls = check_all(id, doc, &ops);
+        error_calls += calls.iter().filter(|c| c.0 == 0).count();
         if calls.windows(2).any(|w| w[0].0 == 0 && w[1].0 == 1) {
             ok_after_error += 1;
         }
         runs += 1;
     }
     eprintln!(
-        "random sequences: {runs} runs, {after_end} calls after the end, {ok_after_error} runs with OK after an error"
+        "random sequences: {runs} runs, {after_end} calls after the end, {ok_after_error} runs with OK after an error, {error_calls} error positions compared"
     );
     assert!(
         after_end > 0 && ok_after_error > 0,

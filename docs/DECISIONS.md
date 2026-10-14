@@ -942,10 +942,11 @@ recorded in DIVERGENCES.md.
   `Error` is read when the error is returned. Each read advances the
   position from `m_positionPtr` (which every call resets to its start),
   so after repeated failing calls the column grows with each read (for
-  `<a></b>` and two further final calls: columns 5, 10, 15, the same as a
-  C program reading after every call, checked by hand outside the test
-  suite). The oracle reads the position only after its last call, so the
-  differential test compares the position of the first error only.
+  `<a></b>` and two further final calls: columns 5, 10, 15), as in a C
+  program that reads the position after every failed call. The oracle's
+  `buffer_run_with_error_positions` reads it at the same points, and the
+  differential test compares the position of every error with it; the
+  default `buffer_run` output is unchanged.
 - **Error codes.** `ErrorCode` is `#[non_exhaustive]`, has one variant
   per libexpat 2.9.0 error code except `XML_ERROR_NONE` (44), and
   `to_c()` gives the C value. Both conversions with the parser's
@@ -961,8 +962,7 @@ recorded in DIVERGENCES.md.
   and namespace options, and any release.
 - **Verification.** The mapping is checked against the vendored
   `expat.h` (`api.rs` unit tests, with and without features); results,
-  codes and the first error position are compared with the C oracle call
-  by call (`tests/tests/public_api_diff.rs`: 540 upstream vectors and
+  codes and error positions are compared with the C oracle call by call (`tests/tests/public_api_diff.rs`: 540 upstream vectors and
   2 x 300 generated documents in one call, byte by byte and in random
   pieces, and calls after the end); `crates/expat/tests/public_api.rs`
   uses only the public API and runs in CI with `internal-api` off

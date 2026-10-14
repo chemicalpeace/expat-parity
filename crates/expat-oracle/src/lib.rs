@@ -664,6 +664,33 @@ pub enum BufferOp {
 /// `oracle_buffer_run`; the format is reproduced by the test crate's
 /// `port::buffer_run`).
 pub fn buffer_run(doc: &[u8], ops: &[BufferOp], ns: bool, reparse_deferral: bool) -> String {
+    buffer_run_impl(doc, ops, ns, reparse_deferral, false)
+}
+
+/// [`buffer_run`] that also reads the position after every operation that
+/// returns `XML_STATUS_ERROR`, as an application that calls
+/// `XML_GetCurrentLineNumber64`, `XML_GetCurrentColumnNumber64` and
+/// `XML_GetCurrentByteIndex64` after each failed call: such an operation's
+/// line is followed by `pos <line> <column> <byte index>`. Each read
+/// updates the parser's position (`m_position`, `m_positionPtr`), so the
+/// later positions, and the `end` line, are those of that application.
+/// The other lines are [`buffer_run`]'s.
+pub fn buffer_run_with_error_positions(
+    doc: &[u8],
+    ops: &[BufferOp],
+    ns: bool,
+    reparse_deferral: bool,
+) -> String {
+    buffer_run_impl(doc, ops, ns, reparse_deferral, true)
+}
+
+fn buffer_run_impl(
+    doc: &[u8],
+    ops: &[BufferOp],
+    ns: bool,
+    reparse_deferral: bool,
+    error_positions: bool,
+) -> String {
     let mut flat: Vec<c_int> = Vec::with_capacity(ops.len() * 3);
     for op in ops {
         match *op {
@@ -688,6 +715,7 @@ pub fn buffer_run(doc: &[u8], ops: &[BufferOp], ns: bool, reparse_deferral: bool
             ops.len(),
             c_int::from(ns),
             c_int::from(reparse_deferral),
+            c_int::from(error_positions),
             &mut out,
             &mut out_len,
         )

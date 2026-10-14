@@ -211,6 +211,7 @@ unsafe extern "C" {
         nops: usize,
         ns: c_int,
         deferral: c_int,
+        error_positions: c_int,
         out: *mut *mut u8,
         out_len: *mut usize,
     ) -> c_int;
