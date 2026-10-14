@@ -1,6 +1,6 @@
 # Security policy
 
-`expat-rs` is pre-release software (v0.0.x). Do not rely on it in production yet.
+`Expat-Parity` is pre-release software (v0.0.x). Do not rely on it in production yet.
 
 ## Reporting a vulnerability
 

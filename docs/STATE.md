@@ -31,7 +31,9 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   coverage figures above are PR #13's tree (7,552 lines); see "Next steps"
   5 for the current ones. Next: OOM fault injection per allocation point,
   then module 12.
-- **Remote:** `chemicalpeace/expat-rs`, public. Changes land through short-lived
+- **Remote:** `chemicalpeace/expat-parity`, public (renamed from
+  `chemicalpeace/expat-rs` on 2026-10-14, D-036; the old URL redirects).
+  Changes land through short-lived
   branches and pull requests merged only on green CI (D-013).
 - **CI:** GitHub Actions, jobs: check (fmt, clippy, debt, vendor, generated
   tables, doc, deny), test on ubuntu-latest / macos-latest / windows-latest,

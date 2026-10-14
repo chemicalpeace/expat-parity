@@ -1,4 +1,4 @@
-# External parsed entities: encoding (libexpat 2.9.0 vs expat-rs)
+# External parsed entities: encoding (libexpat 2.9.0 vs Expat-Parity)
 
 Scope: how the encoding of an external parsed entity is chosen when it is
 read through an external entity parser (`XML_ExternalEntityParserCreate`),

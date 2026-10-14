@@ -52,6 +52,8 @@ standing privacy instruction; the owner then explicitly asked for this project
 to be **public** ("bu projeyi Public yap"), which supersedes it for this
 repository only.
 
+*Renamed to `chemicalpeace/expat-parity` on 2026-10-14; see D-036.*
+
 **Blocker (2026-10-11):** the GitHub integration available to the agent lacks the
 `repository_creation`/`administration` permission (`POST /user/repos` and the
 GraphQL `createRepository` both return 403 "Resource not accessible by
@@ -143,6 +145,8 @@ the integration access. `main` was pushed and the first Actions run
 (run 38147233705, commit `ebc8e89`) was green on every job: check, test on
 `ubuntu-latest` and `macos-latest`, Miri, fuzz smoke. From now on "CI green"
 means GitHub Actions. `scripts/ci-local.sh` stays as the local equivalent.
+
+*Renamed to `chemicalpeace/expat-parity` on 2026-10-14; see D-036.*
 
 Workflow from here: every change goes to a short-lived branch, a pull request
 is opened, and it is merged into `main` only after CI on the PR is green.
@@ -812,3 +816,25 @@ recorded in DIVERGENCES.md.
   D-029).
 - **Pinned by** `tests/tests/xmldecl_unknown_diff.rs` (C-differential) and
   `crates/expat/src/tok/tests.rs` `q5` (port-only, Miri in CI).
+
+## D-036 Repository renamed to `expat-parity` (2026-10-14)
+
+- **Context.** Another project publishes a crate named `expat-rs` and uses the
+  same repository name; the owner wanted a distinct name that states this
+  project's aim (behaviour equal to libexpat, checked differentially).
+- **Decision.** The owner renamed the GitHub repository from
+  `chemicalpeace/expat-rs` to `chemicalpeace/expat-parity` on 2026-10-14.
+  The repository object is the same (history, branches, pull requests and
+  Actions runs unchanged); GitHub redirects the old web, git and API URLs.
+  The display name in current documentation is `Expat-Parity`, and the
+  `repository` metadata in `Cargo.toml` points at the new URL.
+- **Unchanged on purpose.** Crate names (`expat`, `expat-oracle`,
+  `expat-difftest`, `expat-bench`, `expat-fuzz`); the oracle hash salt
+  `b"expat-rs-oracle!"` and the trace source name `"expat-rs"`, which are
+  test inputs, not display names (changing them would change hash orders
+  and recorded traces); the `EXPAT_RS_ORACLE_H` include guard; `LICENSE`
+  and `NOTICE`; evidence files, generated output and CI logs, which keep
+  the name they were recorded under; the historical text of D-003 and
+  D-013.
+- **Risk.** The redirect stops working if a new repository named
+  `expat-rs` is ever created under the same account.
