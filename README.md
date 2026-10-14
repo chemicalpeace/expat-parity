@@ -1,4 +1,4 @@
-# expat-rs
+# Expat-Parity
 
 A memory-safe Rust port of [libexpat](https://github.com/libexpat/libexpat)
 2.9.0, the stream-oriented XML parser, verified by differential testing and
