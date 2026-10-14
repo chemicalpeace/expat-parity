@@ -838,3 +838,85 @@ recorded in DIVERGENCES.md.
   D-013.
 - **Risk.** The redirect stops working if a new repository named
   `expat-rs` is ever created under the same account.
+
+## D-037 Design groundwork for the public API: in-callback position and internal `Sink` (module 12, 2026-10-14)
+
+- **Purpose.** This entry prepares the design of the public API
+  (module 12). It does not define that API, does not implement it, and
+  does not establish position parity for callbacks in general. Evidence
+  tags: *Verified* (measured in a temporary, uncommitted experiment, scope
+  stated with each result), *Open* (not tested or not decided).
+
+### 1. Position queried inside a callback: lazy update, copied cache
+
+- **What C does.** *Verified (BOM experiment, XML-declaration handler
+  only).* `XML_GetCurrentLineNumber64` and `XML_GetCurrentColumnNumber64`
+  advance `m_position` from `m_positionPtr` to `m_eventPtr` with the
+  encoding current at the call, so a query can change later positions.
+  With a UTF-8 BOM and `encoding='ISO-8859-1'`, a query in the
+  XML-declaration handler (called before `processXmlDecl` switches the
+  encoding) changes the final column of `gen152` from 63 to 61 and the
+  error column of `gen226` from 56 to 54; line, byte index, byte count
+  and error code are unchanged.
+- **Decision.** A position query from a callback runs the lazy position
+  update at the moment of the query, with the encoding current at that
+  moment, over the document bytes. The parser copies its position cache
+  into the callback context before the callback and writes the advanced
+  cache back to the parser after it. Positions are not updated before
+  callbacks and not deferred to after them.
+- **Evidence, each limited to its scope.**
+  - *Verified (Context spike, start-element handler only):* 352/352 runs,
+    10,672 position reads, equal to C. Not measured for any other handler.
+  - *Verified (BOM experiment, XML-declaration handler only):* the port's
+    getters called during a callback count nothing, because
+    `Parser::call_processor` moves `Parser::buffer` out while the
+    processors run; updating over the processor's document bytes gave C's
+    values for `gen152` and `gen226`.
+  - *Verified (BOM experiment, run-level results):* the experiment
+    covered 7,980 runs: 1,140 documents (540 upstream vectors, plus two
+    separate sets of 300 generated documents each, from seeds
+    `0x5eed_7e47` and `0x5eed_0001`), each parsed under 7 option sets.
+    In every run, a query was set up in the XML-declaration handler on
+    both sides, and the port's `result` and `extend` lines equalled C's.
+    A callback position was compared only in the 2,172 runs where that
+    handler actually ran; the handler did not run in the other 5,808
+    runs, so no callback position was compared in those runs. These are
+    not 7,980 callback-position checks.
+  - Not measured: an eager implementation. That it would differ from C
+    is inferred from the finding above.
+
+### 2. Internal `Sink`
+
+- **Verified need.** *Verified (Context spike, code reading).* On
+  entity-expansion paths the processors' `buf` holds the entity text,
+  not the document, and `internal_entity_processor` takes no buffer,
+  while positions are computed from `event_ptr` in the document. The
+  document slice therefore needs its own path to the callback sites.
+- **Feasibility shown at one site.** *Verified (Context spike,
+  `call_start_element` only).* A crate-private `Sink` with a wrapper that
+  borrows the handler and the document slice, built once in
+  `call_processor`, compiled and passed the workspace tests; the public
+  entry points kept `H: Handler`.
+- **Decision.** The processors use a crate-private `Sink`; it is not part
+  of the public API.
+- **Not decided.** *Open.* Its final shape and names; the remaining
+  handler call sites; external entity parsers; the `NoEvents` path of
+  `add_binding`, which must never build a context; cost.
+
+### 3. Separate decisions, not taken here
+
+- **Stop and resume from a callback.** Stop/resume is outside this
+  design. The relationship to the status checks described in D-023
+  remains to be resolved. *Open.*
+- **UTF-8 guarantee for callback strings (`XmlStr`).** Strings stay
+  bytes until a guarantee is shown; D-002 fixes `XML_Char` as UTF-8, but
+  no test asserts that every string the port hands to a handler is valid
+  UTF-8. *Open.*
+- **Allocation failure.** There is no `try_reserve` in `crates/expat`
+  (*Verified*, code audit of main ad99115a); the tracker's `NoMemory`
+  (D-030, D-034) is unchanged. The policy for a real allocator failure is
+  *Open*.
+- **Trace equality (D-010).** Whether in-callback position queries extend
+  the current trace-equality definition is *Open*; D-010 is unchanged.
+- **Public API and release.** Names, shape, v0.1 scope and any release
+  need the owner's separate approval. *Open.*
