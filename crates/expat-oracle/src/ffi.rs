@@ -223,4 +223,5 @@ unsafe extern "C" {
         ulong_bits: *mut c_int,
     ) -> c_ulonglong;
     pub(crate) fn oracle_expat_version() -> *const c_char;
+    pub(crate) fn oracle_error_string(code: c_int) -> *const c_char;
 }

@@ -784,3 +784,10 @@ const char *
 oracle_expat_version(void) {
   return XML_ExpatVersion();
 }
+
+/* XML_ErrorString for any int, including values outside enum XML_Error
+   (NULL for XML_ERROR_NONE and for every value without a case). */
+const char *
+oracle_error_string(int code) {
+  return XML_ErrorString((enum XML_Error)code);
+}

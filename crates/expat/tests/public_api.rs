@@ -127,3 +127,40 @@ fn errors_are_plain_values() {
     assert_eq!(copy, r);
     assert!(format!("{r:?}").contains("TagMismatch"));
 }
+
+#[test]
+fn error_texts_and_display() {
+    assert_eq!(ErrorCode::TagMismatch.description(), "mismatched tag");
+    assert_eq!(ErrorCode::TagMismatch.to_string(), "mismatched tag");
+    let mut p = Parser::new(SALT);
+    let e = p.parse(b"<a></b>", true).err();
+    assert_eq!(
+        e.map(|e| e.to_string()).as_deref(),
+        Some("mismatched tag at line 1, column 5")
+    );
+    // Line 2: the column counts from the start of that line.
+    let mut p = Parser::new(SALT);
+    let e = p.parse(b"<a>\n</b>", true).err();
+    assert_eq!(e.map(|e| (e.line(), e.column())), Some((2, 2)));
+    assert_eq!(
+        e.map(|e| e.to_string()).as_deref(),
+        Some("mismatched tag at line 2, column 2")
+    );
+}
+
+/// `std::error::Error` exists with the `std` feature (`cargo test -p
+/// expat`); without it (`--no-default-features`) this test is not built.
+#[cfg(feature = "std")]
+#[test]
+fn error_is_a_std_error() {
+    let mut p = Parser::new(SALT);
+    let boxed: Option<Box<dyn std::error::Error>> = p
+        .parse(b"<a></b>", true)
+        .err()
+        .map(|e| Box::new(e) as Box<dyn std::error::Error>);
+    assert_eq!(
+        boxed.as_ref().map(|e| e.to_string()).as_deref(),
+        Some("mismatched tag at line 1, column 5")
+    );
+    assert!(boxed.is_some_and(|e| e.source().is_none()));
+}
