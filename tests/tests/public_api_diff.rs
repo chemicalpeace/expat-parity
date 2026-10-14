@@ -11,8 +11,8 @@
 //!
 //! - T2: whole documents (540 upstream vectors and 2 x 300 generated
 //!   documents) fed in one call, byte by byte, and in random pieces; the
-//!   result of every call up to the first error, and the code and position
-//!   of that error, must equal C's.
+//!   result and code of every call, and the position of every error, must
+//!   equal C's (the same check as T3).
 //! - T3: calls after the end (after the final call, after an error,
 //!   including deferred calls after an error that C answers with
 //!   `XML_STATUS_OK`), on fixed cases and random call sequences; the result
@@ -23,6 +23,10 @@
 //!   failed call in the same way; the oracle tests below check that this
 //!   mode is the C library's behaviour and leaves the default mode as it
 //!   was.
+//! - Error texts (D-039): `ErrorCode::description` of every code equals
+//!   the bytes of the vendored `XML_ErrorString`, which returns `NULL` for
+//!   `XML_ERROR_NONE` and for values outside the enum; `Display for Error`
+//!   writes C's line and column.
 
 use expat::{ErrorCode, Parser};
 use expat_difftest::docgen::{Rng, document, dtd_document};
@@ -498,4 +502,117 @@ fn t3_random_call_sequences() {
         after_end > 0 && ok_after_error > 0,
         "both situations are covered"
     );
+}
+
+/// Every public error code, written out because `ErrorCode` is
+/// `#[non_exhaustive]`; `error_texts_match_xml_error_string` checks that it
+/// holds each C value 1..=44 exactly once.
+const ALL_CODES: [ErrorCode; 44] = [
+    ErrorCode::NoMemory,
+    ErrorCode::Syntax,
+    ErrorCode::NoElements,
+    ErrorCode::InvalidToken,
+    ErrorCode::UnclosedToken,
+    ErrorCode::PartialChar,
+    ErrorCode::TagMismatch,
+    ErrorCode::DuplicateAttribute,
+    ErrorCode::JunkAfterDocElement,
+    ErrorCode::ParamEntityRef,
+    ErrorCode::UndefinedEntity,
+    ErrorCode::RecursiveEntityRef,
+    ErrorCode::AsyncEntity,
+    ErrorCode::BadCharRef,
+    ErrorCode::BinaryEntityRef,
+    ErrorCode::AttributeExternalEntityRef,
+    ErrorCode::MisplacedXmlPi,
+    ErrorCode::UnknownEncoding,
+    ErrorCode::IncorrectEncoding,
+    ErrorCode::UnclosedCdataSection,
+    ErrorCode::ExternalEntityHandling,
+    ErrorCode::NotStandalone,
+    ErrorCode::UnexpectedState,
+    ErrorCode::EntityDeclaredInPe,
+    ErrorCode::FeatureRequiresXmlDtd,
+    ErrorCode::CantChangeFeatureOnceParsing,
+    ErrorCode::UnboundPrefix,
+    ErrorCode::UndeclaringPrefix,
+    ErrorCode::IncompletePe,
+    ErrorCode::XmlDecl,
+    ErrorCode::TextDecl,
+    ErrorCode::Publicid,
+    ErrorCode::Suspended,
+    ErrorCode::NotSuspended,
+    ErrorCode::Aborted,
+    ErrorCode::Finished,
+    ErrorCode::SuspendPe,
+    ErrorCode::ReservedPrefixXml,
+    ErrorCode::ReservedPrefixXmlns,
+    ErrorCode::ReservedNamespaceUri,
+    ErrorCode::InvalidArgument,
+    ErrorCode::NoBuffer,
+    ErrorCode::AmplificationLimitBreach,
+    ErrorCode::NotStarted,
+];
+
+#[test]
+fn error_texts_match_xml_error_string() {
+    let mut values: Vec<u32> = ALL_CODES.iter().map(|c| c.to_c()).collect();
+    values.sort_unstable();
+    assert_eq!(
+        values,
+        (1..=44).collect::<Vec<u32>>(),
+        "one code per C value"
+    );
+    for c in ALL_CODES {
+        let value = i32::try_from(c.to_c()).expect("small");
+        let c_text = expat_oracle::error_string(value)
+            .unwrap_or_else(|| panic!("XML_ErrorString({value}) is NULL"));
+        assert_eq!(
+            c.description().as_bytes(),
+            c_text.as_slice(),
+            "{c:?} = {value}: text differs (left port, right C)"
+        );
+        assert_eq!(c.to_string().as_bytes(), c_text.as_slice(), "{c:?}");
+    }
+    // XML_ERROR_NONE and values outside the enum: C returns NULL; the
+    // public API has no code for any of them (`ErrorCode` holds 1..=44
+    // only, and no error is returned with XML_ERROR_NONE).
+    for value in [0, -1, 45, 46, 1000, i32::MAX, i32::MIN] {
+        assert_eq!(
+            expat_oracle::error_string(value),
+            None,
+            "XML_ErrorString({value})"
+        );
+    }
+}
+
+#[test]
+fn error_display_uses_c_line_and_column() {
+    let docs: [&[u8]; 5] = [
+        b"<a></b>",
+        b"<a>\n</b>",
+        b"<a>\r\n  <b></c>",
+        b"<doc>&undefined;</doc>",
+        b"<?xml version='1.0'?>\n<a x='1' x='2'/>",
+    ];
+    for doc in docs {
+        let ops = one_call(doc);
+        let (c_calls, c_pos) = c_run(doc, &ops);
+        let &[(0, code)] = c_calls.as_slice() else {
+            panic!("{doc:?}: expected one failed call, C gave {c_calls:?}");
+        };
+        let Err(e) = Parser::new(SALT).parse(doc, true) else {
+            panic!("expected an error");
+        };
+        assert_eq!(e.code().to_c(), code);
+        assert_eq!((e.line(), e.column(), e.byte_index()), c_pos);
+        let text = expat_oracle::error_string(i32::try_from(code).expect("small")).expect("text");
+        let expected = format!(
+            "{} at line {}, column {}",
+            String::from_utf8(text).expect("ASCII"),
+            c_pos.0,
+            c_pos.1
+        );
+        assert_eq!(e.to_string(), expected, "{doc:?}");
+    }
 }

@@ -976,3 +976,47 @@ recorded in DIVERGENCES.md.
   inputs. `crates/expat/tests/public_api.rs` uses only the public API
   and runs in CI with `internal-api` off (`cargo test -p expat`, with
   and without default features).
+
+## D-039 Public API: error texts, `Display` and `std::error::Error` (module 12, slice 2, 2026-10-14)
+
+- **Scope.** Added to the public API of D-038, nothing else changed:
+  `ErrorCode::description(self) -> &'static str`, `Display` for
+  `ErrorCode` and for `Error`, and `std::error::Error` for `Error` with
+  the `std` feature.
+- **Texts.** `description` is the text `XML_ErrorString` of the vendored
+  libexpat 2.9.0 returns for the code's C value, as a `match` without a
+  wildcard. The texts were taken from the oracle's `XML_ErrorString`
+  output, not written by hand, and a differential test compares every
+  code's text with it byte by byte. All 44 texts are ASCII.
+- **`XML_ERROR_NONE` and other values.** `XML_ErrorString` returns `NULL`
+  for `XML_ERROR_NONE` and for every value outside the enum (checked for
+  0, -1, 45, 46, 1000, `INT_MAX`, `INT_MIN`). The public API cannot
+  express any of them: `ErrorCode` has the codes 1 to 44 only, has no
+  conversion from a C value, and no error is returned with
+  `XML_ERROR_NONE` (D-038), so `description` is total and never empty.
+- **`Display`.** `ErrorCode` writes its description. `Error` writes
+  `<description> at line <line>, column <column>`, for example
+  `mismatched tag at line 1, column 5`: the values of `Error::line`
+  (from 1) and `Error::column` (from 0), as C's
+  `XML_GetCurrentLineNumber` and `XML_GetCurrentColumnNumber` report
+  them. The byte index is left out: it is an offset in the input rather
+  than a place a reader looks up, it is `-1` when the parser has no
+  current event, and `Error::byte_index` returns it. The format is part
+  of the API from this slice on and is pinned by tests.
+- **`std::error::Error`.** Implemented for `Error` only, under the `std`
+  feature, without a source. `ErrorCode` is a code rather than an error
+  that occurred, so it does not implement it. Without `std`, `Display`
+  uses `core::fmt` only.
+- **Oracle.** `oracle_error_string(int)` in `oracle_trace.c` calls the
+  vendored `XML_ErrorString`; `expat_oracle::error_string` returns its
+  bytes, or `None` for `NULL`, without assuming an encoding. It is used
+  only by the test crate.
+- **Verification.** `tests/tests/public_api_diff.rs`: 44 of 44 texts
+  equal C's, `Display for ErrorCode` equals them, the `NULL` cases above,
+  and `Display for Error` on five documents built from C's code, line and
+  column. `crates/expat/src/api.rs` and
+  `crates/expat/tests/public_api.rs` test the texts and formats with the
+  `internal-api` feature off, with and without `std`; the
+  `std::error::Error` test runs with `std` only.
+- **Outside this slice.** Localised texts, a `source()` chain, `Display`
+  details beyond line and column, and everything outside D-038's scope.

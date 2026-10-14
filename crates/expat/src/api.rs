@@ -1,4 +1,5 @@
-//! The public parser API (module 12, first slice, D-038).
+//! The public parser API (module 12, first slice, D-038; error texts and
+//! `Display`, D-039).
 //!
 //! [`Parser`] wraps the ported parser core (`parse::Parser`) without
 //! callbacks: the document is parsed with the default encoding (detected
@@ -6,6 +7,8 @@
 //! processing. [`Parser::parse`] is `XML_Parse`, and every call goes to the
 //! core, so the results after an error or after the final call are C's
 //! (D-023).
+
+use core::fmt;
 
 use crate::parse::{self, Status, Stop, XmlError};
 
@@ -87,6 +90,10 @@ impl Parser {
 }
 
 /// A parse error: its code and where the parser stood when it occurred.
+///
+/// `Display` writes the code's text and the line and column
+/// (`mismatched tag at line 1, column 5`); with the `std` feature it is a
+/// `std::error::Error`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Error {
     code: ErrorCode,
@@ -251,7 +258,104 @@ impl ErrorCode {
     pub fn to_c(self) -> u32 {
         self.to_internal().to_c()
     }
+
+    /// The libexpat text of the code (`XML_ErrorString`), the same bytes as
+    /// the vendored libexpat 2.9.0 returns for its C value. This is also
+    /// what [`Display`](core::fmt::Display) writes.
+    ///
+    /// ```
+    /// assert_eq!(expat::ErrorCode::TagMismatch.description(), "mismatched tag");
+    /// ```
+    pub fn description(self) -> &'static str {
+        match self {
+            ErrorCode::NoMemory => "out of memory",
+            ErrorCode::Syntax => "syntax error",
+            ErrorCode::NoElements => "no element found",
+            ErrorCode::InvalidToken => "not well-formed (invalid token)",
+            ErrorCode::UnclosedToken => "unclosed token",
+            ErrorCode::PartialChar => "partial character",
+            ErrorCode::TagMismatch => "mismatched tag",
+            ErrorCode::DuplicateAttribute => "duplicate attribute",
+            ErrorCode::JunkAfterDocElement => "junk after document element",
+            ErrorCode::ParamEntityRef => "illegal parameter entity reference",
+            ErrorCode::UndefinedEntity => "undefined entity",
+            ErrorCode::RecursiveEntityRef => "recursive entity reference",
+            ErrorCode::AsyncEntity => "asynchronous entity",
+            ErrorCode::BadCharRef => "reference to invalid character number",
+            ErrorCode::BinaryEntityRef => "reference to binary entity",
+            ErrorCode::AttributeExternalEntityRef => "reference to external entity in attribute",
+            ErrorCode::MisplacedXmlPi => "XML or text declaration not at start of entity",
+            ErrorCode::UnknownEncoding => "unknown encoding",
+            ErrorCode::IncorrectEncoding => "encoding specified in XML declaration is incorrect",
+            ErrorCode::UnclosedCdataSection => "unclosed CDATA section",
+            ErrorCode::ExternalEntityHandling => "error in processing external entity reference",
+            ErrorCode::NotStandalone => "document is not standalone",
+            ErrorCode::UnexpectedState => "unexpected parser state - please send a bug report",
+            ErrorCode::EntityDeclaredInPe => "entity declared in parameter entity",
+            ErrorCode::FeatureRequiresXmlDtd => {
+                "requested feature requires XML_DTD support in Expat"
+            }
+            ErrorCode::CantChangeFeatureOnceParsing => {
+                "cannot change setting once parsing has begun"
+            }
+            ErrorCode::UnboundPrefix => "unbound prefix",
+            ErrorCode::UndeclaringPrefix => "must not undeclare prefix",
+            ErrorCode::IncompletePe => "incomplete markup in parameter entity",
+            ErrorCode::XmlDecl => "XML declaration not well-formed",
+            ErrorCode::TextDecl => "text declaration not well-formed",
+            ErrorCode::Publicid => "illegal character(s) in public id",
+            ErrorCode::Suspended => "parser suspended",
+            ErrorCode::NotSuspended => "parser not suspended",
+            ErrorCode::Aborted => "parsing aborted",
+            ErrorCode::Finished => "parsing finished",
+            ErrorCode::SuspendPe => "cannot suspend in external parameter entity",
+            ErrorCode::ReservedPrefixXml => {
+                "reserved prefix (xml) must not be undeclared or bound to another namespace name"
+            }
+            ErrorCode::ReservedPrefixXmlns => {
+                "reserved prefix (xmlns) must not be declared or undeclared"
+            }
+            ErrorCode::ReservedNamespaceUri => {
+                "prefix must not be bound to one of the reserved namespace names"
+            }
+            ErrorCode::InvalidArgument => "invalid argument",
+            ErrorCode::NoBuffer => "a successful prior call to function XML_GetBuffer is required",
+            ErrorCode::AmplificationLimitBreach => {
+                "limit on input amplification factor (from DTD and entities) breached"
+            }
+            ErrorCode::NotStarted => "parser not started",
+        }
+    }
 }
+
+impl fmt::Display for ErrorCode {
+    /// Writes [`ErrorCode::description`].
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.description())
+    }
+}
+
+impl fmt::Display for Error {
+    /// Writes `<description> at line <line>, column <column>`, for example
+    /// `mismatched tag at line 1, column 5`: the line counted from 1 and the
+    /// column from 0, as [`Error::line`] and [`Error::column`] return them
+    /// (`XML_GetCurrentLineNumber`, `XML_GetCurrentColumnNumber`). The byte
+    /// index is not written: it is an offset in the input rather than a
+    /// place a reader looks up, and it is `-1` when the parser has no current
+    /// event; [`Error::byte_index`] returns it.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} at line {}, column {}",
+            self.code, self.line, self.column
+        )
+    }
+}
+
+/// With the `std` feature: `Error` is a [`std::error::Error`] without a
+/// source.
+#[cfg(feature = "std")]
+impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
@@ -309,6 +413,26 @@ mod tests {
             let debug = found.first().map(|c| format!("{c:?}"));
             assert_eq!(debug, Some(camel(name)), "value {value}");
         }
+    }
+
+    #[test]
+    fn error_code_display_is_its_description() {
+        for &c in ErrorCode::ALL {
+            let text = c.description();
+            assert!(!text.is_empty() && text.is_ascii(), "{c:?}");
+            assert_eq!(format!("{c}"), text);
+        }
+    }
+
+    #[test]
+    fn error_display_writes_text_line_and_column() {
+        let e = Error {
+            code: ErrorCode::TagMismatch,
+            line: 3,
+            column: 0,
+            byte_index: -1,
+        };
+        assert_eq!(format!("{e}"), "mismatched tag at line 3, column 0");
     }
 
     #[test]

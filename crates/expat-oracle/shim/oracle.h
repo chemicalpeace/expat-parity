@@ -261,5 +261,6 @@ unsigned long long oracle_parser_hash(const unsigned char salt[16],
                                       int *ulong_bits);
 
 const char *oracle_expat_version(void);
+const char *oracle_error_string(int code);
 
 #endif

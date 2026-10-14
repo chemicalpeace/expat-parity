@@ -768,6 +768,20 @@ pub fn expat_version() -> String {
     unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
 }
 
+/// `XML_ErrorString(code)` of the vendored libexpat as bytes, without
+/// assuming any encoding; `None` where it returns `NULL` (`XML_ERROR_NONE`
+/// and every value that is not an error code).
+pub fn error_string(code: c_int) -> Option<Vec<u8>> {
+    // SAFETY: XML_ErrorString accepts any value and returns either NULL or
+    // a pointer to a static NUL-terminated string.
+    let p: *const c_char = unsafe { ffi::oracle_error_string(code) };
+    if p.is_null() {
+        return None;
+    }
+    // SAFETY: `p` is non-null and points to a static NUL-terminated string.
+    Some(unsafe { CStr::from_ptr(p) }.to_bytes().to_vec())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
