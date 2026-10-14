@@ -1,16 +1,76 @@
 //! The public parser API (module 12, first slice, D-038; error texts and
-//! `Display`, D-039).
+//! `Display`, D-039; encoding and namespace options, D-040).
 //!
 //! [`Parser`] wraps the ported parser core (`parse::Parser`) without
-//! callbacks: the document is parsed with the default encoding (detected
+//! callbacks. [`Parser::new`] parses with the default encoding (detected
 //! from the input, as `XML_ParserCreate(NULL)` does) and without namespace
-//! processing. [`Parser::parse`] is `XML_Parse`, and every call goes to the
-//! core, so the results after an error or after the final call are C's
-//! (D-023).
+//! processing; [`Parser::with_options`] takes an encoding name and a
+//! namespace separator ([`Options`]), as `XML_ParserCreate(encoding)` and
+//! `XML_ParserCreateNS(encoding, sep)` do. [`Parser::parse`] is
+//! `XML_Parse`, and every call goes to the core, so the results after an
+//! error or after the final call are C's (D-023).
 
+use alloc::vec::Vec;
 use core::fmt;
 
 use crate::parse::{self, Status, Stop, XmlError};
+
+/// How a [`Parser`] is created: the encoding name and the namespace
+/// separator given to `XML_ParserCreate` / `XML_ParserCreateNS`.
+///
+/// `Options::default()` (the same as [`Options::new`]) sets neither: the
+/// encoding is detected from the input and namespace processing is off, as
+/// with [`Parser::new`]. New options may be added in later versions, so the
+/// type is built with its methods:
+///
+/// ```
+/// let options = expat::Options::new()
+///     .encoding(b"ISO-8859-1")
+///     .namespace_separator(b'|');
+/// let mut p = expat::Parser::with_options([7; 16], options);
+/// assert_eq!(p.parse(b"<a>caf\xe9</a>", true), Ok(()));
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct Options {
+    encoding: Option<Vec<u8>>,
+    namespace_separator: Option<u8>,
+}
+
+impl Options {
+    /// No encoding name and no namespace processing (`Options::default()`).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The encoding name (`encodingName`). libexpat knows `UTF-8`,
+    /// `UTF-16`, `UTF-16BE`, `UTF-16LE`, `ISO-8859-1` and `US-ASCII`,
+    /// compared ignoring the case of ASCII letters; the input is read in
+    /// this encoding (a byte order mark is handled as libexpat handles it)
+    /// and the encoding named in its XML declaration is ignored. Any other name, the empty name included, makes the first
+    /// [`Parser::parse`] call fail with [`ErrorCode::UnknownEncoding`].
+    ///
+    /// As with the C string, the name ends at its first NUL byte: only
+    /// the bytes before it are kept.
+    #[must_use]
+    pub fn encoding(mut self, name: &[u8]) -> Self {
+        let name = name.split(|&b| b == 0).next().unwrap_or_default();
+        self.encoding = Some(name.to_vec());
+        self
+    }
+
+    /// Turns namespace processing on with `separator`
+    /// (`XML_ParserCreateNS`): prefixes must be declared, and the reserved
+    /// prefixes and names are checked. `0` is a valid separator, as in C:
+    /// namespace processing is on and expanded names have no separator. A
+    /// namespace name that contains the separator is a syntax error unless
+    /// the separator is a character allowed in URIs (RFC 3986).
+    #[must_use]
+    pub fn namespace_separator(mut self, separator: u8) -> Self {
+        self.namespace_separator = Some(separator);
+        self
+    }
+}
 
 /// An XML parser for one document.
 ///
@@ -44,8 +104,34 @@ impl Parser {
     /// entropy source, so the caller provides it; it should be
     /// unpredictable to whoever supplies the document.
     pub fn new(salt: [u8; 16]) -> Self {
+        Self::with_options(salt, Options::default())
+    }
+
+    /// A parser with the encoding and namespace processing of `options`
+    /// (`XML_ParserCreate(encoding)`, or `XML_ParserCreateNS(encoding,
+    /// separator)` when a separator is set, followed by
+    /// `XML_SetHashSalt16Bytes`). `Parser::with_options(salt,
+    /// Options::default())` is [`Parser::new`]`(salt)`.
+    ///
+    /// ```
+    /// use expat::{ErrorCode, Options, Parser};
+    ///
+    /// // Namespace processing: an unbound prefix is an error.
+    /// let mut p = Parser::with_options([7; 16], Options::new().namespace_separator(b'|'));
+    /// let e = p.parse(b"<p:a/>", true).unwrap_err();
+    /// assert_eq!(e.code(), ErrorCode::UnboundPrefix);
+    ///
+    /// // Without it, `p:a` is an ordinary name.
+    /// let mut p = Parser::new([7; 16]);
+    /// assert_eq!(p.parse(b"<p:a/>", true), Ok(()));
+    /// ```
+    pub fn with_options(salt: [u8; 16], options: Options) -> Self {
         Parser {
-            inner: parse::Parser::new(None, None, salt),
+            inner: parse::Parser::new(
+                options.encoding.as_deref(),
+                options.namespace_separator,
+                salt,
+            ),
         }
     }
 
@@ -413,6 +499,20 @@ mod tests {
             let debug = found.first().map(|c| format!("{c:?}"));
             assert_eq!(debug, Some(camel(name)), "value {value}");
         }
+    }
+
+    #[test]
+    fn options_keep_the_name_up_to_its_first_nul() {
+        assert_eq!(Options::new(), Options::default());
+        let o = Options::new()
+            .encoding(b"UTF-8\0junk")
+            .namespace_separator(0);
+        assert_eq!(o.encoding.as_deref(), Some(&b"UTF-8"[..]));
+        assert_eq!(o.namespace_separator, Some(0));
+        assert_eq!(
+            Options::new().encoding(b"\0x").encoding.as_deref(),
+            Some(&b""[..])
+        );
     }
 
     #[test]

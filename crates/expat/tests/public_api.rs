@@ -1,6 +1,6 @@
 //! Module 12, first slice (D-038): the public API on its own.
 //!
-//! This file uses only `expat::{Parser, Error, ErrorCode}`, never
+//! This file uses only `expat::{Parser, Options, Error, ErrorCode}`, never
 //! `expat::internal`, so it compiles in every feature combination. CI runs
 //! it with the `internal-api` feature off in `cargo test -p expat` (std on)
 //! and `cargo test -p expat --no-default-features` (std off); a workspace
@@ -10,7 +10,7 @@
 //! `tests/tests/public_api_diff.rs` compares the same calls with the C
 //! oracle on many documents.
 
-use expat::{Error, ErrorCode, Parser};
+use expat::{Error, ErrorCode, Options, Parser};
 
 const SALT: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
@@ -163,4 +163,87 @@ fn error_is_a_std_error() {
         Some("mismatched tag at line 1, column 5")
     );
     assert!(boxed.is_some_and(|e| e.source().is_none()));
+}
+
+/// The code and position of a failed call with `options`, from
+/// `Parser::with_options` (`None` if it succeeded). The expected values
+/// below are libexpat 2.9.0's (`tests/tests/public_api_diff.rs`, S3).
+fn with_options(options: Options, doc: &[u8]) -> Option<(ErrorCode, (u64, u64, i64))> {
+    failure(Parser::with_options(SALT, options).parse(doc, true))
+}
+
+#[test]
+fn default_options_are_new() {
+    assert_eq!(Options::new(), Options::default());
+    for doc in [
+        &b"<doc>hello</doc>"[..],
+        b"<a></b>",
+        b"<p:a/>",
+        b"<a>caf\xe9</a>",
+    ] {
+        assert_eq!(
+            failure(Parser::new(SALT).parse(doc, true)),
+            with_options(Options::default(), doc)
+        );
+    }
+}
+
+#[test]
+fn encoding_name() {
+    let latin1 = b"<a>caf\xe9</a>";
+    assert_eq!(
+        failure(Parser::new(SALT).parse(latin1, true)),
+        Some((ErrorCode::InvalidToken, (1, 6, 6)))
+    );
+    assert_eq!(
+        with_options(Options::new().encoding(b"ISO-8859-1"), latin1),
+        None
+    );
+    assert_eq!(
+        with_options(Options::new().encoding(b"iso-8859-1"), latin1),
+        None
+    );
+    // The name ends at its first NUL byte, as a C string does.
+    assert_eq!(
+        with_options(Options::new().encoding(b"ISO-8859-1\0X"), latin1),
+        None
+    );
+    let unknown = Some((ErrorCode::UnknownEncoding, (1, 0, -1)));
+    assert_eq!(
+        with_options(Options::new().encoding(b"\0UTF-8"), b"<a/>"),
+        unknown
+    );
+    assert_eq!(with_options(Options::new().encoding(b""), b"<a/>"), unknown);
+    assert_eq!(
+        with_options(Options::new().encoding(b"KOI8-R"), b"<a/>"),
+        unknown
+    );
+    // The override wins over the encoding of the XML declaration.
+    let decl = b"<?xml version='1.0' encoding='KOI8-R'?><a/>";
+    assert_eq!(with_options(Options::new().encoding(b"UTF-8"), decl), None);
+    let utf16: Vec<u8> = "<a>x</a>"
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    assert_eq!(
+        with_options(Options::new().encoding(b"UTF-16LE"), &utf16),
+        None
+    );
+}
+
+#[test]
+fn namespace_separator() {
+    let ns = |sep: u8| Options::new().namespace_separator(sep);
+    let unbound = Some((ErrorCode::UnboundPrefix, (1, 0, 0)));
+    assert_eq!(with_options(Options::new(), b"<p:a/>"), None);
+    assert_eq!(with_options(ns(b'|'), b"<p:a/>"), unbound);
+    // 0 turns namespace processing on, as in C.
+    assert_eq!(with_options(ns(0), b"<p:a/>"), unbound);
+    assert_eq!(with_options(ns(0), b"<p:a xmlns:p='u'/>"), None);
+    // A namespace name containing a non-URI separator is a syntax error.
+    let syntax = Some((ErrorCode::Syntax, (1, 0, 0)));
+    assert_eq!(with_options(ns(b'|'), b"<a xmlns='u|v'/>"), syntax);
+    assert_eq!(with_options(ns(b':'), b"<a xmlns='u:v'/>"), None);
+    assert_eq!(with_options(ns(0xc3), b"<a xmlns='u\xc3\xa9v'/>"), syntax);
+    assert_eq!(with_options(ns(0xe9), b"<a xmlns='u\xc3\xa9v'/>"), None);
 }

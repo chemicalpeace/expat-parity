@@ -662,9 +662,10 @@ pub enum BufferOp {
 /// Feeds `doc` to libexpat with `ops` and returns the white-box trace of
 /// its input buffer after each operation (`shim/oracle_core.c`,
 /// `oracle_buffer_run`; the format is reproduced by the test crate's
-/// `port::buffer_run`).
+/// `port::buffer_run`). The parser is `XML_ParserCreate(NULL)`, or
+/// `XML_ParserCreateNS(NULL, '|')` with `ns`.
 pub fn buffer_run(doc: &[u8], ops: &[BufferOp], ns: bool, reparse_deferral: bool) -> String {
-    buffer_run_impl(doc, ops, ns, reparse_deferral, false)
+    buffer_run_with(doc, ops, &BufferConfig::legacy(ns, reparse_deferral), false)
 }
 
 /// [`buffer_run`] that also reads the position after every operation that
@@ -681,16 +682,59 @@ pub fn buffer_run_with_error_positions(
     ns: bool,
     reparse_deferral: bool,
 ) -> String {
-    buffer_run_impl(doc, ops, ns, reparse_deferral, true)
+    buffer_run_with(doc, ops, &BufferConfig::legacy(ns, reparse_deferral), true)
+}
+
+/// How [`buffer_run_with`] creates its parser.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BufferConfig<'a> {
+    /// The `encodingName` argument: `None` is `NULL`. The bytes are passed
+    /// with a NUL appended, so libexpat reads them up to their first NUL,
+    /// as it would a C string holding them.
+    pub encoding: Option<&'a [u8]>,
+    /// `None`: `XML_ParserCreate`. `Some(sep)`: `XML_ParserCreateNS` with
+    /// `sep`, `0` included (namespace processing on, no separator).
+    pub ns_separator: Option<u8>,
+    /// `XML_SetReparseDeferralEnabled`.
+    pub reparse_deferral: bool,
+}
+
+impl BufferConfig<'_> {
+    /// The parser of [`buffer_run`]: no encoding name, `'|'` with `ns`.
+    fn legacy(ns: bool, reparse_deferral: bool) -> Self {
+        BufferConfig {
+            encoding: None,
+            ns_separator: ns.then_some(b'|'),
+            reparse_deferral,
+        }
+    }
+}
+
+/// [`buffer_run`] (or, with `error_positions`,
+/// [`buffer_run_with_error_positions`]) with the parser `config` describes
+/// (module 12, D-040).
+pub fn buffer_run_with(
+    doc: &[u8],
+    ops: &[BufferOp],
+    config: &BufferConfig<'_>,
+    error_positions: bool,
+) -> String {
+    buffer_run_impl(doc, ops, config, error_positions)
 }
 
 fn buffer_run_impl(
     doc: &[u8],
     ops: &[BufferOp],
-    ns: bool,
-    reparse_deferral: bool,
+    config: &BufferConfig<'_>,
     error_positions: bool,
 ) -> String {
+    // NUL-terminated copy of the name; any NUL inside it ends the C string
+    // there, as it would in the application's buffer.
+    let encoding: Option<Vec<u8>> = config.encoding.map(|e| {
+        let mut v = e.to_vec();
+        v.push(0);
+        v
+    });
     let mut flat: Vec<c_int> = Vec::with_capacity(ops.len() * 3);
     for op in ops {
         match *op {
@@ -705,16 +749,21 @@ fn buffer_run_impl(
     let mut out: *mut u8 = std::ptr::null_mut();
     let mut out_len: usize = 0;
     // SAFETY: `doc` and `flat` are live slices of the given lengths (`flat`
-    // holds `ops.len()` triples); `out`/`out_len` are valid out-pointers.
-    // The function uses no global state.
+    // holds `ops.len()` triples); `encoding` is null or a live
+    // NUL-terminated buffer that outlives the call; `out`/`out_len` are
+    // valid out-pointers. The function uses no global state.
     let rc = unsafe {
         ffi::oracle_buffer_run(
             doc.as_ptr(),
             doc.len(),
             flat.as_ptr(),
             ops.len(),
-            c_int::from(ns),
-            c_int::from(reparse_deferral),
+            encoding
+                .as_ref()
+                .map_or(std::ptr::null(), |e| e.as_ptr().cast::<c_char>()),
+            c_int::from(config.ns_separator.is_some()),
+            c_int::from(config.ns_separator.unwrap_or(0)),
+            c_int::from(config.reparse_deferral),
             c_int::from(error_positions),
             &mut out,
             &mut out_len,

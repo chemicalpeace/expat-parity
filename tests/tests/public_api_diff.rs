@@ -23,15 +23,23 @@
 //!   failed call in the same way; the oracle tests below check that this
 //!   mode is the C library's behaviour and leaves the default mode as it
 //!   was.
+//! - S3 (D-040): `Parser::with_options` with encoding names (known, in
+//!   both cases, empty, unknown, with a NUL byte) and namespace separators
+//!   (none, URI and non-URI characters, NUL, bytes from 0x80 up), on the
+//!   T2 documents and on encoding and namespace documents, in one call, in
+//!   random pieces and in T3-style call sequences; the C parser is
+//!   `XML_ParserCreate(encoding)` or `XML_ParserCreateNS(encoding, sep)`
+//!   (`buffer_run_with`), and `Parser::new` equals `with_options` with
+//!   `Options::default()`.
 //! - Error texts (D-039): `ErrorCode::description` of every code equals
 //!   the bytes of the vendored `XML_ErrorString`, which returns `NULL` for
 //!   `XML_ERROR_NONE` and for values outside the enum; `Display for Error`
 //!   writes C's line and column.
 
-use expat::{ErrorCode, Parser};
+use expat::{ErrorCode, Options, Parser};
 use expat_difftest::docgen::{Rng, document, dtd_document};
 use expat_difftest::vectors::upstream;
-use expat_oracle::BufferOp;
+use expat_oracle::{BufferConfig, BufferOp};
 
 /// The salt `oracle_buffer_run` sets.
 const SALT: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
@@ -42,7 +50,58 @@ type Call = (u8, u32);
 /// C's results: one entry per call, then line, column and byte index after
 /// the last call.
 fn c_run(doc: &[u8], ops: &[BufferOp]) -> (Vec<Call>, (u64, u64, i64)) {
-    let out = expat_oracle::buffer_run(doc, ops, false, true);
+    c_run_cfg(None, doc, ops)
+}
+
+/// The parser options of an S3 run (D-040): `None` in the helpers is
+/// `Parser::new` against `XML_ParserCreate(NULL)` (slices 1 and 2).
+#[derive(Debug, Clone, Copy)]
+struct Cfg<'a> {
+    encoding: Option<&'a [u8]>,
+    sep: Option<u8>,
+}
+
+impl Cfg<'_> {
+    fn options(&self) -> Options {
+        let mut o = Options::new();
+        if let Some(e) = self.encoding {
+            o = o.encoding(e);
+        }
+        if let Some(s) = self.sep {
+            o = o.namespace_separator(s);
+        }
+        o
+    }
+
+    fn oracle(&self) -> BufferConfig<'_> {
+        BufferConfig {
+            encoding: self.encoding,
+            ns_separator: self.sep,
+            reparse_deferral: true,
+        }
+    }
+}
+
+/// The oracle output for `cfg` (see [`Cfg`]).
+fn c_out(cfg: Option<&Cfg<'_>>, doc: &[u8], ops: &[BufferOp], error_positions: bool) -> String {
+    match (cfg, error_positions) {
+        (None, false) => expat_oracle::buffer_run(doc, ops, false, true),
+        (None, true) => expat_oracle::buffer_run_with_error_positions(doc, ops, false, true),
+        (Some(c), _) => expat_oracle::buffer_run_with(doc, ops, &c.oracle(), error_positions),
+    }
+}
+
+/// The public parser for `cfg` (see [`Cfg`]).
+fn port_parser(cfg: Option<&Cfg<'_>>) -> Parser {
+    match cfg {
+        None => Parser::new(SALT),
+        Some(c) => Parser::with_options(SALT, c.options()),
+    }
+}
+
+/// [`c_run`] with the parser of `cfg`.
+fn c_run_cfg(cfg: Option<&Cfg<'_>>, doc: &[u8], ops: &[BufferOp]) -> (Vec<Call>, (u64, u64, i64)) {
+    let out = c_out(cfg, doc, ops, false);
     let mut calls = Vec::new();
     let mut end = None;
     for line in out.lines() {
@@ -65,8 +124,12 @@ type CallPos = (Call, Option<(u64, u64, i64)>);
 
 /// C's results with the position read after every failed call
 /// (`buffer_run_with_error_positions`), and the `end` line.
-fn c_run_error_positions(doc: &[u8], ops: &[BufferOp]) -> (Vec<CallPos>, (u64, u64, i64)) {
-    let out = expat_oracle::buffer_run_with_error_positions(doc, ops, false, true);
+fn c_run_error_positions(
+    cfg: Option<&Cfg<'_>>,
+    doc: &[u8],
+    ops: &[BufferOp],
+) -> (Vec<CallPos>, (u64, u64, i64)) {
+    let out = c_out(cfg, doc, ops, true);
     let mut calls: Vec<CallPos> = Vec::new();
     let mut end = None;
     for line in out.lines() {
@@ -99,8 +162,8 @@ fn c_run_error_positions(doc: &[u8], ops: &[BufferOp]) -> (Vec<CallPos>, (u64, u
 
 /// The public API's results for every call, with the position of each
 /// error.
-fn port_run_error_positions(doc: &[u8], ops: &[BufferOp]) -> Vec<CallPos> {
-    let mut p = Parser::new(SALT);
+fn port_run_error_positions(cfg: Option<&Cfg<'_>>, doc: &[u8], ops: &[BufferOp]) -> Vec<CallPos> {
+    let mut p = port_parser(cfg);
     let mut cur = 0usize;
     let mut calls = Vec::new();
     for op in ops {
@@ -123,8 +186,12 @@ fn port_run_error_positions(doc: &[u8], ops: &[BufferOp]) -> Vec<CallPos> {
 
 /// The public API's results for the same calls; the position is that of the last error returned, if the
 /// last call made failed.
-fn port_run(doc: &[u8], ops: &[BufferOp]) -> (Vec<Call>, Option<(u64, u64, i64)>) {
-    let mut p = Parser::new(SALT);
+fn port_run(
+    cfg: Option<&Cfg<'_>>,
+    doc: &[u8],
+    ops: &[BufferOp],
+) -> (Vec<Call>, Option<(u64, u64, i64)>) {
+    let mut p = port_parser(cfg);
     let mut calls = Vec::new();
     let mut last_err = None;
     let mut cur = 0usize;
@@ -154,14 +221,19 @@ fn port_run(doc: &[u8], ops: &[BufferOp]) -> (Vec<Call>, Option<(u64, u64, i64)>
 /// every error, the first one also against a C run that reads no position
 /// before it. Returns the C results.
 fn check_all(id: &str, doc: &[u8], ops: &[BufferOp]) -> Vec<Call> {
-    let (c_pos_calls, _) = c_run_error_positions(doc, ops);
-    let p_pos_calls = port_run_error_positions(doc, ops);
+    check_all_cfg(id, None, doc, ops)
+}
+
+/// [`check_all`] with the parser of `cfg`.
+fn check_all_cfg(id: &str, cfg: Option<&Cfg<'_>>, doc: &[u8], ops: &[BufferOp]) -> Vec<Call> {
+    let (c_pos_calls, _) = c_run_error_positions(cfg, doc, ops);
+    let p_pos_calls = port_run_error_positions(cfg, doc, ops);
     assert_eq!(
         p_pos_calls, c_pos_calls,
         "{id}: results or error positions differ (left port, right C); ops {ops:?}"
     );
-    let (c_calls, _) = c_run(doc, ops);
-    let (p_calls, _) = port_run(doc, ops);
+    let (c_calls, _) = c_run_cfg(cfg, doc, ops);
+    let (p_calls, _) = port_run(cfg, doc, ops);
     assert_eq!(
         p_calls, c_calls,
         "{id}: results differ (left port, right C); ops {ops:?}"
@@ -170,8 +242,8 @@ fn check_all(id: &str, doc: &[u8], ops: &[BufferOp]) -> Vec<Call> {
         assert!(st == 0 || code == 0, "{id}: C returned OK with code {code}");
     }
     if let Some(i) = c_calls.iter().position(|&(st, _)| st == 0) {
-        let (_, c_pos) = c_run(doc, &ops[..=i]);
-        let (_, p_pos) = port_run(doc, &ops[..=i]);
+        let (_, c_pos) = c_run_cfg(cfg, doc, &ops[..=i]);
+        let (_, p_pos) = port_run(cfg, doc, &ops[..=i]);
         assert_eq!(
             p_pos,
             Some(c_pos),
@@ -321,7 +393,7 @@ fn t3_final_call_after_an_error() {
     let calls = check_all("after error", doc, &ops);
     let mismatch = ErrorCode::TagMismatch.to_c();
     assert_eq!(calls, [(0, mismatch), (0, mismatch), (0, mismatch)]);
-    let positions: Vec<_> = port_run_error_positions(doc, &ops)
+    let positions: Vec<_> = port_run_error_positions(None, doc, &ops)
         .into_iter()
         .map(|(_, pos)| pos)
         .collect();
@@ -368,7 +440,7 @@ fn oracle_error_positions_mode() {
     //    column at every read while the line and byte index stay.
     let doc = b"<a></b>";
     let ops = [parse(7, true), parse(0, true), parse(0, true)];
-    let (calls, end) = c_run_error_positions(doc, &ops);
+    let (calls, end) = c_run_error_positions(None, doc, &ops);
     let mismatch = ErrorCode::TagMismatch.to_c();
     assert_eq!(
         calls,
@@ -409,7 +481,7 @@ fn oracle_error_positions_mode() {
                 .map(str::to_owned)
                 .collect()
         };
-        let (calls, _) = c_run_error_positions(&doc, &ops);
+        let (calls, _) = c_run_error_positions(None, &doc, &ops);
         let first_error = calls.iter().position(|(c, _)| c.0 == 0);
         let (with_lines, plain_lines) = (strip(&with), strip(&plain));
         assert_eq!(with_lines.len(), plain_lines.len());
@@ -614,5 +686,424 @@ fn error_display_uses_c_line_and_column() {
             c_pos.1
         );
         assert_eq!(e.to_string(), expected, "{doc:?}");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// S3 (D-040): `Parser::with_options`, encoding names and namespace
+// separators. The oracle side is `buffer_run_with`, which creates the C
+// parser with `XML_ParserCreate(encoding)` or `XML_ParserCreateNS(encoding,
+// sep)`; `check_all_cfg` compares the result and code of every call and
+// the position of every error, as T2 and T3 do.
+
+/// The encoding names compared: the six names libexpat knows in both
+/// cases, the empty name, unknown names, and names with a NUL byte (C
+/// reads them up to the NUL).
+const ENCODINGS: [&[u8]; 17] = [
+    b"UTF-8",
+    b"utf-8",
+    b"UTF-16",
+    b"utf-16",
+    b"UTF-16BE",
+    b"UTF-16LE",
+    b"utf-16le",
+    b"ISO-8859-1",
+    b"iso-8859-1",
+    b"US-ASCII",
+    b"us-ascii",
+    b"",
+    b"UTF8",
+    b"KOI8-R",
+    b"UTF-8\0junk",
+    b"ISO-8859-1\0",
+    b"\0UTF-8",
+];
+
+/// The namespace separators compared: URI characters (`:`, `/`), non-URI
+/// characters (`|`, space, newline, `!`), NUL, and bytes from 0x80 up.
+const SEPARATORS: [u8; 12] = [
+    b'|', b':', b'/', b' ', b'\n', b'!', 0, 0x80, 0xa9, 0xc3, 0xe9, 0xff,
+];
+
+/// Documents that exercise namespace processing: declarations, unbound
+/// and undeclared prefixes, the reserved prefixes and names, namespace
+/// names containing separator bytes, duplicate expanded attribute names,
+/// and defaults from the DTD.
+fn namespace_documents() -> Vec<(String, Vec<u8>)> {
+    let docs: [&[u8]; 26] = [
+        b"<a/>",
+        b"<p:a/>",
+        b"<p:a xmlns:p='u'/>",
+        b"<a xmlns='u'><b/></a>",
+        b"<a xmlns:p='u'><p:b p:x='1'/></a>",
+        b"<a b:c='1'/>",
+        b"<a xmlns:p='u'><b xmlns:p=''/></a>",
+        b"<a xmlns=''/>",
+        b"<a xmlns:xml='http://www.w3.org/XML/1998/namespace'/>",
+        b"<a xmlns:xml='u'/>",
+        b"<a xmlns:xmlns='u'/>",
+        b"<a xmlns:p='http://www.w3.org/2000/xmlns/'/>",
+        b"<a xmlns:p='http://www.w3.org/XML/1998/namespace'/>",
+        b"<a xmlns='u|v'/>",
+        b"<a xmlns='u:v'/>",
+        b"<a xmlns='u/v'/>",
+        b"<a xmlns='u v'/>",
+        b"<a xmlns='u&#10;v'/>",
+        b"<a xmlns='u!v'/>",
+        b"<a xmlns='u\xc2\x80v'/>",
+        b"<a xmlns='u\xc3\xa9v'/>",
+        b"<a xmlns='u\xc2\xa9'/>",
+        b"<a xmlns:p='u' xmlns:q='u' p:x='1' q:x='2'/>",
+        b"<!DOCTYPE a [<!ATTLIST a xmlns:p CDATA 'u'>]><p:a/>",
+        b"<!DOCTYPE a [<!ATTLIST a xmlns CDATA 'u|v'>]><a/>",
+        b"<a:b:c/>",
+    ];
+    docs.iter()
+        .enumerate()
+        .map(|(i, d)| (format!("ns doc #{i}"), d.to_vec()))
+        .collect()
+}
+
+/// Documents for encoding names: Latin-1 and ASCII bytes, UTF-16 with and
+/// without a byte order mark, a UTF-8 byte order mark, and XML
+/// declarations that name another encoding than the override.
+fn encoding_documents() -> Vec<(String, Vec<u8>)> {
+    let mut docs: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut add = |id: &str, d: Vec<u8>| docs.push((id.to_string(), d));
+    add("ascii", b"<a>plain</a>".to_vec());
+    add("latin1 byte", b"<a>caf\xe9</a>".to_vec());
+    add("utf8 e-acute", b"<a>caf\xc3\xa9</a>".to_vec());
+    add("utf8 bom", b"\xef\xbb\xbf<a/>".to_vec());
+    add(
+        "decl utf-8",
+        b"<?xml version='1.0' encoding='UTF-8'?><a/>".to_vec(),
+    );
+    add(
+        "decl latin1 + byte",
+        b"<?xml version='1.0' encoding='ISO-8859-1'?><a>\xe9</a>".to_vec(),
+    );
+    add(
+        "decl utf-16 in utf-8",
+        b"<?xml version='1.0' encoding='UTF-16'?><a/>".to_vec(),
+    );
+    add(
+        "decl unknown",
+        b"<?xml version='1.0' encoding='KOI8-R'?><a/>".to_vec(),
+    );
+    add(
+        "decl us-ascii + byte",
+        b"<?xml version='1.0' encoding='US-ASCII'?><a>\xe9</a>".to_vec(),
+    );
+    for (name, text) in [
+        ("plain", "<a>caf\u{e9}</a>"),
+        ("decl utf-16", "<?xml version='1.0' encoding='UTF-16'?><a/>"),
+        (
+            "decl utf-8",
+            "<?xml version='1.0' encoding='UTF-8'?><a>x</a>",
+        ),
+        ("error", "<a></b>"),
+    ] {
+        let le: Vec<u8> = text.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let be: Vec<u8> = text.encode_utf16().flat_map(u16::to_be_bytes).collect();
+        add(&format!("utf-16le {name}"), le.clone());
+        add(&format!("utf-16be {name}"), be.clone());
+        add(
+            &format!("utf-16le bom {name}"),
+            [&[0xff, 0xfe][..], &le].concat(),
+        );
+        add(
+            &format!("utf-16be bom {name}"),
+            [&[0xfe, 0xff][..], &be].concat(),
+        );
+    }
+    docs
+}
+
+/// Runs `check_all_cfg` for `cfg` on every document in one call and in
+/// random pieces; returns (runs, runs with an error).
+fn check_cfg_corpus(r: &mut Rng, cfg: &Cfg<'_>, docs: &[(String, Vec<u8>)]) -> (usize, usize) {
+    let (mut n, mut errors) = (0, 0);
+    for (id, doc) in docs {
+        for ops in [one_call(doc), random_pieces(r, doc)] {
+            let id = format!("{id} with {cfg:?}");
+            let calls = check_all_cfg(&id, Some(cfg), doc, &ops);
+            errors += usize::from(calls.iter().any(|c| c.0 == 0));
+            n += 1;
+        }
+    }
+    (n, errors)
+}
+
+/// `buffer_run` is `buffer_run_with` with no encoding name and `'|'` (or
+/// no namespace processing), and `Some(0)` creates a namespace parser:
+/// `<p:a/>` fails with an unbound prefix, as with `'|'`, and not without
+/// namespace processing.
+#[test]
+fn s3_oracle_config() {
+    let docs = documents();
+    for (id, doc) in docs.iter().take(200) {
+        let ops = one_call(doc);
+        for ns in [false, true] {
+            let cfg = BufferConfig {
+                encoding: None,
+                ns_separator: ns.then_some(b'|'),
+                reparse_deferral: true,
+            };
+            assert_eq!(
+                expat_oracle::buffer_run(doc, &ops, ns, true),
+                expat_oracle::buffer_run_with(doc, &ops, &cfg, false),
+                "{id} ns {ns}"
+            );
+            assert_eq!(
+                expat_oracle::buffer_run_with_error_positions(doc, &ops, ns, true),
+                expat_oracle::buffer_run_with(doc, &ops, &cfg, true),
+                "{id} ns {ns}"
+            );
+        }
+    }
+    let unbound = ErrorCode::UnboundPrefix.to_c();
+    let doc = b"<p:a/>";
+    let code = |sep: Option<u8>| {
+        let cfg = Cfg {
+            encoding: None,
+            sep,
+        };
+        c_run_cfg(Some(&cfg), doc, &one_call(doc)).0[0]
+    };
+    assert_eq!(code(None), (1, 0));
+    assert_eq!(code(Some(b'|')), (0, unbound));
+    assert_eq!(code(Some(0)), (0, unbound));
+}
+
+/// `Parser::new(salt)` and `Parser::with_options(salt, Options::default())`
+/// give the same results, and both are C's `XML_ParserCreate(NULL)`.
+#[test]
+fn s3_default_options_are_new() {
+    let mut r = Rng::new(0x5333_0000_0001);
+    let default = Cfg {
+        encoding: None,
+        sep: None,
+    };
+    assert_eq!(default.options(), Options::default());
+    for (id, doc) in documents() {
+        for ops in [one_call(&doc), random_pieces(&mut r, &doc)] {
+            assert_eq!(
+                port_run_error_positions(None, &doc, &ops),
+                port_run_error_positions(Some(&default), &doc, &ops),
+                "{id}: new and with_options(default) differ"
+            );
+            check_all_cfg(&id, Some(&default), &doc, &ops);
+        }
+    }
+}
+
+/// Every encoding name on the upstream vectors, one seed of generated
+/// documents and the encoding documents (also without a name), each in
+/// one call and in random pieces.
+#[test]
+fn s3_encoding_names() {
+    let mut r = Rng::new(0x5333_0000_0002);
+    let mut docs: Vec<(String, Vec<u8>)> = documents().into_iter().take(540 + 300).collect();
+    docs.extend(encoding_documents());
+    let enc_docs = encoding_documents();
+    let (mut runs, mut errors) = check_cfg_corpus(
+        &mut r,
+        &Cfg {
+            encoding: None,
+            sep: None,
+        },
+        &enc_docs,
+    );
+    for name in ENCODINGS {
+        let (n, e) = check_cfg_corpus(
+            &mut r,
+            &Cfg {
+                encoding: Some(name),
+                sep: None,
+            },
+            &docs,
+        );
+        runs += n;
+        errors += e;
+    }
+    eprintln!("encoding names: {runs} runs, {errors} with an error");
+    assert!(errors > 0 && errors < runs);
+}
+
+/// Encoding names combined with namespace processing.
+#[test]
+fn s3_encoding_names_with_namespaces() {
+    let mut r = Rng::new(0x5333_0000_0003);
+    let mut docs = encoding_documents();
+    docs.extend(namespace_documents());
+    for name in [
+        b"UTF-8".as_slice(),
+        b"UTF-16LE",
+        b"ISO-8859-1",
+        b"",
+        b"KOI8-R",
+    ] {
+        for sep in [b'|', 0] {
+            check_cfg_corpus(
+                &mut r,
+                &Cfg {
+                    encoding: Some(name),
+                    sep: Some(sep),
+                },
+                &docs,
+            );
+        }
+    }
+}
+
+/// Every separator, and no namespace processing, on the namespace
+/// documents, the upstream vectors and both seeds of generated documents,
+/// each in one call and in random pieces.
+#[test]
+fn s3_namespace_separators() {
+    let mut r = Rng::new(0x5333_0000_0004);
+    let mut docs = namespace_documents();
+    docs.extend(documents());
+    let mut seps: Vec<Option<u8>> = vec![None];
+    seps.extend(SEPARATORS.iter().copied().map(Some));
+    let (mut runs, mut errors) = (0, 0);
+    for sep in seps {
+        let (n, e) = check_cfg_corpus(
+            &mut r,
+            &Cfg {
+                encoding: None,
+                sep,
+            },
+            &docs,
+        );
+        runs += n;
+        errors += e;
+    }
+    eprintln!("namespace separators: {runs} runs, {errors} with an error");
+    assert!(errors > 0 && errors < runs);
+}
+
+/// A recorded case: document, encoding name, separator, C's result.
+type Recorded<'a> = (&'a [u8], Option<&'a [u8]>, Option<u8>, Call);
+
+/// C's results for the cases D-040 records (NUL in a name, separators from
+/// 0x80 up, namespace names containing the separator), each also checked
+/// against the port by `check_all_cfg`.
+#[test]
+fn s3_recorded_c_behaviour() {
+    let ok = (1, 0);
+    let err = |c: ErrorCode| (0, c.to_c());
+    let cases: [Recorded<'_>; 14] = [
+        // The name ends at its first NUL.
+        (b"<a>caf\xc3\xa9</a>", Some(b"UTF-8\0junk"), None, ok),
+        (b"<a>caf\xe9</a>", Some(b"ISO-8859-1\0X"), None, ok),
+        (
+            b"<a/>",
+            Some(b"\0UTF-8"),
+            None,
+            err(ErrorCode::UnknownEncoding),
+        ),
+        (b"<a/>", Some(b""), None, err(ErrorCode::UnknownEncoding)),
+        (
+            b"<a/>",
+            Some(b"KOI8-R"),
+            None,
+            err(ErrorCode::UnknownEncoding),
+        ),
+        (b"<a>caf\xe9</a>", Some(b"iso-8859-1"), None, ok),
+        // The override wins over the declaration.
+        (
+            b"<?xml version='1.0' encoding='KOI8-R'?><a/>",
+            Some(b"UTF-8"),
+            None,
+            ok,
+        ),
+        // Separators: compared with the bytes of the namespace name in
+        // UTF-8, and only when they are not URI characters.
+        (
+            b"<a xmlns='u|v'/>",
+            None,
+            Some(b'|'),
+            err(ErrorCode::Syntax),
+        ),
+        (b"<a xmlns='u:v'/>", None, Some(b':'), ok),
+        (
+            b"<a xmlns='u\xc2\x80v'/>",
+            None,
+            Some(0x80),
+            err(ErrorCode::Syntax),
+        ),
+        (
+            b"<a xmlns='u\xc3\xa9v'/>",
+            None,
+            Some(0xc3),
+            err(ErrorCode::Syntax),
+        ),
+        (b"<a xmlns='u\xc3\xa9v'/>", None, Some(0xe9), ok),
+        (b"<p:a/>", None, Some(0), err(ErrorCode::UnboundPrefix)),
+        (b"<p:a xmlns:p='u'/>", None, Some(0), ok),
+    ];
+    for (doc, encoding, sep, want) in cases {
+        let cfg = Cfg { encoding, sep };
+        let id = format!("{doc:?} with {cfg:?}");
+        let calls = check_all_cfg(&id, Some(&cfg), doc, &one_call(doc));
+        assert_eq!(calls, vec![want], "{id}: C's result");
+    }
+    // An unknown name fails in the first call, before any byte is read.
+    let cfg = Cfg {
+        encoding: Some(b"KOI8-R"),
+        sep: None,
+    };
+    let (calls, pos) = c_run_cfg(Some(&cfg), b"<a/>", &one_call(b"<a/>"));
+    assert_eq!(
+        (calls, pos),
+        (vec![err(ErrorCode::UnknownEncoding)], (1, 0, -1))
+    );
+}
+
+/// T3 with options: calls after an unknown-name error and after a
+/// namespace error, and random call sequences.
+#[test]
+fn s3_calls_after_the_end() {
+    let mut r = Rng::new(0x5333_0000_0005);
+    let cfgs = [
+        Cfg {
+            encoding: Some(b"KOI8-R"),
+            sep: None,
+        },
+        Cfg {
+            encoding: Some(b"UTF-16LE"),
+            sep: Some(b'|'),
+        },
+        Cfg {
+            encoding: None,
+            sep: Some(0),
+        },
+        Cfg {
+            encoding: Some(b"ISO-8859-1"),
+            sep: Some(0xe9),
+        },
+    ];
+    let docs: [&[u8]; 4] = [
+        b"<a/>",
+        b"<p:a/>",
+        b"<a xmlns='u|v'>x</a>",
+        b"<a>caf\xe9</a>",
+    ];
+    for cfg in &cfgs {
+        for doc in docs {
+            for ops in [
+                vec![parse(4, true), parse(1, false), parse(0, true)],
+                vec![
+                    parse(2, false),
+                    parse(0, false),
+                    parse(100, true),
+                    parse(0, true),
+                ],
+                random_pieces(&mut r, doc),
+            ] {
+                check_all_cfg(&format!("{doc:?} with {cfg:?}"), Some(cfg), doc, &ops);
+            }
+        }
     }
 }
