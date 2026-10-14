@@ -117,14 +117,9 @@ fn port_run_error_positions(doc: &[u8], ops: &[BufferOp]) -> Vec<CallPos> {
     calls
 }
 
-/// The public API's results for the same calls (all of them, or up to the
-/// first error); the position is that of the last error returned, if the
+/// The public API's results for the same calls; the position is that of the last error returned, if the
 /// last call made failed.
-fn port_run(
-    doc: &[u8],
-    ops: &[BufferOp],
-    stop_at_first_error: bool,
-) -> (Vec<Call>, Option<(u64, u64, i64)>) {
+fn port_run(doc: &[u8], ops: &[BufferOp]) -> (Vec<Call>, Option<(u64, u64, i64)>) {
     let mut p = Parser::new(SALT);
     let mut calls = Vec::new();
     let mut last_err = None;
@@ -145,39 +140,10 @@ fn port_run(
                 assert_ne!(e.code().to_c(), 0, "an error never has code NONE");
                 calls.push((0, e.code().to_c()));
                 last_err = Some((e.line(), e.column(), e.byte_index()));
-                if stop_at_first_error {
-                    break;
-                }
             }
         }
     }
     (calls, last_err)
-}
-
-/// Compares the calls of `ops` up to and including the first error, and
-/// that error's position. Returns whether an error occurred.
-fn check_until_first_error(id: &str, doc: &[u8], ops: &[BufferOp]) -> bool {
-    let (c_calls, _) = c_run(doc, ops);
-    let (p_calls, p_pos) = port_run(doc, ops, true);
-    let first = c_calls.iter().position(|&(st, _)| st == 0);
-    let n = first.map_or(c_calls.len(), |i| i + 1);
-    assert_eq!(
-        p_calls,
-        c_calls[..n],
-        "{id}: results differ (left port, right C); ops {ops:?}"
-    );
-    if let Some(i) = first {
-        // C's position right after the failing call.
-        let (_, c_pos) = c_run(doc, &ops[..=i]);
-        assert_eq!(
-            p_pos,
-            Some(c_pos),
-            "{id}: error position differs (left port, right C); ops {ops:?}"
-        );
-        true
-    } else {
-        false
-    }
 }
 
 /// Compares the result and code of every call of `ops` and the position of
@@ -191,7 +157,7 @@ fn check_all(id: &str, doc: &[u8], ops: &[BufferOp]) -> Vec<Call> {
         "{id}: results or error positions differ (left port, right C); ops {ops:?}"
     );
     let (c_calls, _) = c_run(doc, ops);
-    let (p_calls, _) = port_run(doc, ops, false);
+    let (p_calls, _) = port_run(doc, ops);
     assert_eq!(
         p_calls, c_calls,
         "{id}: results differ (left port, right C); ops {ops:?}"
@@ -201,7 +167,7 @@ fn check_all(id: &str, doc: &[u8], ops: &[BufferOp]) -> Vec<Call> {
     }
     if let Some(i) = c_calls.iter().position(|&(st, _)| st == 0) {
         let (_, c_pos) = c_run(doc, &ops[..=i]);
-        let (_, p_pos) = port_run(doc, &ops[..=i], false);
+        let (_, p_pos) = port_run(doc, &ops[..=i]);
         assert_eq!(
             p_pos,
             Some(c_pos),
@@ -209,6 +175,12 @@ fn check_all(id: &str, doc: &[u8], ops: &[BufferOp]) -> Vec<Call> {
         );
     }
     c_calls
+}
+
+/// [`check_all`] for a T2 run: returns the number of failed calls, whose
+/// positions were all compared with C.
+fn check_t2(id: &str, doc: &[u8], ops: &[BufferOp]) -> usize {
+    check_all(id, doc, ops).iter().filter(|c| c.0 == 0).count()
 }
 
 fn parse(n: i32, is_final: bool) -> BufferOp {
@@ -282,38 +254,50 @@ fn documents() -> Vec<(String, Vec<u8>)> {
 
 #[test]
 fn t2_whole_documents_one_call() {
-    let (mut n, mut errors) = (0, 0);
+    let (mut n, mut errors, mut positions) = (0, 0, 0);
     for (id, doc) in documents() {
-        errors += usize::from(check_until_first_error(&id, &doc, &one_call(&doc)));
+        let failed = check_t2(&id, &doc, &one_call(&doc));
+        errors += usize::from(failed > 0);
+        positions += failed;
         n += 1;
     }
-    eprintln!("one call: {n} documents, {errors} ended in an error");
+    eprintln!(
+        "one call: {n} documents, {errors} with an error, {positions} error positions compared"
+    );
     assert!(errors > 0 && errors < n, "both outcomes are covered");
 }
 
 #[test]
 fn t2_whole_documents_byte_by_byte() {
-    let (mut n, mut errors) = (0, 0);
+    let (mut n, mut errors, mut positions) = (0, 0, 0);
     for (id, doc) in documents() {
-        errors += usize::from(check_until_first_error(&id, &doc, &byte_by_byte(&doc)));
+        let failed = check_t2(&id, &doc, &byte_by_byte(&doc));
+        errors += usize::from(failed > 0);
+        positions += failed;
         n += 1;
     }
-    eprintln!("byte by byte: {n} documents, {errors} ended in an error");
+    eprintln!(
+        "byte by byte: {n} documents, {errors} with an error, {positions} error positions compared"
+    );
     assert!(errors > 0 && errors < n, "both outcomes are covered");
 }
 
 #[test]
 fn t2_whole_documents_random_pieces() {
     let mut r = Rng::new(0x7075_626c_6963_0002);
-    let (mut n, mut errors) = (0, 0);
+    let (mut n, mut errors, mut positions) = (0, 0, 0);
     for (id, doc) in documents() {
         for _ in 0..2 {
             let ops = random_pieces(&mut r, &doc);
-            errors += usize::from(check_until_first_error(&id, &doc, &ops));
+            let failed = check_t2(&id, &doc, &ops);
+            errors += usize::from(failed > 0);
+            positions += failed;
             n += 1;
         }
     }
-    eprintln!("random pieces: {n} runs, {errors} ended in an error");
+    eprintln!(
+        "random pieces: {n} runs, {errors} with an error, {positions} error positions compared"
+    );
     assert!(errors > 0 && errors < n, "both outcomes are covered");
 }
 

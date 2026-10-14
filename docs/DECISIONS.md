@@ -944,9 +944,9 @@ recorded in DIVERGENCES.md.
   so after repeated failing calls the column grows with each read (for
   `<a></b>` and two further final calls: columns 5, 10, 15), as in a C
   program that reads the position after every failed call. The oracle's
-  `buffer_run_with_error_positions` reads it at the same points, and the
-  differential test compares the position of every error with it; the
-  default `buffer_run` output is unchanged.
+  `buffer_run_with_error_positions` reads it at the same points, and T2
+  and T3 compare the position of every failed call with it; the default
+  `buffer_run` output is unchanged.
 - **Error codes.** `ErrorCode` is `#[non_exhaustive]`, has one variant
   per libexpat 2.9.0 error code except `XML_ERROR_NONE` (44), and
   `to_c()` gives the C value. Both conversions with the parser's
@@ -961,9 +961,18 @@ recorded in DIVERGENCES.md.
   (D-037), stop/resume, an allocation-failure policy, encoding override
   and namespace options, and any release.
 - **Verification.** The mapping is checked against the vendored
-  `expat.h` (`api.rs` unit tests, with and without features); results,
-  codes and error positions are compared with the C oracle call by call (`tests/tests/public_api_diff.rs`: 540 upstream vectors and
-  2 x 300 generated documents in one call, byte by byte and in random
-  pieces, and calls after the end); `crates/expat/tests/public_api.rs`
-  uses only the public API and runs in CI with `internal-api` off
-  (`cargo test -p expat`, with and without default features).
+  `expat.h` (`api.rs` unit tests, with and without features). In
+  `tests/tests/public_api_diff.rs` the public API is compared with the C
+  oracle (`buffer_run_with_error_positions`) call by call: the result and
+  error code of every call, and the line, column and byte index of every
+  failed call. T2 feeds the 540 upstream vectors and 2 x 300 generated
+  documents in one call, byte by byte and in random pieces (two splits
+  per document); T3 covers a call after the final call, a final call
+  after an error, a deferred call that returns `Ok(())` after an error,
+  and random call sequences with calls after the end. In both, the first
+  error's position is also compared with a C run that reads no position
+  before it. This is equality on these inputs for `XML_Parse` with the
+  default encoding, no namespaces and no callbacks, not a proof for all
+  inputs. `crates/expat/tests/public_api.rs` uses only the public API
+  and runs in CI with `internal-api` off (`cargo test -p expat`, with
+  and without default features).
