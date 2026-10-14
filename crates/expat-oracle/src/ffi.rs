@@ -43,6 +43,8 @@ pub(crate) struct OracleOptions {
     pub(crate) ext_data: *const u8,
     pub(crate) ext_len: usize,
     pub(crate) ext_encoding: *const c_char,
+    pub(crate) handler_mask_set: c_int,
+    pub(crate) handler_mask: std::os::raw::c_uint,
 }
 
 /// Mirror of `struct oracle_role_state`.

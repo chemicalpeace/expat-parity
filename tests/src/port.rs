@@ -13,7 +13,9 @@ use expat::internal::parse::{
     self, ContentModel, ExternalEntities, Handler, HandlerSet, ParamEntityParsing as PortPep,
     Parser, Stop,
 };
-use expat_oracle::{BufferOp, EXT_MAX_DEPTH, ExtHandler, ParamEntityParsing, ParseOptions};
+use expat_oracle::{
+    BufferOp, EXT_MAX_DEPTH, ExtHandler, HandlerMask, ParamEntityParsing, ParseOptions,
+};
 
 /// The fixed hash salt of the C shim (`ORACLE_HASH_SALT` in
 /// `oracle_trace.c`).
@@ -217,27 +219,34 @@ impl Handler for Tracer {
 
 /// The handlers `oracle_parse_trace` sets, as far as the port has them.
 fn traced_handlers() -> HandlerSet {
+    masked_handlers(HandlerMask::FULL)
+}
+
+/// The handlers the C shim sets for `mask` (`ParseOptions::handler_mask`);
+/// the external entity, not-standalone and unparsed entity handlers are
+/// left unset here and set from their own options.
+fn masked_handlers(mask: HandlerMask) -> HandlerSet {
     HandlerSet {
-        xml_decl: true,
-        start_element: true,
-        end_element: true,
-        character_data: true,
-        processing_instruction: true,
-        comment: true,
-        start_cdata_section: true,
-        end_cdata_section: true,
-        start_namespace_decl: true,
-        end_namespace_decl: true,
-        skipped_entity: true,
-        start_doctype_decl: true,
-        end_doctype_decl: true,
-        entity_decl: true,
+        xml_decl: mask.xml_decl,
+        start_element: mask.start_element,
+        end_element: mask.end_element,
+        character_data: mask.character_data,
+        processing_instruction: mask.processing_instruction,
+        comment: mask.comment,
+        start_cdata_section: mask.start_cdata_section,
+        end_cdata_section: mask.end_cdata_section,
+        start_namespace_decl: mask.start_namespace_decl,
+        end_namespace_decl: mask.end_namespace_decl,
+        skipped_entity: mask.skipped_entity,
+        start_doctype_decl: mask.start_doctype_decl,
+        end_doctype_decl: mask.end_doctype_decl,
+        entity_decl: mask.entity_decl,
         // Set by `ParseOptions::unparsed_handler` (like the shim); without
         // it unparsed entities reach the entity declaration handler.
         unparsed_entity_decl: false,
-        notation_decl: true,
-        element_decl: true,
-        attlist_decl: true,
+        notation_decl: mask.notation_decl,
+        element_decl: mask.element_decl,
+        attlist_decl: mask.attlist_decl,
         external_entity_ref: false,
         not_standalone: false,
     }
@@ -334,7 +343,9 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
         external_entity_ref: opts.ext_handler != ExtHandler::None,
         not_standalone: opts.not_standalone.is_some(),
         unparsed_entity_decl: opts.unparsed_handler,
-        ..traced_handlers()
+        ..opts
+            .handler_mask
+            .map_or_else(traced_handlers, masked_handlers)
     });
     if opts.use_foreign_dtd {
         p.use_foreign_dtd(true);

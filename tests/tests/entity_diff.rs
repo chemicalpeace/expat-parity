@@ -90,6 +90,7 @@ const ALWAYS: ParseOptions = ParseOptions {
     unparsed_handler: false,
     ext_entities: Vec::new(),
     ext_encoding: None,
+    handler_mask: None,
 };
 
 /// (id, document, expected C error code with parameter entity parsing

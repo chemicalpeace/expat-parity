@@ -31,6 +31,31 @@ enum {
   ORACLE_PRED_IS_INVALID4 = 6
 };
 
+/* Handler mask bits (oracle_options.handler_mask): which of the shim's
+   always-traced handlers oracle_parse_trace sets. Each bit sets one
+   handler through its own setter (XML_SetStartElementHandler, ...), which
+   is what the combined setters do for each half. */
+enum {
+  ORACLE_H_XML_DECL = 1 << 0,
+  ORACLE_H_START_DOCTYPE = 1 << 1,
+  ORACLE_H_END_DOCTYPE = 1 << 2,
+  ORACLE_H_START_ELEMENT = 1 << 3,
+  ORACLE_H_END_ELEMENT = 1 << 4,
+  ORACLE_H_CHARACTER_DATA = 1 << 5,
+  ORACLE_H_PI = 1 << 6,
+  ORACLE_H_COMMENT = 1 << 7,
+  ORACLE_H_START_CDATA = 1 << 8,
+  ORACLE_H_END_CDATA = 1 << 9,
+  ORACLE_H_ENTITY_DECL = 1 << 10,
+  ORACLE_H_NOTATION_DECL = 1 << 11,
+  ORACLE_H_ELEMENT_DECL = 1 << 12,
+  ORACLE_H_ATTLIST_DECL = 1 << 13,
+  ORACLE_H_START_NS = 1 << 14,
+  ORACLE_H_END_NS = 1 << 15,
+  ORACLE_H_SKIPPED_ENTITY = 1 << 16,
+  ORACLE_H_FULL = (1 << 17) - 1
+};
+
 /* Parse options for oracle_parse_trace. */
 struct oracle_options {
   const char *encoding;  /* NULL: autodetect */
@@ -92,6 +117,12 @@ struct oracle_options {
   /* The encodingName argument ext_handler 3 passes to every
      XML_ExternalEntityParserCreate call (NULL: no name, the default). */
   const char *ext_encoding;
+  /* 0: the shim sets every handler of ORACLE_H_FULL (the fixed set it
+     always set before the mask existed); 1: it sets only the handlers
+     whose bits are in handler_mask. The external entity, not-standalone
+     and unparsed entity handlers stay controlled by their own fields. */
+  int handler_mask_set;
+  unsigned int handler_mask;
 };
 
 #define ORACLE_EXT_MAX_DEPTH 16
