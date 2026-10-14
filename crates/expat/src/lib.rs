@@ -3,7 +3,9 @@
 //!
 //! The port is built bottom-up and verified module by module against the
 //! vendored C reference (see `docs/ARCHITECTURE.md`). The public parser API
-//! does not exist yet; see `docs/STATE.md` for progress.
+//! is being built in slices (module 12, `docs/STATE.md`): so far [`Parser`]
+//! parses a document without callbacks and reports the result, or an
+//! [`Error`] with its [`ErrorCode`] and position.
 //!
 //! # Features
 //!
@@ -16,6 +18,9 @@
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
+
+mod api;
+pub use api::{Error, ErrorCode, Parser};
 
 /// Declares an internal module that is private by default and public under
 /// the `internal-api` feature.

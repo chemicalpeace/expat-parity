@@ -40,6 +40,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cargo test --workspace --all-features
+      # The public API with `internal-api` off (D-038): a workspace build
+      # turns the feature on through expat-difftest, so only `-p expat`
+      # alone tests the crate without it, with std and without.
+      - run: cargo test -p expat
       - run: cargo test -p expat --no-default-features
       # D-034: the tracker's structure sizes against this platform's C
       # compiler, the DV-1 / R1 window boundaries and the per-event
