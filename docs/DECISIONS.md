@@ -920,3 +920,59 @@ recorded in DIVERGENCES.md.
   the current trace-equality definition is *Open*; D-010 is unchanged.
 - **Public API and release.** Names, shape, v0.1 scope and any release
   need the owner's separate approval. *Open.*
+
+## D-038 Public API, first slice: a parser without callbacks (module 12, 2026-10-14)
+
+- **Scope.** The first public types, in `crates/expat/src/api.rs`,
+  re-exported from the crate root: `Parser::new(salt: [u8; 16])` and
+  `Parser::parse(&mut self, data: &[u8], is_final: bool) -> Result<(),
+  Error>`, a wrapper around `parse::Parser` with the default encoding
+  (`XML_ParserCreate(NULL)`), namespace processing off and no callbacks;
+  `Error` with `code()`, `line()`, `column()` and `byte_index()`; and
+  `ErrorCode`. The public API does not depend on the `internal-api`
+  feature (D-006).
+- **Salt.** The caller provides the salt; no entropy source is added in
+  this slice.
+- **Behaviour after an error or after the final call.** Every call is
+  passed to the parser core and the wrapper keeps no state of its own, so
+  the results are C's (D-023): a later call normally repeats the error, a
+  call after the final one fails with `Finished`, and a call whose input
+  the reparse-deferral heuristic does not scan returns `Ok(())` after an
+  error, as `XML_Parse` returns `XML_STATUS_OK`. The position in an
+  `Error` is read when the error is returned. Each read advances the
+  position from `m_positionPtr` (which every call resets to its start),
+  so after repeated failing calls the column grows with each read (for
+  `<a></b>` and two further final calls: columns 5, 10, 15), as in a C
+  program that reads the position after every failed call. The oracle's
+  `buffer_run_with_error_positions` reads it at the same points, and T2
+  and T3 compare the position of every failed call with it; the default
+  `buffer_run` output is unchanged.
+- **Error codes.** `ErrorCode` is `#[non_exhaustive]`, has one variant
+  per libexpat 2.9.0 error code except `XML_ERROR_NONE` (44), and
+  `to_c()` gives the C value. Both conversions with the parser's
+  `XmlError` are `match`es without a wildcard. `XML_ERROR_NONE` is never
+  returned as an error; an error status without a code, or a suspended
+  status (only `XML_StopParser` suspends, and this API cannot call it),
+  is returned as `UnexpectedState` without a panic.
+- **Traits.** `Error` and `ErrorCode` implement `Debug`, `Clone`, `Copy`,
+  `PartialEq`, `Eq` and `Hash`. `Display`, `std::error::Error` and the
+  `XML_ErrorString` texts are outside this slice.
+- **Outside this slice.** Callbacks, the `Sink` and in-callback position
+  (D-037), stop/resume, an allocation-failure policy, encoding override
+  and namespace options, and any release.
+- **Verification.** The mapping is checked against the vendored
+  `expat.h` (`api.rs` unit tests, with and without features). In
+  `tests/tests/public_api_diff.rs` the public API is compared with the C
+  oracle (`buffer_run_with_error_positions`) call by call: the result and
+  error code of every call, and the line, column and byte index of every
+  failed call. T2 feeds the 540 upstream vectors and 2 x 300 generated
+  documents in one call, byte by byte and in random pieces (two splits
+  per document); T3 covers a call after the final call, a final call
+  after an error, a deferred call that returns `Ok(())` after an error,
+  and random call sequences with calls after the end. In both, the first
+  error's position is also compared with a C run that reads no position
+  before it. This is equality on these inputs for `XML_Parse` with the
+  default encoding, no namespaces and no callbacks, not a proof for all
+  inputs. `crates/expat/tests/public_api.rs` uses only the public API
+  and runs in CI with `internal-api` off (`cargo test -p expat`, with
+  and without default features).

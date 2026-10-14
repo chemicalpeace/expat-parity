@@ -243,10 +243,12 @@ size_t oracle_tracker_events_take(struct oracle_tracker_event **out,
  * failure. */
 #define ORACLE_CORE_HEAP_CAP ((size_t)32 << 20)
 /* Module 10: feeds `doc` with (req, n, final) operations (req == INT_MIN:
- * XML_Parse) and traces the input buffer state after each (oracle_core.c). */
+ * XML_Parse) and traces the input buffer state after each (oracle_core.c);
+ * with error_positions, also the position read after each failed one
+ * (module 12, D-038). */
 int oracle_buffer_run(const unsigned char *doc, size_t len, const int *ops,
-                      size_t nops, int ns, int deferral, unsigned char **out,
-                      size_t *out_len);
+                      size_t nops, int ns, int deferral, int error_positions,
+                      unsigned char **out, size_t *out_len);
 int oracle_core_run(const unsigned char *prog, size_t len, unsigned char **out,
                     size_t *out_len);
 /* poolBytesToAllocateFor and offsetof(BLOCK, s). */

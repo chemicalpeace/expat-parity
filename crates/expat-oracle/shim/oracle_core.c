@@ -740,11 +740,16 @@ buf_off(XML_Parser p, const char *ptr) {
    document), and XML_ParseBuffer(n, final) follows
    when the buffer was granted. Callers keep n <= req, or n larger than the
    free space (which XML_ParseBuffer rejects), so no byte is parsed that
-   was not written. */
+   was not written.
+   With error_positions != 0, every operation that returns
+   XML_STATUS_ERROR is followed by a line "pos <line> <column> <byte index>"
+   read right after its state line, as an application that reads the
+   position after each failed call would (each read updates m_position and
+   m_positionPtr); with 0 nothing is read before the end, as before. */
 int
 oracle_buffer_run(const unsigned char *doc, size_t len, const int *ops,
-                  size_t nops, int ns, int deferral, unsigned char **out,
-                  size_t *out_len) {
+                  size_t nops, int ns, int deferral, int error_positions,
+                  unsigned char **out, size_t *out_len) {
   static const unsigned char salt[16] = {1, 2, 3, 4, 5, 6, 7, 8,
                                          9, 10, 11, 12, 13, 14, 15, 16};
   struct obuf o = {NULL, 0, 0, 0};
@@ -789,6 +794,12 @@ oracle_buffer_run(const unsigned char *doc, size_t len, const int *ops,
               p->m_partialTokenBytesBefore, p->m_lastBufferRequestSize,
               (unsigned long long)p->m_parseEndByteIndex,
               buf_off(p, p->m_eventPtr), buf_off(p, p->m_positionPtr), got);
+    if (error_positions && st == XML_STATUS_ERROR) {
+      unsigned long long el = XML_GetCurrentLineNumber64(p);
+      unsigned long long ec = XML_GetCurrentColumnNumber64(p);
+      ob_printf(&o, "pos %llu %llu %lld\n", el, ec,
+                (long long)XML_GetCurrentByteIndex64(p));
+    }
   }
   unsigned long long line = XML_GetCurrentLineNumber64(p);
   unsigned long long col = XML_GetCurrentColumnNumber64(p);
