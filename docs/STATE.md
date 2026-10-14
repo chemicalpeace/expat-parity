@@ -32,8 +32,9 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   5 for the current ones. Next: OOM fault injection per allocation point,
   then module 12. Module 12 slice 1 (public `expat::Parser` without
   callbacks, D-038) is merged (PR #22, merge commit 3fe249be); slice 2
-  (error texts, `Display`, `std::error::Error`, D-039) is on branch
-  `module-12-slice-2`.
+  (error texts, `Display`, `std::error::Error`, D-039) is merged (PR #23,
+  merge commit 64d3fca7). Slice 3 (S3: encoding name and namespace
+  separator options, D-040) is on branch `module-12-slice-3`.
 - **Remote:** `chemicalpeace/expat-parity`, public (renamed from
   `chemicalpeace/expat-rs` on 2026-10-14, D-036; the old URL redirects).
   Changes land through short-lived
@@ -101,7 +102,7 @@ A Phase 3 module is done when all of these hold, in the same PR:
 | 9 | `pool` / `hash` / `heap`: string pool, hash table, allocation accounting | `xmlparse.c` | **done** — `StringPool`, `HashTable`, `Heap`; white-box vs C (block lists, slot layout, every allocation request, failure of each attempt); D-021 |
 | 10 | `parse` parser state, buffer (`XML_Parse`, `XML_GetBuffer`, `XML_ParseBuffer`, reparse deferral), prolog without DTD, content, attributes, namespaces, CDATA, epilog (Q-1, Q-2) | `xmlparse.c` | **done** — `parse::Parser`; whole parses equal to C by trace (upstream vectors under 11 option sets incl. namespace triplets, generated documents, fuzzing), buffer state white-box; D-023, D-025; Q-1/Q-2 resolved (replicate, D-024). DTD roles stopped with `Stop::DtdNotPorted` until module 11 |
 | 11 | `parse` DTD, entities, amplification limits | `xmlparse.c` | **11a done** — declarations (`parse::decl`, `parse::model`, entity tables); spec `docs/DTD-SECURITY.md`, D-026, D-027. **11b done** — internal entity expansion in content, attribute values, default values, parameter entities and entity values, recursion and nesting checks (`parse::entity`, D-028); 540/540 upstream vectors compared. **11b2 done** — billion-laughs setters, bounded amplification tests, Q-4 (D-029). **11c done** — allocation tracker charged at C's allocation points, never below C (`parse::tracker`, D-030, divergence DV-1). **11d D1 done** — external entity and not-standalone handler call sites, `getContext`, foreign DTD (D-031). **11d D2 done** — external entity parsers (`parse::external`: text declarations, conditional sections, PEs in entity values, shared DTD/tracker/accounting, D-032); `Stop::DtdNotPorted` removed. Coverage and summary: REPORT.md (module 11 step E, module 11 summary); DV-1 removed by exact tracker parity (D-034 stages 1-8; R1 found and fixed) |
-| 12 | public API `expat::Parser` (default handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers, unknown-encoding handler, `XML_GetInputContext`, entropy for the salt) | — | **slice 1 done** (D-038, PR #22): `Parser::new(salt)`, `Parser::parse` (`XML_Parse`, default encoding, no namespaces, no callbacks), `Error` with `ErrorCode` and position; compared with the C oracle call by call in `public_api_diff.rs` (T2: 540 upstream vectors and 600 generated documents in one call, byte by byte and in random pieces; T3: calls after the end, after an error and after deferral, random sequences): result and error code of every call, line, column and byte index of every failed call, tested with `internal-api` off in `crates/expat/tests/public_api.rs`. **Slice 2** (D-039, in progress on branch `module-12-slice-2`): `ErrorCode::description` (the vendored `XML_ErrorString` texts, compared with C), `Display` for `ErrorCode` and `Error`, `std::error::Error` for `Error` with `std`. Callbacks with `Sink` and in-callback position (D-037), the rest of the list and encoding/namespace options are not started |
+| 12 | public API `expat::Parser` (default handler, `XML_StopParser`/`XML_ResumeParser`, external entity parsers, unknown-encoding handler, `XML_GetInputContext`, entropy for the salt) | — | **slice 1 done** (D-038, PR #22): `Parser::new(salt)`, `Parser::parse` (`XML_Parse`, default encoding, no namespaces, no callbacks), `Error` with `ErrorCode` and position; compared with the C oracle call by call in `public_api_diff.rs` (T2: 540 upstream vectors and 600 generated documents in one call, byte by byte and in random pieces; T3: calls after the end, after an error and after deferral, random sequences): result and error code of every call, line, column and byte index of every failed call, tested with `internal-api` off in `crates/expat/tests/public_api.rs`. **slice 2 done** (D-039, PR #23): `ErrorCode::description` (the vendored `XML_ErrorString` texts, compared with C), `Display` for `ErrorCode` and `Error`, `std::error::Error` for `Error` with `std`. **Slice 3** (D-040, in progress on branch `module-12-slice-3`): `Parser::with_options(salt, Options)`, `Options` (`#[non_exhaustive]`, builder: raw encoding name kept up to its first NUL, namespace separator `Option<u8>` with `0` valid); compared with C for 17 encoding names and 12 separators plus none. Callbacks with `Sink` and in-callback position (D-037) and the rest of the list are not started |
 | 13 | `expat-capi` (optional) | `expat.h` | not started |
 
 Fuzz targets: `parse_trace` (differential since module 10: port vs C by
@@ -169,8 +170,10 @@ with allocation failures, white-box).
    Linux and macOS, 93.25 % on Windows (lines 7,738 / 8,135 on Linux and
    macOS, 7,734 / 8,131 on Windows).
 6. Module 12: public `expat::Parser` on top of `parse::Parser`. Slice 1
-   (D-038, no callbacks) is merged; slice 2 (D-039, error texts and
-   `Display`) is in progress; then callbacks through the
+   (D-038, no callbacks) and slice 2 (D-039, error texts and `Display`)
+   are merged; slice 3 (D-040, encoding and namespace options) is in
+   progress; then
+   callbacks through the
    crate-private `Sink` with in-callback position (D-037), default
    handler, stop/resume, external entity parsers (`getContext` with the
    oracle's salt, D-021), unknown-encoding handler, input context, salt

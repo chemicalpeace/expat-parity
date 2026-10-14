@@ -748,12 +748,17 @@ buf_off(XML_Parser p, const char *ptr) {
    m_positionPtr); with 0 nothing is read before the end, as before. */
 int
 oracle_buffer_run(const unsigned char *doc, size_t len, const int *ops,
-                  size_t nops, int ns, int deferral, int error_positions,
-                  unsigned char **out, size_t *out_len) {
+                  size_t nops, const char *encoding, int ns, int ns_sep,
+                  int deferral, int error_positions, unsigned char **out,
+                  size_t *out_len) {
   static const unsigned char salt[16] = {1, 2, 3, 4, 5, 6, 7, 8,
                                          9, 10, 11, 12, 13, 14, 15, 16};
   struct obuf o = {NULL, 0, 0, 0};
-  XML_Parser p = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
+  /* encoding: NULL or a NUL-terminated name, read by libexpat up to its
+     first NUL. ns != 0: XML_ParserCreateNS with ns_sep, which may be 0
+     (module 12, D-040). */
+  XML_Parser p = ns ? XML_ParserCreateNS(encoding, (XML_Char)ns_sep)
+                    : XML_ParserCreate(encoding);
   if (p == NULL)
     return -1;
   XML_SetHashSalt16Bytes(p, salt);

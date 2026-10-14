@@ -1020,3 +1020,60 @@ recorded in DIVERGENCES.md.
   `std::error::Error` test runs with `std` only.
 - **Outside this slice.** Localised texts, a `source()` chain, `Display`
   details beyond line and column, and everything outside D-038's scope.
+
+## D-040 Public API: encoding name and namespace separator options (module 12, slice 3, 2026-10-15)
+
+- **Scope.** Added to the public API of D-038 and D-039:
+  `Parser::with_options(salt: [u8; 16], options: Options) -> Parser` and
+  `Options` (`#[non_exhaustive]`, `Debug`, `Clone`, `Default`,
+  `PartialEq`, `Eq`, `Hash`) with `Options::new()`,
+  `Options::encoding(self, name: &[u8]) -> Self` and
+  `Options::namespace_separator(self, separator: u8) -> Self`.
+  `Parser::new(salt)` is `with_options(salt, Options::default())`. The
+  options go to `parse::Parser::new(encoding, ns_separator, salt)`, which
+  already implements `XML_ParserCreate(encoding)` and
+  `XML_ParserCreateNS(encoding, sep)`; the core is unchanged.
+- **Encoding.** A raw byte name, not an enum, so every name C accepts can
+  be given and an unknown name fails as in C (`XML_ERROR_UNKNOWN_ENCODING`
+  in the first `XML_Parse`, line 1, column 0, byte index -1); this is also
+  what a later unknown-encoding handler needs. The name is kept up to its
+  first NUL, as C's `copyString` of the `encodingName` string keeps it;
+  the empty name, given or left by a leading NUL, is not "no name" and is
+  unknown. Names compare ignoring ASCII case, and the override replaces
+  the encoding of the XML declaration, both as in C.
+- **Separator.** `Option<u8>`: `None` is `XML_ParserCreate`, `Some(sep)`
+  is `XML_ParserCreateNS(encoding, sep)` for every byte, `0` included
+  (namespace processing on, no separator; never merged with `None`) and
+  bytes from 0x80 up (C's `XML_Char` is `char`). With no callbacks the
+  separator is visible only through `addBinding`'s check: a namespace name
+  containing the separator is `XML_ERROR_SYNTAX` unless the separator is
+  an RFC 3986 URI character; the comparison is with the namespace name's
+  bytes in UTF-8, so separator 0xC3 rejects `u\xc3\xa9v` and 0xE9 does
+  not.
+- **C behaviour recorded with the oracle before testing it:** names with
+  a NUL byte (`UTF-8\0junk` is UTF-8, `\0UTF-8` is unknown) and
+  separators 0x80, 0xA9, 0xC3, 0xE9, 0xFF; the port matched C in every
+  case.
+- **Oracle.** `oracle_buffer_run` takes `const char *encoding, int ns, int
+  ns_sep` instead of `int ns`, so namespace processing and the separator
+  are separate and `Some(0)` reaches `XML_ParserCreateNS(enc, '\0')`. The
+  name is passed with a NUL appended, so C reads it up to its first NUL.
+  `expat_oracle::buffer_run_with(doc, ops, &BufferConfig, error_positions)`
+  exposes it; `buffer_run` and `buffer_run_with_error_positions` keep their
+  signatures and output (`ns` is `'|'`), checked by `s3_oracle_config`.
+  `parse_trace` is unchanged.
+- **Verification.** `tests/tests/public_api_diff.rs` (S3 section): the
+  result and code of every call and the position of every error equal
+  C's for 17 encoding names (known names in both cases, empty, unknown,
+  with a NUL) on the upstream vectors, 300 generated documents and
+  encoding documents (Latin-1, UTF-8 BOM, UTF-16LE/BE with and without
+  BOM, declarations naming other encodings); for no namespace processing
+  and 12 separators on namespace documents, the upstream vectors and 600
+  generated documents; encodings with namespaces; calls after the end;
+  each in one call and in random pieces. `Parser::new` equals
+  `with_options(Options::default())` on every T2 document.
+  `crates/expat/tests/public_api.rs` tests the options with
+  `internal-api` off, with and without `std`.
+- **Outside this slice.** `XML_SetEncoding`, the unknown-encoding handler
+  (and Q-5, D-035), callbacks (and therefore expanded names and triplets),
+  other parser settings.
