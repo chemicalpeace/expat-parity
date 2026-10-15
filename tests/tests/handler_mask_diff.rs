@@ -36,7 +36,7 @@ use std::time::Duration;
 use expat_difftest::bounded::{self, Bounds, CountingAlloc};
 use expat_difftest::docgen::{self, Rng};
 use expat_difftest::port::{port_trace, port_trace_with_tracker_events};
-use expat_difftest::trace::{first_difference, mask_q4};
+use expat_difftest::trace::{first_difference, mask_q4, result_error_code};
 use expat_difftest::vectors::upstream;
 use expat_oracle::{
     ExtHandler, Factor, HandlerMask, Limits, ParamEntityParsing, ParseOptions, TrackerEvent,
@@ -127,7 +127,7 @@ fn singles() -> Vec<(String, HandlerMask)> {
     .collect()
 }
 
-/// The whole mask matrix (26 masks).
+/// The whole mask matrix (20 masks: full, MVP, none, 9 singles, 8 random).
 fn masks() -> Vec<(String, HandlerMask)> {
     let mut v = vec![
         ("full".to_string(), HandlerMask::FULL),
@@ -278,7 +278,7 @@ fn no_mask_equals_explicit_full_mask() {
         let (t0, e0) = parse_trace_with_tracker_events(doc, &o).expect("oracle");
         let (t1, e1) = parse_trace_with_tracker_events(doc, &with_mask(&o, HandlerMask::FULL))
             .expect("oracle");
-        if t0 != t1 || e0.events != e1.events || e0.at_end != e1.at_end {
+        if t0 != t1 || !same_c_events(&t0, &e0.events, &e1.events) || e0.at_end != e1.at_end {
             failures.push(format!("{id}: C tracker stream differs"));
         }
         streams += 1;
@@ -292,6 +292,24 @@ fn no_mask_equals_explicit_full_mask() {
     for bits in [0, 1, 0x1_5555, 0xaaaa, 0x1_ffff] {
         assert_eq!(HandlerMask::from_bits(bits).bits(), bits);
     }
+}
+
+/// C tracker events compared field by field, every field included. The
+/// one exception is Q-4 (`trace::mask_q4`, docs/DIVERGENCES.md): when the
+/// trace ends with `XML_ERROR_JUNK_AFTER_DOC_ELEMENT` (9), an event's
+/// `direct` counter of at least 2^62 on either side is the
+/// address-dependent value of that quirk and can differ between two runs
+/// of the same build, so `direct` alone is not compared for that event;
+/// `increase`, `refused`, `size`, `total`, `peak` and `line` still are.
+fn same_c_events(trace: &[u8], a: &[TrackerEvent], b: &[TrackerEvent]) -> bool {
+    let q4 = result_error_code(trace) == Some(9);
+    a.len() == b.len()
+        && a.iter().zip(b).all(|(x, y)| {
+            let garbage = q4 && (x.direct >= 1 << 62 || y.direct >= 1 << 62);
+            (x.increase, x.refused, x.size, x.total, x.peak, x.line)
+                == (y.increase, y.refused, y.size, y.total, y.peak, y.line)
+                && (garbage || x.direct == y.direct)
+        })
 }
 
 /// Part 2a of the module docs: The mask matrix on T2, whole and with namespaces.
