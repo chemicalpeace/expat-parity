@@ -150,8 +150,8 @@ impl Parser {
     /// reparse-deferral heuristic does not scan returns `Ok(())`; after the
     /// final piece, a call fails with [`ErrorCode::Finished`].
     pub fn parse(&mut self, data: &[u8], is_final: bool) -> Result<(), Error> {
-        // No handler is set, as in every call before callbacks existed;
-        // after a `parse_with` call this clears its handlers (D-041).
+        // Clears the handlers a previous `parse_with` call set, so this call
+        // runs with no handler, as every call did before callbacks (D-041).
         self.inner.set_handlers(parse::HandlerSet::default());
         let status = self.inner.parse(&mut NoCallbacks, data, is_final);
         self.result(status)
