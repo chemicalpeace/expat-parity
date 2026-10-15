@@ -258,6 +258,126 @@ pub struct ParseOptions {
     /// The `encodingName` argument [`ExtHandler::Read`] passes to every
     /// `XML_ExternalEntityParserCreate` call (`None`: `NULL`, the default).
     pub ext_encoding: Option<String>,
+    /// Which of the always-traced handlers are set (`None`: all of them,
+    /// [`HandlerMask::FULL`], the fixed set the shim set before the mask
+    /// existed). The external entity, not-standalone and unparsed entity
+    /// handlers stay controlled by their own fields.
+    pub handler_mask: Option<HandlerMask>,
+}
+
+/// Which of the trace handlers [`parse_trace`] sets (C: which handler
+/// pointers are non-`NULL`; `ORACLE_H_*` in `shim/oracle.h`). A handler
+/// that is not set is neither called nor traced, and libexpat skips the
+/// work done only for it (for example storing a processing instruction's
+/// target and data), so the mask can change allocations and positions,
+/// not only the trace lines.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[allow(clippy::struct_excessive_bools)] // reason: one flag per C handler pointer.
+pub struct HandlerMask {
+    /// `XML_SetXmlDeclHandler`
+    pub xml_decl: bool,
+    /// `XML_SetStartDoctypeDeclHandler`
+    pub start_doctype_decl: bool,
+    /// `XML_SetEndDoctypeDeclHandler`
+    pub end_doctype_decl: bool,
+    /// `XML_SetStartElementHandler`
+    pub start_element: bool,
+    /// `XML_SetEndElementHandler`
+    pub end_element: bool,
+    /// `XML_SetCharacterDataHandler`
+    pub character_data: bool,
+    /// `XML_SetProcessingInstructionHandler`
+    pub processing_instruction: bool,
+    /// `XML_SetCommentHandler`
+    pub comment: bool,
+    /// `XML_SetStartCdataSectionHandler`
+    pub start_cdata_section: bool,
+    /// `XML_SetEndCdataSectionHandler`
+    pub end_cdata_section: bool,
+    /// `XML_SetEntityDeclHandler`
+    pub entity_decl: bool,
+    /// `XML_SetNotationDeclHandler`
+    pub notation_decl: bool,
+    /// `XML_SetElementDeclHandler`
+    pub element_decl: bool,
+    /// `XML_SetAttlistDeclHandler`
+    pub attlist_decl: bool,
+    /// `XML_SetStartNamespaceDeclHandler`
+    pub start_namespace_decl: bool,
+    /// `XML_SetEndNamespaceDeclHandler`
+    pub end_namespace_decl: bool,
+    /// `XML_SetSkippedEntityHandler`
+    pub skipped_entity: bool,
+}
+
+impl HandlerMask {
+    /// Number of handlers in the mask (bits `0..COUNT`).
+    pub const COUNT: u32 = 17;
+
+    /// Every handler set: what [`parse_trace`] does without a mask.
+    pub const FULL: HandlerMask = HandlerMask::from_bits((1 << Self::COUNT) - 1);
+
+    /// No trace handler set.
+    pub const NONE: HandlerMask = HandlerMask::from_bits(0);
+
+    /// The mask of `bits`, in the order of the fields (bit 0
+    /// `xml_decl` ... bit 16 `skipped_entity`, the `ORACLE_H_*` values);
+    /// higher bits are ignored.
+    #[must_use]
+    pub const fn from_bits(bits: u32) -> HandlerMask {
+        HandlerMask {
+            xml_decl: bits & (1 << 0) != 0,
+            start_doctype_decl: bits & (1 << 1) != 0,
+            end_doctype_decl: bits & (1 << 2) != 0,
+            start_element: bits & (1 << 3) != 0,
+            end_element: bits & (1 << 4) != 0,
+            character_data: bits & (1 << 5) != 0,
+            processing_instruction: bits & (1 << 6) != 0,
+            comment: bits & (1 << 7) != 0,
+            start_cdata_section: bits & (1 << 8) != 0,
+            end_cdata_section: bits & (1 << 9) != 0,
+            entity_decl: bits & (1 << 10) != 0,
+            notation_decl: bits & (1 << 11) != 0,
+            element_decl: bits & (1 << 12) != 0,
+            attlist_decl: bits & (1 << 13) != 0,
+            start_namespace_decl: bits & (1 << 14) != 0,
+            end_namespace_decl: bits & (1 << 15) != 0,
+            skipped_entity: bits & (1 << 16) != 0,
+        }
+    }
+
+    /// The bits of the mask ([`HandlerMask::from_bits`] inverted).
+    #[must_use]
+    pub const fn bits(self) -> u32 {
+        let f = [
+            self.xml_decl,
+            self.start_doctype_decl,
+            self.end_doctype_decl,
+            self.start_element,
+            self.end_element,
+            self.character_data,
+            self.processing_instruction,
+            self.comment,
+            self.start_cdata_section,
+            self.end_cdata_section,
+            self.entity_decl,
+            self.notation_decl,
+            self.element_decl,
+            self.attlist_decl,
+            self.start_namespace_decl,
+            self.end_namespace_decl,
+            self.skipped_entity,
+        ];
+        let mut bits = 0;
+        let mut i = 0;
+        while i < f.len() {
+            if f[i] {
+                bits |= 1 << i;
+            }
+            i += 1;
+        }
+        bits
+    }
 }
 
 /// The test external entity reference handler of a parse (module 11d).
@@ -580,6 +700,8 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
         ext_encoding: ext_encoding
             .as_ref()
             .map_or(std::ptr::null(), |e| e.as_ptr()),
+        handler_mask_set: c_int::from(opts.handler_mask.is_some()),
+        handler_mask: opts.handler_mask.map_or(0, HandlerMask::bits),
     };
     let mut out: *mut u8 = std::ptr::null_mut();
     let mut out_len: usize = 0;

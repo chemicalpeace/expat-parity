@@ -205,6 +205,15 @@ literal. A C `NULL` string is written as `~`. Integers are decimal.
 | `notstandalone` | the test `XML_NotStandaloneHandler` (module 11d) |
 | `result <ok\|error> <error_code> <line> <column> <byte_index>` | always last: return status of the last `XML_Parse` call, `XML_GetErrorCode`, `XML_GetCurrentLineNumber64`, `XML_GetCurrentColumnNumber64`, `XML_GetCurrentByteIndex64` after parsing stops |
 
+By default the shim sets every handler of the table that has no option of its
+own. `ParseOptions::handler_mask` (module 12 slice 4) sets only the handlers in
+the mask, through their individual setters (`XML_SetStartElementHandler`, ...);
+the port's trace adapter sets the same `HandlerSet`. A handler that is not set
+emits no line, and libexpat also skips the work done only for it (for example
+storing a processing instruction's target and data), so a mask can change
+allocations and positions as well as the trace; `handler_mask_diff.rs` compares
+C and the port under a matrix of masks.
+
 ### Why these rules
 
 - **Coalescing character data**: libexpat may split character data at buffer

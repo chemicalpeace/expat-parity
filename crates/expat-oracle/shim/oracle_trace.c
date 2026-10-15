@@ -700,19 +700,44 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   XML_SetUserData(p, &ctx);
   XML_SetParamEntityParsing(
       p, (enum XML_ParamEntityParsing)opts->param_entity_parsing);
-  XML_SetXmlDeclHandler(p, on_xmldecl_w);
-  XML_SetDoctypeDeclHandler(p, on_doctype_w, on_enddoctype_w);
-  XML_SetElementHandler(p, on_start, on_end);
-  XML_SetCharacterDataHandler(p, on_text);
-  XML_SetProcessingInstructionHandler(p, on_pi);
-  XML_SetCommentHandler(p, on_comment);
-  XML_SetCdataSectionHandler(p, on_cdata, on_endcdata);
-  XML_SetEntityDeclHandler(p, on_entity);
-  XML_SetNotationDeclHandler(p, on_notation);
-  XML_SetElementDeclHandler(p, on_element);
-  XML_SetAttlistDeclHandler(p, on_attlist);
-  XML_SetNamespaceDeclHandler(p, on_nsstart, on_nsend);
-  XML_SetSkippedEntityHandler(p, on_skipped);
+  {
+    unsigned int m = opts->handler_mask_set ? opts->handler_mask
+                                            : (unsigned int)ORACLE_H_FULL;
+    if (m & ORACLE_H_XML_DECL)
+      XML_SetXmlDeclHandler(p, on_xmldecl_w);
+    if (m & ORACLE_H_START_DOCTYPE)
+      XML_SetStartDoctypeDeclHandler(p, on_doctype_w);
+    if (m & ORACLE_H_END_DOCTYPE)
+      XML_SetEndDoctypeDeclHandler(p, on_enddoctype_w);
+    if (m & ORACLE_H_START_ELEMENT)
+      XML_SetStartElementHandler(p, on_start);
+    if (m & ORACLE_H_END_ELEMENT)
+      XML_SetEndElementHandler(p, on_end);
+    if (m & ORACLE_H_CHARACTER_DATA)
+      XML_SetCharacterDataHandler(p, on_text);
+    if (m & ORACLE_H_PI)
+      XML_SetProcessingInstructionHandler(p, on_pi);
+    if (m & ORACLE_H_COMMENT)
+      XML_SetCommentHandler(p, on_comment);
+    if (m & ORACLE_H_START_CDATA)
+      XML_SetStartCdataSectionHandler(p, on_cdata);
+    if (m & ORACLE_H_END_CDATA)
+      XML_SetEndCdataSectionHandler(p, on_endcdata);
+    if (m & ORACLE_H_ENTITY_DECL)
+      XML_SetEntityDeclHandler(p, on_entity);
+    if (m & ORACLE_H_NOTATION_DECL)
+      XML_SetNotationDeclHandler(p, on_notation);
+    if (m & ORACLE_H_ELEMENT_DECL)
+      XML_SetElementDeclHandler(p, on_element);
+    if (m & ORACLE_H_ATTLIST_DECL)
+      XML_SetAttlistDeclHandler(p, on_attlist);
+    if (m & ORACLE_H_START_NS)
+      XML_SetStartNamespaceDeclHandler(p, on_nsstart);
+    if (m & ORACLE_H_END_NS)
+      XML_SetEndNamespaceDeclHandler(p, on_nsend);
+    if (m & ORACLE_H_SKIPPED_ENTITY)
+      XML_SetSkippedEntityHandler(p, on_skipped);
+  }
   ext_handler_mode = opts->ext_handler;
   not_standalone_mode = opts->not_standalone;
   ext_data = opts->ext_data;
