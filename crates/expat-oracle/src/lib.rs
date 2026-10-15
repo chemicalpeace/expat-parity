@@ -213,7 +213,10 @@ pub enum ParamEntityParsing {
 pub struct ParseOptions {
     /// Encoding passed to `XML_ParserCreate`; `None` lets the parser detect it.
     pub encoding: Option<String>,
-    /// Namespace separator for `XML_ParserCreateNS`; `None` disables namespaces.
+    /// Namespace separator for `XML_ParserCreateNS`; `None` disables
+    /// namespaces. Every byte is a separator, `0` included: `Some(0)` is
+    /// `XML_ParserCreateNS(encoding, '\0')` (D-041; before, `parse_trace`
+    /// read `Some(0)` as `None`).
     pub ns_separator: Option<u8>,
     /// Feed the input in chunks of this many bytes (`0` = one call).
     pub chunk_size: usize,
@@ -661,7 +664,9 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
     let records = ext_records(&opts.ext_entities);
     let c_opts = ffi::OracleOptions {
         encoding: encoding.as_ref().map_or(std::ptr::null(), |e| e.as_ptr()),
-        ns_separator: opts.ns_separator.map_or(0, c_int::from),
+        // -1 is "no namespace processing", so `Some(0)` reaches
+        // `XML_ParserCreateNS(enc, '\0')` (D-041).
+        ns_separator: opts.ns_separator.map_or(-1, c_int::from),
         chunk_size: opts.chunk_size,
         param_entity_parsing: match opts.param_entity_parsing {
             ParamEntityParsing::Never => 0,

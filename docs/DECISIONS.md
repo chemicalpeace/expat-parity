@@ -1077,3 +1077,89 @@ recorded in DIVERGENCES.md.
 - **Outside this slice.** `XML_SetEncoding`, the unknown-encoding handler
   (and Q-5, D-035), callbacks (and therefore expanded names and triplets),
   other parser settings.
+
+## D-041 Public API: callbacks (module 12, slice 4, 2026-10-16)
+
+- **Scope.** Added to the public API of D-038 to D-040: the trait
+  `Handler`, the type `Events`, and
+  `Parser::parse_with<H: Handler>(&mut self, handler: &mut H, data: &[u8],
+  is_final: bool) -> Result<(), Error>`. The nine events are
+  `start_element(name, attributes, specified)`, `end_element(name)`,
+  `character_data(data)`, `processing_instruction(target, data)`,
+  `comment(data)`, `start_cdata_section()`, `end_cdata_section()`,
+  `start_namespace_decl(prefix, uri)` and `end_namespace_decl(prefix)`;
+  every method has an empty default body. The core is unchanged: an
+  adapter forwards the nine methods of the core's `parse::Handler`, and
+  the core's `HandlerSet` is built from `H::EVENTS` with every other
+  handler unset.
+- **No context, no position in callbacks.** D-037 justifies a context
+  parameter (and the Sink that copies the document slice into it) only
+  for position queries inside a callback; with those deferred, a context
+  would be a parameter without a contract. So the callbacks get only
+  their data. When in-callback position (or `XML_StopParser`) is added,
+  the callback signatures change: this is accepted as a breaking change
+  in 0.x, or the feature arrives as a separate API; that choice is made
+  then and recorded in its own decision.
+- **`Events` semantics.** `Events` (`#[non_exhaustive]`, `Copy`, nine
+  public `bool` fields, `const fn` builders named after the fields,
+  `Events::ALL`, `Events::NONE`) says which C handler pointers are set.
+  It is not only call filtering: libexpat skips the work done only for a
+  set handler (a processing instruction or comment is copied to the temp
+  pool only with its handler; an empty element updates the event pointer
+  for its end only when both element handlers are set), so the mask can
+  change allocations, a memory-limit result and positions. An empty
+  method body is therefore not a `NULL` handler. The mask is the
+  associated constant `Handler::EVENTS` (default `Events::ALL`, so a
+  handler that implements a method without touching the constant gets its
+  events); a constant cannot drift within a document the way a method
+  returning the mask could. Each `parse_with` call sets the handlers of
+  `H::EVENTS`; `parse` sets none, which is what it always did (it is
+  `parse_with` with `Events::NONE`). The handler is passed to every call;
+  `Parser` stays non-generic.
+- **`&[u8]` data.** Names, values, text and namespace URIs are the UTF-8
+  bytes libexpat produces (`XML_Char` is `char`, D-002), passed as `&[u8]`
+  without validation or copying; a C `NULL` (default namespace prefix,
+  undeclared default namespace URI) is `None`. `&str` would need a UTF-8
+  check per event and a decision about character data split inside a
+  character, so it is left to a later slice. `specified` is the number of
+  attributes given in the tag (C's `XML_GetSpecifiedAttributeCount` / 2);
+  they come first in `attributes`, the DTD defaults after them.
+- **Not tested, documented as such.** Changing the events (the handler
+  type) between the calls of one document, or mixing `parse` and
+  `parse_with`, is allowed and corresponds to changing handlers between
+  `XML_Parse` calls in C, but the oracle sets its mask once per document,
+  so it is not compared. Where character data is split is not compared
+  either: the trace format coalesces adjacent `XML_CharacterDataHandler`
+  calls on both sides. The position after a successful call is not
+  observable in the public API (only an `Error` carries a position), so
+  `result ok` lines are compared without it; the core-level mask matrix
+  of PR #25 compares it.
+- **Oracle.** `parse_trace` read `ParseOptions::ns_separator == Some(0)`
+  as no namespace processing (the C option used `0` for "none"). The C
+  option now uses `-1` for "none", so `Some(0)` is
+  `XML_ParserCreateNS(enc, '\0')`, as `buffer_run_with` already does
+  (D-040). No existing test used `Some(0)` with `parse_trace`; the traces
+  for `None` and every other separator are unchanged. The port's trace
+  adapter always created a namespace parser for `Some(0)`; it now equals
+  C on T2 with separator NUL.
+- **Verification.** `tests/tests/public_callbacks_diff.rs`: the public
+  trace adapter (`tests/src/public.rs`, one handler type per mask)
+  against `parse_trace` with the PR #25 handler mask, every event line,
+  the result, the error code and the position of every error equal:
+  T2 (540 upstream vectors, 600 generated documents) plus 24 event
+  documents under `ALL`, `NONE` and each event alone, in one call, byte by
+  byte, and in 7- and 64-byte chunks (4 x 12,804 runs); the S3 matrix,
+  namespaces off, separator `|` and separator NUL, each with nine encoding
+  settings (none, UTF-8, utf-16, UTF-16LE, UTF-16BE, iso-8859-1,
+  US-ASCII, empty, KOI8-R) on T2, the event documents and 19 encoding
+  documents, in one call and in 7-byte chunks (3 x 234,234 runs);
+  `parse` equals `parse_with` with `Events::NONE` call by call on T2;
+  the oracle's NUL separator; a sensitivity check (a wrong mask is
+  detected). `crates/expat/tests/public_callbacks.rs` and the doctests
+  test the API with `internal-api` off, with and without `std`.
+- **Outside this slice.** Position, byte count and input context in
+  callbacks, a context parameter, the Sink, `XML_StopParser` /
+  `XML_ResumeParser`, the XML declaration, doctype, DTD declaration,
+  skipped entity, external entity and not-standalone callbacks, the
+  default handler, the unknown-encoding handler (and Q-5, D-035),
+  namespace triplets, `&str` data.

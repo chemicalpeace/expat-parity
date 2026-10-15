@@ -661,8 +661,8 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
     heap_live = 0;
     heap_peak = 0;
     p = XML_ParserCreate_MM(opts->encoding, &capped,
-                            opts->ns_separator != 0 ? &sep : NULL);
-  } else if (opts->ns_separator != 0)
+                            opts->ns_separator >= 0 ? &sep : NULL);
+  } else if (opts->ns_separator >= 0)
     p = XML_ParserCreateNS(opts->encoding, (XML_Char)opts->ns_separator);
   else
     p = XML_ParserCreate(opts->encoding);

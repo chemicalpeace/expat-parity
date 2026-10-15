@@ -1,5 +1,6 @@
 //! The public parser API (module 12, first slice, D-038; error texts and
-//! `Display`, D-039; encoding and namespace options, D-040).
+//! `Display`, D-039; encoding and namespace options, D-040; callbacks,
+//! D-041).
 //!
 //! [`Parser`] wraps the ported parser core (`parse::Parser`) without
 //! callbacks. [`Parser::new`] parses with the default encoding (detected
@@ -8,11 +9,13 @@
 //! namespace separator ([`Options`]), as `XML_ParserCreate(encoding)` and
 //! `XML_ParserCreateNS(encoding, sep)` do. [`Parser::parse`] is
 //! `XML_Parse`, and every call goes to the core, so the results after an
-//! error or after the final call are C's (D-023).
+//! error or after the final call are C's (D-023). [`Parser::parse_with`]
+//! is the same call with the [`Handler`] events of D-041.
 
 use alloc::vec::Vec;
 use core::fmt;
 
+use crate::handler::{Adapter, Handler};
 use crate::parse::{self, Status, Stop, XmlError};
 
 /// How a [`Parser`] is created: the encoding name and the namespace
@@ -147,7 +150,61 @@ impl Parser {
     /// reparse-deferral heuristic does not scan returns `Ok(())`; after the
     /// final piece, a call fails with [`ErrorCode::Finished`].
     pub fn parse(&mut self, data: &[u8], is_final: bool) -> Result<(), Error> {
-        match self.inner.parse(&mut NoCallbacks, data, is_final) {
+        // No handler is set, as in every call before callbacks existed;
+        // after a `parse_with` call this clears its handlers (D-041).
+        self.inner.set_handlers(parse::HandlerSet::default());
+        let status = self.inner.parse(&mut NoCallbacks, data, is_final);
+        self.result(status)
+    }
+
+    /// Parses the next piece of the document like [`Parser::parse`], and
+    /// reports its events to `handler` (`XML_Parse` with the handlers of
+    /// [`Handler::EVENTS`] set).
+    ///
+    /// The handler is given to each call: the events of this piece go to
+    /// this handler. Before parsing, the call sets the handlers of
+    /// `H::EVENTS` and no other (C: the other handlers are `NULL`);
+    /// [`Parser::parse`] is `parse_with` with [`Events::NONE`]. Changing
+    /// the handler type, and so the events, between the calls of one
+    /// document is allowed but not compared with C (D-041).
+    ///
+    /// The result is that of [`Parser::parse`]: the events reported before
+    /// an error are not taken back.
+    ///
+    /// ```
+    /// use expat::{Handler, Parser};
+    ///
+    /// #[derive(Default)]
+    /// struct Text(Vec<u8>);
+    ///
+    /// impl Handler for Text {
+    ///     fn character_data(&mut self, data: &[u8]) {
+    ///         self.0.extend_from_slice(data);
+    ///     }
+    /// }
+    ///
+    /// let mut text = Text::default();
+    /// let mut p = Parser::new([7; 16]);
+    /// assert_eq!(p.parse_with(&mut text, b"<a>one <b>two</b>", false), Ok(()));
+    /// assert_eq!(p.parse_with(&mut text, b" three</a>", true), Ok(()));
+    /// assert_eq!(text.0, b"one two three");
+    /// ```
+    ///
+    /// [`Events::NONE`]: crate::Events::NONE
+    pub fn parse_with<H: Handler>(
+        &mut self,
+        handler: &mut H,
+        data: &[u8],
+        is_final: bool,
+    ) -> Result<(), Error> {
+        self.inner.set_handlers(H::EVENTS.handler_set());
+        let status = self.inner.parse(&mut Adapter(handler), data, is_final);
+        self.result(status)
+    }
+
+    /// The public result of a call that returned `status`.
+    fn result(&mut self, status: Status) -> Result<(), Error> {
+        match status {
             Status::Ok => Ok(()),
             Status::Error => {
                 let Stop::Error(e) = self.inner.error_code();

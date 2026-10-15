@@ -59,7 +59,8 @@ enum {
 /* Parse options for oracle_parse_trace. */
 struct oracle_options {
   const char *encoding;  /* NULL: autodetect */
-  int ns_separator;      /* 0: no namespace processing; else separator byte */
+  int ns_separator;      /* -1: no namespace processing; else the separator
+                            byte, 0 included (XML_ParserCreateNS(enc, '\0')) */
   size_t chunk_size;     /* 0: feed whole document in one XML_Parse call */
   int param_entity_parsing; /* XML_ParamEntityParsing value */
   int buffer_api; /* 1: XML_GetBuffer(2n+3) + XML_ParseBuffer(n) per chunk */
