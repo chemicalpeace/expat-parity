@@ -4,9 +4,11 @@
 //! The port is built bottom-up and verified module by module against the
 //! vendored C reference (see `docs/ARCHITECTURE.md`). The public parser API
 //! is being built in slices (module 12, `docs/STATE.md`): so far [`Parser`]
-//! parses a document without callbacks, with the encoding and namespace
-//! [`Options`] given, and reports the result, or an [`Error`] with its
-//! [`ErrorCode`] and position.
+//! parses a document with the encoding and namespace [`Options`] given,
+//! reports the result, or an [`Error`] with its [`ErrorCode`] and position,
+//! and with [`Parser::parse_with`] reports the element, character data,
+//! processing instruction, comment, CDATA section and namespace
+//! declaration events to a [`Handler`] ([`Events`]).
 //!
 //! # Features
 //!
@@ -21,7 +23,9 @@ extern crate alloc;
 extern crate std;
 
 mod api;
+mod handler;
 pub use api::{Error, ErrorCode, Options, Parser};
+pub use handler::{Events, Handler};
 
 /// Declares an internal module that is private by default and public under
 /// the `internal-api` feature.

@@ -9,6 +9,7 @@
 //! - [`role`]: differential checks of the prolog state machine.
 //! - [`docgen`]: random XML-ish documents for whole-parser tests.
 //! - [`port`]: the trace adapter of the port's parser.
+//! - [`public`]: the trace adapter of the public callback API (D-041).
 //! - [`fuzzcase`]: the checks of the whole-parser fuzz targets and their
 //!   deterministic seed generator.
 //! - [`bounded`]: comparisons bounded in input size, wall-clock time and
@@ -22,6 +23,7 @@ pub mod diff;
 pub mod docgen;
 pub mod fuzzcase;
 pub mod port;
+pub mod public;
 pub mod role;
 pub mod tok;
 pub mod trace;
