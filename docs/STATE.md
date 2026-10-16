@@ -176,9 +176,14 @@ with allocation failures, white-box).
 6. Module 12: public `expat::Parser` on top of `parse::Parser`. Slice 1
    (D-038, no callbacks), slice 2 (D-039, error texts and `Display`)
    and slice 3 (D-040, encoding and namespace options) are merged, and so
-   is the S4 callback MVP (D-041, PRs #25 and #26); next in-callback
-   position through the crate-private `Sink` (D-037), default
-   handler, stop/resume, external entity parsers (`getContext` with the
-   oracle's salt, D-021), unknown-encoding handler, input context, salt
-   from an entropy source behind `std`.
+   is the S4 callback MVP (D-041, PRs #25 and #26). Next: an MVP
+   release-readiness audit, not yet done and not a claim that the crate
+   is release-ready. It is to review test and CI status, API and usage
+   documentation, license and packaging, versioning, and the known
+   limitations; after the MVP release the project moves to maintenance
+   mode. Deferred, with no commitment to implement: in-callback position
+   through the crate-private `Sink` (D-037), default handler,
+   stop/resume, external entity parsers (`getContext` with the oracle's
+   salt, D-021), unknown-encoding handler, input context, salt from an
+   entropy source behind `std`.
 7. Phase 4: long fuzzing runs, coverage, benchmarks against C.
