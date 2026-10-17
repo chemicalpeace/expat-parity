@@ -10,6 +10,8 @@ step scripts/debt-check.sh
 step scripts/verify-vendor.sh
 step python3 scripts/gen_tables.py --check
 step cargo doc --workspace --no-deps --all-features
+step cargo doc -p expat --no-deps
+step scripts/package-check.sh
 step cargo deny check
 step cargo test --workspace --all-features
 step cargo test -p expat

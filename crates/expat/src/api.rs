@@ -504,58 +504,16 @@ impl std::error::Error for Error {}
 mod tests {
     use super::*;
     use alloc::format;
-    use alloc::string::String;
-    use alloc::vec::Vec;
 
-    /// The vendored libexpat header the port is verified against (D-001).
-    const EXPAT_H: &str = include_str!("../../expat-oracle/vendor/expat/lib/expat.h");
-
-    /// The names of `enum XML_Error` in declaration order (C value = index;
-    /// the enum has no explicit initialisers).
-    fn c_error_names() -> Vec<&'static str> {
-        let start = EXPAT_H.find("enum XML_Error {").unwrap_or(0);
-        let body = EXPAT_H.get(start..).unwrap_or("");
-        let body = body.get(..body.find("};").unwrap_or(0)).unwrap_or("");
-        body.lines()
-            .filter_map(|l| {
-                let l = l.trim();
-                let name = l.strip_prefix("XML_ERROR_")?;
-                assert!(!name.contains('='), "unexpected initialiser: {l}");
-                Some(name.trim_end_matches(','))
-            })
-            .collect()
-    }
-
-    /// `NO_MEMORY` -> `NoMemory`.
-    fn camel(c_name: &str) -> String {
-        c_name
-            .split('_')
-            .map(|w| {
-                let mut cs = w.chars();
-                cs.next().map_or_else(String::new, |f| {
-                    let mut s = String::from(f);
-                    s.extend(cs.flat_map(char::to_lowercase));
-                    s
-                })
-            })
-            .collect()
-    }
-
+    /// The comparison of every code with the vendored `enum XML_Error`
+    /// is `error_codes_match_the_c_header` in
+    /// `tests/tests/public_api_diff.rs`, which runs over a list of the 44
+    /// codes; this test checks that the list is complete. (The header is
+    /// not part of the published crate, so the comparison cannot live
+    /// here.)
     #[test]
-    fn error_codes_match_the_c_header() {
-        let names = c_error_names();
-        assert_eq!(names.len(), 45, "enum XML_Error has 45 codes in 2.9.0");
-        assert_eq!(names.first(), Some(&"NONE"));
+    fn there_are_44_error_codes() {
         assert_eq!(ErrorCode::ALL.len(), 44);
-        for (value, name) in names.iter().enumerate().skip(1) {
-            let found: Vec<_> = ErrorCode::ALL
-                .iter()
-                .filter(|c| c.to_c() as usize == value)
-                .collect();
-            assert_eq!(found.len(), 1, "XML_ERROR_{name} = {value}");
-            let debug = found.first().map(|c| format!("{c:?}"));
-            assert_eq!(debug, Some(camel(name)), "value {value}");
-        }
     }
 
     #[test]
