@@ -105,7 +105,10 @@ impl Parser {
     ///
     /// The salt keys the parser's internal hash tables. This crate has no
     /// entropy source, so the caller provides it; it should be
-    /// unpredictable to whoever supplies the document.
+    /// unpredictable to whoever supplies the document. The examples in this
+    /// documentation use a constant salt for brevity; with untrusted input
+    /// a predictable salt allows hash flooding (see the crate
+    /// documentation, "Hash salt").
     pub fn new(salt: [u8; 16]) -> Self {
         Self::with_options(salt, Options::default())
     }

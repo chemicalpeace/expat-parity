@@ -173,11 +173,18 @@ with allocation failures, white-box).
    95.39 % regions on ubuntu, macOS and Windows; 93.26 % functions on
    Linux and macOS, 93.25 % on Windows (lines 7,738 / 8,135 on Linux and
    macOS, 7,734 / 8,131 on Windows).
-   These are the latest figures recorded here; they predate module 12
-   slices 1-4. Main CI run 38911381135 on 12ecc1a3 (after S4) measured
-   coverage on all three platforms (artifacts `coverage-<OS>`), but its
-   figures have not been read into this file, so the current tree's
-   coverage is not stated.
+   These figures predate module 12 slices 1-4.
+   After S1-S4 and the release preparation: PR #28 head b518a804, CI run
+   39013629253 (all 9 jobs green), stable Rust 1.99.0, cargo-llvm-cov
+   0.9.1, `full` run of `scripts/coverage.sh` (the `all-features` run and
+   the uncorrected reports give the same totals), from the
+   `coverage-<OS>` artifacts:
+   - lines: 95.41 % on Linux and macOS (8,045 / 8,432), 95.41 % on
+     Windows (8,041 / 8,428);
+   - regions: 95.66 % on all three (14,074 / 14,712 on Linux and macOS,
+     14,068 / 14,706 on Windows);
+   - functions: 92.67 % on Linux and macOS (657 / 709), 92.66 % on
+     Windows (656 / 708).
 6. Module 12: public `expat::Parser` on top of `parse::Parser`. Slice 1
    (D-038, no callbacks), slice 2 (D-039, error texts and `Display`)
    and slice 3 (D-040, encoding and namespace options) are merged, and so
