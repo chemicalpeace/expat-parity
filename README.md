@@ -116,6 +116,18 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   libexpat does and refuses with `ErrorCode::NoMemory` or
   `ErrorCode::AmplificationLimitBreach` where libexpat does; this is
   checked in the differential tests, but not in production use.
+- **Unfixed upstream security issues.** This crate follows libexpat 2.9.0,
+  and libexpat 2.9.0 has security issues that upstream lists as unfixed and
+  whose details are not public
+  ([libexpat#1160](https://github.com/libexpat/libexpat/issues/1160)). One of
+  them, CVE-2025-66382
+  ([libexpat#1076](https://github.com/libexpat/libexpat/issues/1076)), is
+  publicly described as denial of service: a crafted input of about 2 MiB
+  can take tens of seconds to process. Whether this port is affected has not
+  been verified, in either direction. The amplification limits count bytes,
+  not time, so they do not guarantee bounded processing time. When parsing
+  untrusted input, limit its size and the time spent parsing it in your
+  application.
 - **Real out-of-memory aborts.** When the system allocator itself fails,
   the crate does not return `ErrorCode::NoMemory` as libexpat does; Rust's
   allocation-error handler runs, which by default aborts the process.
