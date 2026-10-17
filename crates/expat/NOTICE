@@ -1,0 +1,30 @@
+Expat-Parity
+============
+
+This repository contains a Rust port of libexpat and a vendored, unmodified
+copy of the libexpat C sources used as a test oracle.
+
+Upstream:   https://github.com/libexpat/libexpat
+Version:    2.9.0 (tag R_2_9_0)
+Commit:     a76b1174c1ea52abb639a4c69d52b630a8a106a2
+License:    MIT (see crates/expat-oracle/vendor/expat/COPYING)
+Authors:    see crates/expat-oracle/vendor/expat/AUTHORS
+
+  Copyright (c) 1998-2000 Thai Open Source Software Center Ltd and Clark Cooper
+  Copyright (c) 2001-2025 Expat maintainers
+  (individual files carry additional per-author copyright lines, which are
+  preserved verbatim in the vendored copy)
+
+Vendored location: crates/expat-oracle/vendor/expat/
+Files: expat/lib/*.c, expat/lib/*.h, expat/lib/.gitignore, expat/COPYING,
+       expat/AUTHORS — byte-for-byte copies (verify with scripts/verify-vendor.sh).
+
+Build shims written for this project (not upstream code):
+  crates/expat-oracle/shim/expat_config.h
+  crates/expat-oracle/shim/oracle.h
+  crates/expat-oracle/shim/oracle_trace.c
+  crates/expat-oracle/shim/oracle_internals.c
+
+Test vectors under tests/vectors/ that were extracted from libexpat's test
+suite (expat/tests/*.c, MIT) carry their upstream file and line in
+tests/vectors/PROVENANCE.md and in each vector's header.

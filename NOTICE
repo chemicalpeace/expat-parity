@@ -1,5 +1,5 @@
-expat-rs
-========
+Expat-Parity
+============
 
 This repository contains a Rust port of libexpat and a vendored, unmodified
 copy of the libexpat C sources used as a test oracle.

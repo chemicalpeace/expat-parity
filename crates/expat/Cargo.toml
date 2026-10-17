@@ -1,12 +1,21 @@
 [package]
 name = "expat"
 description = "Memory-safe Rust port of the libexpat XML parser, verified against the C reference"
-version.workspace = true
+# The only crate published to crates.io; the others stay at the workspace
+# version and `publish = false`.
+version = "0.1.0-beta.1"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish.workspace = true
+publish = true
+readme = "../../README.md"
+keywords = ["xml", "parser", "expat", "sax", "no-std"]
+categories = ["parser-implementations", "no-std"]
+# LICENSE and NOTICE are byte-identical copies of the repository's
+# (checked by scripts/package-check.sh), so the published crate carries
+# libexpat's copyright notice.
+include = ["src/**/*.rs", "tests/**/*.rs", "LICENSE", "NOTICE"]
 
 [features]
 default = ["std"]

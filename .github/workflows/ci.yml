@@ -26,6 +26,9 @@ jobs:
       - run: scripts/verify-vendor.sh
       - run: python3 scripts/gen_tables.py --check
       - run: cargo doc --workspace --no-deps --all-features
+      # Default features, as docs.rs builds the published crate.
+      - run: cargo doc -p expat --no-deps
+      - run: scripts/package-check.sh
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check

@@ -836,6 +836,11 @@ recorded in DIVERGENCES.md.
   and `NOTICE`; evidence files, generated output and CI logs, which keep
   the name they were recorded under; the historical text of D-003 and
   D-013.
+- **Later change (2026-10-17, release preparation, PR #28).** At the
+  owner's request the project's own attribution in `LICENSE`
+  ("Copyright (c) 2026 Expat-Parity contributors") and the `NOTICE` title
+  now use the new name; every contribution so far is the owner's. The
+  upstream copyright lines and the MIT text are unchanged.
 - **Risk.** The redirect stops working if a new repository named
   `expat-rs` is ever created under the same account.
 

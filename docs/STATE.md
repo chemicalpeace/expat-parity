@@ -29,7 +29,7 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   all three CI runners (CI run 38289234285). The encoding argument of
   external entity parsers is compared (PR #19, no difference). The
   coverage figures above are PR #13's tree (7,552 lines); see "Next steps"
-  5 for the current ones. Next: OOM fault injection per allocation point,
+  5 for the latest recorded ones (not the current tree's). Next: OOM fault injection per allocation point,
   then module 12. Module 12 slice 1 (public `expat::Parser` without
   callbacks, D-038) is merged (PR #22, merge commit 3fe249be); slice 2
   (error texts, `Display`, `std::error::Error`, D-039) is merged (PR #23,
@@ -173,6 +173,18 @@ with allocation failures, white-box).
    95.39 % regions on ubuntu, macOS and Windows; 93.26 % functions on
    Linux and macOS, 93.25 % on Windows (lines 7,738 / 8,135 on Linux and
    macOS, 7,734 / 8,131 on Windows).
+   These figures predate module 12 slices 1-4.
+   After S1-S4 and the release preparation: PR #28 head b518a804, CI run
+   39013629253 (all 9 jobs green), stable Rust 1.99.0, cargo-llvm-cov
+   0.9.1, `full` run of `scripts/coverage.sh` (the `all-features` run and
+   the uncorrected reports give the same totals), from the
+   `coverage-<OS>` artifacts:
+   - lines: 95.41 % on Linux and macOS (8,045 / 8,432), 95.41 % on
+     Windows (8,041 / 8,428);
+   - regions: 95.66 % on all three (14,074 / 14,712 on Linux and macOS,
+     14,068 / 14,706 on Windows);
+   - functions: 92.67 % on Linux and macOS (657 / 709), 92.66 % on
+     Windows (656 / 708).
 6. Module 12: public `expat::Parser` on top of `parse::Parser`. Slice 1
    (D-038, no callbacks), slice 2 (D-039, error texts and `Display`)
    and slice 3 (D-040, encoding and namespace options) are merged, and so
@@ -181,7 +193,14 @@ with allocation failures, white-box).
    is release-ready. It is to review test and CI status, API and usage
    documentation, license and packaging, versioning, and the known
    limitations; after the MVP release the project moves to maintenance
-   mode. Deferred, with no commitment to implement: in-callback position
+   mode. The audit was done on 12ecc1a3 (2026-10-17); the owner chose crates.io,
+   `expat` `0.1.0-beta.1` (experimental). Release preparation (README
+   usage and limitations, `LICENSE`/`NOTICE` in the package, version and
+   `publish` of `crates/expat`, the C header test moved to
+   `public_api_diff.rs` so the packaged crate's tests build,
+   `scripts/package-check.sh` in CI) is on branch
+   `release-0.1.0-beta.1`; publishing, the tag and the release need the
+   owner's approval. Deferred, with no commitment to implement: in-callback position
    through the crate-private `Sink` (D-037), default handler,
    stop/resume, external entity parsers (`getContext` with the oracle's
    salt, D-021), unknown-encoding handler, input context, salt from an
