@@ -1231,3 +1231,31 @@ recorded in DIVERGENCES.md.
   `cve_2026_115506_rejected_at_the_reference`). The 2.10.0 value of
   `parser_struct` with a 4-byte `unsigned long` (1080) is computed, not
   yet measured on Windows CI.
+
+## D-043 Start tags reuse parser-owned buffers (2026-11-13)
+
+- **Decision.** `storeAtts` builds the attribute list in buffers the
+  parser keeps from tag to tag (`AppAtts`: one byte buffer for names and
+  values with ranges per attribute, and a scratch buffer for a
+  normalised value), the counterpart of C's `m_atts` and `m_tempPool`.
+  The element type's default attributes and `defaultAttForName` are read
+  in place rather than cloned. Closed tags go to a free list (C:
+  `m_freeTagList`) and the next start tags reuse their name buffers;
+  empty-element tags reuse one name buffer. The start handler receives
+  up to 16 attributes from a stack array, more from a `Vec`.
+  `siphash24` is computed in one pass instead of through the incremental
+  hasher.
+- **Why.** `perf` on the `benches/filc` corpus (REPORT.md "Benchmarks")
+  attributed about 13 % of samples to `malloc`/`free`, most of them from
+  per-attribute and per-element allocations in `storeAtts`, which C does
+  not make.
+- **Parity.** Only Rust heap use changes. The tracker still records every
+  C allocation at the same point and with the same size, handler calls
+  and their arguments are the same, and SipHash keeps its key, salt and
+  values, so the hash tables' slot order is unchanged.
+- **UTF-8 shortcut.** Names and reference-free attribute values of input
+  whose encoding is already UTF-8 (`isUtf8`: UTF-8 and US-ASCII) are
+  copied instead of passed through the 64-byte conversion loop
+  (`to_utf8_token_into`). These bytes come from tokens the scanner
+  accepted, so they are whole characters and `utf8_toUtf8` would copy
+  them unchanged; debug builds compare the copy with the conversion.
