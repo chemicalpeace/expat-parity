@@ -46,6 +46,7 @@ impl Normal {
     ];
 
     /// The byte-type table of this encoding.
+    #[inline(always)]
     pub fn table(self) -> Table {
         match self {
             Normal::Utf8 => Table::Utf8,
@@ -68,6 +69,7 @@ fn bytes<const N: usize>(buf: &[u8], p: usize) -> Option<[u8; N]> {
 impl Encoding for Normal {
     const MINBPC: usize = 1;
 
+    #[inline(always)]
     fn byte_type(&self, buf: &[u8], p: usize) -> ByteType {
         // Positions past the end only occur where C would read out of
         // bounds; they classify as "not XML", which stops every loop.
