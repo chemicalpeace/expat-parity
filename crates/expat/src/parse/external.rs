@@ -659,6 +659,17 @@ impl Parser {
                 self.event_ptr = Some(start);
                 return Err(XmlError::PartialChar.into());
             }
+            // libexpat 2.10.0 (#1444, CVE-2026-117610): an empty non-final
+            // input leaves the processor here, so the byte order mark and
+            // text declaration of a later call are still recognised. 2.9.0
+            // fell through to `externalEntityInitProcessor3` (and crashed).
+            // An empty final input keeps 2.9.0's path (parity with the
+            // oracle; 2.10.0 returns here too and so does not set the
+            // event pointer, which only changes the reported byte index).
+            Scan::None if !self.final_buffer => {
+                *end_ptr = start;
+                return Ok(());
+            }
             _ => {}
         }
         self.processor = Processor::ExternalEntityInit3;

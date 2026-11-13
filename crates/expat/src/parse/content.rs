@@ -902,11 +902,19 @@ impl Parser {
 
         // Set up for XML_GetSpecifiedAttributeCount and
         // XML_GetIdAttributeIndex.
-        self.n_specified_atts = (2 * app.len()) as i32;
+        // libexpat 2.10.0 (#1450, CVE-2026-118370): a count that does not
+        // fit C's `int` is refused with XML_ERROR_NO_MEMORY instead of
+        // being narrowed (2.9.0: signed overflow of `attIndex`).
+        let as_c_int = |n: usize| {
+            n.checked_mul(2)
+                .and_then(|v| i32::try_from(v).ok())
+                .ok_or(Stop::Error(XmlError::NoMemory))
+        };
+        self.n_specified_atts = as_c_int(app.len())?;
         match et_id_att {
             Some(ida) if self.dtd.att_flag(ida) != 0 => {
                 if let Some(i) = app.iter().position(|a| a.id == ida) {
-                    self.id_att_index = (2 * i) as i32;
+                    self.id_att_index = as_c_int(i)?;
                 }
             }
             _ => self.id_att_index = -1,
