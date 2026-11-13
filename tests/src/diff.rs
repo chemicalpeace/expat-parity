@@ -17,7 +17,7 @@ pub struct Oracle;
 
 impl TraceSource for Oracle {
     fn name(&self) -> &str {
-        "libexpat-2.9.0"
+        "libexpat-2.10.0"
     }
 
     fn trace(&self, doc: &[u8], opts: &ParseOptions) -> Vec<u8> {

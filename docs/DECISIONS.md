@@ -3,7 +3,7 @@
 Append-only log. Each entry: id, date, decision, why, consequences.
 Dates are 2026-10-11 unless stated otherwise.
 
-## D-001 Target selection (Phase 0) — FROZEN
+## D-001 Target selection (Phase 0) — FROZEN (version moved to 2.10.0 by D-042)
 
 **Decision:** port **libexpat 2.9.0** (tag `R_2_9_0`, commit
 `a76b1174c1ea52abb639a4c69d52b630a8a106a2`).
@@ -1168,3 +1168,66 @@ recorded in DIVERGENCES.md.
   skipped entity, external entity and not-standalone callbacks, the
   default handler, the unknown-encoding handler (and Q-5, D-035),
   namespace triplets, `&str` data.
+
+## D-042 Re-target the port and the oracle to libexpat 2.10.0 (CVE-2026-115506, 2026-11-13)
+
+- **Decision.** The frozen target of D-001 moves from 2.9.0 to
+  **libexpat 2.10.0** (tag `R_2_10_0`, commit
+  `a70841d9ffa64ddde29ab824ed6305035ebe4c47`). The vendored C oracle is
+  re-vendored byte for byte (its own commit, `scripts/verify-vendor.sh`),
+  and the port follows every 2.10.0 change that is observable through
+  the differential harness. D-001's scoring and scope are unchanged.
+- **Why.** 2.10.0 fixes CVE-2026-115506 (billion-laughs variants, #1433,
+  #1436, #1439, #1442; issue #1438): 2.9.0 noticed an amplification attack
+  only after expanding up to 100 times the input, which costs the port
+  about 3.7 s of CPU per MiB of crafted input. The fix changes the
+  accounting counters at a breach, so it cannot be ported against a
+  frozen 2.9.0 oracle without a permanent divergence.
+- **What the port follows.**
+  - Precomputed entity expansion sizes (`parse/expansion`, eb525ded,
+    56192280): on the first expansion of an internal entity its expanded
+    size and that of every entity it references is computed by an
+    iterative depth-first search (tracked stack of one pointer per table
+    entry, cycle marks, overflow = breach), skipping CDATA sections,
+    comments and PIs in entity text; `processEntity` refuses the
+    reference before opening it when
+    `accountingCurrentAmplificationTolerated(root, expandedSize)` fails.
+    The amplification factor is computed with float additions
+    (`(float)direct + ((float)indirect + (float)extra)`) as in 2.10.0.
+  - `XML_ROLE_ENTITY_VALUE` returns a `callStoreEntityValue` error before
+    the entity gets its text and before the entity declaration handler
+    runs (#1415, b34f62d5, b068d5a0).
+  - `externalEntityInitProcessor2` stays in place on an empty input,
+    final or not (#1444; the final case changes only the event pointer).
+  - `storeAtts` counts in `size_t` and refuses counts above `INT_MAX`
+    with NO_MEMORY (#1450).
+  - C structure sizes: `ENTITY` (96 bytes on LP64), `MALLOC_TRACKER` (+1
+    `size_t`), the parser structure (1112 on LP64) and the new
+    `ENTITY_ANALYSIS_TASK`, all compared with the C compiler by
+    `tracker_sizes.rs`.
+- **Not ported (no observable effect in the port).** `XML_ParserReset`
+  changes (#1431: the port has no reset); `XML_Parse` argument and
+  in-handler check order, the `XML_CONTEXT_BYTES == 0` branch and the
+  `nLeftOver > INT_MAX` check (#1457, #1459, #1461: the port cannot be
+  re-entered from a handler and is built with 1024 context bytes);
+  re-checks of a handler that was reset during a callback (#1437 start
+  doctype, #1467 character data: the port's handler set cannot change
+  during a parse); `finalBuffer` initialisation (#1452: the port's field
+  is initialised); `getAtts`/`XmlGetAttributes` in `size_t` (#1463: the
+  port's tokenizer already counts in `usize`); the entity-scan debug
+  output and the depth statistics it updates (#1436, `m_entity_stats`,
+  only printed with `EXPAT_ENTITY_DEBUG`); type-only changes (`bool` for
+  `isCdata`/`isId`/`needSep`, `size_t` `textLen`/`processed`).
+- **Consequences.** The port is "libexpat 2.10.0" in the README, the
+  crate docs and STATE; earlier REPORT.md figures and line numbers in
+  older decisions refer to 2.9.0. `tests/vectors/upstream.traces.jsonl`
+  is regenerated (three vectors lose the entity declaration of a failed
+  value). Tests that pinned 2.9.0-only C behaviour were updated:
+  `amplification_diff::default_limits_match_c` (the counters now stay
+  below the threshold), `external_parser_diff` pin
+  `sub-pe-in-entity-value-charref`, `tracker_stages` (2.10.0 line
+  numbers; refused entity values are no longer reported), and
+  `cve_2_10_0` (the pin of the vulnerable behaviour is now
+  `cve_2026_115506_rejected_at_the_reference`). The 2.10.0 value of
+  `parser_struct` with a 4-byte `unsigned long` (1080) is computed, not
+  yet measured on Windows CI.

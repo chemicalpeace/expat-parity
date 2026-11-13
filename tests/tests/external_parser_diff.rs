@@ -624,7 +624,15 @@ fn pinned_external_parser_behaviour() {
         let s = String::from_utf8_lossy(&c).into_owned();
         assert_eq!(result_code(&c), want_code, "{id}: {s}");
         for w in want {
-            assert!(s.lines().any(|l| l == *w), "{id}: no line `{w}` in\n{s}");
+            // `!prefix`: no line may start with `prefix`.
+            if let Some(not) = w.strip_prefix('!') {
+                assert!(
+                    !s.lines().any(|l| l.starts_with(not)),
+                    "{id}: unexpected `{not}...` in\n{s}"
+                );
+            } else {
+                assert!(s.lines().any(|l| l == *w), "{id}: no line `{w}` in\n{s}");
+            }
         }
     };
     let always = ParamEntityParsing::Always;
@@ -653,13 +661,14 @@ fn pinned_external_parser_behaviour() {
     // A parameter entity in an entity value inside the external subset.
     pin("sub-pe-in-entity-value", always, 0, &["text aVALb"]);
     // C scans that text with the prolog tokenizer before storing it: a
-    // character reference is an invalid token there (the declaration
-    // handler still sees the value stored so far).
+    // character reference is an invalid token there. Since 2.10.0 (#1415)
+    // the failed value is discarded before the declaration handler would
+    // see it (2.9.0 reported `entity v 0 a`, the value stored so far).
     pin(
         "sub-pe-in-entity-value-charref",
         always,
         21,
-        &["extend 0 4 1 0 0", "entity v 0 a ~ ~ ~ ~"],
+        &["extend 0 4 1 0 0", "!entity v "],
     );
     // Without parameter entity parsing nothing is read and the undeclared
     // entity is skipped (the document has an external subset).

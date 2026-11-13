@@ -743,6 +743,7 @@ pub const TRACKER_SIZES: &[(&str, usize)] = &[
     ("ACCOUNTING", c_layout::ACCOUNTING),
     ("MALLOC_TRACKER", c_layout::MALLOC_TRACKER),
     ("ENTITY_STATS", c_layout::ENTITY_STATS),
+    ("ENTITY_ANALYSIS_TASK", c_layout::ENTITY_ANALYSIS_TASK),
 ];
 
 /// A `TAG` of `m_tagStack` as far as its allocations go.

@@ -382,31 +382,35 @@ impl Parser {
                     let mut text = Vec::new();
                     self.charged_len = 0;
                     let result = self.call_store_entity_value(h, enc, buf, s + m, next - m, &mut text, Account::None);
-                    // Every token's characters are charged by now (also
-                    // when an error stopped the value).
-                    debug_assert!(result.is_err() || self.charged_len == text.len());
-                    // C hands the handler what `dtd->entityValuePool` holds
-                    // even when storing stopped with an error (xmlparse.c
-                    // 5935-5958): after a refused growth that is the part
-                    // written before it, and NULL when the pool never got
-                    // its first block (7126-7129).
-                    let (has_block, pool_len) = {
+                    // libexpat 2.10.0 (#1415): an error stops here, before
+                    // the entity gets a text or the declaration handler is
+                    // called; the pool's partial string is discarded.
+                    if let Err(e) = result {
+                        self.finish_current(Pool::EntityValue, false, false)?;
+                        return Err(e);
+                    }
+                    // Every token's characters are charged by now.
+                    debug_assert_eq!(self.charged_len, text.len());
+                    // `dtd->entityValuePool` has no block when the value
+                    // stored nothing (xmlparse.c 7126-7129): the text is
+                    // then NULL.
+                    let has_block = {
                         let direct = self.direct();
                         let (p, _) = self.tracker.pool(Pool::EntityValue, direct);
-                        (p.has_block(), p.current_len())
+                        p.has_block()
                     };
-                    if result.is_err() {
-                        text.truncate(pool_len);
-                    }
-                    self.finish_current(Pool::EntityValue, false, self.decl_entity.is_some())?;
                     if let Some(r) = self.decl_entity {
                         if i32::try_from(text.len()).is_err() {
+                            self.finish_current(Pool::EntityValue, false, false)?;
                             return Err(XmlError::NoMemory.into());
                         }
+                        self.finish_current(Pool::EntityValue, false, true)?;
                         let text: Option<alloc::sync::Arc<[u8]>> = has_block.then(|| text.into());
                         let mut info = None;
                         if let Some(e) = self.dtd.entity_mut(r) {
                             e.text = text.clone();
+                            // `scanPtr = textPtr`
+                            e.scan_pos = 0;
                             info = Some(e.is_param);
                         }
                         if self.handlers.entity_decl
@@ -424,8 +428,9 @@ impl Parser {
                                 None,
                             );
                         }
+                    } else {
+                        self.finish_current(Pool::EntityValue, false, false)?;
                     }
-                    result?;
                 }
             }
             Role::DoctypeSystemId | Role::EntitySystemId => {

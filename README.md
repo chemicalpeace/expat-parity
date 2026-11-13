@@ -1,7 +1,7 @@
 # Expat-Parity
 
 A memory-safe Rust port of [libexpat](https://github.com/libexpat/libexpat)
-2.9.0, the stream-oriented XML parser, verified by differential testing and
+2.10.0, the stream-oriented XML parser, verified by differential testing and
 fuzzing against the vendored C reference. The crate is published as `expat`.
 
 > **Status: `0.1.0-beta.1`, experimental.** This is an early-use MVP: the
@@ -111,14 +111,15 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   libexpat does when no `XML_SetExternalEntityRefHandler` is set (compared
   with libexpat on its test vectors in this configuration). The internal
   DTD subset is parsed and internal entities are expanded.
-- **Amplification limits** are libexpat 2.9.0's defaults and cannot be
+- **Amplification limits** are libexpat 2.10.0's defaults and cannot be
   changed through the public API. The parser counts its allocations as
   libexpat does and refuses with `ErrorCode::NoMemory` or
   `ErrorCode::AmplificationLimitBreach` where libexpat does; this is
   checked in the differential tests, but not in production use.
-- **Unfixed upstream security issues.** This crate follows libexpat 2.9.0,
-  and libexpat 2.9.0 has security issues that upstream lists as unfixed and
-  whose details are not public
+- **Unfixed upstream security issues.** This crate follows libexpat 2.10.0
+  (including its fix for the billion-laughs variants of CVE-2026-115506),
+  and libexpat 2.10.0 still has security issues that upstream lists as
+  unfixed and whose details are not public
   ([libexpat#1160](https://github.com/libexpat/libexpat/issues/1160)). One of
   them, CVE-2025-66382
   ([libexpat#1076](https://github.com/libexpat/libexpat/issues/1076)), is
