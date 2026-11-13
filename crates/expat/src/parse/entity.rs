@@ -300,6 +300,25 @@ impl Parser {
         in_prolog: bool,
     ) -> Result<alloc::vec::Vec<u8>, Stop> {
         let mut out = alloc::vec::Vec::new();
+        self.store_attribute_value_into(enc, buf, is_cdata, ptr, end, account, in_prolog, &mut out)?;
+        Ok(out)
+    }
+
+    /// [`Parser::store_attribute_value`] into `out`, which is cleared
+    /// first, so a caller can reuse one buffer for every value.
+    #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of storeAttributeValue plus the output buffer.
+    pub(crate) fn store_attribute_value_into<E: Encoding>(
+        &mut self,
+        enc: &E,
+        buf: &[u8],
+        is_cdata: bool,
+        ptr: usize,
+        end: usize,
+        account: Account,
+        in_prolog: bool,
+        out: &mut alloc::vec::Vec<u8>,
+    ) -> Result<(), Stop> {
+        out.clear();
         self.charged_len = 0;
         let doc = buf.get(..end).unwrap_or(buf);
         let mut next = ptr;
@@ -317,7 +336,7 @@ impl Parser {
                         &text,
                         is_cdata,
                         processed,
-                        &mut out,
+                        out,
                         Account::EntityExpansion,
                         in_prolog,
                         &mut next_in_entity,
@@ -338,7 +357,7 @@ impl Parser {
                 self.close_entity(EntityType::Attribute);
                 Ok(())
             } else {
-                self.append_attribute_value(enc, doc, is_cdata, next, &mut out, account, in_prolog, &mut next)
+                self.append_attribute_value(enc, doc, is_cdata, next, out, account, in_prolog, &mut next)
             };
             result?;
             // Break if there is nothing left to process.
@@ -356,7 +375,7 @@ impl Parser {
         }
         // `poolAppendChar(pool, '\0')`, then the caller's `poolFinish`.
         self.finish_current(pool, true, true)?;
-        Ok(out)
+        Ok(())
     }
 
     /// `callStoreEntityValue`: the replacement text of the entity value
