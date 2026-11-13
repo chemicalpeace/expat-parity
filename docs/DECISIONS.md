@@ -1279,3 +1279,25 @@ recorded in DIVERGENCES.md.
   0.71–1.10x of C across 20 cases; the median gain was 7.7 % for the
   release build and 4.2 % with fat LTO. UTF-16 input with handlers was
   about 4 % slower in the release build and within noise with LTO.
+
+## D-045 Lookup cache in front of the hash table (2026-11-14)
+
+- **Decision.** Each `HashTable` keeps a 64-entry direct-mapped cache of
+  entry ids, indexed by a cheap mix of the key's length and first and last
+  bytes. `find` and `lookup_or_insert` check it first and confirm a hit by
+  comparing the whole key; a miss falls through to the C-compatible
+  SipHash probe and fills the cache. `clear` empties it.
+- **Why.** `perf` on `plain-large` attributed about 28 % of samples to the
+  hash path (`siphash24`, `AttributeId` lookup, `ElementType` find). The
+  same few attribute and element names are looked up for every start tag,
+  and each lookup recomputed SipHash.
+- **Parity.** Keys are unique and an `EntryId` stays valid until `clear`,
+  so a confirmed hit is the entry the probe would return; debug builds
+  assert this on every hit. Slot layout, table sizes, iteration order and
+  heap accounting are unchanged, so the tracker tests still match C. The
+  cache index is not keyed by the salt, but a collision only costs a miss;
+  it cannot lengthen a probe sequence.
+- **Measured.** On one aarch64 VM against libexpat 2.10.0 built with
+  clang -O2, the slower of the two port builds moved from 0.72–1.11x to
+  0.76–1.22x of C across 20 cases; the median gain was 6.5 % for the
+  release build and 8.4 % with fat LTO, and 11–22 % on `plain-large`.
