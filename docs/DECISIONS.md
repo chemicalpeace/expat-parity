@@ -1259,3 +1259,23 @@ recorded in DIVERGENCES.md.
   (`to_utf8_token_into`). These bytes come from tokens the scanner
   accepted, so they are whole characters and `utf8_toUtf8` would copy
   them unchanged; debug builds compare the copy with the conversion.
+
+## D-044 Byte tables are indexed by variant (2026-11-14)
+
+- **Decision.** `Table::entries` reads the 256-entry table from a static
+  array indexed by the variant's discriminant (`#[repr(u8)]`, in the order
+  of `Table::ALL`) instead of a `match`. `Table::byte_type`, the
+  encodings' `table()` and their `byte_type` are `#[inline(always)]`, so
+  `BYTE_TYPE` in the scanner is one table load and one byte load, as with
+  C's `((const struct normal_encoding *)enc)->type[(unsigned char)*p]`.
+- **Why.** `perf` on the `benches/filc` corpus attributed about 9 % of
+  samples to `byte_type`, most of it the per-variant branch that picked the
+  table for every byte.
+- **Parity.** The tables and their contents are unchanged; a unit test
+  checks that each variant maps to the same table as before. No unsafe
+  code is added.
+- **Measured.** On one aarch64 VM against libexpat 2.10.0 built with
+  clang -O2, the slower of the two port builds moved from 0.70–1.00x to
+  0.71–1.10x of C across 20 cases; the median gain was 7.7 % for the
+  release build and 4.2 % with fat LTO. UTF-16 input with handlers was
+  about 4 % slower in the release build and within noise with LTO.
