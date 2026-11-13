@@ -196,7 +196,8 @@ oracle_tok_get_atts(const void *encv, const char *buf, size_t ptr, int atts_max,
     atts[i].valueEnd = buf;
     atts[i].normalized = 0;
   }
-  n = enc->getAtts(enc, buf + ptr, atts_max, atts);
+  /* 2.10.0 (#1463): getAtts counts in size_t; at most 64 here. */
+  n = (int)enc->getAtts(enc, buf + ptr, (size_t)atts_max, atts);
   for (i = 0; i < atts_max; i++) {
     out[4 * i] = atts[i].name - buf;
     out[4 * i + 1] = atts[i].valuePtr - buf;

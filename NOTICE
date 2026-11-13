@@ -5,8 +5,8 @@ This repository contains a Rust port of libexpat and a vendored, unmodified
 copy of the libexpat C sources used as a test oracle.
 
 Upstream:   https://github.com/libexpat/libexpat
-Version:    2.9.0 (tag R_2_9_0)
-Commit:     a76b1174c1ea52abb639a4c69d52b630a8a106a2
+Version:    2.10.0 (tag R_2_10_0)
+Commit:     a70841d9ffa64ddde29ab824ed6305035ebe4c47
 License:    MIT (see crates/expat-oracle/vendor/expat/COPYING)
 Authors:    see crates/expat-oracle/vendor/expat/AUTHORS
 

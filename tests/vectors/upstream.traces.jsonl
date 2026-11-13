@@ -353,10 +353,10 @@
 {"id":"basic_tests.c:4961","trace":"result error 2 1 0 0\n"}
 {"id":"basic_tests.c:4997","trace":"result error 2 1 0 0\n"}
 {"id":"basic_tests.c:5001","trace":"result error 2 1 0 0\n"}
-{"id":"basic_tests.c:5025","trace":"doctype doc ~ ~ 1\nentity entity 0  ~ ~ ~ ~\nresult error 14 2 19 35\n"}
-{"id":"basic_tests.c:5036","trace":"doctype doc ~ ~ 1\nentity entity 0  ~ ~ ~ ~\nresult error 4 2 22 38\n"}
+{"id":"basic_tests.c:5025","trace":"doctype doc ~ ~ 1\nresult error 14 2 19 35\n"}
+{"id":"basic_tests.c:5036","trace":"doctype doc ~ ~ 1\nresult error 4 2 22 38\n"}
 {"id":"basic_tests.c:5049","trace":"doctype doc ~ ~ 1\nentity entity 0 &%E0%B8%84%E0%B8%88; ~ ~ ~ ~\nenddoctype\nstart doc 0\nresult error 11 4 5 96\n"}
-{"id":"basic_tests.c:5069","trace":"doctype doc ~ ~ 1\nentity entity 0  ~ ~ ~ ~\nresult error 14 2 19 35\n"}
+{"id":"basic_tests.c:5069","trace":"doctype doc ~ ~ 1\nresult error 14 2 19 35\n"}
 {"id":"basic_tests.c:5081","trace":"pi test processing%20instruction\nstart doc 0\nend doc\nresult ok 0 2 6 38\n"}
 {"id":"basic_tests.c:5097","trace":"comment %20This%20is%20a%20comment%20\nstart doc 0\nend doc\nresult ok 0 2 6 33\n"}
 {"id":"basic_tests.c:5113","trace":"pi yml something%20like%20data\nstart doc 0\nend doc\nresult ok 0 1 33 33\n"}
