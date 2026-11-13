@@ -115,6 +115,17 @@ pub struct Entity {
     /// `is_internal`: declared in the internal subset outside a parameter
     /// entity.
     pub is_internal: bool,
+    /// `expandedSize` (libexpat 2.10.0, CVE-2026-115506): the indirect
+    /// accounting bytes that expanding this entity charges, computed on
+    /// its first expansion (`parse::expansion`); 0 = not computed yet
+    /// (an empty entity is 0 too, told apart by an empty text).
+    pub expanded_size: u64,
+    /// `beingAnalyzed`: on the depth-first search stack of
+    /// `resolveEntityClosureExpandedSize` (cycle detection).
+    pub being_analyzed: bool,
+    /// `scanPtr - textPtr`: how far the size computation has scanned the
+    /// text (it resumes there after a blocking reference is resolved).
+    pub scan_pos: usize,
 }
 
 /// Which entity table an entity is in.

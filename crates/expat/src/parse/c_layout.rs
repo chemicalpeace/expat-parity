@@ -12,8 +12,9 @@
 //! every one of them with `sizeof` / `offsetof` taken by the C compiler
 //! from the vendored `xmlparse.c` (oracle) on every CI platform.
 //!
-//! Field lists are copied from libexpat 2.9.0 (`xmlparse.c`, `xmltok.h`,
-//! `hash_table.h`; line numbers at each constant).
+//! Field lists are copied from libexpat 2.10.0 (`xmlparse.c`, `entities.h`,
+//! `xmltok.h`, `hash_table.h`; line numbers at each constant, some still
+//! 2.9.0's where the definition did not change).
 
 use core::ffi::{c_float, c_int, c_uchar, c_uint, c_ulong, c_ulonglong};
 use core::mem::{align_of, size_of};
@@ -94,9 +95,15 @@ pub const BINDING: usize = c_struct(&[PTR, PTR, PTR, PTR, PTR, SIZE_T, SIZE_T]).
 /// `sizeof(PREFIX)` (`xmlparse.c` 272-275): two pointers.
 pub const PREFIX: usize = c_struct(&[PTR, PTR]).0;
 
-/// `sizeof(ENTITY)` (`xmlparse.c` 312-328): two pointers, two `int`s,
-/// four pointers, four `bool`s.
-pub const ENTITY: usize = c_struct(&[PTR, PTR, INT, INT, PTR, PTR, PTR, PTR, BOOL, BOOL, BOOL, BOOL]).0;
+/// `sizeof(ENTITY)` (`entities.h` 43-71 since 2.10.0, with `XML_GE == 1`):
+/// two pointers, `size_t textLen`, `size_t processed`, four pointers,
+/// four `bool`s, then `XmlBigCount expandedSize`, `bool beingAnalyzed`
+/// and the `scanPtr` pointer of the billion-laughs precomputation
+/// (CVE-2026-115506).
+pub const ENTITY: usize = c_struct(&[
+    PTR, PTR, SIZE_T, SIZE_T, PTR, PTR, PTR, PTR, BOOL, BOOL, BOOL, BOOL, U64, BOOL, PTR,
+])
+.0;
 
 /// `sizeof(CONTENT_SCAFFOLD)` (`xmlparse.c` 330-338): two enums, a
 /// pointer, four `int`s.
@@ -158,10 +165,11 @@ const fn accounting(ulong: Ty) -> Ty {
     c_struct(&[U64, U64, ulong, FLOAT, U64])
 }
 
-/// `MALLOC_TRACKER` (`xmlparse.c` 467-473): two `size_t`, `unsigned long
+/// `MALLOC_TRACKER` (`xmlparse.c` 452-460): three `size_t` (the third,
+/// `bytesAllocatedWhenLastReset`, is new in 2.10.0), `unsigned long
 /// debugLevel`, `float`, `XmlBigCount`.
 const fn malloc_tracker(ulong: Ty) -> Ty {
-    c_struct(&[SIZE_T, SIZE_T, ulong, FLOAT, U64])
+    c_struct(&[SIZE_T, SIZE_T, SIZE_T, ulong, FLOAT, U64])
 }
 
 /// `ENTITY_STATS` (`xmlparse.c` 475-480): three `unsigned int`s and
@@ -355,6 +363,10 @@ pub const DTD: usize = c_struct(&[
 ])
 .0;
 
+/// `sizeof(ENTITY_ANALYSIS_TASK)` (`xmlparse.c` 468-473, new in 2.10.0):
+/// one pointer, the entry of the entity-size search stack.
+pub const ENTITY_ANALYSIS_TASK: usize = c_struct(&[PTR]).0;
+
 /// `sizeof(NAMED *)`: one slot of a hash table.
 pub const NAMED_PTR: usize = PTR.0;
 
@@ -403,9 +415,9 @@ mod tests {
         // DV-1, R1); the integration test compares every platform.
         assert_eq!(
             [TAG, BINDING, NAME_AND_DEFAULT_ATTRIBUTE, ELEMENT_TYPE, ENTITY, NS_ATT, BLOCK_HEADER],
-            [96, 56, 24, 88, 64, 24, 12]
+            [96, 56, 24, 88, 96, 24, 12]
         );
-        assert_eq!([PARSER, DTD, PARSER_M_POSITION], [1104, 368, 808]);
+        assert_eq!([PARSER, DTD, PARSER_M_POSITION], [1112, 368, 808]);
     }
 
     #[cfg(target_pointer_width = "64")]
@@ -415,15 +427,18 @@ mod tests {
         // (`unsigned long` 4 bytes, aligned to 4): 32 bytes less than on
         // 64-bit Unix, 8 for each `unsigned long` member: m_nsAttsVersion
         // (with m_nsAttsPower before an 8-aligned POSITION), and the
-        // debugLevel of ACCOUNTING (40 -> 32), MALLOC_TRACKER (40 -> 32)
+        // debugLevel of ACCOUNTING (40 -> 32), MALLOC_TRACKER (48 -> 40)
         // and ENTITY_STATS (24 -> 16, the rest of the structure packing
-        // into the freed padding). Measured with clang's MSVC target and
-        // confirmed against MSVC by tests/tests/tracker_sizes.rs on CI.
-        assert_eq!(parser_struct((4, 4)).0, 1072);
-        assert_eq!(parser_struct((8, 8)).0, 1104);
+        // into the freed padding). The 2.9.0 values (1072 / 1104, tracker
+        // 32 / 40) were measured with clang's MSVC target and confirmed
+        // against MSVC by tests/tests/tracker_sizes.rs on CI; 2.10.0 adds
+        // one `size_t` to MALLOC_TRACKER (8 bytes on both), measured on
+        // 64-bit Linux and still to be confirmed on Windows CI.
+        assert_eq!(parser_struct((4, 4)).0, 1080);
+        assert_eq!(parser_struct((8, 8)).0, 1112);
         assert_eq!(parser_m_position((4, 4)), 800);
         assert_eq!(accounting((4, 4)).0, 32);
-        assert_eq!(malloc_tracker((4, 4)).0, 32);
+        assert_eq!(malloc_tracker((4, 4)).0, 40);
         assert_eq!(entity_stats((4, 4)).0, 16);
     }
 }

@@ -1,4 +1,4 @@
-//! Memory-safe Rust port of [libexpat](https://libexpat.github.io/) 2.9.0,
+//! Memory-safe Rust port of [libexpat](https://libexpat.github.io/) 2.10.0,
 //! a stream-oriented XML 1.0 parser, verified against the vendored C
 //! reference by differential testing and fuzzing.
 //!
@@ -55,7 +55,7 @@
 //!   I/O and has no external entity handler, and the parser behaves as
 //!   libexpat does when none is set. The internal DTD subset is parsed and
 //!   internal entities are expanded.
-//! - The amplification limits are libexpat 2.9.0's defaults and cannot be
+//! - The amplification limits are libexpat 2.10.0's defaults and cannot be
 //!   changed. The parser counts its allocations as libexpat does and
 //!   refuses with [`ErrorCode::NoMemory`] or
 //!   [`ErrorCode::AmplificationLimitBreach`] where libexpat does (checked

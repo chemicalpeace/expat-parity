@@ -55,6 +55,7 @@ mod decl;
 mod dtd;
 mod entity;
 mod error;
+mod expansion;
 mod external;
 mod model;
 mod prolog;

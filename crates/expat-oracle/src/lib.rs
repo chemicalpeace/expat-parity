@@ -495,7 +495,7 @@ pub fn last_tracker_bytes() -> TrackerBytes {
 /// `MALLOC_TRACKER` and `ENTITY_STATS` are the parser's members with an
 /// `unsigned long debugLevel` (stage 3: the parser structure is 32 bytes
 /// smaller on 64-bit Windows).
-pub const ORACLE_C_SIZE_NAMES: [&str; 22] = [
+pub const ORACLE_C_SIZE_NAMES: [&str; 23] = [
     "TAG",
     "BINDING",
     "PREFIX",
@@ -518,6 +518,7 @@ pub const ORACLE_C_SIZE_NAMES: [&str; 22] = [
     "ACCOUNTING",
     "MALLOC_TRACKER",
     "ENTITY_STATS",
+    "ENTITY_ANALYSIS_TASK",
 ];
 
 /// The C compiler's sizes of the structures named in

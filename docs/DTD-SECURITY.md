@@ -155,6 +155,36 @@ attribute value 39.9 MB port / 33.6 MB C, default-limit billion laughs
 Large expansions are traced with `text_digest` (character data as length
 and FNV-1a hash), so traces stay small.
 
+### 4.1 Since libexpat 2.10.0: precomputed expansion sizes (CVE-2026-115506, D-042)
+
+2.9.0, described above, notices an attack only while the expansion runs,
+after up to `maximumAmplificationFactor` times the direct bytes have been
+produced. 2.10.0 (`xmlparse.c` of `R_2_10_0`: `scanEntityText` 6902-7077,
+`resolveEntityClosureExpandedSize` 7088-7182, `processEntity` 7213-7242,
+`accountingCurrentAmplificationTolerated` 9562-9586) adds a check before an
+internal entity is opened:
+
+- On its first expansion the entity's `expandedSize` is computed: one per
+  character of its text, plus for every reference the length of the
+  `&name;` / `%name;` token and the referenced entity's own
+  `expandedSize` (one character for a predefined entity in general text;
+  nothing for an undefined, external or empty entity or for a reference
+  that closes a cycle). `<![CDATA[...]]>`, `<!--...-->` and `<?...?>` in
+  the text are counted verbatim without looking for references (#1439),
+  up to the end of the text when unterminated.
+- Referenced sizes are computed first by an iterative depth-first search
+  with an explicit stack of `table->used` pointers (a tracked `MALLOC`,
+  freed at the end; NO_MEMORY when the tracker refuses it); an overflow
+  of the 64-bit size is AMPLIFICATION_LIMIT_BREACH.
+- Every expansion (not only the first) is refused with
+  AMPLIFICATION_LIMIT_BREACH when `(direct + indirect + expandedSize)` is
+  at least the activation threshold and
+  `((float)direct + ((float)indirect + (float)expandedSize)) / (float)direct`
+  exceeds the maximum factor. Nothing is opened or allocated for a
+  refused reference.
+
+Line numbers in the rest of this document are 2.9.0's.
+
 ## 5. Allocation tracker
 
 ### What C does

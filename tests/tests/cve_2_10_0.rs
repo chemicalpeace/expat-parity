@@ -1,17 +1,20 @@
-//! libexpat 2.10.0 security fixes (2026-11-02) checked against the port of
-//! libexpat 2.9.0 (`expat` 0.1.0-beta.1). One group per CVE; the verdicts
-//! and measurements are in the check report (`expat-parity-cve-2-10-0.md`).
+//! libexpat 2.10.0 security fixes (2026-11-02) checked against the port
+//! (`expat` 0.1.0-beta.1, brought to 2.10.0 parity) and the C oracle
+//! (vendored libexpat 2.10.0). One group per CVE; the verdicts and
+//! measurements are in the check report (`expat-parity-cve-2-10-0.md`).
 //!
 //! - CVE-2026-113351 (libexpat#1431): `XML_ParserReset` kept the
 //!   allocation-tracker total and reset the billion-laughs settings. The
 //!   port has no reset (neither the public nor the internal `Parser`); the
 //!   tests pin the upstream reset-neutrality documents on fresh parsers.
-//! - CVE-2026-115506 (#1433 #1436 #1438 #1439 #1442): billion laughs
-//!   detected only after up to `factor x direct bytes` of expansion work.
-//!   The port replicates 2.9.0's accounting exactly, so it is affected:
-//!   `cve_2026_115506_port_still_expands_before_breach` pins today's
-//!   (vulnerable) behaviour and must be inverted when the fix lands; the
-//!   strict 2.10.0 check runs with `EXPAT_CVE_STRICT=1` and fails today.
+//! - CVE-2026-115506 (#1433 #1436 #1439 #1442; issue #1438): billion
+//!   laughs detected only after up to `factor x direct bytes` of expansion
+//!   work. Fixed in the port by porting 2.10.0's precomputed entity
+//!   expansion sizes (`parse/expansion.rs`): a reference whose complete
+//!   expansion would breach the limits is refused before it is expanded.
+//!   `cve_2026_115506_rejected_at_the_reference` (formerly the pin of the
+//!   vulnerable behaviour) checks that on every shape against C; the
+//!   1 MiB strict check runs with `EXPAT_CVE_STRICT=1`.
 //!   `bl_measure_*` print port and C timings (`--nocapture`;
 //!   `EXPAT_CVE_TIMING=1` for the scaling run).
 //! - CVE-2026-117610 (#1444): an empty, non-final first parse call of an
@@ -217,9 +220,7 @@ const SHAPES: &[(&str, bool, usize, usize, usize, usize, bool)] = &[
 ];
 
 /// Port and C reach the same verdict and the same counters at the breach
-/// (the port replicates 2.9.0), and the indirect count at the breach is
-/// ~100x the direct count: the expansion work done before rejection grows
-/// with the document size. Prints the timings.
+/// (the port replicates 2.10.0). Prints the timings.
 #[test]
 fn bl_measure_shapes_port_vs_c() {
     for &(name, pe, len, multi, depth, count, flip) in SHAPES {
@@ -233,7 +234,7 @@ fn bl_measure_shapes_port_vs_c() {
             let r = port_run(&doc, pe);
             let c = c_run(&doc, pe);
             eprintln!(
-                "cve-115506: {name:<15} pad={pad:>8} doc={:>8}B port: code={} {:.3}s direct={} indirect={} ({:.1}x) | C 2.9.0: code={} {:.3}s indirect={}",
+                "cve-115506: {name:<15} pad={pad:>8} doc={:>8}B port: code={} {:.3}s direct={} indirect={} ({:.1}x) | C 2.10.0: code={} {:.3}s indirect={}",
                 doc.len(),
                 r.code,
                 r.secs,
@@ -256,7 +257,8 @@ fn bl_measure_shapes_port_vs_c() {
 }
 
 /// Time to breach as the padding grows (2.9.0 behaviour: linear in the
-/// padding with a ~100x factor; 2.10.0: the parse of the padding only).
+/// padding with a ~100x factor; 2.10.0 and the port: the parse of the
+/// padding only).
 /// Release build recommended. `EXPAT_CVE_PAD_MIB` overrides the largest
 /// padding (default 4 MiB); `EXPAT_CVE_SHAPE` selects one shape by name.
 #[test]
@@ -280,49 +282,64 @@ fn bl_measure_time_scaling() {
             let r = port_run(&doc, pe);
             let c = c_run(&doc, pe);
             eprintln!(
-                "cve-115506-scaling: {name:<15} pad={pad_mib}MiB port {:.2}s (indirect {:.0} MB) | C 2.9.0 {:.2}s (indirect {:.0} MB) | port/C {:.2}",
+                "cve-115506-scaling: {name:<15} pad={pad_mib}MiB port code={} {:.3}s (indirect {:.1} MB) | C 2.10.0 code={} {:.3}s (indirect {:.1} MB) | port/C {:.2}",
+                r.code,
                 r.secs,
                 r.indirect as f64 / 1e6,
+                c.code,
                 c.secs,
                 c.indirect as f64 / 1e6,
                 r.secs / c.secs.max(1e-9)
             );
-            assert_eq!(r.code, BREACH);
-            assert_eq!(c.code, BREACH);
+            // Every shape breaches under 2.10.0's precomputation except
+            // where the padding lets the whole expansion fit the 100x
+            // factor (pe-empty from 8 MiB); either way port and C agree.
+            assert_eq!(r.code, c.code, "{name} pad={pad_mib}MiB");
+            assert_eq!(
+                (r.direct, r.indirect),
+                (c.direct, c.indirect),
+                "{name} pad={pad_mib}MiB: accounting differs from C"
+            );
         }
         pad_mib *= 2;
     }
 }
 
-/// Pins the port's current, vulnerable behaviour (CVE-2026-115506): at
-/// the breach the indirect count is ~99x the direct count, i.e. the
-/// expansion ran until the 100x limit. When 2.10.0's precomputed
-/// expansion sizes (#1433 + #1439) are ported this test fails by design:
-/// replace it with `cve_2026_115506_rejected_before_expansion` unconditionally.
+/// CVE-2026-115506 fixed (this test pinned the vulnerable behaviour
+/// before the port of 2.10.0's precomputation, with a ratio of ~99x): on
+/// every shape the reference is refused before it is expanded, so the
+/// indirect bytes at the breach stay below the direct bytes, and the
+/// counters are C 2.10.0's.
 #[test]
-fn cve_2026_115506_port_still_expands_before_breach() {
-    let (name, pe, len, multi, depth, count, flip) = SHAPES[0];
-    let doc = lol(pe, len, multi, depth, count, 256 << 10, flip);
-    let r = port_run(&doc, pe);
-    assert_eq!(r.code, BREACH, "{name}");
-    let ratio = r.indirect as f64 / r.direct as f64;
-    assert!(
-        ratio > 90.0,
-        "{name}: ratio {ratio:.1}: fixed? see the doc comment"
-    );
+fn cve_2026_115506_rejected_at_the_reference() {
+    for &(name, pe, len, multi, depth, count, flip) in SHAPES {
+        let doc = lol(pe, len, multi, depth, count, 256 << 10, flip);
+        let r = port_run(&doc, pe);
+        let c = c_run(&doc, pe);
+        assert_eq!(r.code, BREACH, "{name}");
+        assert_eq!(c.code, BREACH, "{name}: C");
+        let ratio = r.indirect as f64 / r.direct as f64;
+        assert!(
+            ratio < 1.0,
+            "{name}: ratio {ratio:.1}: the expansion ran before the breach"
+        );
+        assert_eq!(
+            (r.direct, r.indirect),
+            (c.direct, c.indirect),
+            "{name}: accounting differs from C"
+        );
+    }
 }
 
-/// 2.10.0 behaviour (strict): an entity reference whose precomputed
-/// expansion would breach the limit is rejected before it is expanded,
-/// so the indirect bytes at the breach stay below the direct bytes
-/// instead of reaching ~100x of them. Fails on the port (and on C 2.9.0)
-/// until the fix lands; runs with `EXPAT_CVE_STRICT=1`.
+/// 2.10.0 behaviour (strict, 1 MiB of padding): an entity reference whose
+/// precomputed expansion would breach the limit is rejected before it is
+/// expanded, so the indirect bytes at the breach stay below the direct
+/// bytes instead of reaching ~100x of them. Failed on the 2.9.0 port (and
+/// on C 2.9.0); passes since the fix. Runs with `EXPAT_CVE_STRICT=1`.
 #[test]
 fn cve_2026_115506_rejected_before_expansion() {
     if std::env::var_os("EXPAT_CVE_STRICT").is_none() {
-        eprintln!(
-            "cve-115506 strict: skipped (set EXPAT_CVE_STRICT=1; fails until the fix is ported)"
-        );
+        eprintln!("cve-115506 strict: skipped (set EXPAT_CVE_STRICT=1)");
         return;
     }
     for &(name, pe, len, multi, depth, count, flip) in SHAPES {
@@ -340,8 +357,7 @@ fn cve_2026_115506_rejected_before_expansion() {
 
 /// #1439: references inside CDATA sections, comments and PIs in entity
 /// text are not expanded, so 2.10.0's precomputation must not count them
-/// (a backport without #1439 rejects this valid document). Passes on the
-/// port today; keeps a future port of the precomputation honest.
+/// (a backport without #1439 rejects this valid document, issue #1438).
 #[test]
 fn cve_2026_115506_pr1439_markup_in_entity_text_not_counted() {
     let mut s = String::from("<!DOCTYPE r [\n<!ENTITY a0 'lol'>\n");
@@ -433,7 +449,7 @@ fn run_sub(chunks: &[(&[u8], bool)]) -> (Status, u32, Sub) {
 }
 
 /// Upstream `test_misc_empty_nonfinal_subparser_parse`: `""` non-final,
-/// then `<?target data?>` final. C 2.9.0 crashes; 2.10.0 and the port
+/// then `<?target data?>` final. C 2.9.0 crashed; 2.10.0 and the port
 /// return OK and report the processing instruction.
 #[test]
 fn cve_2026_117610_upstream_test() {
