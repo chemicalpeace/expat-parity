@@ -175,6 +175,7 @@ impl Parser {
         next: usize,
         allow_closing_doctype: bool,
     ) -> Result<bool, Stop> {
+        self.poll_base(h);
         let m = E::MINBPC;
         let salt = self.salt;
         let no_mem = |_| Stop::Error(XmlError::NoMemory);
@@ -833,6 +834,7 @@ impl Parser {
     /// foreign DTD the entity's base is the parser's base. After a read,
     /// the not-standalone handler decides.
     pub(crate) fn read_external_subset<H: Handler>(&mut self, h: &mut H) -> Result<(), Stop> {
+        self.poll_base(h);
         let salt = self.salt;
         let direct = self.direct();
         let r = self

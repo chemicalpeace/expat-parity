@@ -4,21 +4,29 @@
 //! The library exports the functions below under their libexpat names, so
 //! a C program written against the vendored `expat.h` (libexpat 2.10.0,
 //! `XML_Char` = `char`, UTF-8 output) can link against it instead of
-//! libexpat. This first slice covers parser creation and release, user
-//! data, the nine handlers of [`expat::Events`], `XML_Parse`,
-//! `XML_GetBuffer` and `XML_ParseBuffer` (D-049), `XML_StopParser` and
-//! `XML_ResumeParser` (D-050), `XML_SetDefaultHandler` and
-//! `XML_SetDefaultHandlerExpand` (D-051), `XML_DefaultCurrent` (D-052),
-//! the declaration handlers (XML, document type, entity, unparsed
-//! entity, notation, element type and attribute-list declarations, and
-//! skipped entities), `XML_FreeContentModel`, `XML_SetBase` and
-//! `XML_GetBase` (D-053), the error code and its
-//! text, the position between calls and inside handlers (D-048) and the
-//! version. Every
-//! other `expat.h` function is missing, so a program that uses one fails
-//! to link rather than run with different behaviour.
+//! libexpat. It covers parser creation (`XML_ParserCreate`,
+//! `XML_ParserCreateNS`, `XML_ParserCreate_MM`), reset and release, user
+//! data, the handlers of [`expat::Events`], `XML_Parse`, `XML_GetBuffer`
+//! and `XML_ParseBuffer` (D-049), `XML_StopParser` and `XML_ResumeParser`
+//! (D-050), `XML_SetDefaultHandler` and `XML_SetDefaultHandlerExpand`
+//! (D-051), `XML_DefaultCurrent` (D-052), the declaration handlers,
+//! `XML_FreeContentModel`, `XML_SetBase` and `XML_GetBase` (D-053), the
+//! parser settings (`XML_SetEncoding`, `XML_SetHashSalt`,
+//! `XML_SetHashSalt16Bytes`, `XML_SetReturnNSTriplet`,
+//! `XML_UseForeignDTD`, `XML_SetParamEntityParsing`, the amplification
+//! limits, `XML_SetReparseDeferralEnabled` and the property functions),
+//! `XML_GetParsingStatus`, the memory functions and `XML_GetFeatureList`
+//! (D-054), the error code and its text, the position between calls and
+//! inside handlers (D-048) and the version.
 //!
-//! Differences from libexpat in this slice:
+//! Not provided yet, so that a program using them fails to link rather
+//! than run with different behaviour: external entities
+//! (`XML_SetExternalEntityRefHandler`, `XML_SetExternalEntityRefHandlerArg`,
+//! `XML_ExternalEntityParserCreate`), `XML_SetNotStandaloneHandler`,
+//! `XML_SetUnknownEncodingHandler`, `XML_GetCurrentByteCount`,
+//! `XML_GetIdAttributeIndex` and `XML_GetInputContext`.
+//!
+//! Differences from libexpat:
 //!
 //! - Inside a handler, `XML_GetCurrentLineNumber`,
 //!   `XML_GetCurrentColumnNumber` and `XML_GetCurrentByteIndex` (and their
@@ -32,22 +40,31 @@
 //!   libexpat.)
 //! - `XML_GetSpecifiedAttributeCount` is updated only while a start
 //!   element handler is set, which is where libexpat documents its use.
-//! - `XML_Parse`, `XML_ParseBuffer`, `XML_GetBuffer`, `XML_ResumeParser`
-//!   and `XML_ParserFree` called from inside a handler do nothing (`XML_STATUS_ERROR` or
-//!   `NULL`, without an error code), as in libexpat 2.10.0.
+//! - `XML_Parse`, `XML_ParseBuffer`, `XML_GetBuffer`, `XML_ResumeParser`,
+//!   `XML_ParserReset` and `XML_ParserFree` called from inside a handler
+//!   do nothing (`XML_STATUS_ERROR`, `XML_FALSE` or `NULL`, without an
+//!   error code), as in libexpat 2.10.0.
 //! - `XML_DefaultCurrent` works only if a default handler was set when
 //!   `XML_Parse` started. Inside the default handler it calls, for an
 //!   event of a document not in UTF-8 whose text takes more than one
 //!   1024-byte piece, the position functions return the position of the
 //!   event rather than of each piece.
-//! - `XML_SetBase` called from inside a handler does nothing and returns
-//!   `XML_STATUS_ERROR`; libexpat changes the base for the declarations
-//!   that follow.
-//! - A content model is freed only by `XML_FreeContentModel` on the
-//!   parser that passed it, or with the parser; `XML_MemFree` is not
-//!   provided. The value of an internal entity passed to the entity
-//!   declaration handler is NUL-terminated, which libexpat does not
-//!   promise.
+//! - From inside a handler, `XML_SetBase` returns `XML_STATUS_OK` and the
+//!   parser takes the base before it next uses it; a copy refused by the
+//!   memory limit then leaves the old base, where libexpat returns
+//!   `XML_STATUS_ERROR` to the handler. The billion laughs limits and
+//!   `XML_SetReparseDeferralEnabled` set from inside a handler take
+//!   effect from the next token (libexpat: at once); the allocation
+//!   tracker limits take effect at the next allocation, as in libexpat.
+//! - `XML_ParserCreate_MM`: only the memory handed to the program
+//!   (content models, `XML_MemMalloc`, `XML_MemRealloc`, `XML_MemFree`)
+//!   comes from the suite; the parser's own memory comes from the Rust
+//!   allocator. When the suite fails to allocate a content model, the
+//!   parse is aborted (`XML_ERROR_ABORTED`) where libexpat reports
+//!   `XML_ERROR_NO_MEMORY`.
+//! - After `XML_ParserReset`, the memory limit applies, as in libexpat,
+//!   to what is counted after the reset, but the parser counts its
+//!   buffers and tables again where libexpat reuses the ones it has.
 //! - The hash salt comes from the standard library's `RandomState` keys,
 //!   which are seeded from the operating system.
 //!
@@ -65,7 +82,10 @@ use std::ffi::{CStr, CString, c_char, c_int, c_long, c_ulong, c_void};
 use std::hash::BuildHasher;
 use std::sync::OnceLock;
 
-use expat::{ContentModel, ErrorCode, Events, Handler, Options, Parser, Stopper};
+use expat::{
+    ContentModel, ErrorCode, Events, Handler, Options, ParamEntityParsing, Parser, ParsingStatus,
+    Stopper,
+};
 
 /// `XML_Char` without `XML_UNICODE`.
 pub type XML_Char = c_char;
@@ -193,51 +213,106 @@ pub struct XML_Content {
     pub children: *mut XML_Content,
 }
 
-/// A content model handed to an element declaration handler, kept by the
-/// parser until `XML_FreeContentModel` or `XML_ParserFree`.
-struct Model {
-    nodes: Box<[XML_Content]>,
-    /// The names the nodes point to.
-    _names: Vec<CString>,
+unsafe extern "C" {
+    fn malloc(size: usize) -> *mut c_void;
+    fn realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
+    fn free(ptr: *mut c_void);
 }
 
-impl Model {
-    /// The C form of `model`: the nodes in the crate's order (node 0 the
-    /// root, each node's children contiguous), as libexpat lays them out.
-    fn new(model: &ContentModel) -> Self {
-        let mut names = Vec::new();
-        let mut nodes: Box<[XML_Content]> = model
-            .nodes
-            .iter()
-            .map(|n| {
-                let name = n.name.as_deref().map_or(std::ptr::null_mut(), |b| {
-                    let c = CString::new(b).unwrap_or_default();
-                    let p = c.as_ptr().cast_mut();
-                    names.push(c);
-                    p
-                });
-                XML_Content {
-                    r#type: n.kind as c_int,
-                    quant: n.quant as c_int,
-                    name,
-                    numchildren: std::ffi::c_uint::try_from(n.children.len()).unwrap_or(0),
-                    children: std::ptr::null_mut(),
-                }
-            })
-            .collect();
-        let base = nodes.as_mut_ptr();
-        for (node, src) in nodes.iter_mut().zip(&model.nodes) {
-            if !src.children.is_empty() && src.children.end <= model.nodes.len() {
-                // `wrapping_add` keeps this safe code; the index is in bounds
-                // (checked above), so the pointer is inside `nodes`.
-                node.children = base.wrapping_add(src.children.start);
-            }
-        }
-        Model {
-            nodes,
-            _names: names,
+/// `malloc_fcn` of `XML_Memory_Handling_Suite`.
+pub type XML_MallocFcn = unsafe extern "C" fn(usize) -> *mut c_void;
+/// `realloc_fcn` of `XML_Memory_Handling_Suite`.
+pub type XML_ReallocFcn = unsafe extern "C" fn(*mut c_void, usize) -> *mut c_void;
+/// `free_fcn` of `XML_Memory_Handling_Suite`.
+pub type XML_FreeFcn = unsafe extern "C" fn(*mut c_void);
+
+/// `XML_Memory_Handling_Suite`.
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct XML_Memory_Handling_Suite {
+    /// `malloc_fcn`
+    pub malloc_fcn: Option<XML_MallocFcn>,
+    /// `realloc_fcn`
+    pub realloc_fcn: Option<XML_ReallocFcn>,
+    /// `free_fcn`
+    pub free_fcn: Option<XML_FreeFcn>,
+}
+
+/// The allocation functions of one parser: those of
+/// `XML_ParserCreate_MM`, or the C library's.
+#[derive(Debug, Clone, Copy)]
+struct Mem {
+    malloc: XML_MallocFcn,
+    realloc: XML_ReallocFcn,
+    free: XML_FreeFcn,
+}
+
+impl Default for Mem {
+    fn default() -> Self {
+        Mem {
+            malloc,
+            realloc,
+            free,
         }
     }
+}
+
+/// The C form of `model` in one block from `alloc`, as libexpat's
+/// `build_model` lays it out: the nodes in the crate's order (node 0 the
+/// root, each node's children contiguous), then their names. `NULL` when
+/// the allocation fails.
+fn build_model(model: &ContentModel, alloc: XML_MallocFcn) -> *mut XML_Content {
+    let n = model.nodes.len();
+    let names: usize = model
+        .nodes
+        .iter()
+        .filter_map(|x| x.name.as_ref())
+        .map(|b| b.len() + 1)
+        .sum();
+    let Some(size) = n
+        .checked_mul(std::mem::size_of::<XML_Content>())
+        .and_then(|a| a.checked_add(names))
+    else {
+        return std::ptr::null_mut();
+    };
+    // SAFETY: `alloc` is `malloc` or the program's `malloc_fcn`, which
+    // takes any size.
+    let block = unsafe { alloc(size) }.cast::<XML_Content>();
+    if block.is_null() {
+        return block;
+    }
+    // SAFETY: `block` holds `n` nodes followed by `names` bytes; the
+    // writes below stay inside it: one node per index below `n`, and each
+    // name with its NUL in the space counted for it. `malloc` aligns the
+    // block for `XML_Content`, and the names follow the nodes.
+    unsafe {
+        let mut text = block.add(n).cast::<u8>();
+        for (i, src) in model.nodes.iter().enumerate() {
+            let name = match &src.name {
+                Some(b) => {
+                    std::ptr::copy_nonoverlapping(b.as_ptr(), text, b.len());
+                    text.add(b.len()).write(0);
+                    let p = text.cast::<XML_Char>();
+                    text = text.add(b.len() + 1);
+                    p
+                }
+                None => std::ptr::null_mut(),
+            };
+            let children = if !src.children.is_empty() && src.children.end <= n {
+                block.add(src.children.start)
+            } else {
+                std::ptr::null_mut()
+            };
+            block.add(i).write(XML_Content {
+                r#type: src.kind as c_int,
+                quant: src.quant as c_int,
+                name,
+                numchildren: std::ffi::c_uint::try_from(src.children.len()).unwrap_or(0),
+                children,
+            });
+        }
+    }
+    block
 }
 
 /// `XML_Expat_Version`.
@@ -289,9 +364,24 @@ pub struct XML_ParserStruct {
     element_decl: Cell<XML_ElementDeclHandler>,
     attlist_decl: Cell<XML_AttlistDeclHandler>,
     skipped_entity: Cell<XML_SkippedEntityHandler>,
-    /// The content models given to the element declaration handler and
-    /// not yet freed with `XML_FreeContentModel`.
-    models: RefCell<Vec<Model>>,
+    /// The allocation functions for the memory handed to the program
+    /// (content models, `XML_MemMalloc`).
+    mem: Cell<Mem>,
+    /// A base set by `XML_SetBase` from inside a handler, for the parser
+    /// to take ([`Handler::take_base`]).
+    pending_base: RefCell<Option<Option<Vec<u8>>>>,
+    /// `m_hash_secret_salt_set`.
+    salt_set: Cell<bool>,
+    /// The billion laughs maximum amplification, as set.
+    bl_maximum: Cell<f32>,
+    /// The billion laughs activation threshold, as set.
+    bl_threshold: Cell<u64>,
+    /// The allocation tracker maximum amplification, as set.
+    at_maximum: Cell<f32>,
+    /// The allocation tracker activation threshold, as set.
+    at_threshold: Cell<u64>,
+    /// `m_reparseDeferralEnabled`.
+    reparse_deferral: Cell<bool>,
     /// A NUL-terminated copy of the base, for `XML_GetBase`.
     base: RefCell<Option<CString>>,
     /// `m_defaultExpandInternalEntities`: cleared by
@@ -347,7 +437,14 @@ impl XML_ParserStruct {
             element_decl: Cell::new(None),
             attlist_decl: Cell::new(None),
             skipped_entity: Cell::new(None),
-            models: RefCell::new(Vec::new()),
+            mem: Cell::new(Mem::default()),
+            pending_base: RefCell::new(None),
+            salt_set: Cell::new(false),
+            bl_maximum: Cell::new(parser.billion_laughs_maximum_amplification()),
+            bl_threshold: Cell::new(parser.billion_laughs_activation_threshold()),
+            at_maximum: Cell::new(parser.alloc_tracker_maximum_amplification()),
+            at_threshold: Cell::new(parser.alloc_tracker_activation_threshold()),
+            reparse_deferral: Cell::new(parser.reparse_deferral_enabled()),
             base: RefCell::new(None),
             default_expand: Cell::new(true),
             current: RefCell::new((Vec::new(), Vec::new())),
@@ -413,6 +510,87 @@ impl XML_ParserStruct {
         // between threads (libexpat parsers are not thread-safe either).
         let inner = unsafe { &mut *self.inner.get() };
         Some(f(&mut inner.parser))
+    }
+
+    /// `parserBusy`: a parse has started and has not finished.
+    fn parser_busy(&self) -> bool {
+        matches!(
+            self.stopper.parsing_status(),
+            ParsingStatus::Parsing | ParsingStatus::Suspended
+        )
+    }
+
+    /// `setBillionLaughsAttackProtectionMaximumAmplification`.
+    fn set_bl_maximum(&self, factor: f32) -> XML_Prop_Error {
+        if factor.is_nan() || factor < 1.0 {
+            return XML_PROP_ERROR_INVALID_VALUE;
+        }
+        self.bl_maximum.set(factor);
+        if self
+            .with_parser(|p| p.set_billion_laughs_maximum_amplification(factor))
+            .is_none()
+        {
+            let _ = self
+                .stopper
+                .set_billion_laughs_maximum_amplification(factor);
+        }
+        XML_PROP_ERROR_NONE
+    }
+
+    /// `setBillionLaughsAttackProtectionActivationThreshold`.
+    fn set_bl_threshold(&self, bytes: u64) -> XML_Prop_Error {
+        self.bl_threshold.set(bytes);
+        if self
+            .with_parser(|p| p.set_billion_laughs_activation_threshold(bytes))
+            .is_none()
+        {
+            self.stopper.set_billion_laughs_activation_threshold(bytes);
+        }
+        XML_PROP_ERROR_NONE
+    }
+
+    /// `setAllocTrackerMaximumAmplification`.
+    fn set_at_maximum(&self, factor: f32) -> XML_Prop_Error {
+        if factor.is_nan() || factor < 1.0 {
+            return XML_PROP_ERROR_INVALID_VALUE;
+        }
+        self.at_maximum.set(factor);
+        if self
+            .with_parser(|p| p.set_alloc_tracker_maximum_amplification(factor))
+            .is_none()
+        {
+            let _ = self.stopper.set_alloc_tracker_maximum_amplification(factor);
+        }
+        XML_PROP_ERROR_NONE
+    }
+
+    /// `setAllocTrackerActivationThreshold`.
+    fn set_at_threshold(&self, bytes: u64) -> XML_Prop_Error {
+        self.at_threshold.set(bytes);
+        if self
+            .with_parser(|p| p.set_alloc_tracker_activation_threshold(bytes))
+            .is_none()
+        {
+            self.stopper.set_alloc_tracker_activation_threshold(bytes);
+        }
+        XML_PROP_ERROR_NONE
+    }
+
+    /// `setReparseDeferralEnabled`.
+    fn set_reparse(&self, enabled: XML_Bool) -> XML_Prop_Error {
+        let on = match enabled {
+            0 => false,
+            1 => true,
+            _ => return XML_PROP_ERROR_INVALID_VALUE,
+        };
+        self.reparse_deferral.set(on);
+        if self
+            .with_parser(|p| p.set_reparse_deferral_enabled(on))
+            .is_none()
+        {
+            self.stopper.set_reparse_deferral_enabled(on);
+        }
+        XML_PROP_ERROR_NONE
     }
 }
 
@@ -481,6 +659,10 @@ impl Dispatch<'_> {
 }
 
 impl Handler for Dispatch<'_> {
+    fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
+        self.state.pending_base.borrow_mut().take()
+    }
+
     fn position(&mut self, line: u64, column: u64, byte_index: i64) {
         self.state.event_position.set((line, column, byte_index));
     }
@@ -728,15 +910,17 @@ impl Handler for Dispatch<'_> {
         let Some(h) = self.state.element_decl.get() else {
             return;
         };
-        let mut m = Model::new(model);
-        let root = m.nodes.as_mut_ptr();
-        // The boxed nodes do not move when the `Model` moves into the list.
-        self.state.models.borrow_mut().push(m);
+        let root = build_model(model, self.state.mem.get().malloc);
+        if root.is_null() {
+            // libexpat ends the parse with `XML_ERROR_NO_MEMORY`; the
+            // nearest this interface can do is to abort it.
+            let _ = self.state.stopper.stop(false);
+            return;
+        }
         let arg = self.state.handler_arg.get();
         // SAFETY: `h` is a handler the program set; the name is a
-        // NUL-terminated copy valid for the call; `root` points to the
-        // model, which stays valid until `XML_FreeContentModel` or
-        // `XML_ParserFree` (the list is not borrowed during the call).
+        // NUL-terminated copy valid for the call; `root` is a model the
+        // program now owns and frees with `XML_FreeContentModel`.
         self.with_str(Some(name), |n| unsafe { h(arg, n, root) });
     }
 
@@ -1036,31 +1220,78 @@ pub unsafe extern "C" fn XML_SetDoctypeDeclHandler(
 }
 
 /// `XML_FreeContentModel`: frees a model passed to the element
-/// declaration handler. Does nothing for a pointer this parser did not
-/// pass or already freed.
+/// declaration handler with the parser's free function.
 ///
 /// # Safety
 ///
-/// `parser` is `NULL` or a live handle; nothing uses `model` after the
-/// call.
+/// `parser` is `NULL` or a live handle; `model` is `NULL` or a model this
+/// parser passed and not yet freed; nothing uses it after the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XML_FreeContentModel(parser: XML_Parser, model: *mut XML_Content) {
     // SAFETY: forwarded from this function's contract.
     let Some(s) = (unsafe { state(parser) }) else {
         return;
     };
-    let mut models = s.models.borrow_mut();
-    if let Some(i) = models
-        .iter()
-        .position(|m| std::ptr::eq(m.nodes.as_ptr(), model))
-    {
-        models.swap_remove(i);
-    }
+    // SAFETY: `model` came from this parser's `malloc` (`build_model`).
+    unsafe { (s.mem.get().free)(model.cast()) };
+}
+
+/// `XML_MemMalloc`: memory from the parser's allocation functions, not
+/// counted towards its memory limit.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_MemMalloc(parser: XML_Parser, size: usize) -> *mut c_void {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return std::ptr::null_mut();
+    };
+    // SAFETY: the parser's `malloc` takes any size.
+    unsafe { (s.mem.get().malloc)(size) }
+}
+
+/// `XML_MemRealloc`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `ptr` is `NULL` or memory from
+/// this parser's allocation functions.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_MemRealloc(
+    parser: XML_Parser,
+    ptr: *mut c_void,
+    size: usize,
+) -> *mut c_void {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return std::ptr::null_mut();
+    };
+    // SAFETY: forwarded from this function's contract.
+    unsafe { (s.mem.get().realloc)(ptr, size) }
+}
+
+/// `XML_MemFree`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `ptr` is `NULL` or memory from
+/// this parser's allocation functions, not used after the call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_MemFree(parser: XML_Parser, ptr: *mut c_void) {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return;
+    };
+    // SAFETY: forwarded from this function's contract.
+    unsafe { (s.mem.get().free)(ptr) }
 }
 
 /// `XML_SetBase`: the base passed to the declaration handlers from now
-/// on, or none for `NULL`. `XML_STATUS_ERROR` for a `NULL` parser, when
-/// the parser's memory runs out, or from inside a handler.
+/// on, or none for `NULL`. `XML_STATUS_ERROR` for a `NULL` parser or when
+/// the parser's memory runs out. From inside a handler the parser takes
+/// the base before it next uses it.
 ///
 /// # Safety
 ///
@@ -1075,12 +1306,12 @@ pub unsafe extern "C" fn XML_SetBase(parser: XML_Parser, base: *const XML_Char) 
     // SAFETY: forwarded from this function's contract.
     let bytes = unsafe { c_bytes(base) };
     match s.with_parser(|p| p.set_base(bytes)) {
-        Some(Ok(())) => {
-            *s.base.borrow_mut() = bytes.and_then(|b| CString::new(b).ok());
-            XML_STATUS_OK
-        }
-        _ => XML_STATUS_ERROR,
+        Some(Err(_)) => return XML_STATUS_ERROR,
+        Some(Ok(())) => {}
+        None => *s.pending_base.borrow_mut() = Some(bytes.map(<[u8]>::to_vec)),
     }
+    *s.base.borrow_mut() = bytes.and_then(|b| CString::new(b).ok());
+    XML_STATUS_OK
 }
 
 /// `XML_GetBase`: the base set with `XML_SetBase`, or `NULL`. The string
@@ -1549,3 +1780,687 @@ pub extern "C" fn XML_ExpatVersionInfo() -> XML_Expat_Version {
 
 #[cfg(test)]
 mod tests;
+
+/// `enum XML_Prop_Error`.
+pub type XML_Prop_Error = c_int;
+/// `XML_PROP_ERROR_NONE`.
+pub const XML_PROP_ERROR_NONE: XML_Prop_Error = 0;
+/// `XML_PROP_ERROR_INVALID_KEY`.
+pub const XML_PROP_ERROR_INVALID_KEY: XML_Prop_Error = 1;
+/// `XML_PROP_ERROR_INVALID_TYPE`.
+pub const XML_PROP_ERROR_INVALID_TYPE: XML_Prop_Error = 2;
+/// `XML_PROP_ERROR_INVALID_VALUE`.
+pub const XML_PROP_ERROR_INVALID_VALUE: XML_Prop_Error = 3;
+/// `XML_PROP_ERROR_PARSER_NULL`.
+pub const XML_PROP_ERROR_PARSER_NULL: XML_Prop_Error = 4;
+
+/// `enum XML_Parser_Property`.
+pub type XML_Parser_Property = c_int;
+/// `XML_PROP_ALLOC_TRACKER_ACTIVATION_THRESHOLD` (`uint64_t`).
+pub const XML_PROP_ALLOC_TRACKER_ACTIVATION_THRESHOLD: XML_Parser_Property = 1;
+/// `XML_PROP_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION` (`double`).
+pub const XML_PROP_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION: XML_Parser_Property = 2;
+/// `XML_PROP_BILLION_LAUGHS_ACTIVATION_THRESHOLD` (`uint64_t`).
+pub const XML_PROP_BILLION_LAUGHS_ACTIVATION_THRESHOLD: XML_Parser_Property = 3;
+/// `XML_PROP_BILLION_LAUGHS_MAXIMUM_AMPLIFICATION` (`double`).
+pub const XML_PROP_BILLION_LAUGHS_MAXIMUM_AMPLIFICATION: XML_Parser_Property = 4;
+/// `XML_PROP_REPARSE_DEFERRAL_ENABLED` (`XML_Bool`).
+pub const XML_PROP_REPARSE_DEFERRAL_ENABLED: XML_Parser_Property = 5;
+
+/// The type a property has, if it is known.
+fn property_type(property: XML_Parser_Property) -> Option<u8> {
+    match property {
+        XML_PROP_ALLOC_TRACKER_ACTIVATION_THRESHOLD
+        | XML_PROP_BILLION_LAUGHS_ACTIVATION_THRESHOLD => Some(b'u'),
+        XML_PROP_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION
+        | XML_PROP_BILLION_LAUGHS_MAXIMUM_AMPLIFICATION => Some(b'd'),
+        XML_PROP_REPARSE_DEFERRAL_ENABLED => Some(b'b'),
+        _ => None,
+    }
+}
+
+/// `XML_INVALID_KEY` or `XML_INVALID_TYPE` for a property that is not of
+/// type `want`, or `None` when it is.
+fn property_check(property: XML_Parser_Property, want: u8) -> Option<XML_Prop_Error> {
+    match property_type(property) {
+        None => Some(XML_PROP_ERROR_INVALID_KEY),
+        Some(t) if t != want => Some(XML_PROP_ERROR_INVALID_TYPE),
+        Some(_) => None,
+    }
+}
+
+/// `XML_SetPropertyBool`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetPropertyBool(
+    parser: XML_Parser,
+    property: XML_Parser_Property,
+    value: XML_Bool,
+) -> XML_Prop_Error {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return XML_PROP_ERROR_PARSER_NULL;
+    };
+    if let Some(e) = property_check(property, b'b') {
+        return e;
+    }
+    s.set_reparse(value)
+}
+
+/// `XML_SetPropertyDouble`: the value is converted to `float`, as in
+/// libexpat.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetPropertyDouble(
+    parser: XML_Parser,
+    property: XML_Parser_Property,
+    value: f64,
+) -> XML_Prop_Error {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return XML_PROP_ERROR_PARSER_NULL;
+    };
+    if let Some(e) = property_check(property, b'd') {
+        return e;
+    }
+    // reason: C's `(float)value`.
+    #[allow(clippy::cast_possible_truncation)]
+    let f = value as f32;
+    if property == XML_PROP_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION {
+        s.set_at_maximum(f)
+    } else {
+        s.set_bl_maximum(f)
+    }
+}
+
+/// `XML_SetPropertyUInt64`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetPropertyUInt64(
+    parser: XML_Parser,
+    property: XML_Parser_Property,
+    value: u64,
+) -> XML_Prop_Error {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return XML_PROP_ERROR_PARSER_NULL;
+    };
+    if let Some(e) = property_check(property, b'u') {
+        return e;
+    }
+    if property == XML_PROP_ALLOC_TRACKER_ACTIVATION_THRESHOLD {
+        s.set_at_threshold(value)
+    } else {
+        s.set_bl_threshold(value)
+    }
+}
+
+/// `XML_GetPropertyBool`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `value` is `NULL` or writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetPropertyBool(
+    parser: XML_Parser,
+    property: XML_Parser_Property,
+    value: *mut XML_Bool,
+) -> XML_Prop_Error {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return XML_PROP_ERROR_PARSER_NULL;
+    };
+    if value.is_null() {
+        return XML_PROP_ERROR_INVALID_VALUE;
+    }
+    if let Some(e) = property_check(property, b'b') {
+        return e;
+    }
+    // SAFETY: `value` is non-NULL and writable by the caller's contract.
+    unsafe { value.write(XML_Bool::from(s.reparse_deferral.get())) };
+    XML_PROP_ERROR_NONE
+}
+
+/// `XML_GetPropertyDouble`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `value` is `NULL` or writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetPropertyDouble(
+    parser: XML_Parser,
+    property: XML_Parser_Property,
+    value: *mut f64,
+) -> XML_Prop_Error {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return XML_PROP_ERROR_PARSER_NULL;
+    };
+    if value.is_null() {
+        return XML_PROP_ERROR_INVALID_VALUE;
+    }
+    if let Some(e) = property_check(property, b'd') {
+        return e;
+    }
+    let f = if property == XML_PROP_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION {
+        s.at_maximum.get()
+    } else {
+        s.bl_maximum.get()
+    };
+    // SAFETY: `value` is non-NULL and writable by the caller's contract.
+    unsafe { value.write(f64::from(f)) };
+    XML_PROP_ERROR_NONE
+}
+
+/// `XML_GetPropertyUInt64`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `value` is `NULL` or writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetPropertyUInt64(
+    parser: XML_Parser,
+    property: XML_Parser_Property,
+    value: *mut u64,
+) -> XML_Prop_Error {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return XML_PROP_ERROR_PARSER_NULL;
+    };
+    if value.is_null() {
+        return XML_PROP_ERROR_INVALID_VALUE;
+    }
+    if let Some(e) = property_check(property, b'u') {
+        return e;
+    }
+    let v = if property == XML_PROP_ALLOC_TRACKER_ACTIVATION_THRESHOLD {
+        s.at_threshold.get()
+    } else {
+        s.bl_threshold.get()
+    };
+    // SAFETY: `value` is non-NULL and writable by the caller's contract.
+    unsafe { value.write(v) };
+    XML_PROP_ERROR_NONE
+}
+
+/// `XML_SetBillionLaughsAttackProtectionMaximumAmplification`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetBillionLaughsAttackProtectionMaximumAmplification(
+    parser: XML_Parser,
+    factor: f32,
+) -> XML_Bool {
+    // SAFETY: forwarded from this function's contract.
+    unsafe { state(parser) }.map_or(0, |s| {
+        XML_Bool::from(s.set_bl_maximum(factor) == XML_PROP_ERROR_NONE)
+    })
+}
+
+/// `XML_SetBillionLaughsAttackProtectionActivationThreshold`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetBillionLaughsAttackProtectionActivationThreshold(
+    parser: XML_Parser,
+    bytes: u64,
+) -> XML_Bool {
+    // SAFETY: forwarded from this function's contract.
+    unsafe { state(parser) }.map_or(0, |s| {
+        XML_Bool::from(s.set_bl_threshold(bytes) == XML_PROP_ERROR_NONE)
+    })
+}
+
+/// `XML_SetAllocTrackerMaximumAmplification`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetAllocTrackerMaximumAmplification(
+    parser: XML_Parser,
+    factor: f32,
+) -> XML_Bool {
+    // SAFETY: forwarded from this function's contract.
+    unsafe { state(parser) }.map_or(0, |s| {
+        XML_Bool::from(s.set_at_maximum(factor) == XML_PROP_ERROR_NONE)
+    })
+}
+
+/// `XML_SetAllocTrackerActivationThreshold`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetAllocTrackerActivationThreshold(
+    parser: XML_Parser,
+    bytes: u64,
+) -> XML_Bool {
+    // SAFETY: forwarded from this function's contract.
+    unsafe { state(parser) }.map_or(0, |s| {
+        XML_Bool::from(s.set_at_threshold(bytes) == XML_PROP_ERROR_NONE)
+    })
+}
+
+/// `XML_SetReparseDeferralEnabled`: `XML_FALSE` for a value other than
+/// `XML_TRUE` or `XML_FALSE`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetReparseDeferralEnabled(
+    parser: XML_Parser,
+    enabled: XML_Bool,
+) -> XML_Bool {
+    // SAFETY: forwarded from this function's contract.
+    unsafe { state(parser) }.map_or(0, |s| {
+        XML_Bool::from(s.set_reparse(enabled) == XML_PROP_ERROR_NONE)
+    })
+}
+
+/// `XML_SetHashSalt`: the salt `{0, hash_salt}`; 0 leaves the salt to be
+/// chosen at random unless one was set before, as in libexpat. 0 while
+/// the parser is busy.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetHashSalt(parser: XML_Parser, hash_salt: c_ulong) -> c_int {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return 0;
+    };
+    if s.parser_busy() {
+        return 0;
+    }
+    if hash_salt != 0 {
+        s.salt_set.set(true);
+    }
+    if s.salt_set.get() {
+        let mut key = [0; 16];
+        // reason: `unsigned long` is 32 bits on some targets.
+        #[allow(clippy::useless_conversion)]
+        let k1 = u64::from(hash_salt);
+        key[8..].copy_from_slice(&k1.to_le_bytes());
+        let _ = s.with_parser(|p| p.set_salt(key));
+    }
+    1
+}
+
+/// `XML_SetHashSalt16Bytes`. `XML_FALSE` for `NULL` entropy or while the
+/// parser is busy.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `entropy` is `NULL` or points to
+/// 16 readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetHashSalt16Bytes(
+    parser: XML_Parser,
+    entropy: *const u8,
+) -> XML_Bool {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return 0;
+    };
+    if entropy.is_null() || s.parser_busy() {
+        return 0;
+    }
+    let mut key = [0; 16];
+    // SAFETY: `entropy` points to 16 readable bytes by the caller's
+    // contract.
+    key.copy_from_slice(unsafe { std::slice::from_raw_parts(entropy, 16) });
+    s.salt_set.set(true);
+    let _ = s.with_parser(|p| p.set_salt(key));
+    1
+}
+
+/// `XML_SetEncoding`: the encoding to read the document in, overriding
+/// its declaration, or none for `NULL`. `XML_STATUS_ERROR` while the
+/// parser is busy or when the copy of the name fails.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `encoding` is `NULL` or a
+/// NUL-terminated string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetEncoding(
+    parser: XML_Parser,
+    encoding: *const XML_Char,
+) -> XML_Status {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return XML_STATUS_ERROR;
+    };
+    if s.parser_busy() {
+        return XML_STATUS_ERROR;
+    }
+    // SAFETY: forwarded from this function's contract.
+    let name = unsafe { c_bytes(encoding) };
+    match s.with_parser(|p| p.set_encoding(name)) {
+        Some(false) => XML_STATUS_ERROR,
+        _ => XML_STATUS_OK,
+    }
+}
+
+/// `XML_SetReturnNSTriplet`. No effect while the parser is busy.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetReturnNSTriplet(parser: XML_Parser, do_nst: c_int) {
+    // SAFETY: forwarded from this function's contract.
+    if let Some(s) = unsafe { state(parser) } {
+        let _ = s.with_parser(|p| p.set_return_ns_triplet(do_nst != 0));
+    }
+}
+
+/// `XML_UseForeignDTD`: `XML_ERROR_CANT_CHANGE_FEATURE_ONCE_PARSING`
+/// while the parser is busy, `XML_ERROR_INVALID_ARGUMENT` for `NULL`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_UseForeignDTD(parser: XML_Parser, use_dtd: XML_Bool) -> XML_Error {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return error(ErrorCode::InvalidArgument);
+    };
+    if s.parser_busy() {
+        return error(ErrorCode::CantChangeFeatureOnceParsing);
+    }
+    match s.with_parser(|p| p.use_foreign_dtd(use_dtd != 0)) {
+        Some(Err(e)) => error(e),
+        _ => XML_ERROR_NONE,
+    }
+}
+
+/// `enum XML_ParamEntityParsing`.
+pub type XML_ParamEntityParsing = c_int;
+
+/// `XML_SetParamEntityParsing`: 0 while the parser is busy.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetParamEntityParsing(
+    parser: XML_Parser,
+    parsing: XML_ParamEntityParsing,
+) -> c_int {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return 0;
+    };
+    if s.parser_busy() {
+        return 0;
+    }
+    // libexpat stores any value; a value outside the enumeration behaves
+    // as a non-zero mode other than `XML_PARAM_ENTITY_PARSING_UNLESS_STANDALONE`.
+    let mode = match parsing {
+        0 => ParamEntityParsing::Never,
+        1 => ParamEntityParsing::UnlessStandalone,
+        _ => ParamEntityParsing::Always,
+    };
+    let _ = s.with_parser(|p| p.set_param_entity_parsing(mode));
+    1
+}
+
+/// `XML_ParsingStatus`.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XML_ParsingStatus {
+    /// `parsing` (`enum XML_Parsing`: `XML_INITIALIZED` 0,
+    /// `XML_PARSING` 1, `XML_FINISHED` 2, `XML_SUSPENDED` 3).
+    pub parsing: c_int,
+    /// `finalBuffer`
+    pub finalBuffer: XML_Bool,
+}
+
+/// `XML_GetParsingStatus`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `status` is `NULL` or writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetParsingStatus(parser: XML_Parser, status: *mut XML_ParsingStatus) {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return;
+    };
+    if status.is_null() {
+        return;
+    }
+    let parsing = match s.stopper.parsing_status() {
+        ParsingStatus::Initialized => 0,
+        ParsingStatus::Parsing => 1,
+        ParsingStatus::Finished => 2,
+        ParsingStatus::Suspended => 3,
+    };
+    // SAFETY: `status` is non-NULL and writable by the caller's contract.
+    unsafe {
+        status.write(XML_ParsingStatus {
+            parsing,
+            finalBuffer: XML_Bool::from(s.stopper.is_final_buffer()),
+        });
+    }
+}
+
+/// `XML_ParserReset`: the parser as `XML_ParserCreate(encoding)` (or
+/// `XML_ParserCreateNS`) leaves it, keeping what libexpat keeps (the
+/// namespace setting, `XML_SetReturnNSTriplet`, the amplification limits
+/// and the allocation functions). `XML_FALSE` for `NULL` or from inside a
+/// handler. Content models already passed stay the program's.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `encoding` is `NULL` or a
+/// NUL-terminated string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_ParserReset(
+    parser: XML_Parser,
+    encoding: *const XML_Char,
+) -> XML_Bool {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return 0;
+    };
+    // SAFETY: forwarded from this function's contract.
+    let name = unsafe { c_bytes(encoding) };
+    if s.with_parser(|p| p.reset(name, salt())).is_none() {
+        return 0;
+    }
+    s.user_data.set(std::ptr::null_mut());
+    s.handler_arg.set(std::ptr::null_mut());
+    s.error_code.set(XML_ERROR_NONE);
+    s.specified.set(0);
+    s.event_position.set((0, 0, -1));
+    s.start_element.set(None);
+    s.end_element.set(None);
+    s.character_data.set(None);
+    s.processing_instruction.set(None);
+    s.comment.set(None);
+    s.start_cdata_section.set(None);
+    s.end_cdata_section.set(None);
+    s.start_namespace_decl.set(None);
+    s.end_namespace_decl.set(None);
+    s.default.set(None);
+    s.xml_decl.set(None);
+    s.start_doctype_decl.set(None);
+    s.end_doctype_decl.set(None);
+    s.entity_decl.set(None);
+    s.unparsed_entity_decl.set(None);
+    s.notation_decl.set(None);
+    s.element_decl.set(None);
+    s.attlist_decl.set(None);
+    s.skipped_entity.set(None);
+    *s.base.borrow_mut() = None;
+    *s.pending_base.borrow_mut() = None;
+    s.default_expand.set(true);
+    {
+        let mut current = s.current.borrow_mut();
+        current.0.clear();
+        current.1.clear();
+    }
+    s.salt_set.set(false);
+    s.reparse_deferral.set(true);
+    1
+}
+
+/// `XML_ParserCreate_MM`: a parser whose memory handed to the program
+/// (content models, `XML_MemMalloc`, `XML_MemRealloc`, `XML_MemFree`)
+/// comes from `memsuite` (the C library's functions for `NULL`), with
+/// namespace processing when `namespace_separator` is not `NULL`. The
+/// parser's own memory comes from the Rust allocator. `NULL` when a
+/// suite lacks one of its functions.
+///
+/// # Safety
+///
+/// `encoding` and `namespace_separator` are `NULL` or NUL-terminated
+/// strings; `memsuite` is `NULL` or points to a suite whose functions
+/// behave as `malloc`, `realloc` and `free` do.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_ParserCreate_MM(
+    encoding: *const XML_Char,
+    memsuite: *const XML_Memory_Handling_Suite,
+    namespace_separator: *const XML_Char,
+) -> XML_Parser {
+    let mem = if memsuite.is_null() {
+        Mem::default()
+    } else {
+        // SAFETY: `memsuite` is non-NULL and readable by the caller's
+        // contract.
+        let m = unsafe { *memsuite };
+        match (m.malloc_fcn, m.realloc_fcn, m.free_fcn) {
+            (Some(malloc), Some(realloc), Some(free)) => Mem {
+                malloc,
+                realloc,
+                free,
+            },
+            _ => return std::ptr::null_mut(),
+        }
+    };
+    let mut options = Options::new();
+    if !namespace_separator.is_null() {
+        // SAFETY: non-NULL, so it points to at least its first character.
+        let sep = unsafe { *namespace_separator };
+        options = options.namespace_separator(sep.to_ne_bytes()[0]);
+    }
+    // SAFETY: forwarded from this function's contract.
+    if let Some(name) = unsafe { c_bytes(encoding) } {
+        options = options.encoding(name);
+    }
+    let p = create(options);
+    // SAFETY: `p` was just created and is live.
+    if let Some(s) = unsafe { state(p) } {
+        s.mem.set(mem);
+    }
+    p
+}
+
+/// `XML_FeatureEnum`.
+pub type XML_FeatureEnum = c_int;
+
+/// `XML_Feature`.
+#[repr(C)]
+#[derive(Debug)]
+pub struct XML_Feature {
+    /// `feature`
+    pub feature: XML_FeatureEnum,
+    /// `name`
+    pub name: *const XML_Char,
+    /// `value`
+    pub value: c_long,
+}
+
+/// The feature list, in a static of its own so that the pointers to the
+/// names can be shared between threads.
+struct Features([XML_Feature; 11]);
+
+// SAFETY: the list is never written, and the names it points to are
+// static string literals.
+unsafe impl Sync for Features {}
+
+static FEATURES: Features = Features([
+    XML_Feature {
+        feature: 6,
+        name: c"sizeof(XML_Char)".as_ptr(),
+        value: 1,
+    },
+    XML_Feature {
+        feature: 7,
+        name: c"sizeof(XML_LChar)".as_ptr(),
+        value: 1,
+    },
+    XML_Feature {
+        feature: 3,
+        name: c"XML_DTD".as_ptr(),
+        value: 0,
+    },
+    XML_Feature {
+        feature: 4,
+        name: c"XML_CONTEXT_BYTES".as_ptr(),
+        value: 1024,
+    },
+    XML_Feature {
+        feature: 8,
+        name: c"XML_NS".as_ptr(),
+        value: 0,
+    },
+    XML_Feature {
+        feature: 11,
+        name: c"XML_BLAP_MAX_AMP".as_ptr(),
+        value: 100,
+    },
+    XML_Feature {
+        feature: 12,
+        name: c"XML_BLAP_ACT_THRES".as_ptr(),
+        value: 8_388_608,
+    },
+    XML_Feature {
+        feature: 13,
+        name: c"XML_GE".as_ptr(),
+        value: 0,
+    },
+    XML_Feature {
+        feature: 14,
+        name: c"XML_AT_MAX_AMP".as_ptr(),
+        value: 100,
+    },
+    XML_Feature {
+        feature: 15,
+        name: c"XML_AT_ACT_THRES".as_ptr(),
+        value: 67_108_864,
+    },
+    XML_Feature {
+        feature: 0,
+        name: std::ptr::null(),
+        value: 0,
+    },
+]);
+
+/// `XML_GetFeatureList`: the features of libexpat 2.10.0 built with
+/// `XML_DTD`, `XML_NS`, `XML_GE` and `XML_CONTEXT_BYTES` 1024, ending with
+/// `XML_FEATURE_END`.
+#[unsafe(no_mangle)]
+pub extern "C" fn XML_GetFeatureList() -> *const XML_Feature {
+    FEATURES.0.as_ptr()
+}

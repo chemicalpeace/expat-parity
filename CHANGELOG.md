@@ -37,10 +37,17 @@ All notable changes are documented here. The format follows
   (`Handler::xml_decl`, `start_doctype_decl`, `end_doctype_decl`,
   `entity_decl`, `unparsed_entity_decl`, `notation_decl`, `element_decl`,
   `attlist_decl`, `skipped_entity`, the matching `Events` flags,
-  `ContentModel` and its parts) and `Parser::set_base` / `base` (D-053).
+  `ContentModel` and its parts) and `Parser::set_base` / `base` (D-053),
+  the parser settings (`set_salt`, `set_encoding`,
+  `set_return_ns_triplet`, `use_foreign_dtd`, `set_param_entity_parsing`
+  with `ParamEntityParsing`, the billion laughs and allocation tracker
+  limits, `set_reparse_deferral_enabled`, with their getters),
+  `parsing_status` with `ParsingStatus`, `is_final_buffer`, `reset`,
+  the same limits and status on `Stopper` for use inside handlers, and
+  `Handler::take_base` (D-054).
 - `crates/expat-capi` (not published): a first part of libexpat's C
   interface over the crate, compared with libexpat by
-  `scripts/capi-check.sh` (D-047 to D-053).
+  `scripts/capi-check.sh` (D-047 to D-054).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.

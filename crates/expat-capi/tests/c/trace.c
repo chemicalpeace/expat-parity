@@ -19,11 +19,26 @@
  * data handlers and positions (unparsed entities then reach the entity
  * declaration handler), 10 with every handler, the default handler and a
  * base set with XML_SetBase, 11 with the default handler expanded and
- * XML_DefaultCurrent called from each handler. */
+ * XML_DefaultCurrent called from each handler. Handler sets 12 to 17
+ * change the parser's settings: 12 and 13 the declaration handlers with
+ * parameter entity parsing always (and a foreign DTD) or unless
+ * standalone, 14 every handler with namespace triplets and the encoding
+ * set to ISO-8859-1, 15 the declaration handlers with a new base set and
+ * the parsing status printed at every event, 16 and 17 every handler with
+ * the billion laughs or the allocation tracker limits lowered from the
+ * first handler. reset_run() parses each document again after
+ * XML_ParserReset, and settings_edge() checks the setting functions,
+ * the properties, the feature list and the memory functions. */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* The property enumeration lists the limits only for XML_GE == 1, the
+ * configuration of the vendored build. */
+#ifndef XML_GE
+#  define XML_GE 1
+#endif
 #include "expat.h"
 
 static XML_Parser g_parser;
@@ -38,6 +53,14 @@ static long g_events;
  * so now. */
 static int g_current;
 static int g_in_current;
+/* Whether each handler sets a new base, prints the parsing status, or
+ * (the first time) lowers the billion laughs (1) or allocation tracker
+ * (2) limits. */
+static int g_rebase;
+static int g_rebase_n;
+static int g_status;
+static int g_limits;
+static void putz(const char *s);
 
 static void position(void);
 
@@ -54,6 +77,43 @@ static void where(void) {
     g_in_current = 1;
     XML_DefaultCurrent(g_parser);
     g_in_current = 0;
+  }
+  if (g_rebase) {
+    char b[32];
+    snprintf(b, sizeof b, "r%d/", ++g_rebase_n);
+    int st = (int)XML_SetBase(g_parser, b);
+    printf("   rebase status=%d ", st);
+    putz(XML_GetBase(g_parser));
+    putchar('\n');
+  }
+  if (g_status) {
+    XML_ParsingStatus ps;
+    XML_GetParsingStatus(g_parser, &ps);
+    printf("   status %d %d\n", (int)ps.parsing, (int)ps.finalBuffer);
+  }
+  if (g_limits) {
+    int a, b;
+    double d = 0;
+    unsigned long long u = 0;
+    if (g_limits == 1) {
+      a = XML_SetBillionLaughsAttackProtectionMaximumAmplification(g_parser,
+                                                                    1.0f);
+      b = XML_SetBillionLaughsAttackProtectionActivationThreshold(g_parser, 0);
+      XML_GetPropertyDouble(g_parser,
+                            XML_PROP_BILLION_LAUGHS_MAXIMUM_AMPLIFICATION, &d);
+      XML_GetPropertyUInt64(g_parser,
+                            XML_PROP_BILLION_LAUGHS_ACTIVATION_THRESHOLD,
+                            (uint64_t *)&u);
+    } else {
+      a = XML_SetAllocTrackerMaximumAmplification(g_parser, 1.0f);
+      b = XML_SetAllocTrackerActivationThreshold(g_parser, 0);
+      XML_GetPropertyDouble(g_parser,
+                            XML_PROP_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION, &d);
+      XML_GetPropertyUInt64(g_parser, XML_PROP_ALLOC_TRACKER_ACTIVATION_THRESHOLD,
+                            (uint64_t *)&u);
+    }
+    printf("   limits %d %d %g %llu\n", a, b, d, u);
+    g_limits = 0;
   }
   if (g_every && ++g_events % g_every == 0) {
     int st = XML_StopParser(g_parser, (XML_Bool)g_resumable);
@@ -329,14 +389,20 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
     printf(" stop=%d resumable=%d", every, resumable);
   putchar('\n');
   g_where = handlers == 2 || handlers == 3 || handlers == 5 || handlers == 8 ||
-            handlers == 9;
+            handlers == 9 || handlers == 12 || handlers == 13 ||
+            handlers == 15 || handlers == 16 || handlers == 17;
+  g_rebase = handlers == 15;
+  g_rebase_n = 0;
+  g_status = handlers == 15;
+  g_limits = handlers == 16 ? 1 : handlers == 17 ? 2 : 0;
   g_current = handlers == 7 || handlers == 8 || handlers == 11;
   g_every = every;
   g_resumable = resumable;
   g_events = 0;
   g_parser = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
   if (handlers == 1 || handlers == 2 || handlers == 4 || handlers == 6 ||
-      handlers == 7 || handlers == 8 || handlers == 10 || handlers == 11) {
+      handlers == 7 || handlers == 8 || handlers == 10 || handlers == 11 ||
+      handlers == 14 || handlers == 16 || handlers == 17) {
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCharacterDataHandler(g_parser, on_chars);
     XML_SetProcessingInstructionHandler(g_parser, on_pi);
@@ -348,12 +414,24 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCommentHandler(g_parser, on_comment);
   }
-  if (handlers == 9) {
+  if (handlers == 9 || handlers == 12 || handlers == 13 || handlers == 15) {
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCharacterDataHandler(g_parser, on_chars);
   }
   if (handlers >= 9)
     set_decl_handlers(handlers != 9);
+  if (handlers == 12 || handlers == 13) {
+    int pe = XML_SetParamEntityParsing(
+        g_parser, handlers == 12 ? XML_PARAM_ENTITY_PARSING_ALWAYS
+                                 : XML_PARAM_ENTITY_PARSING_UNLESS_STANDALONE);
+    int fd = (int)XML_UseForeignDTD(g_parser, handlers == 12);
+    printf(" settings pe=%d foreign=%d\n", pe, fd);
+  }
+  if (handlers == 14) {
+    XML_SetReturnNSTriplet(g_parser, 1);
+    printf(" settings encoding=%d\n",
+           (int)XML_SetEncoding(g_parser, "ISO-8859-1"));
+  }
   if (handlers == 10) {
     enum XML_Status bs = XML_SetBase(g_parser, "http://example.org/b/");
     printf(" base status=%d ", (int)bs);
@@ -550,11 +628,215 @@ static void base_edge(void) {
   XML_ParserFree(g_parser);
 }
 
+/* Parses the document, resets the parser and parses it again. */
+static void reset_run(const char *doc, long len, int ns) {
+  printf(" config reset ns=%d\n", ns);
+  g_where = 1;
+  g_current = g_rebase = g_status = g_limits = g_every = 0;
+  g_parser = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
+  XML_SetReturnNSTriplet(g_parser, 1);
+  XML_SetBillionLaughsAttackProtectionMaximumAmplification(g_parser, 50.0f);
+  XML_SetReparseDeferralEnabled(g_parser, XML_FALSE);
+  XML_SetBase(g_parser, "before/");
+  for (int round = 0; round < 2; round++) {
+    XML_SetElementHandler(g_parser, on_start, on_end);
+    XML_SetCharacterDataHandler(g_parser, on_chars);
+    XML_SetNamespaceDeclHandler(g_parser, on_ns_start, on_ns_end);
+    set_decl_handlers(1);
+    enum XML_Status st = XML_Parse(g_parser, doc, (int)len, 1);
+    printf(" call status=%d error=%d", (int)st, (int)XML_GetErrorCode(g_parser));
+    position();
+    XML_Bool r = XML_ParserReset(g_parser, round ? "UTF-8" : NULL);
+    double d = 0;
+    XML_Bool defer = 9;
+    XML_GetPropertyDouble(g_parser, XML_PROP_BILLION_LAUGHS_MAXIMUM_AMPLIFICATION,
+                          &d);
+    XML_GetPropertyBool(g_parser, XML_PROP_REPARSE_DEFERRAL_ENABLED, &defer);
+    XML_ParsingStatus ps;
+    XML_GetParsingStatus(g_parser, &ps);
+    printf(" reset %d error=%d status=%d %d max=%g defer=%d base=", (int)r,
+           (int)XML_GetErrorCode(g_parser), (int)ps.parsing,
+           (int)ps.finalBuffer, d, (int)defer);
+    putz(XML_GetBase(g_parser));
+    putchar(' ');
+    position();
+  }
+  XML_ParserFree(g_parser);
+}
+
+static void XMLCALL on_start_settings(void *ud, const XML_Char *name,
+                                      const XML_Char **atts) {
+  (void)ud;
+  (void)name;
+  (void)atts;
+  printf(" inside salt=%d salt16=%d encoding=%d foreign=%d pe=%d reset=%d\n",
+         XML_SetHashSalt(g_parser, 5),
+         (int)XML_SetHashSalt16Bytes(g_parser, (const uint8_t *)"0123456789abcdef"),
+         (int)XML_SetEncoding(g_parser, "UTF-8"),
+         (int)XML_UseForeignDTD(g_parser, XML_TRUE),
+         XML_SetParamEntityParsing(g_parser, XML_PARAM_ENTITY_PARSING_ALWAYS),
+         (int)XML_ParserReset(g_parser, NULL));
+}
+
+static int g_mallocs;
+static void *XMLCALL count_malloc(size_t n) {
+  g_mallocs++;
+  return malloc(n);
+}
+static void *XMLCALL count_realloc(void *p, size_t n) { return realloc(p, n); }
+static void XMLCALL count_free(void *p) { free(p); }
+
+static void XMLCALL on_element_keep(void *ud, const XML_Char *n,
+                                    XML_Content *m) {
+  (void)ud;
+  int before = g_mallocs;
+  printf(" model %s ", n);
+  model(m);
+  /* The content model came from the suite (one call before this one). */
+  printf(" free\n");
+  XML_MemFree(g_parser, m);
+  (void)before;
+}
+
+/* The setting functions, the properties, the feature list and the memory
+ * functions. */
+static void settings_edge(void) {
+  g_where = g_current = g_rebase = g_status = g_limits = g_every = 0;
+  const XML_Feature *f = XML_GetFeatureList();
+  for (; f->feature != XML_FEATURE_END; f++)
+    printf("edge feature %d %s %ld\n", (int)f->feature, f->name, f->value);
+  printf("edge feature-end %d\n", (int)f->feature);
+
+  g_parser = XML_ParserCreate(NULL);
+  XML_Bool b = 7;
+  double d = -1;
+  uint64_t u = 1;
+  for (int k = 0; k <= 6; k++) {
+    printf("edge prop %d getb=%d getd=%d getu=%d", k,
+           (int)XML_GetPropertyBool(g_parser, (enum XML_Parser_Property)k, &b),
+           (int)XML_GetPropertyDouble(g_parser, (enum XML_Parser_Property)k, &d),
+           (int)XML_GetPropertyUInt64(g_parser, (enum XML_Parser_Property)k, &u));
+    printf(" values %d %g %llu", (int)b, d, (unsigned long long)u);
+    printf(" setb=%d setd=%d setu=%d",
+           (int)XML_SetPropertyBool(g_parser, (enum XML_Parser_Property)k, XML_TRUE),
+           (int)XML_SetPropertyDouble(g_parser, (enum XML_Parser_Property)k, 3.5),
+           (int)XML_SetPropertyUInt64(g_parser, (enum XML_Parser_Property)k, 77));
+    printf(" null=%d nullp=%d\n",
+           (int)XML_GetPropertyBool(g_parser, (enum XML_Parser_Property)k, NULL),
+           (int)XML_SetPropertyBool(NULL, (enum XML_Parser_Property)k, XML_TRUE));
+  }
+  printf("edge prop-bad setb2=%d setd-nan=%d setd-small=%d setd-1=%d\n",
+         (int)XML_SetPropertyBool(g_parser, XML_PROP_REPARSE_DEFERRAL_ENABLED, 2),
+         (int)XML_SetPropertyDouble(g_parser,
+                                    XML_PROP_BILLION_LAUGHS_MAXIMUM_AMPLIFICATION,
+                                    0.0 / 0.0),
+         (int)XML_SetPropertyDouble(g_parser,
+                                    XML_PROP_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION,
+                                    0.99),
+         (int)XML_SetPropertyDouble(g_parser,
+                                    XML_PROP_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION,
+                                    1.0));
+  XML_GetPropertyDouble(g_parser, XML_PROP_ALLOC_TRACKER_MAXIMUM_AMPLIFICATION,
+                        &d);
+  XML_GetPropertyUInt64(g_parser, XML_PROP_ALLOC_TRACKER_ACTIVATION_THRESHOLD,
+                        &u);
+  printf("edge prop-after %g %llu\n", d, (unsigned long long)u);
+  /* Back to the defaults, so that the calls below can allocate. */
+  XML_SetAllocTrackerMaximumAmplification(g_parser, 100.0f);
+  XML_SetAllocTrackerActivationThreshold(g_parser, 67108864);
+  printf("edge set blmax-nan=%d blmax-small=%d atmax-small=%d defer2=%d "
+         "defer0=%d null=%d %d %d %d %d\n",
+         (int)XML_SetBillionLaughsAttackProtectionMaximumAmplification(
+             g_parser, 0.0f / 0.0f),
+         (int)XML_SetBillionLaughsAttackProtectionMaximumAmplification(g_parser,
+                                                                       0.5f),
+         (int)XML_SetAllocTrackerMaximumAmplification(g_parser, 0.5f),
+         (int)XML_SetReparseDeferralEnabled(g_parser, 2),
+         (int)XML_SetReparseDeferralEnabled(g_parser, XML_FALSE),
+         (int)XML_SetBillionLaughsAttackProtectionMaximumAmplification(NULL, 2.0f),
+         (int)XML_SetBillionLaughsAttackProtectionActivationThreshold(NULL, 2),
+         (int)XML_SetAllocTrackerMaximumAmplification(NULL, 2.0f),
+         (int)XML_SetAllocTrackerActivationThreshold(NULL, 2),
+         (int)XML_SetReparseDeferralEnabled(NULL, XML_TRUE));
+  XML_ParsingStatus ps = {9, 9};
+  XML_GetParsingStatus(g_parser, &ps);
+  printf("edge status-initial %d %d\n", (int)ps.parsing, (int)ps.finalBuffer);
+  printf("edge before salt=%d salt0=%d salt16=%d salt16-null=%d encoding=%d "
+         "encoding-null=%d foreign=%d pe=%d pe9=%d\n",
+         XML_SetHashSalt(g_parser, 42), XML_SetHashSalt(g_parser, 0),
+         (int)XML_SetHashSalt16Bytes(g_parser, (const uint8_t *)"0123456789abcdef"),
+         (int)XML_SetHashSalt16Bytes(g_parser, NULL),
+         (int)XML_SetEncoding(g_parser, "US-ASCII"),
+         (int)XML_SetEncoding(g_parser, NULL),
+         (int)XML_UseForeignDTD(g_parser, XML_FALSE),
+         XML_SetParamEntityParsing(g_parser, XML_PARAM_ENTITY_PARSING_NEVER),
+         XML_SetParamEntityParsing(g_parser, (enum XML_ParamEntityParsing)9));
+  printf("edge null salt=%d salt16=%d encoding=%d foreign=%d pe=%d reset=%d\n",
+         XML_SetHashSalt(NULL, 1),
+         (int)XML_SetHashSalt16Bytes(NULL, (const uint8_t *)"0123456789abcdef"),
+         (int)XML_SetEncoding(NULL, "UTF-8"), (int)XML_UseForeignDTD(NULL, 1),
+         XML_SetParamEntityParsing(NULL, XML_PARAM_ENTITY_PARSING_ALWAYS),
+         (int)XML_ParserReset(NULL, NULL));
+  XML_SetReturnNSTriplet(NULL, 1);
+  XML_GetParsingStatus(NULL, &ps);
+  status("partial", XML_Parse(g_parser, "<a>", 3, 0));
+  XML_GetParsingStatus(g_parser, &ps);
+  printf("edge status-partial %d %d\n", (int)ps.parsing, (int)ps.finalBuffer);
+  printf("edge busy salt=%d salt16=%d encoding=%d foreign=%d pe=%d\n",
+         XML_SetHashSalt(g_parser, 42),
+         (int)XML_SetHashSalt16Bytes(g_parser, (const uint8_t *)"0123456789abcdef"),
+         (int)XML_SetEncoding(g_parser, "US-ASCII"),
+         (int)XML_UseForeignDTD(g_parser, XML_TRUE),
+         XML_SetParamEntityParsing(g_parser, XML_PARAM_ENTITY_PARSING_ALWAYS));
+  XML_SetElementHandler(g_parser, on_start_settings, NULL);
+  status("inside", XML_Parse(g_parser, "<b/></a>", 8, 1));
+  XML_GetParsingStatus(g_parser, &ps);
+  printf("edge status-final %d %d\n", (int)ps.parsing, (int)ps.finalBuffer);
+  printf("edge finished salt=%d encoding=%d foreign=%d pe=%d\n",
+         XML_SetHashSalt(g_parser, 42),
+         (int)XML_SetEncoding(g_parser, "US-ASCII"),
+         (int)XML_UseForeignDTD(g_parser, XML_TRUE),
+         XML_SetParamEntityParsing(g_parser, XML_PARAM_ENTITY_PARSING_ALWAYS));
+  /* An encoding set before the first call is used, and kept by a reset
+   * only when passed again. */
+  printf("edge reset=%d encoding=%d\n", (int)XML_ParserReset(g_parser, NULL),
+         (int)XML_SetEncoding(g_parser, "US-ASCII"));
+  status("ascii", XML_Parse(g_parser, "<a>\xc3\xa9</a>", 9, 1));
+  printf("edge reset=%d\n", (int)XML_ParserReset(g_parser, "ISO-8859-1"));
+  XML_SetCharacterDataHandler(g_parser, on_chars);
+  status("latin1", XML_Parse(g_parser, "<a>\xe9</a>", 8, 1));
+  printf("edge reset=%d\n", (int)XML_ParserReset(g_parser, "no-such"));
+  status("unknown", XML_Parse(g_parser, "<a/>", 4, 1));
+  void *m = XML_MemMalloc(g_parser, 16);
+  m = XML_MemRealloc(g_parser, m, 32);
+  printf("edge mem %d %d %d\n", m != NULL, XML_MemMalloc(NULL, 1) == NULL,
+         XML_MemRealloc(NULL, m, 1) == NULL);
+  XML_MemFree(g_parser, m);
+  XML_MemFree(NULL, NULL);
+  XML_FreeContentModel(NULL, NULL);
+  XML_ParserFree(g_parser);
+
+  XML_Memory_Handling_Suite suite = {count_malloc, count_realloc, count_free};
+  g_parser = XML_ParserCreate_MM(NULL, &suite, "|");
+  XML_SetElementDeclHandler(g_parser, on_element_keep);
+  XML_SetStartNamespaceDeclHandler(g_parser, on_ns_start);
+  status("mm", XML_Parse(g_parser,
+                         "<!DOCTYPE p:a [<!ELEMENT p:a (b|c)*>]>"
+                         "<p:a xmlns:p='u'/>",
+                         56, 1));
+  printf("edge mm-malloc-used %d\n", g_mallocs > 0);
+  XML_ParserFree(g_parser);
+  g_parser = XML_ParserCreate_MM(NULL, NULL, NULL);
+  status("mm-default", XML_Parse(g_parser, "<p:a/>", 6, 1));
+  XML_ParserFree(g_parser);
+}
+
 int main(int argc, char **argv) {
   printf("version %s\n", XML_ExpatVersion());
   edge();
   base_edge();
   stop_edge();
+  settings_edge();
   for (int i = 1; i < argc; i++) {
     FILE *f = fopen(argv[i], "rb");
     if (! f) {
@@ -574,7 +856,7 @@ int main(int argc, char **argv) {
     static const long chunks[] = {0, 1, 7};
     for (int c = 0; c < 3; c++)
       for (int ns = 0; ns < 2; ns++)
-        for (int h = 0; h < 12; h++)
+        for (int h = 0; h < 18; h++)
           for (int b = 0; b < 2; b++)
             run(doc, len, chunks[c], ns, h, b, 0, 0);
     /* Stopped from the handlers: suspended at every event, at every third
@@ -589,6 +871,7 @@ int main(int argc, char **argv) {
     for (int ns = 0; ns < 2; ns++) {
       run(doc, len, 0, ns, 3, 0, 1, 1);
       run(doc, len, 0, ns, 9, 0, 1, 1);
+      reset_run(doc, len, ns);
     }
     free(doc);
   }

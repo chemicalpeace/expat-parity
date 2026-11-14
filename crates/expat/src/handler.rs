@@ -4,6 +4,7 @@
 //! [`Parser::parse_with`]: crate::Parser::parse_with
 
 use crate::parse::{self, ContentModel};
+use alloc::vec::Vec;
 
 /// Which of the [`Handler`] events a parser reports: the C handler
 /// pointers that are set (non-`NULL`).
@@ -606,6 +607,46 @@ pub trait Handler {
     /// # Ok::<(), expat::Error>(())
     /// ```
     fn event_text(&mut self, _pieces: &[&[u8]]) {}
+
+    /// A new base set from inside a handler (`XML_SetBase` during a
+    /// parse), asked for before the parser next uses the base: before
+    /// each event, each token of the document type declaration, and at
+    /// the end of each call. `Some(Some(base))` sets the base,
+    /// `Some(None)` clears it, `None` (the default) keeps it. As with
+    /// [`Parser::set_base`], the parser copies the base into its DTD's
+    /// string pool; a copy refused by the memory limit leaves the base as
+    /// it was.
+    ///
+    /// ```
+    /// use expat::{Events, Handler, Parser};
+    ///
+    /// #[derive(Default)]
+    /// struct Rebase(Option<Option<Vec<u8>>>, Vec<Option<Vec<u8>>>);
+    ///
+    /// impl Handler for Rebase {
+    ///     const EVENTS: Events = Events::NONE.notation_decl(true);
+    ///     fn notation_decl(&mut self, _name: &[u8], base: Option<&[u8]>, _system_id: Option<&[u8]>, _public_id: Option<&[u8]>) {
+    ///         self.1.push(base.map(<[u8]>::to_vec));
+    ///         self.0 = Some(Some(b"second/".to_vec()));
+    ///     }
+    ///     fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
+    ///         self.0.take()
+    ///     }
+    /// }
+    ///
+    /// let mut h = Rebase::default();
+    /// let mut p = Parser::new([7; 16]);
+    /// p.set_base(Some(b"first/")).map_err(|_| "no memory")?;
+    /// p.parse_with(&mut h, b"<!DOCTYPE d [<!NOTATION n SYSTEM 'a'><!NOTATION m SYSTEM 'b'>]><d/>", true)?;
+    /// assert_eq!(h.1, [Some(b"first/".to_vec()), Some(b"second/".to_vec())]);
+    /// assert_eq!(p.base(), Some(&b"second/"[..]));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// [`Parser::set_base`]: crate::Parser::set_base
+    fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
+        None
+    }
 }
 
 /// Passes the parser core's events to a public [`Handler`]. Only the
@@ -615,6 +656,9 @@ pub trait Handler {
 pub(crate) struct Adapter<'a, H: Handler>(pub(crate) &'a mut H);
 
 impl<H: Handler> parse::Handler for Adapter<'_, H> {
+    fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
+        self.0.take_base()
+    }
     fn event_position(&mut self, line: u64, column: u64, byte_index: i64) {
         self.0.position(line, column, byte_index);
     }
