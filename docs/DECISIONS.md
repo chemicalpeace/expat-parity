@@ -1589,3 +1589,58 @@ recorded in DIVERGENCES.md.
   handlers suspended at every event and the error cases of
   `XML_SetBase` and `XML_GetBase`: 541 documents x 160 runs (86560),
   output equal to libexpat. Unit tests cover the new `Events` flags.
+
+## D-054 Parser settings, reset and memory functions (module 13, slice 7) (2026-11-14)
+
+- **Decision.** The public `Parser` gets the settings libexpat has
+  (`set_salt`, `set_encoding`, `set_return_ns_triplet`,
+  `use_foreign_dtd`, `set_param_entity_parsing`, the billion laughs and
+  allocation tracker limits, `set_reparse_deferral_enabled`, each with a
+  getter), `parsing_status`, `is_final_buffer` and `reset`. The settings
+  libexpat refuses while a parse has started and not finished
+  (`parserBusy`) are refused in the same states; that includes the state
+  after an error.
+- **Settings from inside a handler.** A handler cannot borrow the
+  parser. The limits and reparse deferral are left on the shared control
+  (`Stopper::set_*`, atomics) and applied before the next token, before
+  each event and at the end of each call; the allocation tracker also
+  applies them before each allocation check, so they take effect where
+  libexpat's do. A base set from inside a handler is asked for with
+  `Handler::take_base` before the base is next used (each token of the
+  document type declaration, each event, the end of each call). The C
+  interface uses both for `XML_SetBase` and the limit setters called from
+  handlers, and keeps its own copy of each setting for the getters.
+- **Reset.** `Parser::reset` builds a new parser and keeps what
+  `XML_ParserReset` keeps: the namespace setting and separator,
+  `XML_SetReturnNSTriplet`, both kinds of limits, and the shared control,
+  so `Stopper` handles stay valid. The allocation tracker gains
+  `bytesAllocatedWhenLastReset`: the limit applies to what is counted
+  after the reset, as in C. The count after a reset can be higher than
+  C's, which reuses its buffers and tables.
+- **Memory handed to the program.** A content model is now one block
+  from the parser's `malloc` in libexpat's layout, so
+  `XML_FreeContentModel` and `XML_MemFree` both free it and the parser
+  no longer keeps it. `XML_ParserCreate_MM` uses the suite for this
+  memory and for `XML_MemMalloc`, `XML_MemRealloc` and `XML_MemFree`
+  only.
+- **C interface.** Adds `XML_ParserReset`, `XML_ParserCreate_MM`,
+  `XML_SetEncoding`, `XML_SetHashSalt`, `XML_SetHashSalt16Bytes`,
+  `XML_SetReturnNSTriplet`, `XML_UseForeignDTD`,
+  `XML_SetParamEntityParsing`, the four limit setters,
+  `XML_SetReparseDeferralEnabled`, the six property functions,
+  `XML_GetParsingStatus`, `XML_MemMalloc`, `XML_MemRealloc`,
+  `XML_MemFree` and `XML_GetFeatureList`, and `XML_SetBase` from inside a
+  handler. Still missing: external entities,
+  `XML_SetNotStandaloneHandler`, `XML_SetUnknownEncodingHandler`,
+  `XML_GetCurrentByteCount`, `XML_GetIdAttributeIndex`,
+  `XML_GetInputContext`.
+- **Verification.** `scripts/capi-check.sh` adds handler sets 12 to 17
+  (parameter entity parsing always with a foreign DTD, and unless
+  standalone; namespace triplets with an encoding set; a new base and the
+  parsing status at every event; the billion laughs and the allocation
+  tracker limits lowered from the first handler), a parse after
+  `XML_ParserReset` per document, and the error cases of the setters,
+  the properties, the feature list, the memory functions and
+  `XML_ParserCreate_MM`: 541 documents x 234 runs (126594), output equal
+  to libexpat. Doc examples cover `reset`, `set_encoding`,
+  `set_return_ns_triplet`, the limits and `Handler::take_base`.
