@@ -80,7 +80,7 @@ extern crate std;
 
 mod api;
 mod handler;
-pub use api::{Error, ErrorCode, Options, Parser};
+pub use api::{Error, ErrorCode, Options, Parser, Stopper};
 pub use handler::{Events, Handler};
 
 /// Declares an internal module that is private by default and public under
