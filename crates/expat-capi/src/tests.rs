@@ -186,6 +186,44 @@ fn events_reach_the_c_handlers() {
 }
 
 #[test]
+fn buffer_pieces_reach_the_c_handlers() {
+    // SAFETY: NULL selects the default encoding.
+    let p = unsafe { XML_ParserCreate(std::ptr::null()) };
+    let mut log = Log {
+        parser: p,
+        ..Log::default()
+    };
+    // SAFETY: `p` is live and `log` outlives the parse.
+    unsafe { XML_SetUserData(p, (&raw mut log).cast()) };
+    all_handlers(p);
+    let doc = b"<r><!--c-->text<![CDATA[x]]></r>";
+    for (i, piece) in doc.chunks(5).enumerate() {
+        let len = c_int::try_from(piece.len()).unwrap();
+        let last = c_int::from((i + 1) * 5 >= doc.len());
+        // SAFETY: `p` is live and not inside a handler.
+        let space = unsafe { XML_GetBuffer(p, len) }.cast::<u8>();
+        assert!(!space.is_null());
+        // SAFETY: the space holds `len` bytes until the next call on `p`.
+        unsafe { std::ptr::copy_nonoverlapping(piece.as_ptr(), space, piece.len()) };
+        // SAFETY: `p` is live.
+        assert_eq!(unsafe { XML_ParseBuffer(p, len, last) }, XML_STATUS_OK);
+    }
+    assert_eq!(log.lines.first().map(String::as_str), Some("start r [0]"));
+    assert_eq!(log.lines.last().map(String::as_str), Some("end r"));
+    // SAFETY: `p` is live; a NULL handle is accepted.
+    unsafe {
+        assert!(XML_GetBuffer(p, 1).is_null());
+        assert_eq!(XML_GetErrorCode(p), error(ErrorCode::Finished));
+        assert!(XML_GetBuffer(std::ptr::null_mut(), 1).is_null());
+        assert_eq!(
+            XML_ParseBuffer(std::ptr::null_mut(), 0, 1),
+            XML_STATUS_ERROR
+        );
+        XML_ParserFree(p);
+    }
+}
+
+#[test]
 fn errors_and_positions_match_the_rust_api() {
     // SAFETY: NULL selects the default encoding.
     let p = unsafe { XML_ParserCreate(std::ptr::null()) };
@@ -204,7 +242,7 @@ fn errors_and_positions_match_the_rust_api() {
 }
 
 #[test]
-fn calls_from_inside_a_handler_are_refused() {
+fn calls_from_inside_a_handler_are_refused_and_positions_answered() {
     // SAFETY: NULL selects the default encoding.
     let p = unsafe { XML_ParserCreate(std::ptr::null()) };
     let mut log = Log {
@@ -218,7 +256,8 @@ fn calls_from_inside_a_handler_are_refused() {
     }
     assert_eq!(parse(p, b"<a/>", true), XML_STATUS_OK);
     assert_eq!(log.nested_parse, Some(XML_STATUS_ERROR));
-    assert_eq!(log.lines, ["inside line=0 col=0 byte=-1"]);
+    // The position functions answer with the position of the event.
+    assert_eq!(log.lines, ["inside line=1 col=0 byte=0"]);
     // SAFETY: the parser survived the refused free.
     unsafe {
         assert_eq!(XML_GetErrorCode(p), XML_ERROR_NONE);

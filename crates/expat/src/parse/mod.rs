@@ -74,6 +74,7 @@ pub use model::{ContentModel, ContentNode, ContentQuant, ContentType, Scaffold};
 pub use error::{Stop, XmlError};
 pub use external::{ExternalEntities, ExternalEntityParser};
 
+use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -168,12 +169,20 @@ pub struct HandlerSet {
     pub external_entity_ref: bool,
     /// `XML_SetNotStandaloneHandler` (module 11d).
     pub not_standalone: bool,
+    /// Report each event's position first ([`Handler::event_position`]),
+    /// for a caller that asks for positions from inside its handlers.
+    pub event_position: bool,
 }
 
 /// Receives the parser's events. Only the methods whose [`HandlerSet`]
 /// flag is set are called. Strings are UTF-8 (`XML_Char`, D-002); a C
 /// `NULL` string is `None`.
 pub trait Handler {
+    /// The position of the event reported next, when
+    /// [`HandlerSet::event_position`] is set: what
+    /// `XML_GetCurrentLineNumber64`, `XML_GetCurrentColumnNumber64` and
+    /// `XML_GetCurrentByteIndex64` return inside its handler.
+    fn event_position(&mut self, _line: u64, _column: u64, _byte_index: i64) {}
     /// `XML_XmlDeclHandler`: `standalone` is -1 (absent), 0 or 1.
     fn xml_decl(&mut self, _version: Option<&[u8]>, _encoding: Option<&[u8]>, _standalone: i32) {}
     /// `XML_StartElementHandler`: the attributes as (name, value) pairs in
@@ -381,8 +390,12 @@ pub(crate) struct Tag {
 #[derive(Debug, Clone)]
 pub struct Parser {
     // Input buffer (offsets into `buffer`; C pointers).
-    /// `m_buffer[0..bufferLim]`; empty while `m_buffer` is `NULL`.
-    pub(crate) buffer: Vec<u8>,
+    /// `m_buffer[0..bufferLim]`; empty while `m_buffer` is `NULL`. Shared
+    /// so that the processors read it through their own handle while the
+    /// event position ([`Parser::event_position`]) reads it through the
+    /// parser; it is only written between parses, when the parser holds the
+    /// only handle.
+    pub(crate) buffer: Arc<Vec<u8>>,
     /// `m_buffer != NULL`
     pub(crate) has_buffer: bool,
     /// `m_bufferPtr`
@@ -407,6 +420,11 @@ pub struct Parser {
     pub(crate) position_ptr: Option<usize>,
     /// `m_position`
     pub(crate) position: Position,
+    /// The position of an earlier event of the current parse call and the
+    /// offset it was taken at: where [`Parser::event_position`] resumes
+    /// counting. Kept apart from `position` so that reporting event
+    /// positions leaves the C state as it is.
+    pub(crate) located: Option<(usize, Position)>,
 
     // Configuration.
     /// Which handlers are set.
@@ -536,7 +554,7 @@ impl Parser {
     pub fn new(encoding: Option<&[u8]>, ns_separator: Option<u8>, salt: [u8; 16]) -> Self {
         let ns = ns_separator.is_some();
         Parser {
-            buffer: Vec::new(),
+            buffer: Arc::new(Vec::new()),
             has_buffer: false,
             buffer_ptr: 0,
             buffer_end: 0,
@@ -549,6 +567,7 @@ impl Parser {
             event_end_ptr: None,
             position_ptr: None,
             position: Position::default(),
+            located: None,
             handlers: HandlerSet::default(),
             protocol_encoding_name: encoding.map(<[u8]>::to_vec),
             ns,
@@ -851,12 +870,55 @@ impl Parser {
 
     /// `XmlUpdatePosition(m_encoding, buffer + from, buffer + to, &m_position)`.
     fn update_position(&mut self, from: usize, to: usize) {
+        let mut pos = self.position;
+        self.advance_position(from, to, &mut pos);
+        self.position = pos;
+    }
+
+    /// `XmlUpdatePosition(m_encoding, buffer + from, buffer + to, pos)`.
+    fn advance_position(&self, from: usize, to: usize, pos: &mut Position) {
         let buf = self.buffer.get(..to).unwrap_or(&self.buffer);
         match self.enc {
-            Enc::Init(init) => init.update_position(buf, from, &mut self.position),
-            Enc::Known(Known::Normal(e)) => update_position(&e, buf, from, &mut self.position),
-            Enc::Known(Known::Utf16(e)) => update_position(&e, buf, from, &mut self.position),
+            Enc::Init(init) => init.update_position(buf, from, pos),
+            Enc::Known(Known::Normal(e)) => update_position(&e, buf, from, pos),
+            Enc::Known(Known::Utf16(e)) => update_position(&e, buf, from, pos),
         }
+    }
+
+    /// The line and column of the current event, as
+    /// `XML_GetCurrentLineNumber64` and `XML_GetCurrentColumnNumber64`
+    /// return them inside a handler when the application asks at every
+    /// event. The count resumes from the previous event of the same call
+    /// (`located`), and `position` and `position_ptr` are left as they are,
+    /// so the position after the call does not depend on whether event
+    /// positions were reported.
+    pub fn event_position(&mut self) -> Position {
+        let Some(ev) = self.event_ptr else {
+            return self.located.map_or(self.position, |(_, p)| p);
+        };
+        let (from, mut pos) = match (self.located, self.position_ptr) {
+            (Some((at, p)), _) if at <= ev => (at, p),
+            (Some((_, p)), _) => return p,
+            (None, Some(pp)) if pp <= ev => (pp, self.position),
+            (None, _) => return self.position,
+        };
+        self.advance_position(from, ev, &mut pos);
+        self.located = Some((ev, pos));
+        pos
+    }
+
+    /// Reports the current event's position to `h` before the event, when
+    /// [`HandlerSet::event_position`] is set.
+    pub(crate) fn locate<H: Handler>(&mut self, h: &mut H) {
+        if !self.handlers.event_position {
+            return;
+        }
+        let pos = self.event_position();
+        h.event_position(
+            pos.line_number.wrapping_add(1),
+            pos.column_number,
+            self.current_byte_index(),
+        );
     }
 
     /// `XML_GetCurrentLineNumber64`.
@@ -922,18 +984,35 @@ impl Parser {
     /// the buffer, to be committed with [`Parser::parse_buffer`]. `None`
     /// sets the error code.
     pub fn get_buffer(&mut self, len: i32) -> Option<&mut [u8]> {
+        if !self.reserve_buffer(len) {
+            return None;
+        }
+        self.buffer_space(len)
+    }
+
+    /// The space [`Parser::get_buffer`] returns after a successful
+    /// [`Parser::reserve_buffer`] for the same `len`.
+    pub fn buffer_space(&mut self, len: i32) -> Option<&mut [u8]> {
+        let end = self.buffer_end;
+        let len = usize::try_from(len).ok()?;
+        Arc::make_mut(&mut self.buffer).get_mut(end..end.checked_add(len)?)
+    }
+
+    /// The work of `XML_GetBuffer` without the returned pointer: makes room
+    /// for `len` more bytes, or returns `false` and sets the error code.
+    pub fn reserve_buffer(&mut self, len: i32) -> bool {
         if len < 0 {
             self.error_code = XmlError::NoMemory.into();
-            return None;
+            return false;
         }
         match self.parsing {
             Parsing::Suspended => {
                 self.error_code = XmlError::Suspended.into();
-                return None;
+                return false;
             }
             Parsing::Finished => {
                 self.error_code = XmlError::Finished.into();
-                return None;
+                return false;
             }
             Parsing::Initialized | Parsing::Parsing => {}
         }
@@ -954,18 +1033,18 @@ impl Parser {
             // negative.
             let Ok(needed) = i32::try_from((len as u32).wrapping_add(parsing as u32)) else {
                 self.error_code = XmlError::NoMemory.into();
-                return None;
+                return false;
             };
             let parsed = if self.has_buffer { self.buffer_ptr } else { 0 };
             let keep = parsed.min(XML_CONTEXT_BYTES);
             let Some(needed) = needed.checked_add(keep as i32) else {
                 self.error_code = XmlError::NoMemory.into();
-                return None;
+                return false;
             };
             if self.has_buffer && needed as usize <= lim {
                 if keep < parsed {
                     let offset = parsed - keep;
-                    self.buffer.copy_within(offset..self.buffer_end, 0);
+                    Arc::make_mut(&mut self.buffer).copy_within(offset..self.buffer_end, 0);
                     self.buffer_end -= offset;
                     self.buffer_ptr -= offset;
                 }
@@ -979,7 +1058,7 @@ impl Parser {
                 }
                 if size <= 0 {
                     self.error_code = XmlError::NoMemory.into();
-                    return None;
+                    return false;
                 }
                 // C allocates the input buffer with the plain `malloc_fcn`,
                 // outside the allocation tracker ("to leave limiting the
@@ -1000,15 +1079,14 @@ impl Parser {
                     self.buffer_end = 0;
                     self.buffer_ptr = 0;
                 }
-                self.buffer = new_buf;
+                self.buffer = Arc::new(new_buf);
                 self.has_buffer = true;
             }
             self.event_ptr = None;
             self.event_end_ptr = None;
             self.position_ptr = None;
         }
-        let end = self.buffer_end;
-        self.buffer.get_mut(end..end + len as usize)
+        true
     }
 
     /// `XML_ParseBuffer`: parses `len` bytes written into the space that
@@ -1058,6 +1136,7 @@ impl Parser {
         }
         let start = self.buffer_ptr;
         self.position_ptr = Some(start);
+        self.located = None;
         self.buffer_end += len as usize;
         self.parse_end_ptr = Some(self.buffer_end);
         self.parse_end_byte_index += u64::from(len as u32);
@@ -1120,7 +1199,7 @@ impl Parser {
             }
         }
         // The processors read the buffer while they update the parser.
-        let buffer = core::mem::take(&mut self.buffer);
+        let buffer = Arc::clone(&self.buffer);
         let buf = buffer.get(..end).unwrap_or(&buffer);
         *end_ptr = start;
         let ret = loop {
@@ -1138,7 +1217,7 @@ impl Parser {
                 break ret;
             }
         };
-        self.buffer = buffer;
+        drop(buffer);
         if ret.is_ok() {
             // If we consumed nothing, remember what we had on this parse
             // attempt.

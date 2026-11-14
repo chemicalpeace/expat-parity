@@ -1379,3 +1379,63 @@ recorded in DIVERGENCES.md.
   handler, memory suite, reset, billion-laughs setters, hash salt
   setters), positions inside handlers, `XML_UNICODE` builds, a generated
   symbol map or a shared-library version script.
+
+## D-048 Event positions (module 13, slice 2a) (2026-11-14)
+
+- **Decision.** A handler can be told the position of each event before
+  the event: `Events::position` (off in `Events::ALL` and `Events::NONE`)
+  and `Handler::position(line, column, byte_index)`, with the values
+  `XML_GetCurrentLineNumber`, `XML_GetCurrentColumnNumber` and
+  `XML_GetCurrentByteIndex` return inside that event's C handler. The
+  parser core reports it through `HandlerSet::event_position` before each
+  of the nine events of `Events`.
+- **Counting.** The line and column are counted from the previous event
+  of the same call (`located`), or from `m_positionPtr` and `m_position`
+  for the first one, which is what libexpat computes when the
+  application asks at every event. `m_position` and `m_positionPtr` are
+  not changed, so the position after the call is the same with and
+  without event positions. The two can differ from libexpat only when the
+  application asks at some events and not at others and a carriage return
+  and the line feed after it fall on either side of an event boundary.
+- **Input buffer.** The input buffer is an `Arc<Vec<u8>>`: the processors
+  read it through their own handle while the event position reads it
+  through the parser. It is only written between parses, when the parser
+  holds the only handle, so `Arc::make_mut` does not copy.
+- **C interface.** `expat-capi` turns `Events::position` on whenever any
+  handler is set, since it cannot know whether a handler will ask, and
+  answers the position functions from the last reported event while
+  `XML_Parse` runs. This removes the first gap listed in D-047.
+- **Cost.** Off by default for the Rust API. With it on, every byte up to
+  each event is counted once more. Not measured yet.
+- **Verification.** `scripts/capi-check.sh` adds a third run to each
+  configuration in which every handler prints its event's position: 541
+  documents x 18 runs, output equal to libexpat. A deliberate change of
+  the reported column is caught.
+
+## D-049 Buffer functions (module 13, slice 2b) (2026-11-14)
+
+- **Decision.** The public API gets the buffer functions of libexpat:
+  `Parser::buffer(len)` (`XML_GetBuffer`) returns space for `len` bytes
+  in the parser's own buffer, and `Parser::parse_buffer`,
+  `parse_buffer_with` and `parse_buffer_with_events` (`XML_ParseBuffer`)
+  parse the first `len` bytes written there. `Parser::error_code`
+  (`XML_GetErrorCode`) returns the code the last call left. The C
+  interface exports `XML_GetBuffer` and `XML_ParseBuffer` over them.
+- **Lengths.** The Rust functions take `usize`; a length above
+  `i32::MAX` is passed to the core as -1, which it refuses as C refuses a
+  negative length (`XML_ERROR_NO_MEMORY` for the buffer request,
+  `XML_ERROR_INVALID_ARGUMENT` for the parse).
+- **Core.** `get_buffer` is split into `reserve_buffer` (the work and the
+  error codes) and `buffer_space` (the slice), so the public function can
+  return either a slice or an error without holding a borrow across both.
+- **Error code in the C interface.** After every parsing call
+  (`XML_Parse`, `XML_ParseBuffer`) the stored error code is the one the
+  parser left, so a successful call clears it, as `callProcessor` does in
+  libexpat. A failed `XML_GetBuffer` sets it; a successful one leaves it.
+- **Verification.** `scripts/capi-check.sh` feeds every configuration
+  once through `XML_Parse` and once through `XML_GetBuffer` and
+  `XML_ParseBuffer` (541 documents x 36 runs), and checks the error cases
+  (no buffer, negative and too long lengths, after the final piece, from
+  inside a handler, 3000 small requests that move and grow the buffer):
+  output equal to libexpat. Unit tests cover the same cases for the Rust
+  API and, under Miri in CI, the C functions.
