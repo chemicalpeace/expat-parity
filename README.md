@@ -102,10 +102,12 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   declaration start and end — and the default handler
   (`Handler::default_data`, `XML_SetDefaultHandler`), which receives the
   rest of the document as written; `Handler::event_text` gives each
-  event's text for `XML_DefaultCurrent`. There is no handler for DTD
-  declarations, entity declarations, XML declarations or skipped
-  entities (inside the document type declaration everything goes to the
-  default handler), and no unknown-encoding
+  event's text for `XML_DefaultCurrent`. The XML declaration, the
+  document type declaration, entity, unparsed entity, notation, element
+  type and attribute-list declarations, and skipped entities have their
+  own events (`Handler::xml_decl` to `Handler::skipped_entity`), with
+  `Parser::set_base` for the base passed to them. There is no
+  unknown-encoding
   handler (only libexpat's built-in encodings: UTF-8, UTF-16, UTF-16BE,
   UTF-16LE, ISO-8859-1, US-ASCII).
 - **Positions:** the position of each event is reported to

@@ -817,6 +817,28 @@ impl Parser {
         self.accounting.count_bytes_direct
     }
 
+    /// `XML_SetBase`: the base passed to the declaration and external
+    /// entity handlers from now on. C copies a non-`NULL` base into the
+    /// DTD's string pool (`poolCopyString`), which counts against the
+    /// memory limit; `Err` is C's `XML_STATUS_ERROR` when that copy fails,
+    /// and leaves the base unchanged.
+    pub fn set_base(&mut self, base: Option<&[u8]>) -> Result<(), crate::heap::NoMemory> {
+        match base {
+            Some(b) => {
+                let direct = self.direct();
+                self.tracker.copy(tracker::Pool::Dtd, b.len(), direct)?;
+                self.cur_base = Some(b.to_vec());
+            }
+            None => self.cur_base = None,
+        }
+        Ok(())
+    }
+
+    /// `XML_GetBase`.
+    pub fn base(&self) -> Option<&[u8]> {
+        self.cur_base.as_deref()
+    }
+
     /// `XML_SetReparseDeferralEnabled`.
     pub fn set_reparse_deferral_enabled(&mut self, enabled: bool) {
         self.reparse_deferral_enabled = enabled;

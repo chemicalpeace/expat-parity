@@ -421,6 +421,7 @@ impl Parser {
             if let Some(v) = &version {
                 self.tracker.store_text(Pool::Temp2, v, direct).map_err(no_mem)?;
             }
+            self.locate(h);
             h.xml_decl(version.as_deref(), enc_name.as_deref(), standalone);
         } else {
             self.report_default(h, enc, buf, s, next);

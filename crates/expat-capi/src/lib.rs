@@ -9,7 +9,10 @@
 //! `XML_GetBuffer` and `XML_ParseBuffer` (D-049), `XML_StopParser` and
 //! `XML_ResumeParser` (D-050), `XML_SetDefaultHandler` and
 //! `XML_SetDefaultHandlerExpand` (D-051), `XML_DefaultCurrent` (D-052),
-//! the error code and its
+//! the declaration handlers (XML, document type, entity, unparsed
+//! entity, notation, element type and attribute-list declarations, and
+//! skipped entities), `XML_FreeContentModel`, `XML_SetBase` and
+//! `XML_GetBase` (D-053), the error code and its
 //! text, the position between calls and inside handlers (D-048) and the
 //! version. Every
 //! other `expat.h` function is missing, so a program that uses one fails
@@ -37,6 +40,14 @@
 //!   event of a document not in UTF-8 whose text takes more than one
 //!   1024-byte piece, the position functions return the position of the
 //!   event rather than of each piece.
+//! - `XML_SetBase` called from inside a handler does nothing and returns
+//!   `XML_STATUS_ERROR`; libexpat changes the base for the declarations
+//!   that follow.
+//! - A content model is freed only by `XML_FreeContentModel` on the
+//!   parser that passed it, or with the parser; `XML_MemFree` is not
+//!   provided. The value of an internal entity passed to the entity
+//!   declaration handler is NUL-terminated, which libexpat does not
+//!   promise.
 //! - The hash salt comes from the standard library's `RandomState` keys,
 //!   which are seeded from the operating system.
 //!
@@ -54,7 +65,7 @@ use std::ffi::{CStr, CString, c_char, c_int, c_long, c_ulong, c_void};
 use std::hash::BuildHasher;
 use std::sync::OnceLock;
 
-use expat::{ErrorCode, Events, Handler, Options, Parser, Stopper};
+use expat::{ContentModel, ErrorCode, Events, Handler, Options, Parser, Stopper};
 
 /// `XML_Char` without `XML_UNICODE`.
 pub type XML_Char = c_char;
@@ -102,6 +113,132 @@ pub type XML_StartNamespaceDeclHandler =
 pub type XML_EndNamespaceDeclHandler = Option<unsafe extern "C" fn(*mut c_void, *const XML_Char)>;
 /// `XML_DefaultHandler`.
 pub type XML_DefaultHandler = Option<unsafe extern "C" fn(*mut c_void, *const XML_Char, c_int)>;
+/// `XML_XmlDeclHandler`.
+pub type XML_XmlDeclHandler =
+    Option<unsafe extern "C" fn(*mut c_void, *const XML_Char, *const XML_Char, c_int)>;
+/// `XML_StartDoctypeDeclHandler`.
+pub type XML_StartDoctypeDeclHandler = Option<
+    unsafe extern "C" fn(*mut c_void, *const XML_Char, *const XML_Char, *const XML_Char, c_int),
+>;
+/// `XML_EndDoctypeDeclHandler`.
+pub type XML_EndDoctypeDeclHandler = Option<unsafe extern "C" fn(*mut c_void)>;
+/// `XML_EntityDeclHandler`.
+pub type XML_EntityDeclHandler = Option<
+    unsafe extern "C" fn(
+        *mut c_void,
+        *const XML_Char,
+        c_int,
+        *const XML_Char,
+        c_int,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+    ),
+>;
+/// `XML_UnparsedEntityDeclHandler`.
+pub type XML_UnparsedEntityDeclHandler = Option<
+    unsafe extern "C" fn(
+        *mut c_void,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+    ),
+>;
+/// `XML_NotationDeclHandler`.
+pub type XML_NotationDeclHandler = Option<
+    unsafe extern "C" fn(
+        *mut c_void,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+    ),
+>;
+/// `XML_ElementDeclHandler`.
+pub type XML_ElementDeclHandler =
+    Option<unsafe extern "C" fn(*mut c_void, *const XML_Char, *mut XML_Content)>;
+/// `XML_AttlistDeclHandler`.
+pub type XML_AttlistDeclHandler = Option<
+    unsafe extern "C" fn(
+        *mut c_void,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+        c_int,
+    ),
+>;
+/// `XML_SkippedEntityHandler`.
+pub type XML_SkippedEntityHandler =
+    Option<unsafe extern "C" fn(*mut c_void, *const XML_Char, c_int)>;
+
+/// `XML_Content` (`struct XML_cp`): one node of an element declaration's
+/// content model. `type` and `quant` hold the values of
+/// `enum XML_Content_Type` and `enum XML_Content_Quant`.
+#[repr(C)]
+#[derive(Debug)]
+pub struct XML_Content {
+    /// `type`
+    pub r#type: c_int,
+    /// `quant`
+    pub quant: c_int,
+    /// `name` (`NULL` unless `type` is `XML_CTYPE_NAME`).
+    pub name: *mut XML_Char,
+    /// `numchildren`
+    pub numchildren: std::ffi::c_uint,
+    /// `children`
+    pub children: *mut XML_Content,
+}
+
+/// A content model handed to an element declaration handler, kept by the
+/// parser until `XML_FreeContentModel` or `XML_ParserFree`.
+struct Model {
+    nodes: Box<[XML_Content]>,
+    /// The names the nodes point to.
+    _names: Vec<CString>,
+}
+
+impl Model {
+    /// The C form of `model`: the nodes in the crate's order (node 0 the
+    /// root, each node's children contiguous), as libexpat lays them out.
+    fn new(model: &ContentModel) -> Self {
+        let mut names = Vec::new();
+        let mut nodes: Box<[XML_Content]> = model
+            .nodes
+            .iter()
+            .map(|n| {
+                let name = n.name.as_deref().map_or(std::ptr::null_mut(), |b| {
+                    let c = CString::new(b).unwrap_or_default();
+                    let p = c.as_ptr().cast_mut();
+                    names.push(c);
+                    p
+                });
+                XML_Content {
+                    r#type: n.kind as c_int,
+                    quant: n.quant as c_int,
+                    name,
+                    numchildren: std::ffi::c_uint::try_from(n.children.len()).unwrap_or(0),
+                    children: std::ptr::null_mut(),
+                }
+            })
+            .collect();
+        let base = nodes.as_mut_ptr();
+        for (node, src) in nodes.iter_mut().zip(&model.nodes) {
+            if !src.children.is_empty() && src.children.end <= model.nodes.len() {
+                // `wrapping_add` keeps this safe code; the index is in bounds
+                // (checked above), so the pointer is inside `nodes`.
+                node.children = base.wrapping_add(src.children.start);
+            }
+        }
+        Model {
+            nodes,
+            _names: names,
+        }
+    }
+}
 
 /// `XML_Expat_Version`.
 #[repr(C)]
@@ -143,6 +280,20 @@ pub struct XML_ParserStruct {
     start_namespace_decl: Cell<XML_StartNamespaceDeclHandler>,
     end_namespace_decl: Cell<XML_EndNamespaceDeclHandler>,
     default: Cell<XML_DefaultHandler>,
+    xml_decl: Cell<XML_XmlDeclHandler>,
+    start_doctype_decl: Cell<XML_StartDoctypeDeclHandler>,
+    end_doctype_decl: Cell<XML_EndDoctypeDeclHandler>,
+    entity_decl: Cell<XML_EntityDeclHandler>,
+    unparsed_entity_decl: Cell<XML_UnparsedEntityDeclHandler>,
+    notation_decl: Cell<XML_NotationDeclHandler>,
+    element_decl: Cell<XML_ElementDeclHandler>,
+    attlist_decl: Cell<XML_AttlistDeclHandler>,
+    skipped_entity: Cell<XML_SkippedEntityHandler>,
+    /// The content models given to the element declaration handler and
+    /// not yet freed with `XML_FreeContentModel`.
+    models: RefCell<Vec<Model>>,
+    /// A NUL-terminated copy of the base, for `XML_GetBase`.
+    base: RefCell<Option<CString>>,
     /// `m_defaultExpandInternalEntities`: cleared by
     /// `XML_SetDefaultHandler`, set by `XML_SetDefaultHandlerExpand`.
     default_expand: Cell<bool>,
@@ -187,6 +338,17 @@ impl XML_ParserStruct {
             start_namespace_decl: Cell::new(None),
             end_namespace_decl: Cell::new(None),
             default: Cell::new(None),
+            xml_decl: Cell::new(None),
+            start_doctype_decl: Cell::new(None),
+            end_doctype_decl: Cell::new(None),
+            entity_decl: Cell::new(None),
+            unparsed_entity_decl: Cell::new(None),
+            notation_decl: Cell::new(None),
+            element_decl: Cell::new(None),
+            attlist_decl: Cell::new(None),
+            skipped_entity: Cell::new(None),
+            models: RefCell::new(Vec::new()),
+            base: RefCell::new(None),
             default_expand: Cell::new(true),
             current: RefCell::new((Vec::new(), Vec::new())),
             stopper: parser.stopper(),
@@ -211,6 +373,15 @@ impl XML_ParserStruct {
             .end_cdata_section(self.end_cdata_section.get().is_some())
             .start_namespace_decl(self.start_namespace_decl.get().is_some())
             .end_namespace_decl(self.end_namespace_decl.get().is_some())
+            .xml_decl(self.xml_decl.get().is_some())
+            .start_doctype_decl(self.start_doctype_decl.get().is_some())
+            .end_doctype_decl(self.end_doctype_decl.get().is_some())
+            .entity_decl(self.entity_decl.get().is_some())
+            .unparsed_entity_decl(self.unparsed_entity_decl.get().is_some())
+            .notation_decl(self.notation_decl.get().is_some())
+            .element_decl(self.element_decl.get().is_some())
+            .attlist_decl(self.attlist_decl.get().is_some())
+            .skipped_entity(self.skipped_entity.get().is_some())
             .default_data(self.default.get().is_some())
             .expand_internal_entities(self.default_expand.get())
             .event_text(self.default.get().is_some());
@@ -281,6 +452,19 @@ impl Dispatch<'_> {
         self.text
             .get(offset..)
             .map_or(std::ptr::null(), |s| s.as_ptr().cast())
+    }
+
+    /// NUL-terminated copies of `parts` in `text`, with a pointer to each
+    /// (`NULL` for `None`), valid until `text` is next changed.
+    fn strs<const N: usize>(&mut self, parts: [Option<&[u8]>; N]) -> [*const XML_Char; N] {
+        let present: Vec<&[u8]> = parts.iter().flatten().copied().collect();
+        let mut offsets = Vec::with_capacity(N);
+        self.copy(&present, &mut offsets);
+        let mut it = offsets.into_iter();
+        parts.map(|p| {
+            p.and_then(|_| it.next())
+                .map_or(std::ptr::null(), |o| self.at(o))
+        })
     }
 
     /// One NUL-terminated string (or `NULL` for `None`) passed to `f`.
@@ -427,6 +611,175 @@ impl Handler for Dispatch<'_> {
         // SAFETY: `h` is a handler the program set; the prefix is NULL or a
         // NUL-terminated copy valid for the call.
         self.with_str(prefix, |p| unsafe { h(arg, p) });
+    }
+
+    fn xml_decl(
+        &mut self,
+        version: Option<&[u8]>,
+        encoding: Option<&[u8]>,
+        standalone: Option<bool>,
+    ) {
+        let Some(h) = self.state.xml_decl.get() else {
+            return;
+        };
+        let [v, e] = self.strs([version, encoding]);
+        let standalone = standalone.map_or(-1, c_int::from);
+        // SAFETY: `h` is a handler the program set; each string is NULL or
+        // a NUL-terminated copy valid for the call.
+        unsafe { h(self.state.handler_arg.get(), v, e, standalone) };
+    }
+
+    fn start_doctype_decl(
+        &mut self,
+        name: &[u8],
+        system_id: Option<&[u8]>,
+        public_id: Option<&[u8]>,
+        has_internal_subset: bool,
+    ) {
+        let Some(h) = self.state.start_doctype_decl.get() else {
+            return;
+        };
+        let [n, sys, publ] = self.strs([Some(name), system_id, public_id]);
+        // SAFETY: as for `xml_decl`.
+        unsafe {
+            h(
+                self.state.handler_arg.get(),
+                n,
+                sys,
+                publ,
+                c_int::from(has_internal_subset),
+            )
+        };
+    }
+
+    fn end_doctype_decl(&mut self) {
+        if let Some(h) = self.state.end_doctype_decl.get() {
+            // SAFETY: `h` is a handler the program set.
+            unsafe { h(self.state.handler_arg.get()) };
+        }
+    }
+
+    fn entity_decl(
+        &mut self,
+        name: &[u8],
+        is_parameter_entity: bool,
+        value: Option<&[u8]>,
+        base: Option<&[u8]>,
+        system_id: Option<&[u8]>,
+        public_id: Option<&[u8]>,
+        notation: Option<&[u8]>,
+    ) {
+        let Some(h) = self.state.entity_decl.get() else {
+            return;
+        };
+        let len = value.map_or(0, |v| c_int::try_from(v.len()).unwrap_or(c_int::MAX));
+        let [n, v, b, sys, publ, nt] =
+            self.strs([Some(name), value, base, system_id, public_id, notation]);
+        // SAFETY: as for `xml_decl`; the value is `len` bytes (NUL-terminated
+        // here, which libexpat does not promise).
+        unsafe {
+            h(
+                self.state.handler_arg.get(),
+                n,
+                c_int::from(is_parameter_entity),
+                v,
+                len,
+                b,
+                sys,
+                publ,
+                nt,
+            );
+        };
+    }
+
+    fn unparsed_entity_decl(
+        &mut self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        system_id: Option<&[u8]>,
+        public_id: Option<&[u8]>,
+        notation: &[u8],
+    ) {
+        let Some(h) = self.state.unparsed_entity_decl.get() else {
+            return;
+        };
+        let [n, b, sys, publ, nt] =
+            self.strs([Some(name), base, system_id, public_id, Some(notation)]);
+        // SAFETY: as for `xml_decl`.
+        unsafe { h(self.state.handler_arg.get(), n, b, sys, publ, nt) };
+    }
+
+    fn notation_decl(
+        &mut self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        system_id: Option<&[u8]>,
+        public_id: Option<&[u8]>,
+    ) {
+        let Some(h) = self.state.notation_decl.get() else {
+            return;
+        };
+        let [n, b, sys, publ] = self.strs([Some(name), base, system_id, public_id]);
+        // SAFETY: as for `xml_decl`.
+        unsafe { h(self.state.handler_arg.get(), n, b, sys, publ) };
+    }
+
+    fn element_decl(&mut self, name: &[u8], model: &ContentModel) {
+        let Some(h) = self.state.element_decl.get() else {
+            return;
+        };
+        let mut m = Model::new(model);
+        let root = m.nodes.as_mut_ptr();
+        // The boxed nodes do not move when the `Model` moves into the list.
+        self.state.models.borrow_mut().push(m);
+        let arg = self.state.handler_arg.get();
+        // SAFETY: `h` is a handler the program set; the name is a
+        // NUL-terminated copy valid for the call; `root` points to the
+        // model, which stays valid until `XML_FreeContentModel` or
+        // `XML_ParserFree` (the list is not borrowed during the call).
+        self.with_str(Some(name), |n| unsafe { h(arg, n, root) });
+    }
+
+    fn attlist_decl(
+        &mut self,
+        element: &[u8],
+        attribute: &[u8],
+        attribute_type: &[u8],
+        default: Option<&[u8]>,
+        is_required: bool,
+    ) {
+        let Some(h) = self.state.attlist_decl.get() else {
+            return;
+        };
+        let [e, a, t, d] = self.strs([
+            Some(element),
+            Some(attribute),
+            Some(attribute_type),
+            default,
+        ]);
+        // SAFETY: as for `xml_decl`.
+        unsafe {
+            h(
+                self.state.handler_arg.get(),
+                e,
+                a,
+                t,
+                d,
+                c_int::from(is_required),
+            )
+        };
+    }
+
+    fn skipped_entity(&mut self, name: &[u8], is_parameter_entity: bool) {
+        let Some(h) = self.state.skipped_entity.get() else {
+            return;
+        };
+        let arg = self.state.handler_arg.get();
+        // SAFETY: `h` is a handler the program set; the name is a
+        // NUL-terminated copy valid for the call.
+        self.with_str(Some(name), |n| unsafe {
+            h(arg, n, c_int::from(is_parameter_entity))
+        });
     }
 }
 
@@ -626,6 +979,127 @@ setter!(
     /// `XML_SetEndNamespaceDeclHandler`.
     XML_SetEndNamespaceDeclHandler, end_namespace_decl, XML_EndNamespaceDeclHandler
 );
+setter!(
+    /// `XML_SetXmlDeclHandler`.
+    XML_SetXmlDeclHandler, xml_decl, XML_XmlDeclHandler
+);
+setter!(
+    /// `XML_SetStartDoctypeDeclHandler`.
+    XML_SetStartDoctypeDeclHandler, start_doctype_decl, XML_StartDoctypeDeclHandler
+);
+setter!(
+    /// `XML_SetEndDoctypeDeclHandler`.
+    XML_SetEndDoctypeDeclHandler, end_doctype_decl, XML_EndDoctypeDeclHandler
+);
+setter!(
+    /// `XML_SetEntityDeclHandler`.
+    XML_SetEntityDeclHandler, entity_decl, XML_EntityDeclHandler
+);
+setter!(
+    /// `XML_SetUnparsedEntityDeclHandler`.
+    XML_SetUnparsedEntityDeclHandler, unparsed_entity_decl, XML_UnparsedEntityDeclHandler
+);
+setter!(
+    /// `XML_SetNotationDeclHandler`.
+    XML_SetNotationDeclHandler, notation_decl, XML_NotationDeclHandler
+);
+setter!(
+    /// `XML_SetElementDeclHandler`. The handler owns the model it receives
+    /// and frees it with `XML_FreeContentModel`.
+    XML_SetElementDeclHandler, element_decl, XML_ElementDeclHandler
+);
+setter!(
+    /// `XML_SetAttlistDeclHandler`.
+    XML_SetAttlistDeclHandler, attlist_decl, XML_AttlistDeclHandler
+);
+setter!(
+    /// `XML_SetSkippedEntityHandler`.
+    XML_SetSkippedEntityHandler, skipped_entity, XML_SkippedEntityHandler
+);
+
+/// `XML_SetDoctypeDeclHandler`: both document type declaration handlers.
+///
+/// # Safety
+///
+/// As for `XML_SetStartDoctypeDeclHandler`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetDoctypeDeclHandler(
+    parser: XML_Parser,
+    start: XML_StartDoctypeDeclHandler,
+    end: XML_EndDoctypeDeclHandler,
+) {
+    // SAFETY: forwarded from this function's contract.
+    unsafe {
+        XML_SetStartDoctypeDeclHandler(parser, start);
+        XML_SetEndDoctypeDeclHandler(parser, end);
+    }
+}
+
+/// `XML_FreeContentModel`: frees a model passed to the element
+/// declaration handler. Does nothing for a pointer this parser did not
+/// pass or already freed.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; nothing uses `model` after the
+/// call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_FreeContentModel(parser: XML_Parser, model: *mut XML_Content) {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return;
+    };
+    let mut models = s.models.borrow_mut();
+    if let Some(i) = models
+        .iter()
+        .position(|m| std::ptr::eq(m.nodes.as_ptr(), model))
+    {
+        models.swap_remove(i);
+    }
+}
+
+/// `XML_SetBase`: the base passed to the declaration handlers from now
+/// on, or none for `NULL`. `XML_STATUS_ERROR` for a `NULL` parser, when
+/// the parser's memory runs out, or from inside a handler.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `base` is `NULL` or a
+/// NUL-terminated string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetBase(parser: XML_Parser, base: *const XML_Char) -> XML_Status {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return XML_STATUS_ERROR;
+    };
+    // SAFETY: forwarded from this function's contract.
+    let bytes = unsafe { c_bytes(base) };
+    match s.with_parser(|p| p.set_base(bytes)) {
+        Some(Ok(())) => {
+            *s.base.borrow_mut() = bytes.and_then(|b| CString::new(b).ok());
+            XML_STATUS_OK
+        }
+        _ => XML_STATUS_ERROR,
+    }
+}
+
+/// `XML_GetBase`: the base set with `XML_SetBase`, or `NULL`. The string
+/// stays valid until the next `XML_SetBase` or `XML_ParserFree`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetBase(parser: XML_Parser) -> *const XML_Char {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return std::ptr::null();
+    };
+    s.base
+        .borrow()
+        .as_ref()
+        .map_or(std::ptr::null(), |c| c.as_ptr())
+}
 
 /// `XML_SetDefaultHandler`: the handler for the text no other handler
 /// reports. References to internal general entities in content are then
