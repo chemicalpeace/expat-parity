@@ -5,8 +5,10 @@
 //! a C program written against the vendored `expat.h` (libexpat 2.10.0,
 //! `XML_Char` = `char`, UTF-8 output) can link against it instead of
 //! libexpat. This first slice covers parser creation and release, user
-//! data, the nine handlers of [`expat::Events`], `XML_Parse`, the error
-//! code and its text, the position between calls and the version. Every
+//! data, the nine handlers of [`expat::Events`], `XML_Parse`,
+//! `XML_GetBuffer` and `XML_ParseBuffer` (D-049), the error code and its
+//! text, the position between calls and inside handlers (D-048) and the
+//! version. Every
 //! other `expat.h` function is missing, so a program that uses one fails
 //! to link rather than run with different behaviour.
 //!
@@ -24,9 +26,9 @@
 //!   libexpat.)
 //! - `XML_GetSpecifiedAttributeCount` is updated only while a start
 //!   element handler is set, which is where libexpat documents its use.
-//! - `XML_Parse` and `XML_ParserFree` called from inside a handler do
-//!   nothing (`XML_Parse` returns `XML_STATUS_ERROR`), as in libexpat
-//!   2.10.0.
+//! - `XML_Parse`, `XML_ParseBuffer`, `XML_GetBuffer` and `XML_ParserFree`
+//!   called from inside a handler do nothing (`XML_STATUS_ERROR` or
+//!   `NULL`, without an error code), as in libexpat 2.10.0.
 //! - The hash salt comes from the standard library's `RandomState` keys,
 //!   which are seeded from the operating system.
 //!
@@ -134,7 +136,7 @@ pub struct XML_ParserStruct {
 /// `XML_Parser`.
 pub type XML_Parser = *mut XML_ParserStruct;
 
-/// The state only `XML_Parse` and the position functions use.
+/// The state only the parsing, buffer and position functions use.
 struct Inner {
     parser: Parser,
     /// NUL-terminated copies of the strings passed to a handler.
@@ -652,24 +654,97 @@ pub unsafe extern "C" fn XML_Parse(
         // caller's contract; the bytes are not modified during the call.
         unsafe { std::slice::from_raw_parts(s.cast::<u8>(), n) }
     };
+    run(state, |parser, dispatch, events| {
+        parser.parse_with_events(dispatch, events, data, is_final != 0)
+    })
+}
+
+/// Runs one parsing call `f` on the parser of `state` with the handlers
+/// that are set, then records the error code the call left, as libexpat
+/// sets `m_errorCode` on every parsing call.
+fn run(
+    state: &XML_ParserStruct,
+    f: impl FnOnce(&mut Parser, &mut Dispatch<'_>, Events) -> Result<(), expat::Error>,
+) -> XML_Status {
     let events = state.events();
     state.busy.set(true);
-    // SAFETY: `busy` was false, so nothing else borrows `inner`, and it is
-    // true until this borrow ends, so a handler calling back into the
-    // library cannot borrow it (`with_parser` and this function check
-    // `busy`); handlers only reach the `Cell` fields.
+    // SAFETY: the callers checked that `busy` was false, so nothing else
+    // borrows `inner`, and it is true until this borrow ends, so a handler
+    // calling back into the library cannot borrow it (`with_parser` and
+    // the parsing functions check `busy`); handlers only reach the `Cell`
+    // fields.
     let inner = unsafe { &mut *state.inner.get() };
     let Inner { parser, text, atts } = inner;
     let mut dispatch = Dispatch { state, text, atts };
-    let result = parser.parse_with_events(&mut dispatch, events, data, is_final != 0);
+    let result = f(parser, &mut dispatch, events);
     state.busy.set(false);
+    state
+        .error_code
+        .set(parser.error_code().map_or(XML_ERROR_NONE, error));
     match result {
         Ok(()) => XML_STATUS_OK,
-        Err(e) => {
-            state.error_code.set(error(e.code()));
-            XML_STATUS_ERROR
-        }
+        Err(_) => XML_STATUS_ERROR,
     }
+}
+
+/// `XML_GetBuffer`: space for `len` bytes of input in the parser's buffer,
+/// to be filled and then parsed with `XML_ParseBuffer`, or `NULL` with the
+/// error code set (`XML_ERROR_NO_MEMORY` for a negative `len`). The space
+/// is valid until the next call on the parser.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetBuffer(parser: XML_Parser, len: c_int) -> *mut c_void {
+    // SAFETY: forwarded from this function's contract.
+    let Some(state) = (unsafe { state(parser) }) else {
+        return std::ptr::null_mut();
+    };
+    // A negative `len` becomes a length the parser refuses with
+    // `XML_ERROR_NO_MEMORY`, as libexpat refuses it.
+    let n = usize::try_from(len).unwrap_or(usize::MAX);
+    let got = state.with_parser(|p| match p.buffer(n) {
+        Ok(space) => Ok(space.as_mut_ptr()),
+        Err(e) => Err(e.code()),
+    });
+    match got {
+        Some(Ok(ptr)) => ptr.cast(),
+        Some(Err(code)) => {
+            state.error_code.set(error(code));
+            std::ptr::null_mut()
+        }
+        // Called from inside a handler: refused without an error code, as
+        // in libexpat 2.10.0.
+        None => std::ptr::null_mut(),
+    }
+}
+
+/// `XML_ParseBuffer`: parses the first `len` bytes written into the space
+/// `XML_GetBuffer` returned; `is_final` non-zero marks the last piece.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_ParseBuffer(
+    parser: XML_Parser,
+    len: c_int,
+    is_final: c_int,
+) -> XML_Status {
+    // SAFETY: forwarded from this function's contract.
+    let Some(state) = (unsafe { state(parser) }) else {
+        return XML_STATUS_ERROR;
+    };
+    if state.busy.get() {
+        return XML_STATUS_ERROR;
+    }
+    // A negative `len` becomes a length the parser refuses with
+    // `XML_ERROR_INVALID_ARGUMENT`, as libexpat refuses it.
+    let n = usize::try_from(len).unwrap_or(usize::MAX);
+    run(state, |parser, dispatch, events| {
+        parser.parse_buffer_with_events(dispatch, events, n, is_final != 0)
+    })
 }
 
 /// The C value of `code`.

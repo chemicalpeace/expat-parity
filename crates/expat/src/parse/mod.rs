@@ -984,18 +984,35 @@ impl Parser {
     /// the buffer, to be committed with [`Parser::parse_buffer`]. `None`
     /// sets the error code.
     pub fn get_buffer(&mut self, len: i32) -> Option<&mut [u8]> {
+        if !self.reserve_buffer(len) {
+            return None;
+        }
+        self.buffer_space(len)
+    }
+
+    /// The space [`Parser::get_buffer`] returns after a successful
+    /// [`Parser::reserve_buffer`] for the same `len`.
+    pub fn buffer_space(&mut self, len: i32) -> Option<&mut [u8]> {
+        let end = self.buffer_end;
+        let len = usize::try_from(len).ok()?;
+        Arc::make_mut(&mut self.buffer).get_mut(end..end.checked_add(len)?)
+    }
+
+    /// The work of `XML_GetBuffer` without the returned pointer: makes room
+    /// for `len` more bytes, or returns `false` and sets the error code.
+    pub fn reserve_buffer(&mut self, len: i32) -> bool {
         if len < 0 {
             self.error_code = XmlError::NoMemory.into();
-            return None;
+            return false;
         }
         match self.parsing {
             Parsing::Suspended => {
                 self.error_code = XmlError::Suspended.into();
-                return None;
+                return false;
             }
             Parsing::Finished => {
                 self.error_code = XmlError::Finished.into();
-                return None;
+                return false;
             }
             Parsing::Initialized | Parsing::Parsing => {}
         }
@@ -1016,13 +1033,13 @@ impl Parser {
             // negative.
             let Ok(needed) = i32::try_from((len as u32).wrapping_add(parsing as u32)) else {
                 self.error_code = XmlError::NoMemory.into();
-                return None;
+                return false;
             };
             let parsed = if self.has_buffer { self.buffer_ptr } else { 0 };
             let keep = parsed.min(XML_CONTEXT_BYTES);
             let Some(needed) = needed.checked_add(keep as i32) else {
                 self.error_code = XmlError::NoMemory.into();
-                return None;
+                return false;
             };
             if self.has_buffer && needed as usize <= lim {
                 if keep < parsed {
@@ -1041,7 +1058,7 @@ impl Parser {
                 }
                 if size <= 0 {
                     self.error_code = XmlError::NoMemory.into();
-                    return None;
+                    return false;
                 }
                 // C allocates the input buffer with the plain `malloc_fcn`,
                 // outside the allocation tracker ("to leave limiting the
@@ -1069,8 +1086,7 @@ impl Parser {
             self.event_end_ptr = None;
             self.position_ptr = None;
         }
-        let end = self.buffer_end;
-        Arc::make_mut(&mut self.buffer).get_mut(end..end + len as usize)
+        true
     }
 
     /// `XML_ParseBuffer`: parses `len` bytes written into the space that

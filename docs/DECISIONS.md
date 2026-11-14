@@ -1411,3 +1411,31 @@ recorded in DIVERGENCES.md.
   configuration in which every handler prints its event's position: 541
   documents x 18 runs, output equal to libexpat. A deliberate change of
   the reported column is caught.
+
+## D-049 Buffer functions (module 13, slice 2b) (2026-11-14)
+
+- **Decision.** The public API gets the buffer functions of libexpat:
+  `Parser::buffer(len)` (`XML_GetBuffer`) returns space for `len` bytes
+  in the parser's own buffer, and `Parser::parse_buffer`,
+  `parse_buffer_with` and `parse_buffer_with_events` (`XML_ParseBuffer`)
+  parse the first `len` bytes written there. `Parser::error_code`
+  (`XML_GetErrorCode`) returns the code the last call left. The C
+  interface exports `XML_GetBuffer` and `XML_ParseBuffer` over them.
+- **Lengths.** The Rust functions take `usize`; a length above
+  `i32::MAX` is passed to the core as -1, which it refuses as C refuses a
+  negative length (`XML_ERROR_NO_MEMORY` for the buffer request,
+  `XML_ERROR_INVALID_ARGUMENT` for the parse).
+- **Core.** `get_buffer` is split into `reserve_buffer` (the work and the
+  error codes) and `buffer_space` (the slice), so the public function can
+  return either a slice or an error without holding a borrow across both.
+- **Error code in the C interface.** After every parsing call
+  (`XML_Parse`, `XML_ParseBuffer`) the stored error code is the one the
+  parser left, so a successful call clears it, as `callProcessor` does in
+  libexpat. A failed `XML_GetBuffer` sets it; a successful one leaves it.
+- **Verification.** `scripts/capi-check.sh` feeds every configuration
+  once through `XML_Parse` and once through `XML_GetBuffer` and
+  `XML_ParseBuffer` (541 documents x 36 runs), and checks the error cases
+  (no buffer, negative and too long lengths, after the final piece, from
+  inside a handler, 3000 small requests that move and grow the buffer):
+  output equal to libexpat. Unit tests cover the same cases for the Rust
+  API and, under Miri in CI, the C functions.
