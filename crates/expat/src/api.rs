@@ -95,12 +95,29 @@ pub struct Parser {
     inner: parse::Parser,
 }
 
+impl core::fmt::Debug for Parser {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Parser").finish_non_exhaustive()
+    }
+}
+
 /// The handler of a parser without callbacks.
 struct NoCallbacks;
 
 impl parse::Handler for NoCallbacks {}
 
 impl Parser {
+    /// The public parser around a parser core (an external entity
+    /// parser's).
+    pub(crate) fn from_inner(inner: parse::Parser) -> Self {
+        Parser { inner }
+    }
+
+    /// The parser core.
+    pub(crate) fn inner_mut(&mut self) -> &mut parse::Parser {
+        &mut self.inner
+    }
+
     /// A parser with the default encoding and without namespace processing
     /// (`XML_ParserCreate(NULL)` followed by `XML_SetHashSalt16Bytes`).
     ///
@@ -639,16 +656,20 @@ impl Parser {
     /// amplification limits of both kinds; [`Stopper`] handles stay
     /// valid. Everything else, the base included, starts again.
     ///
+    /// Returns `false`, changing nothing, for the parser of an external
+    /// entity ([`crate::ExternalParser`]), which `XML_ParserReset` refuses
+    /// too.
+    ///
     /// ```
     /// let mut p = expat::Parser::new([7; 16]);
     /// assert!(p.parse(b"<a></b>", true).is_err());
-    /// p.reset(None, [8; 16]);
+    /// assert!(p.reset(None, [8; 16]));
     /// assert_eq!(p.parse(b"<a></a>", true), Ok(()));
     /// ```
-    pub fn reset(&mut self, encoding: Option<&[u8]>, salt: [u8; 16]) {
-        // Refused only from inside a handler or for an external entity
-        // parser, neither of which a `&mut Parser` can be.
-        let _ = self.inner.reset(encoding, salt);
+    pub fn reset(&mut self, encoding: Option<&[u8]>, salt: [u8; 16]) -> bool {
+        // The core also refuses from inside a handler, which a `&mut
+        // Parser` cannot be.
+        self.inner.reset(encoding, salt)
     }
 
     /// The public result of a call that returned `status`.

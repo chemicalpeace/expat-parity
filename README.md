@@ -122,11 +122,14 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   `XML_STATUS_SUSPENDED`. A refused stop does not change
   `Parser::error_code`. `Parser::reset` prepares the parser for another
   document (`XML_ParserReset`).
-- **External entities and DTDs are never loaded.** The crate does no I/O, and
-  the public API has no external entity handler: the parser behaves as
-  libexpat does when no `XML_SetExternalEntityRefHandler` is set (compared
-  with libexpat on its test vectors in this configuration). The internal
-  DTD subset is parsed and internal entities are expanded.
+- **External entities and DTDs are not loaded by the parser.** The crate
+  does no I/O. With `Events::external_entity_ref` on,
+  `Handler::external_entity_ref` receives each reference and may parse
+  the entity's bytes, obtained by the program, with the `ExternalParser`
+  that `ExternalEntities::create` returns (`XML_ExternalEntityParserCreate`).
+  Without it the parser behaves as libexpat does when no
+  `XML_SetExternalEntityRefHandler` is set. `Handler::not_standalone` is
+  `XML_SetNotStandaloneHandler`.
 - **Amplification limits** start at libexpat 2.10.0's defaults and are set
   as in libexpat (`Parser::set_billion_laughs_maximum_amplification` and
   the other setters, or `Stopper` from inside a handler, which takes

@@ -44,15 +44,20 @@ All notable changes are documented here. The format follows
   limits, `set_reparse_deferral_enabled`, with their getters),
   `parsing_status` with `ParsingStatus`, `is_final_buffer`, `reset`,
   the same limits and status on `Stopper` for use inside handlers, and
-  `Handler::take_base` (D-054).
+  `Handler::take_base` (D-054), external entities
+  (`Events::external_entity_ref`, `Handler::external_entity_ref`,
+  `ExternalEntities`, `ExternalParser`) and `Handler::not_standalone`
+  (D-055).
 - `crates/expat-capi` (not published): a first part of libexpat's C
   interface over the crate, compared with libexpat by
-  `scripts/capi-check.sh` (D-047 to D-054).
+  `scripts/capi-check.sh` (D-047 to D-055).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.
 
 ### Changed
+- `Parser::reset` returns whether the parser was reset (`false` for an
+  external entity parser, D-055).
 - Target and C oracle moved from libexpat 2.9.0 to 2.10.0 (D-042). The
   vendored sources are re-vendored byte for byte; the port follows every
   2.10.0 change that is observable: an entity declaration whose value
@@ -68,5 +73,6 @@ All notable changes are documented here. The format follows
   padding is now rejected in about 15 ms instead of about 30 s.
 
 ### Known limitations
-- No unknown-encoding handler; external entities are never loaded; real allocator failure aborts instead of returning
+- No unknown-encoding handler; the parser never loads external entities
+  itself; real allocator failure aborts instead of returning
   `NoMemory`. See the README.

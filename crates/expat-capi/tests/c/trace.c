@@ -381,6 +381,98 @@ static void position(void) {
          (long long)XML_GetCurrentByteIndex(g_parser));
 }
 
+/* External entities (sets 18 and 19): the reference handler prints its
+ * arguments, creates the entity's parser and feeds it a fixed text: a
+ * declaration for a parameter entity or the external subset, an element
+ * for a general entity. Set 18 frees the entity's parser in the handler;
+ * set 19 passes an encoding, refuses every third reference, feeds every
+ * fourth a malformed text, and leaves the entity's parser to be freed
+ * after the parse. */
+static int g_ext;
+static int g_ext_n;
+static int g_ext_depth;
+static XML_Parser g_ext_kept[64];
+static int g_ext_nkept;
+
+static void pos_of(XML_Parser p) {
+  printf(" line=%llu col=%llu byte=%lld\n",
+         (unsigned long long)XML_GetCurrentLineNumber(p),
+         (unsigned long long)XML_GetCurrentColumnNumber(p),
+         (long long)XML_GetCurrentByteIndex(p));
+}
+
+static int XMLCALL on_extref(XML_Parser p, const XML_Char *ctx,
+                             const XML_Char *base, const XML_Char *sys,
+                             const XML_Char *pub) {
+  int n = ++g_ext_n;
+  printf(" extref %d depth=%d ctx=", n, g_ext_depth);
+  putz(ctx);
+  put(" base=");
+  putz(base);
+  put(" sys=");
+  putz(sys);
+  put(" pub=");
+  putz(pub);
+  putchar('\n');
+  if (g_ext == 2 && n % 3 == 0)
+    return XML_STATUS_ERROR;
+  if (g_ext_depth >= 2)
+    return XML_STATUS_OK;
+  XML_Parser c
+      = XML_ExternalEntityParserCreate(p, ctx, g_ext == 2 ? "UTF-8" : NULL);
+  if (! c) {
+    printf(" extref %d create failed\n", n);
+    return XML_STATUS_ERROR;
+  }
+  const char *body
+      = ctx ? "<x y='1'>t<!--c--></x>u"
+            : "<!ENTITY i 'in'><!ATTLIST a x CDATA 'd'><!ELEMENT z ANY>";
+  /* Set 19 also feeds every fourth entity a malformed text. */
+  if (g_ext == 2 && n % 4 == 2)
+    body = ctx ? "<x>t" : "<!ENTITY i 'in'";
+  g_ext_depth++;
+  enum XML_Status st = XML_Parse(c, body, (int)strlen(body), 1);
+  g_ext_depth--;
+  printf(" extref %d status=%d error=%d base=", n, (int)st,
+         (int)XML_GetErrorCode(c));
+  putz(XML_GetBase(c));
+  pos_of(c);
+  if (g_ext == 2 && g_ext_nkept < 64)
+    g_ext_kept[g_ext_nkept++] = c;
+  else
+    XML_ParserFree(c);
+  return st == XML_STATUS_ERROR ? XML_STATUS_ERROR : XML_STATUS_OK;
+}
+
+static int XMLCALL on_not_standalone(void *ud) {
+  (void)ud;
+  printf(" not-standalone\n");
+  return g_ext == 1;
+}
+
+static void set_ext_handlers(int which) {
+  g_ext = which;
+  g_ext_n = 0;
+  g_ext_depth = 0;
+  g_ext_nkept = 0;
+  XML_SetExternalEntityRefHandler(g_parser, on_extref);
+  XML_SetNotStandaloneHandler(g_parser, on_not_standalone);
+  XML_SetParamEntityParsing(g_parser,
+                            which == 1
+                                ? XML_PARAM_ENTITY_PARSING_ALWAYS
+                                : XML_PARAM_ENTITY_PARSING_UNLESS_STANDALONE);
+  XML_SetBase(g_parser, "http://example.org/");
+  /* The context string lists the open entities in hash table order. */
+  XML_SetHashSalt(g_parser, 0x5eed);
+}
+
+static void free_kept(void) {
+  for (int i = 0; i < g_ext_nkept; i++)
+    XML_ParserFree(g_ext_kept[i]);
+  g_ext_nkept = 0;
+  g_ext = 0;
+}
+
 static void run(const char *doc, long len, long chunk, int ns, int handlers,
                 int buffer, int every, int resumable) {
   printf(" config chunk=%ld ns=%d handlers=%d buffer=%d", chunk, ns, handlers,
@@ -414,7 +506,8 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCommentHandler(g_parser, on_comment);
   }
-  if (handlers == 9 || handlers == 12 || handlers == 13 || handlers == 15) {
+  if (handlers == 9 || handlers == 12 || handlers == 13 || handlers == 15 ||
+      handlers == 18 || handlers == 19) {
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCharacterDataHandler(g_parser, on_chars);
   }
@@ -432,6 +525,8 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
     printf(" settings encoding=%d\n",
            (int)XML_SetEncoding(g_parser, "ISO-8859-1"));
   }
+  if (handlers == 18 || handlers == 19)
+    set_ext_handlers(handlers - 17);
   if (handlers == 10) {
     enum XML_Status bs = XML_SetBase(g_parser, "http://example.org/b/");
     printf(" base status=%d ", (int)bs);
@@ -487,6 +582,7 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
   if (g_current)
     XML_DefaultCurrent(g_parser);
   XML_ParserFree(g_parser);
+  free_kept();
 }
 
 static void status(const char *what, int st) {
@@ -831,12 +927,35 @@ static void settings_edge(void) {
   XML_ParserFree(g_parser);
 }
 
+static void ext_edge(void) {
+  static const char *const docs[] = {
+      "<!DOCTYPE a SYSTEM 'a.dtd' [<!ENTITY e SYSTEM 'e.xml'>"
+      "<!ENTITY % p PUBLIC 'pp' 'p.ent'> %p;]><a>&e;&i;</a>",
+      "<!DOCTYPE r [<!ENTITY e SYSTEM 'sub/e.xml'>]>"
+      "<r xmlns='urn:x' xmlns:p='urn:p'><p:q>&e;</p:q>&e;&e;</r>",
+      "<?xml version='1.0' standalone='no'?><!DOCTYPE a SYSTEM 'a.dtd'><a/>",
+      "<?xml version='1.0' standalone='yes'?><!DOCTYPE a SYSTEM 'a.dtd'>"
+      "<a/>",
+      "<!DOCTYPE a [<!ENTITY % p SYSTEM 'p.ent'>%p;]><a>&i;</a>",
+      "<!DOCTYPE a [<!ENTITY e SYSTEM 'e.xml'>]><a x='&e;'/>",
+  };
+  for (unsigned d = 0; d < sizeof docs / sizeof *docs; d++) {
+    printf("ext doc %u\n", d);
+    long len = (long)strlen(docs[d]);
+    for (int ns = 0; ns < 2; ns++)
+      for (int h = 18; h < 20; h++)
+        for (int c = 0; c < 2; c++)
+          run(docs[d], len, c, ns, h, c, 0, 0);
+  }
+}
+
 int main(int argc, char **argv) {
   printf("version %s\n", XML_ExpatVersion());
   edge();
   base_edge();
   stop_edge();
   settings_edge();
+  ext_edge();
   for (int i = 1; i < argc; i++) {
     FILE *f = fopen(argv[i], "rb");
     if (! f) {
@@ -856,7 +975,7 @@ int main(int argc, char **argv) {
     static const long chunks[] = {0, 1, 7};
     for (int c = 0; c < 3; c++)
       for (int ns = 0; ns < 2; ns++)
-        for (int h = 0; h < 18; h++)
+        for (int h = 0; h < 20; h++)
           for (int b = 0; b < 2; b++)
             run(doc, len, chunks[c], ns, h, b, 0, 0);
     /* Stopped from the handlers: suspended at every event, at every third

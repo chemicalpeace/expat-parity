@@ -1644,3 +1644,41 @@ recorded in DIVERGENCES.md.
   `XML_ParserCreate_MM`: 541 documents x 234 runs (126594), output equal
   to libexpat. Doc examples cover `reset`, `set_encoding`,
   `set_return_ns_triplet`, the limits and `Handler::take_base`.
+
+## D-055 External entities in the public API and the C interface (module 13, slice 8) (2026-11-14)
+
+- **Decision.** `Events` gains `external_entity_ref` and `not_standalone`,
+  off in both `ALL` and `NONE` because the handler's answer decides
+  whether the parse goes on. `Handler::external_entity_ref` receives an
+  `ExternalEntities`, whose `create(context, encoding)` returns an
+  `ExternalParser` (`XML_ExternalEntityParserCreate`); it dereferences to
+  `Parser`, and dropping it is `XML_ParserFree`, which hands the state it
+  shares with the document's parser back (D-032). The default refuses, as
+  a C handler returning `XML_STATUS_ERROR` does. `Handler::not_standalone`
+  defaults to going on. `Parser::reset` now returns `bool`, `false` for an
+  external entity parser, which `XML_ParserReset` refuses.
+- **Lifetime.** The external entity parser borrows the document's parser,
+  so it cannot outlive the handler call. The core already worked this way
+  (`parse::ExternalEntities`, D-032); the public types wrap it without
+  new unsafe code in `expat`.
+- **C interface.** `XML_SetExternalEntityRefHandler`,
+  `XML_SetExternalEntityRefHandlerArg`, `XML_ExternalEntityParserCreate`
+  and `XML_SetNotStandaloneHandler`. While the reference handler runs, the
+  parser keeps a pointer to its `ExternalEntities`;
+  `XML_ExternalEntityParserCreate` creates the child from it and erases the
+  borrow's lifetime. The child is dropped by `XML_ParserFree` or, if the
+  handler did not free it, when the handler returns; the handle then stays
+  valid but its parsing calls fail with `XML_ERROR_FINISHED`. Outside the
+  handler, and for a second child while one is open, the function returns
+  `NULL`. libexpat allows both and keeps a child usable after the handler;
+  this is documented as a difference. The child copies the handlers, the
+  user data, the handler argument rule, the reference handler argument,
+  the memory functions and the recorded settings, as in libexpat.
+- **Verification.** `scripts/capi-check.sh` adds handler sets 18 and 19
+  (reference handler printing its arguments, creating the child, parsing a
+  fixed text, freeing it in the handler or after the parse; refusals and
+  malformed entity text in set 19; not-standalone handler accepting or
+  refusing; parameter entity parsing always or unless standalone; fixed
+  hash salt so that the context string's order is reproducible) on every
+  document and on six documents with external entities: 541 documents x
+  258 runs plus 48 (139626), output equal to libexpat 2.10.0.
