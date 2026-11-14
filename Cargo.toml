@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
-members = ["crates/expat", "crates/expat-oracle", "tests", "benches"]
-default-members = ["crates/expat", "crates/expat-oracle", "tests", "benches"]
+members = ["crates/expat", "crates/expat-capi", "crates/expat-oracle", "tests", "benches"]
+default-members = ["crates/expat", "crates/expat-capi", "crates/expat-oracle", "tests", "benches"]
 exclude = ["fuzz"]
 
 [workspace.package]
