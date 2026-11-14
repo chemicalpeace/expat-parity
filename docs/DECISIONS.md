@@ -1682,3 +1682,39 @@ recorded in DIVERGENCES.md.
   hash salt so that the context string's order is reproducible) on every
   document and on six documents with external entities: 541 documents x
   258 runs plus 48 (139626), output equal to libexpat 2.10.0.
+
+## D-056 In-handler queries: input context, byte count, ID attribute index (module 13, slice 9) (2026-11-14)
+
+- **Decision.** As for positions (D-048), the parser reports what a C
+  handler would ask for before the event, when asked to: `Events` gains
+  `input_context` and `id_attribute`, off in both `ALL` and `NONE`.
+  `Handler::input_context(buffer, offset, byte_count)` receives the input
+  buffer up to `m_bufferEnd`, the event's offset in it (`None` where
+  `XML_GetInputContext` returns `NULL`) and `XML_GetCurrentByteCount`.
+  `Handler::id_attribute(index)` is called before each start element
+  event with the index of the `ID` attribute among the attribute pairs
+  (libexpat's index divided by two), `None` for -1. Between calls,
+  `Parser::current_byte_count` and `Parser::input_context` return the same
+  values from the parser state.
+- **C interface.** `XML_GetCurrentByteCount`, `XML_GetCurrentByteCount64`,
+  `XML_GetInputContext`, `XML_GetInputContext64` and
+  `XML_GetIdAttributeIndex`. Inside a handler they answer from the values
+  reported before the event; the buffer pointer stays valid during the
+  handler because the input buffer is only written between parsing calls.
+  The C interface asks for the input context whenever any handler is set,
+  and for the ID index whenever a start element handler is set.
+- **Uninitialised value in libexpat.** libexpat 2.10.0 does not
+  initialise `m_idAttIndex` in `parserCreate` or `parserInit`, so
+  `XML_GetIdAttributeIndex` before the first start tag of a new parser
+  returns whatever the allocator left there, and after `XML_ParserReset`
+  the value from the previous document. The C interface returns -1 in
+  both cases; this is documented as a difference, and the comparison
+  prints the index only after a start element handler has run.
+- **Verification.** `scripts/capi-check.sh` adds handler set 20 (content
+  handlers, declaration handlers and the default handler; every handler
+  and every parsing call prints the byte count and input context through
+  both forms of each function, up to 16 bytes before the event, the
+  event's bytes and the ID index): 541 documents x 270 runs plus 48
+  (146118), output equal to libexpat 2.10.0. Doc examples cover
+  `Handler::input_context`, `Handler::id_attribute` and
+  `Parser::input_context`.

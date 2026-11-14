@@ -22,8 +22,7 @@
 //! inside handlers (D-048) and the version.
 //!
 //! Not provided yet, so that a program using them fails to link rather
-//! than run with different behaviour: `XML_SetUnknownEncodingHandler`, `XML_GetCurrentByteCount`,
-//! `XML_GetIdAttributeIndex` and `XML_GetInputContext`.
+//! than run with different behaviour: `XML_SetUnknownEncodingHandler`.
 //!
 //! Differences from libexpat:
 //!
@@ -37,8 +36,11 @@
 //!   cleared from inside a handler takes effect from the next call. (A
 //!   handler replaced by another non-`NULL` handler is used at once, as in
 //!   libexpat.)
-//! - `XML_GetSpecifiedAttributeCount` is updated only while a start
-//!   element handler is set, which is where libexpat documents its use.
+//! - `XML_GetSpecifiedAttributeCount` and `XML_GetIdAttributeIndex` are
+//!   updated only while a start element handler is set, which is where
+//!   libexpat documents their use. Before the first start tag, and after
+//!   `XML_ParserReset`, `XML_GetIdAttributeIndex` returns -1; libexpat
+//!   2.10.0 leaves the value uninitialised there (D-056).
 //! - `XML_Parse`, `XML_ParseBuffer`, `XML_GetBuffer`, `XML_ResumeParser`,
 //!   `XML_ParserReset` and `XML_ParserFree` called from inside a handler
 //!   do nothing (`XML_STATUS_ERROR`, `XML_FALSE` or `NULL`, without an
@@ -366,6 +368,14 @@ pub struct XML_ParserStruct {
     /// The position of the event being reported (line from 1, column,
     /// byte index), for the position functions inside a handler.
     event_position: Cell<(u64, u64, i64)>,
+    /// The input buffer of the event being reported (start, length,
+    /// offset of the event or `None` for `NULL`) and its byte count, for
+    /// `XML_GetInputContext` and `XML_GetCurrentByteCount` inside a
+    /// handler. The buffer is not written while a handler runs.
+    event_input: Cell<(*const u8, usize, Option<usize>, u64)>,
+    /// `XML_GetIdAttributeIndex`: as libexpat returns it, twice the index
+    /// of the attribute; -1 for none.
+    id_index: Cell<c_int>,
     start_element: Cell<XML_StartElementHandler>,
     end_element: Cell<XML_EndElementHandler>,
     character_data: Cell<XML_CharacterDataHandler>,
@@ -480,6 +490,8 @@ impl XML_ParserStruct {
             error_code: Cell::new(XML_ERROR_NONE),
             specified: Cell::new(0),
             event_position: Cell::new((0, 0, -1)),
+            event_input: Cell::new((std::ptr::null(), 0, None, 0)),
+            id_index: Cell::new(-1),
             start_element: Cell::new(None),
             end_element: Cell::new(None),
             character_data: Cell::new(None),
@@ -552,7 +564,11 @@ impl XML_ParserStruct {
             .event_text(self.default.get().is_some())
             .external_entity_ref(self.external_entity_ref.get().is_some())
             .not_standalone(self.not_standalone.get().is_some());
-        events.position(events != Events::NONE)
+        let id = events.start_element;
+        events
+            .position(events != Events::NONE)
+            .input_context(events != Events::NONE)
+            .id_attribute(id)
     }
 
     /// Runs `f` on the Rust parser between calls, or returns the field of
@@ -811,6 +827,19 @@ impl Handler for Dispatch<'_> {
 
     fn position(&mut self, line: u64, column: u64, byte_index: i64) {
         self.state.event_position.set((line, column, byte_index));
+    }
+
+    fn input_context(&mut self, buffer: &[u8], offset: Option<usize>, byte_count: u64) {
+        self.state
+            .event_input
+            .set((buffer.as_ptr(), buffer.len(), offset, byte_count));
+    }
+
+    fn id_attribute(&mut self, index: Option<usize>) {
+        let c = index.map_or(-1, |i| {
+            c_int::try_from(i.saturating_mul(2)).unwrap_or(c_int::MAX)
+        });
+        self.state.id_index.set(c);
     }
 
     fn start_element(&mut self, name: &[u8], attributes: &[(&[u8], &[u8])], specified: usize) {
@@ -2043,6 +2072,126 @@ pub unsafe extern "C" fn XML_GetSpecifiedAttributeCount(parser: XML_Parser) -> c
     unsafe { state(parser) }.map_or(-1, |s| s.specified.get())
 }
 
+/// `XML_GetIdAttributeIndex`: the index in the attribute array of the
+/// last start element handler call of the attribute declared with type
+/// `ID`, counting names and values, or -1 if none was given in the tag;
+/// -1 for `NULL`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetIdAttributeIndex(parser: XML_Parser) -> c_int {
+    // SAFETY: forwarded from this function's contract.
+    unsafe { state(parser) }.map_or(-1, |s| s.id_index.get())
+}
+
+/// `XML_GetCurrentByteCount64`: the length in bytes of the current event
+/// as written, or 0; 0 for `NULL`.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetCurrentByteCount64(parser: XML_Parser) -> u64 {
+    // SAFETY: forwarded from this function's contract.
+    unsafe { state(parser) }.map_or(0, |s| {
+        s.position(|p| p.current_byte_count(), |_| s.event_input.get().3)
+    })
+}
+
+/// `XML_GetCurrentByteCount`: `XML_GetCurrentByteCount64` converted to
+/// `int` as libexpat does.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetCurrentByteCount(parser: XML_Parser) -> c_int {
+    // SAFETY: forwarded from this function's contract.
+    let v = unsafe { XML_GetCurrentByteCount64(parser) };
+    // reason: C's `(int)` conversion, which wraps.
+    #[allow(clippy::cast_possible_truncation)]
+    let r = v as c_int;
+    r
+}
+
+/// `XML_GetInputContext64`: the parser's input buffer, with the offset of
+/// the current event in it and the length of the input it holds, or
+/// `NULL` (leaving `offset` and `size` as they are) when there is no
+/// current event; `NULL` for a `NULL` parser. The bytes are valid until
+/// the parser next reads input or is freed (inside a handler, until the
+/// handler returns).
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `offset` and `size` are each
+/// `NULL` or valid for a write.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetInputContext64(
+    parser: XML_Parser,
+    offset: *mut i64,
+    size: *mut u64,
+) -> *const c_char {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return std::ptr::null();
+    };
+    let context = s.position(
+        |p| p.input_context().map(|(b, o)| (b.as_ptr(), b.len(), o)),
+        |_| {
+            let (ptr, len, offset, _) = s.event_input.get();
+            offset.map(|o| (ptr, len, o))
+        },
+    );
+    let Some((ptr, len, at)) = context else {
+        return std::ptr::null();
+    };
+    if !offset.is_null() {
+        // SAFETY: the caller passes a pointer valid for a write.
+        unsafe { offset.write(i64::try_from(at).unwrap_or(i64::MAX)) };
+    }
+    if !size.is_null() {
+        // SAFETY: as above.
+        unsafe { size.write(len as u64) };
+    }
+    ptr.cast()
+}
+
+/// `XML_GetInputContext`: `XML_GetInputContext64` with `offset` and
+/// `size` converted to `int` as libexpat does.
+///
+/// # Safety
+///
+/// As for [`XML_GetInputContext64`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_GetInputContext(
+    parser: XML_Parser,
+    offset: *mut c_int,
+    size: *mut c_int,
+) -> *const c_char {
+    let mut offset64 = 0i64;
+    let mut size64 = 0u64;
+    // SAFETY: forwarded from this function's contract; the two locals are
+    // valid for a write.
+    let buffer = unsafe { XML_GetInputContext64(parser, &mut offset64, &mut size64) };
+    if buffer.is_null() {
+        return buffer;
+    }
+    // reason: C's `(int)` conversions, which wrap.
+    #[allow(clippy::cast_possible_truncation)]
+    let (o, z) = (offset64 as c_int, size64 as c_int);
+    if !offset.is_null() {
+        // SAFETY: the caller passes a pointer valid for a write.
+        unsafe { offset.write(o) };
+    }
+    if !size.is_null() {
+        // SAFETY: as above.
+        unsafe { size.write(z) };
+    }
+    buffer
+}
+
 /// `XML_ExpatVersion`: `"expat_2.10.0"`, the libexpat version this crate
 /// follows.
 #[unsafe(no_mangle)]
@@ -2575,6 +2724,8 @@ pub unsafe extern "C" fn XML_ParserReset(
     s.error_code.set(XML_ERROR_NONE);
     s.specified.set(0);
     s.event_position.set((0, 0, -1));
+    s.event_input.set((std::ptr::null(), 0, None, 0));
+    s.id_index.set(-1);
     s.start_element.set(None);
     s.end_element.set(None);
     s.character_data.set(None);

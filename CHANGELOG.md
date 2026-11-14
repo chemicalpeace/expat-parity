@@ -47,10 +47,12 @@ All notable changes are documented here. The format follows
   `Handler::take_base` (D-054), external entities
   (`Events::external_entity_ref`, `Handler::external_entity_ref`,
   `ExternalEntities`, `ExternalParser`) and `Handler::not_standalone`
-  (D-055).
+  (D-055), `Events::input_context` with `Handler::input_context`,
+  `Events::id_attribute` with `Handler::id_attribute`,
+  `Parser::current_byte_count` and `Parser::input_context` (D-056).
 - `crates/expat-capi` (not published): a first part of libexpat's C
   interface over the crate, compared with libexpat by
-  `scripts/capi-check.sh` (D-047 to D-055).
+  `scripts/capi-check.sh` (D-047 to D-056).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.

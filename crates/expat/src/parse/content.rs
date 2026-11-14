@@ -722,6 +722,9 @@ impl Parser {
             )
         };
         let n = atts.list.len();
+        if self.handlers.id_attribute {
+            h.id_attribute_index(self.id_att_index);
+        }
         if n <= STACK_ATTS {
             let mut list: [(&[u8], &[u8]); STACK_ATTS] = [(&[], &[]); STACK_ATTS];
             for (slot, a) in list.iter_mut().zip(&atts.list) {

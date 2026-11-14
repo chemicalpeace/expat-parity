@@ -99,6 +99,14 @@ pub struct Events {
     /// [`Handler::not_standalone`] (`XML_SetNotStandaloneHandler`). Off in
     /// both [`Events::ALL`] and [`Events::NONE`], for the same reason.
     pub not_standalone: bool,
+    /// [`Handler::input_context`] before each reported event: what
+    /// `XML_GetInputContext` and `XML_GetCurrentByteCount` return inside
+    /// a C handler. Off in both [`Events::ALL`] and [`Events::NONE`].
+    pub input_context: bool,
+    /// [`Handler::id_attribute`] before each [`Handler::start_element`]:
+    /// what `XML_GetIdAttributeIndex` returns inside a C start element
+    /// handler. Off in both [`Events::ALL`] and [`Events::NONE`].
+    pub id_attribute: bool,
 }
 
 impl Events {
@@ -128,6 +136,8 @@ impl Events {
         event_text: false,
         external_entity_ref: false,
         not_standalone: false,
+        input_context: false,
+        id_attribute: false,
     };
 
     /// No event: the parser works as [`Parser::parse`] does.
@@ -158,6 +168,8 @@ impl Events {
         event_text: false,
         external_entity_ref: false,
         not_standalone: false,
+        input_context: false,
+        id_attribute: false,
     };
 
     /// Sets [`Events::start_element`].
@@ -314,6 +326,20 @@ impl Events {
         self
     }
 
+    /// Sets [`Events::input_context`].
+    #[must_use]
+    pub const fn input_context(mut self, on: bool) -> Self {
+        self.input_context = on;
+        self
+    }
+
+    /// Sets [`Events::id_attribute`].
+    #[must_use]
+    pub const fn id_attribute(mut self, on: bool) -> Self {
+        self.id_attribute = on;
+        self
+    }
+
     /// Sets [`Events::external_entity_ref`].
     #[must_use]
     pub const fn external_entity_ref(mut self, on: bool) -> Self {
@@ -356,6 +382,8 @@ impl Events {
             event_text: self.event_text,
             external_entity_ref: self.external_entity_ref,
             not_standalone: self.not_standalone,
+            event_input: self.input_context,
+            id_attribute: self.id_attribute,
         }
     }
 }
@@ -635,6 +663,77 @@ pub trait Handler {
     /// ```
     fn event_text(&mut self, _pieces: &[&[u8]]) {}
 
+    /// Where the event reported next lies in the parser's input buffer,
+    /// when [`Events::input_context`] is on: the buffer up to the end of
+    /// the input passed so far, of which the parser keeps up to 1024
+    /// bytes before the current parse position, and the event's offset in
+    /// it (`XML_GetInputContext`); `None`, with an empty buffer, where
+    /// `XML_GetInputContext` returns `NULL`. The bytes are the document's
+    /// as written, in its own encoding. `byte_count` is what
+    /// `XML_GetCurrentByteCount` returns: the length of the event in the
+    /// document (for an event inside an internal entity, of the part of
+    /// the document libexpat points at then), or 0.
+    ///
+    /// ```
+    /// use expat::{Events, Handler, Parser};
+    ///
+    /// #[derive(Default)]
+    /// struct Tags {
+    ///     current: Vec<u8>,
+    ///     tags: Vec<Vec<u8>>,
+    /// }
+    ///
+    /// impl Handler for Tags {
+    ///     const EVENTS: Events = Events::NONE.start_element(true).input_context(true);
+    ///     fn input_context(&mut self, buffer: &[u8], offset: Option<usize>, byte_count: u64) {
+    ///         let start = offset.unwrap_or(0);
+    ///         let end = start + usize::try_from(byte_count).unwrap_or(0);
+    ///         self.current = buffer.get(start..end).unwrap_or_default().to_vec();
+    ///     }
+    ///     fn start_element(&mut self, _name: &[u8], _atts: &[(&[u8], &[u8])], _specified: usize) {
+    ///         self.tags.push(self.current.clone());
+    ///     }
+    /// }
+    ///
+    /// let mut tags = Tags::default();
+    /// let mut p = Parser::new([7; 16]);
+    /// p.parse_with(&mut tags, b"<a x = '1'><b/></a>", true)?;
+    /// assert_eq!(tags.tags, [&b"<a x = '1'>"[..], b"<b/>"]);
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    fn input_context(&mut self, _buffer: &[u8], _offset: Option<usize>, _byte_count: u64) {}
+
+    /// The index, among the attributes passed to the next
+    /// [`Handler::start_element`], of the attribute declared with type
+    /// `ID`, when [`Events::id_attribute`] is on and that attribute is
+    /// given in the tag (`XML_GetIdAttributeIndex`, which counts names
+    /// and values and so returns twice this index).
+    ///
+    /// ```
+    /// use expat::{Events, Handler, Parser};
+    ///
+    /// #[derive(Default)]
+    /// struct Ids(Option<usize>, Vec<Option<Vec<u8>>>);
+    ///
+    /// impl Handler for Ids {
+    ///     const EVENTS: Events = Events::NONE.start_element(true).id_attribute(true);
+    ///     fn id_attribute(&mut self, index: Option<usize>) {
+    ///         self.0 = index;
+    ///     }
+    ///     fn start_element(&mut self, _name: &[u8], atts: &[(&[u8], &[u8])], _specified: usize) {
+    ///         self.1.push(self.0.and_then(|i| atts.get(i)).map(|a| a.1.to_vec()));
+    ///     }
+    /// }
+    ///
+    /// let doc = b"<!DOCTYPE a [<!ATTLIST b key ID #IMPLIED>]><a><b n='1' key='k'/><b/></a>";
+    /// let mut ids = Ids::default();
+    /// let mut p = Parser::new([7; 16]);
+    /// p.parse_with(&mut ids, doc, true)?;
+    /// assert_eq!(ids.1, [None, Some(b"k".to_vec()), None]);
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    fn id_attribute(&mut self, _index: Option<usize>) {}
+
     /// A new base set from inside a handler (`XML_SetBase` during a
     /// parse), asked for before the parser next uses the base: before
     /// each event, each token of the document type declaration, and at
@@ -740,6 +839,14 @@ impl<H: Handler> parse::Handler for Adapter<'_, H> {
     }
     fn event_position(&mut self, line: u64, column: u64, byte_index: i64) {
         self.0.position(line, column, byte_index);
+    }
+    fn event_input(&mut self, buffer: &[u8], offset: Option<usize>, byte_count: u64) {
+        self.0.input_context(buffer, offset, byte_count);
+    }
+    fn id_attribute_index(&mut self, index: i32) {
+        // C's index counts names and values.
+        self.0
+            .id_attribute(usize::try_from(index).ok().map(|i| i / 2));
     }
     fn start_element(&mut self, name: &[u8], atts: &[(&[u8], &[u8])], specified: i32) {
         // C's count is twice the number of attributes given in the tag.

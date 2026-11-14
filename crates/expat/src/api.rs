@@ -445,6 +445,29 @@ impl Parser {
         self.inner.current_byte_index()
     }
 
+    /// The length in bytes of the parser's current event as written, or
+    /// 0 when there is none (`XML_GetCurrentByteCount64` between calls;
+    /// [`Handler::input_context`] gives it inside a handler).
+    pub fn current_byte_count(&self) -> u64 {
+        self.inner.current_byte_count()
+    }
+
+    /// The parser's input buffer up to the end of the input passed so far
+    /// and the offset of the current event in it, or `None` when there is
+    /// no current event (`XML_GetInputContext64` between calls;
+    /// [`Handler::input_context`] gives it inside a handler).
+    ///
+    /// ```
+    /// let mut p = expat::Parser::new([7; 16]);
+    /// p.parse(b"<a><b", false)?;
+    /// let rest = p.input_context().map(|(buffer, offset)| &buffer[offset..]);
+    /// assert_eq!(rest, Some(&b"<b"[..]));
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    pub fn input_context(&self) -> Option<(&[u8], usize)> {
+        self.inner.input_context()
+    }
+
     /// Sets the base passed to [`Handler::entity_decl`],
     /// [`Handler::unparsed_entity_decl`] and [`Handler::notation_decl`]
     /// for the declarations read from now on (`XML_SetBase`), or clears

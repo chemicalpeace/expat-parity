@@ -113,8 +113,13 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
 - **Positions:** the position of each event is reported to
   `Handler::position` when `Events::position` is set, and the position
   between calls is `Parser::current_line`, `current_column` and
-  `current_byte_index`; there is no `XML_GetCurrentByteCount` or
-  `XML_GetInputContext`.
+  `current_byte_index`. With `Events::input_context`,
+  `Handler::input_context` receives the event's place in the input buffer
+  and its byte count (`XML_GetInputContext`, `XML_GetCurrentByteCount`;
+  between calls `Parser::input_context` and `current_byte_count`), and
+  with `Events::id_attribute`, `Handler::id_attribute` receives the index
+  of the `ID` attribute before each start element
+  (`XML_GetIdAttributeIndex`).
 - **Stop and resume:** a handler stops the parse through a `Stopper`
   (`Parser::stopper`, `XML_StopParser`) and `Parser::resume` continues it
   (`XML_ResumeParser`). A suspended call returns `Ok(())` and

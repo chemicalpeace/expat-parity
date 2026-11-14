@@ -60,7 +60,16 @@ static int g_rebase;
 static int g_rebase_n;
 static int g_status;
 static int g_limits;
+/* Whether each handler prints the event's byte count, its place in the
+ * input context and the ID attribute index (set 20). */
+static int g_context;
+/* Whether a start element handler ran since the parser was created:
+ * libexpat 2.10.0 leaves the ID attribute index uninitialised until the
+ * first start tag, so it is printed only after one. */
+static int g_seen_start;
 static void putz(const char *s);
+static void putn(const char *s, int len);
+static void context(void);
 
 static void position(void);
 
@@ -78,6 +87,8 @@ static void where(void) {
     XML_DefaultCurrent(g_parser);
     g_in_current = 0;
   }
+  if (g_context)
+    context();
   if (g_rebase) {
     char b[32];
     snprintf(b, sizeof b, "r%d/", ++g_rebase_n);
@@ -151,6 +162,7 @@ static void XMLCALL on_start(void *ud, const XML_Char *name,
     put(atts[i]);
   }
   printf(" [%d]\n", XML_GetSpecifiedAttributeCount(g_parser));
+  g_seen_start = 1;
   where();
 }
 
@@ -374,6 +386,40 @@ static void set_decl_handlers(int unparsed) {
   XML_SetSkippedEntityHandler(g_parser, on_skipped);
 }
 
+/* The current event's byte count, its offset in the input context and
+ * the context's size (through both forms of each function), up to 16
+ * bytes before the event and the event's bytes, and the ID attribute
+ * index. */
+static void context(void) {
+  long long count = (long long)XML_GetCurrentByteCount64(g_parser);
+  int count32 = XML_GetCurrentByteCount(g_parser);
+  int64_t off = -7;
+  uint64_t size = 7;
+  int off32 = -7, size32 = 7;
+  const char *buf = XML_GetInputContext64(g_parser, &off, &size);
+  const char *buf32 = XML_GetInputContext(g_parser, &off32, &size32);
+  printf("   context count=%lld/%d", count, count32);
+  if (g_seen_start)
+    printf(" id=%d", XML_GetIdAttributeIndex(g_parser));
+  if (! buf) {
+    printf(" null=%d off=%lld size=%llu\n", buf32 == NULL, (long long)off,
+           (unsigned long long)size);
+    return;
+  }
+  printf(" same=%d off=%lld/%d size=%llu/%d ", buf == buf32, (long long)off,
+         off32, (unsigned long long)size, size32);
+  long long before = off < 16 ? off : 16;
+  if (before > 0)
+    putn(buf + off - before, (int)before);
+  putchar('|');
+  long long n = count;
+  if (off + n > (long long)size)
+    n = (long long)size - off;
+  if (n > 0)
+    putn(buf + off, (int)n);
+  putchar('\n');
+}
+
 static void position(void) {
   printf(" line=%llu col=%llu byte=%lld\n",
          (unsigned long long)XML_GetCurrentLineNumber(g_parser),
@@ -485,6 +531,8 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
             handlers == 15 || handlers == 16 || handlers == 17;
   g_rebase = handlers == 15;
   g_rebase_n = 0;
+  g_context = handlers == 20;
+  g_seen_start = 0;
   g_status = handlers == 15;
   g_limits = handlers == 16 ? 1 : handlers == 17 ? 2 : 0;
   g_current = handlers == 7 || handlers == 8 || handlers == 11;
@@ -505,6 +553,14 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
   if (handlers == 5) {
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCommentHandler(g_parser, on_comment);
+  }
+  if (handlers == 20) {
+    XML_SetElementHandler(g_parser, on_start, on_end);
+    XML_SetCharacterDataHandler(g_parser, on_chars);
+    XML_SetProcessingInstructionHandler(g_parser, on_pi);
+    XML_SetCommentHandler(g_parser, on_comment);
+    XML_SetCdataSectionHandler(g_parser, on_cdata_start, on_cdata_end);
+    XML_SetDefaultHandlerExpand(g_parser, on_default);
   }
   if (handlers == 9 || handlers == 12 || handlers == 13 || handlers == 15 ||
       handlers == 18 || handlers == 19) {
@@ -558,6 +614,8 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
     off += n;
     printf(" call status=%d error=%d", (int)st, (int)XML_GetErrorCode(g_parser));
     position();
+    if (g_context)
+      context();
     if (st == XML_STATUS_SUSPENDED) {
       /* Input is refused while suspended. */
       st = XML_Parse(g_parser, "", 0, 0);
@@ -975,7 +1033,7 @@ int main(int argc, char **argv) {
     static const long chunks[] = {0, 1, 7};
     for (int c = 0; c < 3; c++)
       for (int ns = 0; ns < 2; ns++)
-        for (int h = 0; h < 20; h++)
+        for (int h = 0; h < 21; h++)
           for (int b = 0; b < 2; b++)
             run(doc, len, chunks[c], ns, h, b, 0, 0);
     /* Stopped from the handlers: suspended at every event, at every third
