@@ -10,7 +10,7 @@ use super::accounting::Account;
 use super::dtd::{Binding, BindingId, EntityRef, PrefixId};
 use super::error::{Stop, XmlError};
 use super::entity::EntityType;
-use super::prolog::{to_utf8, to_utf8_token_into, with_known};
+use super::prolog::{to_utf8, to_utf8_token_into, with_enc};
 use super::tracker::{ATTRIBUTE_SIZE, Pool};
 use super::{AppAtt, AppAtts, Enc, Handler, INIT_ATTS_SIZE, INIT_DATA_BUF_SIZE, Parser, Parsing, Processor};
 use crate::encode::utf8_encode;
@@ -110,13 +110,18 @@ impl Parser {
         // because none of its bytes are direct).
         let start_tag_level = i32::from(self.is_child);
         let have_more = !self.final_buffer;
-        match self.enc {
-            Enc::Known(k) => {
-                with_known!(k, e => self.do_content(h, e, start_tag_level, buf, s, next_ptr, have_more, Account::Direct))?;
+        match self.decided_enc() {
+            Some(k) => {
+                with_enc!(k, e => self.do_content(h, e, start_tag_level, buf, s, next_ptr, have_more, Account::Direct))?;
             }
             // Only an external entity can reach content before its
             // encoding is known (an empty or very short entity).
-            Enc::Init(init) => self.content_undecided(h, init, buf, s, next_ptr, have_more, start_tag_level)?,
+            None => {
+                let Enc::Init(init) = self.enc else {
+                    return Err(XmlError::UnexpectedState.into());
+                };
+                self.content_undecided(h, init, buf, s, next_ptr, have_more, start_tag_level)?;
+            }
         }
         let direct = self.direct();
         self.tracker
@@ -132,12 +137,12 @@ impl Parser {
         s: usize,
         next_ptr: &mut usize,
     ) -> Result<(), Stop> {
-        let Enc::Known(k) = self.enc else {
+        let Some(k) = self.decided_enc() else {
             return Err(XmlError::UnexpectedState.into());
         };
         let have_more = !self.final_buffer;
         let mut start = Some(s);
-        with_known!(k, e => self.do_cdata_section(h, e, buf, &mut start, next_ptr, have_more, Account::Direct))?;
+        with_enc!(k, e => self.do_cdata_section(h, e, buf, &mut start, next_ptr, have_more, Account::Direct))?;
         if let Some(s) = start {
             self.processor = Processor::Content;
             return self.content_processor(h, buf, s, next_ptr);
@@ -153,10 +158,10 @@ impl Parser {
         s: usize,
         next_ptr: &mut usize,
     ) -> Result<(), Stop> {
-        let Enc::Known(k) = self.enc else {
+        let Some(k) = self.decided_enc() else {
             return Err(XmlError::UnexpectedState.into());
         };
-        with_known!(k, e => self.do_epilog(h, e, buf, s, next_ptr))
+        with_enc!(k, e => self.do_epilog(h, e, buf, s, next_ptr))
     }
 
     fn do_epilog<E: Encoding, H: Handler>(

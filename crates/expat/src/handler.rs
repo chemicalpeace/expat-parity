@@ -4,7 +4,7 @@
 //! [`Parser::parse_with`]: crate::Parser::parse_with
 
 use crate::entities::ExternalEntities;
-use crate::parse::{self, ContentModel};
+use crate::parse::{self, ContentModel, EncodingInfo};
 use alloc::vec::Vec;
 
 /// Which of the [`Handler`] events a parser reports: the C handler
@@ -810,6 +810,54 @@ pub trait Handler {
     fn not_standalone(&mut self) -> bool {
         true
     }
+
+    /// An encoding no built-in encoding has, named by the XML or text
+    /// declaration or given to [`Options::encoding`]
+    /// (`XML_UnknownEncodingHandler`; the name in UTF-8). Returning an
+    /// [`EncodingInfo`] describes it; `None` (the default) refuses it and
+    /// the parse fails with [`ErrorCode::UnknownEncoding`], as it does
+    /// for a map the parser rejects (an ASCII character XML uses that does
+    /// not map to itself, a multi-byte entry without a converter, a code
+    /// point above U+FFFF). The parser keeps the encoding until it is
+    /// reset or dropped, and then drops its converter and runs its
+    /// release function. Called whatever [`Handler::EVENTS`] says.
+    ///
+    /// ```
+    /// use expat::{EncodingInfo, Events, Handler, Parser};
+    ///
+    /// // Latin-1 with the euro sign at 0xA4 (as in ISO-8859-15).
+    /// struct Euro(Vec<u8>);
+    ///
+    /// impl Handler for Euro {
+    ///     const EVENTS: Events = Events::NONE.character_data(true);
+    ///     fn character_data(&mut self, data: &[u8]) {
+    ///         self.0.extend_from_slice(data);
+    ///     }
+    ///     fn unknown_encoding(&mut self, name: &[u8]) -> Option<EncodingInfo> {
+    ///         if name != b"x-euro" {
+    ///             return None;
+    ///         }
+    ///         let mut info = EncodingInfo::new();
+    ///         for (m, b) in info.map.iter_mut().zip(0..) {
+    ///             *m = b;
+    ///         }
+    ///         info.map[0xA4] = 0x20AC;
+    ///         Some(info)
+    ///     }
+    /// }
+    ///
+    /// let mut h = Euro(Vec::new());
+    /// let mut p = Parser::new([7; 16]);
+    /// p.parse_with(&mut h, b"<?xml version='1.0' encoding='x-euro'?><a>\xa4 5</a>", true)?;
+    /// assert_eq!(h.0, "\u{20ac} 5".as_bytes());
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    ///
+    /// [`Options::encoding`]: crate::Options::encoding
+    /// [`ErrorCode::UnknownEncoding`]: crate::ErrorCode::UnknownEncoding
+    fn unknown_encoding(&mut self, _name: &[u8]) -> Option<EncodingInfo> {
+        None
+    }
 }
 
 /// Passes the parser core's events to a public [`Handler`]. Only the
@@ -821,6 +869,9 @@ pub(crate) struct Adapter<'a, H: Handler>(pub(crate) &'a mut H);
 impl<H: Handler> parse::Handler for Adapter<'_, H> {
     fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
         self.0.take_base()
+    }
+    fn unknown_encoding(&mut self, name: &[u8]) -> Option<EncodingInfo> {
+        self.0.unknown_encoding(name)
     }
     fn external_entity_ref(
         &mut self,

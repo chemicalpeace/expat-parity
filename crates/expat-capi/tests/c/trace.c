@@ -512,6 +512,111 @@ static void set_ext_handlers(int which) {
   XML_SetHashSalt(g_parser, 0x5eed);
 }
 
+/* ---- Unknown encodings (set 21 and unk_edge) ---------------------------- */
+
+/* Two bytes: U+0100 + the low six bits of each; three bytes (first byte
+ * 0xE0-0xEF): U+3000 + the low nibble of the first and the XOR of the
+ * others. 0xFF as the first or last byte is malformed. */
+static int XMLCALL conv_multi(void *data, const char *s) {
+  (void)data;
+  unsigned char a = (unsigned char)s[0], b = (unsigned char)s[1];
+  if (a == 0xff || b == 0xff)
+    return -1;
+  if (a >= 0xe0) {
+    unsigned char c = (unsigned char)s[2];
+    if (c == 0xff)
+      return -1;
+    return 0x3000 + ((a & 0x0f) << 8) + (b ^ c);
+  }
+  return 0x100 + (((a & 0x3f) << 6) | (b & 0x3f));
+}
+
+/* The converters of libexpat's tests: the low bits of the first byte plus
+ * the second, or always malformed. */
+static int XMLCALL conv_prefix(void *data, const char *s) {
+  (void)data;
+  if (s[0] == (char)-1)
+    return -1;
+  return (s[1] + (s[0] & 0x7f)) & 0x01ff;
+}
+
+static int XMLCALL conv_failing(void *data, const char *s) {
+  (void)data;
+  (void)s;
+  return -1;
+}
+
+static void XMLCALL on_release(void *data) {
+  printf(" release %s\n", (const char *)data);
+}
+
+static int XMLCALL on_unknown_encoding(void *data, const XML_Char *name,
+                                       XML_Encoding *info) {
+  printf(" unknown-encoding %s data=%s map0=%d\n", name, (const char *)data,
+         info->map[0]);
+  int i;
+  int high = -2;
+  int status = XML_STATUS_OK;
+  if (! strcmp(name, "x-euro") || ! strcmp(name, "x-bad")
+      || ! strcmp(name, "x-high") || ! strcmp(name, "x-refuse")) {
+    for (i = 0; i < 256; i++)
+      info->map[i] = i;
+    info->map[0xa4] = 0x20ac;
+    if (! strcmp(name, "x-bad"))
+      info->map['<'] = 'x';
+    if (! strcmp(name, "x-high"))
+      info->map[0x80] = 0x110000;
+    if (! strcmp(name, "x-refuse"))
+      status = XML_STATUS_ERROR;
+    info->data = name[2] == 'e' ? (void *)"euro" : (void *)"single";
+    info->release = on_release;
+    return status;
+  }
+  if (! strcmp(name, "x-multi") || ! strcmp(name, "x-noconv")) {
+    for (i = 0; i < 128; i++)
+      info->map[i] = i;
+    for (; i < 0xe0; i++)
+      info->map[i] = -2;
+    for (; i < 0xf0; i++)
+      info->map[i] = -3;
+    for (; i < 0xff; i++)
+      info->map[i] = 0x410 + (i - 0xf0);
+    info->map[0xff] = -1;
+    info->data = "multi";
+    info->release = on_release;
+    if (! strcmp(name, "x-multi"))
+      info->convert = conv_multi;
+    return XML_STATUS_OK;
+  }
+  /* The names libexpat's tests use (MiscEncodingHandler). */
+  if (! strcmp(name, "invalid-9") || ! strcmp(name, "ascii-like")
+      || ! strcmp(name, "invalid-len") || ! strcmp(name, "invalid-a")
+      || ! strcmp(name, "invalid-surrogate") || ! strcmp(name, "invalid-high"))
+    high = -1;
+  else if (strcmp(name, "prefix-conv") && strcmp(name, "failing-conv")
+           && strcmp(name, "no-conv"))
+    return XML_STATUS_ERROR;
+  for (i = 0; i < 128; i++)
+    info->map[i] = i;
+  for (; i < 256; i++)
+    info->map[i] = high;
+  if (! strcmp(name, "invalid-9"))
+    info->map[9] = 5;
+  if (! strcmp(name, "invalid-len"))
+    info->map[0x81] = -5;
+  if (! strcmp(name, "invalid-a"))
+    info->map[0x82] = 'a';
+  if (! strcmp(name, "invalid-surrogate"))
+    info->map[0x83] = 0xd801;
+  if (! strcmp(name, "invalid-high"))
+    info->map[0x84] = 0x010101;
+  if (! strcmp(name, "failing-conv"))
+    info->convert = conv_failing;
+  else if (! strcmp(name, "prefix-conv"))
+    info->convert = conv_prefix;
+  return XML_STATUS_OK;
+}
+
 static void free_kept(void) {
   for (int i = 0; i < g_ext_nkept; i++)
     XML_ParserFree(g_ext_kept[i]);
@@ -528,10 +633,11 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
   putchar('\n');
   g_where = handlers == 2 || handlers == 3 || handlers == 5 || handlers == 8 ||
             handlers == 9 || handlers == 12 || handlers == 13 ||
-            handlers == 15 || handlers == 16 || handlers == 17;
+            handlers == 15 || handlers == 16 || handlers == 17 ||
+            handlers >= 21;
   g_rebase = handlers == 15;
   g_rebase_n = 0;
-  g_context = handlers == 20;
+  g_context = handlers >= 20;
   g_seen_start = 0;
   g_status = handlers == 15;
   g_limits = handlers == 16 ? 1 : handlers == 17 ? 2 : 0;
@@ -554,7 +660,9 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCommentHandler(g_parser, on_comment);
   }
-  if (handlers == 20) {
+  if (handlers >= 21)
+    XML_SetUnknownEncodingHandler(g_parser, on_unknown_encoding, "doc");
+  if (handlers >= 20) {
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCharacterDataHandler(g_parser, on_chars);
     XML_SetProcessingInstructionHandler(g_parser, on_pi);
@@ -634,8 +742,9 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
       break;
   } while (off < len);
   const XML_Char *msg = XML_ErrorString(XML_GetErrorCode(g_parser));
-  printf(" end error=%d text=%s\n", (int)XML_GetErrorCode(g_parser),
+  printf(" end error=%d text=%s", (int)XML_GetErrorCode(g_parser),
          msg ? msg : "(null)");
+  putchar('\n');
   /* Outside a handler XML_DefaultCurrent does nothing. */
   if (g_current)
     XML_DefaultCurrent(g_parser);
@@ -1007,6 +1116,122 @@ static void ext_edge(void) {
   }
 }
 
+static int XMLCALL on_extref_unknown(XML_Parser p, const XML_Char *ctx,
+                                     const XML_Char *base,
+                                     const XML_Char *sys,
+                                     const XML_Char *pub) {
+  (void)base;
+  (void)pub;
+  printf(" extref sys=%s\n", sys);
+  int named = sys[0] == 'n';
+  XML_Parser c = XML_ExternalEntityParserCreate(p, ctx, named ? "x-euro" : NULL);
+  if (! c)
+    return XML_STATUS_ERROR;
+  const char *body = named ? "<b>\xa4</b>"
+                           : sys[0] == 'd'
+                                 ? "<?xml encoding='x-multi'?><b>\xc1\x81</b>"
+                                 : "<?xml encoding='x-noconv'?><b/>";
+  enum XML_Status st = XML_Parse(c, body, (int)strlen(body), 1);
+  printf(" extref %s status=%d error=%d", sys, (int)st, (int)XML_GetErrorCode(c));
+  pos_of(c);
+  XML_ParserFree(c);
+  return st;
+}
+
+static void unk_parse(const char *what, const char *doc, int bytewise) {
+  long len = (long)strlen(doc);
+  if (bytewise) {
+    long i;
+    int st = XML_STATUS_OK;
+    for (i = 0; i < len && st == XML_STATUS_OK; i++)
+      st = XML_Parse(g_parser, doc + i, 1, 0);
+    if (st == XML_STATUS_OK)
+      st = XML_Parse(g_parser, "", 0, 1);
+    status(what, st);
+  } else
+    status(what, XML_Parse(g_parser, doc, (int)len, 1));
+}
+
+/* Unknown encodings: the name from the parser's creation, from the XML
+ * declaration and from an external entity; refused and rejected maps;
+ * conversion errors; the release function at reset and at free. */
+static void unk_edge(void) {
+  static const char *const multi
+      = "<?xml version='1.0' encoding='x-multi'?>"
+        "<\xc1\x81:b xmlns:\xc1\x81='u' \xc1\x82='\xe1\x01\x02 \xf3'>"
+        "\xf1\xc2\x83&#x41;\xe0\x30\x31<![CDATA[\xc3\x84]]>"
+        "<?p \xc1\x85?><!--\xc1\x86--></\xc1\x81:b>";
+  static const char *const decls[] = {
+      "<?xml version='1.0' encoding='x-noconv'?><a/>",
+      "<?xml version='1.0' encoding='x-bad'?><a/>",
+      "<?xml version='1.0' encoding='x-high'?><a/>",
+      "<?xml version='1.0' encoding='x-refuse'?><a/>",
+      "<?xml version='1.0' encoding='x-zzz'?><a/>",
+      "<?xml version='1.0' encoding='x-euro'?><a>\xa4\x80</a>",
+      "<?xml version='1.0' encoding='x-multi'?><a>\xc1\xff</a>",
+      "<?xml version='1.0' encoding='x-multi'?><a>\xff</a>",
+      "<?xml version='1.0' encoding='x-multi'?><\xc1\x80/>",
+      "<?xml version='1.0' encoding='x-multi'?><a \xc0\x80='1'/>",
+      "<?xml version='1.0' encoding='x-multi'?><a>\xe1\x01",
+      "<?xml version='1.0' encoding='x-multi'?><a>\xe1",
+  };
+  XML_Parser saved = g_parser;
+  for (int ns = 0; ns < 2; ns++) {
+    for (int bytewise = 0; bytewise < 2; bytewise++) {
+      printf("edge unknown ns=%d bytewise=%d\n", ns, bytewise);
+      g_parser = ns ? XML_ParserCreateNS("x-euro", '|')
+                    : XML_ParserCreate("x-euro");
+      XML_SetUnknownEncodingHandler(g_parser, on_unknown_encoding, "edge");
+      XML_SetElementHandler(g_parser, on_start, on_end);
+      XML_SetCharacterDataHandler(g_parser, on_chars);
+      unk_parse("protocol", "<a>\xa4\xe9</a>", bytewise);
+      printf("edge reset=%d\n", (int)XML_ParserReset(g_parser, "x-multi"));
+      XML_SetElementHandler(g_parser, on_start, on_end);
+      XML_SetCharacterDataHandler(g_parser, on_chars);
+      XML_SetProcessingInstructionHandler(g_parser, on_pi);
+      XML_SetCommentHandler(g_parser, on_comment);
+      unk_parse("protocol-multi", "<a>\xc1\x81\xf2</a>", bytewise);
+      printf("edge reset=%d\n", (int)XML_ParserReset(g_parser, NULL));
+      XML_SetElementHandler(g_parser, on_start, on_end);
+      XML_SetCharacterDataHandler(g_parser, on_chars);
+      XML_SetProcessingInstructionHandler(g_parser, on_pi);
+      XML_SetCommentHandler(g_parser, on_comment);
+      XML_SetCdataSectionHandler(g_parser, on_cdata_start, on_cdata_end);
+      unk_parse("decl-multi", multi, bytewise);
+      XML_ParserFree(g_parser);
+      for (unsigned d = 0; d < sizeof decls / sizeof *decls; d++) {
+        g_parser = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
+        XML_SetUnknownEncodingHandler(g_parser, on_unknown_encoding, "edge");
+        XML_SetElementHandler(g_parser, on_start, on_end);
+        XML_SetCharacterDataHandler(g_parser, on_chars);
+        unk_parse("decl", decls[d], bytewise);
+        XML_ParserFree(g_parser);
+      }
+      /* Without a handler, and with the handler cleared. */
+      g_parser = XML_ParserCreate(NULL);
+      unk_parse("no-handler", decls[5], bytewise);
+      XML_ParserFree(g_parser);
+      g_parser = XML_ParserCreate("x-euro");
+      XML_SetUnknownEncodingHandler(g_parser, on_unknown_encoding, "edge");
+      XML_SetUnknownEncodingHandler(g_parser, NULL, NULL);
+      unk_parse("cleared", "<a/>", bytewise);
+      XML_ParserFree(g_parser);
+      /* External entities inherit the handler. */
+      g_parser = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
+      XML_SetUnknownEncodingHandler(g_parser, on_unknown_encoding, "edge");
+      XML_SetElementHandler(g_parser, on_start, on_end);
+      XML_SetCharacterDataHandler(g_parser, on_chars);
+      XML_SetExternalEntityRefHandler(g_parser, on_extref_unknown);
+      unk_parse("external",
+                "<!DOCTYPE a [<!ENTITY n SYSTEM 'n'><!ENTITY d SYSTEM 'd'>"
+                "<!ENTITY r SYSTEM 'r'>]><a>&n;&d;&n;&r;</a>",
+                bytewise);
+      XML_ParserFree(g_parser);
+    }
+  }
+  g_parser = saved;
+}
+
 int main(int argc, char **argv) {
   printf("version %s\n", XML_ExpatVersion());
   edge();
@@ -1014,6 +1239,7 @@ int main(int argc, char **argv) {
   stop_edge();
   settings_edge();
   ext_edge();
+  unk_edge();
   for (int i = 1; i < argc; i++) {
     FILE *f = fopen(argv[i], "rb");
     if (! f) {
@@ -1033,7 +1259,7 @@ int main(int argc, char **argv) {
     static const long chunks[] = {0, 1, 7};
     for (int c = 0; c < 3; c++)
       for (int ns = 0; ns < 2; ns++)
-        for (int h = 0; h < 21; h++)
+        for (int h = 0; h < 22; h++)
           for (int b = 0; b < 2; b++)
             run(doc, len, chunks[c], ns, h, b, 0, 0);
     /* Stopped from the handlers: suspended at every event, at every third

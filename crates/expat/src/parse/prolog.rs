@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use super::accounting::Account;
 use super::error::{Stop, XmlError};
 use super::tracker::Pool;
-use super::{Enc, Handler, ParamEntityParsing, Parser, Parsing, Processor};
+use super::{AnyEnc, Enc, Handler, ParamEntityParsing, Parser, Parsing, Processor};
 use crate::role::Role;
 use crate::tok::{
     Encoding, FoundEncoding, InitEncoding, Scan, State, Tok, init_scan, name_length,
@@ -35,6 +35,21 @@ macro_rules! with_known {
     };
 }
 pub(crate) use with_known;
+
+/// Calls `$body` with `$e` bound to the encoding inside an [`AnyEnc`]:
+/// a built-in encoding through [`with_known`], or the application's.
+macro_rules! with_enc {
+    ($k:expr, $e:ident => $body:expr) => {
+        match $k {
+            $crate::parse::AnyEnc::Known(k) => $crate::parse::prolog::with_known!(k, $e => $body),
+            $crate::parse::AnyEnc::Unknown(u) => {
+                let $e = &u.enc;
+                $body
+            }
+        }
+    };
+}
+pub(crate) use with_enc;
 
 /// How `doProlog` ended.
 pub(crate) enum PrologDone {
@@ -92,15 +107,17 @@ pub(crate) fn to_utf8_token_into<E: Encoding>(enc: &E, from: &[u8], out: &mut Ve
 
 impl Parser {
     /// `initializeEncoding`: the initial encoding for the name the
-    /// application gave. An unknown name goes to `handleUnknownEncoding`,
-    /// which without an unknown-encoding handler (module 12) fails.
-    pub(crate) fn initialize_encoding(&mut self) -> Result<(), Stop> {
+    /// application gave. An unknown name goes to `handleUnknownEncoding`.
+    pub(crate) fn initialize_encoding<H: Handler>(&mut self, h: &mut H) -> Result<(), Stop> {
         match InitEncoding::new(self.protocol_encoding_name.as_deref(), self.ns) {
             Some(init) => {
                 self.enc = Enc::Init(init);
                 Ok(())
             }
-            None => Err(XmlError::UnknownEncoding.into()),
+            None => {
+                let name = self.protocol_encoding_name.clone().unwrap_or_default();
+                self.handle_unknown_encoding(h, &name)
+            }
         }
     }
 
@@ -112,7 +129,7 @@ impl Parser {
         s: usize,
         next_ptr: &mut usize,
     ) -> Result<(), Stop> {
-        self.initialize_encoding()?;
+        self.initialize_encoding(h)?;
         self.processor = Processor::Prolog;
         self.prolog_processor(h, buf, s, next_ptr)
     }
@@ -134,16 +151,22 @@ impl Parser {
                     match r.encoding {
                         Some(k) => {
                             self.enc = Enc::Known(k);
-                            (k, r.scanned)
+                            (AnyEnc::Known(k), r.scanned)
                         }
                         None => return self.prolog_undecided(r.scanned.scan, s, next_ptr),
                     }
                 }
-                Enc::Known(k) => (k, k.tok(State::Prolog, buf, s)),
+                Enc::Known(_) | Enc::Unknown => {
+                    let Some(k) = self.decided_enc() else {
+                        return Err(XmlError::UnexpectedState.into());
+                    };
+                    let scanned = k.tok(State::Prolog, buf, s);
+                    (k, scanned)
+                }
             };
             let next = scanned.next.unwrap_or(s);
             let have_more = !self.final_buffer;
-            let done = with_known!(k, e => self.do_prolog(h, e, buf, s, scanned.scan, next, next_ptr, have_more, true, Account::Direct))?;
+            let done = with_enc!(k, e => self.do_prolog(h, e, buf, s, scanned.scan, next, next_ptr, have_more, true, Account::Direct))?;
             match done {
                 PrologDone::Done => return Ok(()),
                 PrologDone::Rescan(at) => s = at,
@@ -427,15 +450,16 @@ impl Parser {
             self.report_default(h, enc, buf, s, next);
         }
         let stored = self.handlers.xml_decl && (d.encoding_name.is_some() || d.version.is_some());
-        let r = self.process_xml_decl_encoding(enc, buf, &d, stored);
+        let r = self.process_xml_decl_encoding(h, enc, buf, &d, stored);
         self.tracker.temp2_pool.clear();
         r
     }
 
     /// The encoding part of `processXmlDecl`; `stored`: the handler's
     /// strings are in `m_temp2Pool`.
-    fn process_xml_decl_encoding<E: Encoding>(
+    fn process_xml_decl_encoding<E: Encoding, H: Handler>(
         &mut self,
+        h: &mut H,
         enc: &E,
         buf: &[u8],
         d: &crate::tok::XmlDecl,
@@ -461,19 +485,24 @@ impl Parser {
             Some(FoundEncoding::Input) => Ok(false),
             Some(FoundEncoding::Unrecognized) | None => {
                 if let Some(p) = d.encoding_name {
+                    let n = name_length(enc, buf, p);
+                    let name = to_utf8(enc, buf.get(p..p + n).unwrap_or_default());
                     if !(stored && self.handlers.xml_decl) {
                         // `poolStoreString(&parser->m_temp2Pool, ...)` of
                         // the name for `handleUnknownEncoding`.
-                        let n = name_length(enc, buf, p);
-                        let name = to_utf8(enc, buf.get(p..p + n).unwrap_or_default());
                         let direct = self.direct();
                         self.tracker
                             .store_text(Pool::Temp2, &name, direct)
                             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
                     }
-                    // handleUnknownEncoding without a handler (module 12).
-                    self.event_ptr = d.encoding_name;
-                    return Err(XmlError::UnknownEncoding.into());
+                    return match self.handle_unknown_encoding(h, &name) {
+                        Ok(()) => Ok(true),
+                        Err(Stop::Error(XmlError::UnknownEncoding)) => {
+                            self.event_ptr = d.encoding_name;
+                            Err(XmlError::UnknownEncoding.into())
+                        }
+                        Err(e) => Err(e),
+                    };
                 }
                 Ok(false)
             }

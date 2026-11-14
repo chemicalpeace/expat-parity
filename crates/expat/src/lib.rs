@@ -48,7 +48,8 @@
 //! # Limitations
 //!
 //! - The events of [`Events`], the default handler, the declaration
-//!   events and external entity references; no unknown-encoding handler.
+//!   events, external entity references and encodings described by the
+//!   program ([`Handler::unknown_encoding`]).
 //! - A handler reads the position of its event through
 //!   [`Handler::position`], its place in the input through
 //!   [`Handler::input_context`], and stops the parse through a [`Stopper`]; the
@@ -90,8 +91,8 @@ pub use api::{Error, ErrorCode, Options, Parser, Stopper};
 pub use entities::{ExternalEntities, ExternalParser};
 pub use handler::{Events, Handler};
 pub use parse::{
-    ContentModel, ContentNode, ContentQuant, ContentType, ParamEntityParsing,
-    Parsing as ParsingStatus,
+    ContentModel, ContentNode, ContentQuant, ContentType, ConvertFn, EncodingInfo,
+    ParamEntityParsing, Parsing as ParsingStatus, ReleaseFn,
 };
 
 /// Declares an internal module that is private by default and public under
