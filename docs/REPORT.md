@@ -1594,20 +1594,68 @@ entity expansions (see D-042: on large within-limit expansions the port took
 about 1.9x the time of C), external entities, unknown encodings,
 Windows/macOS, peak memory.
 
+### After D-043 to D-046 (2026-11-14)
+
+D-043 (reused start-tag buffers), D-044 (byte tables indexed by variant),
+D-045 (lookup cache in front of the hash table) and D-046 (amplification
+check without a division) changed the port's throughput. The table below is
+the last measurement, with the code of D-046, on the same VM, toolchains and
+flags as above (C built with clang 19.1.7 `-O2 -DNDEBUG`), using the
+harness in `benches/filc/` driven by a local script: two rounds of five
+runs per build, median of the round medians, builds interleaved and pinned
+to CPU 1. The OSM extract was not part of these runs, and Fil-C was not
+measured again.
+
+| corpus | handlers | chunks | port LTO | port release | C clang | port/C clang |
+|---|---|---|--:|--:|--:|--:|
+| bench-mixed | none | single | 231.6 | 269.1 | 256.9 | 0.90x |
+| bench-mixed | none | 64 KiB | 190.4 | 198.4 | 172.1 | 1.11x |
+| bench-mixed | count | single | 283.0 | 264.4 | 248.0 | 1.07x |
+| bench-mixed | count | 64 KiB | 216.1 | 202.4 | 163.3 | 1.24x |
+| plain-large | none | single | 115.7 | 123.3 | 124.6 | 0.93x |
+| plain-large | none | 64 KiB | 104.9 | 110.1 | 102.2 | 1.03x |
+| plain-large | count | single | 131.2 | 119.2 | 122.0 | 0.98x |
+| plain-large | count | 64 KiB | 116.0 | 105.2 | 99.1 | 1.06x |
+| ns-heavy (NS on) | none | single | 97.6 | 102.2 | 95.4 | 1.02x |
+| ns-heavy | none | 64 KiB | 89.2 | 90.0 | 78.7 | 1.13x |
+| ns-heavy | count | single | 113.7 | 104.1 | 94.0 | 1.11x |
+| ns-heavy | count | 64 KiB | 99.1 | 93.5 | 77.8 | 1.20x |
+| utf16le | none | single | 344.9 | 364.4 | 492.6 | 0.70x |
+| utf16le | none | 64 KiB | 287.0 | 271.6 | 326.2 | 0.83x |
+| utf16le | count | single | 289.5 | 221.8 | 324.5 | 0.68x |
+| utf16le | count | 64 KiB | 226.7 | 184.1 | 247.1 | 0.75x |
+| docbook-dtd | none | single | 104.7 | 119.8 | 123.1 | 0.85x |
+| docbook-dtd | none | 64 KiB | 90.7 | 108.4 | 97.2 | 0.93x |
+| docbook-dtd | count | single | 117.5 | 118.1 | 120.6 | 0.97x |
+| docbook-dtd | count | 64 KiB | 101.7 | 102.4 | 94.2 | 1.08x |
+
+MiB/s of input bytes; "port/C clang" uses the slower of the two port
+builds. Event counts are identical across builds in all 20 cells.
+
+In this run the slower port build reached 0.68x-1.24x of C libexpat built
+with clang `-O2` (median 1.00x). UTF-16 input is the slowest case
+(0.68x-0.83x). Between two runs of the same builds on this VM, single
+cells moved by up to about 9 % (median about 1.4 %), so differences of a
+few percent between cells or between D-044 to D-046 are within noise.
+These figures come from one aarch64 VM and may differ on other platforms,
+compilers and inputs; x86_64 was not measured.
+
 ## Limitations
 
-- No public parser API yet (module 12): no default handler,
-  `XML_StopParser`/`XML_ResumeParser`, unknown-encoding handler or
-  `XML_GetInputContext`. External entity parsers exist inside
-  `expat::parse` (module 11d) but not yet behind a public API.
+- The public API (module 12) and the C interface (module 13, D-047 to
+  D-057) cover every function declared in `expat.h` 2.10.0; the
+  documented differences are listed in the `expat-capi` crate
+  documentation and in D-047 to D-057 (for example, an unknown-encoding
+  converter may be called a different number of times than in C).
 - `Stop::DtdNotPorted` no longer exists (module 11d): every document
   parses to C's result; all 540 upstream vectors are compared under every
   option set.
 - The allocation tracker replays C's allocations event by event (D-034);
-  not modelled: `m_unknownEncodingMem` (no unknown-encoding handler yet)
-  and the once-per-run base copy of `copyEntityTable` (bases are NULL
-  without a base setter); the child encoding-name charge is untested. The
-  input buffer is not tracked, as in C.
+  `m_unknownEncodingMem` is charged since D-057. C copies an entity's base
+  once per run of entities sharing the same pointer in `copyEntityTable`;
+  the port copies it for every entity, so it charges at least C's bytes.
+  The child encoding-name charge is untested. The input buffer is not
+  tracked, as in C.
 - D-017: on targets where C `char` is unsigned (aarch64 Linux) C's
   `utf8_toUtf16` zero-extends stray bytes that the port sign-extends; the
   parser never passes such bytes to the converter, and the tokenizer

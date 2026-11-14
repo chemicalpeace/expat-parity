@@ -1322,7 +1322,11 @@ recorded in DIVERGENCES.md.
   NaN.
 - **Measured.** Small: on one aarch64 VM the median gain was 1.3 % for the
   release build and none with fat LTO (2 rounds of 5 runs, within noise),
-  up to 7 % on `plain-large` without handlers.
+  up to 7 % on `plain-large` without handlers. UTF-16 input with handlers
+  measured 7-14 % slower in the release build in the same run; the change
+  only removes work from the check, and between two runs of the same builds
+  single cells moved by up to about 9 %, so this is read as noise. The
+  slower port build measured 0.68x-1.24x of C (REPORT.md "Benchmarks").
 
 ## D-047 C interface, slice 1 (module 13) (2026-11-14)
 
