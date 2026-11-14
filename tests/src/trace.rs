@@ -201,6 +201,11 @@ impl TraceWriter {
         self.line("comment", &[Some(data)], &[]);
     }
 
+    /// `XML_DefaultHandler` (oracle mask bits 17 and 18).
+    pub fn default_data(&mut self, data: &[u8]) {
+        self.line("default", &[Some(data)], &[]);
+    }
+
     /// `XML_StartCdataSectionHandler`.
     pub fn cdata(&mut self) {
         self.line("cdata", &[], &[]);

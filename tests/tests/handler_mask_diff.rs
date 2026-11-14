@@ -29,7 +29,9 @@
 //!    through the tracker limits in 3.
 //!
 //! The mask matrix: full, the nine MVP events of slice 4, none, each MVP
-//! event alone, and eight masks drawn from a fixed seed over all 17 bits.
+//! event alone, eight masks drawn from a fixed seed over all 17 bits, and
+//! the default handler (D-051), with and without internal entity
+//! expansion, alone, beside full and MVP, and beside five drawn masks.
 
 use std::time::Duration;
 
@@ -127,7 +129,9 @@ fn singles() -> Vec<(String, HandlerMask)> {
     .collect()
 }
 
-/// The whole mask matrix (20 masks: full, MVP, none, 9 singles, 8 random).
+/// The whole mask matrix (31 masks: full, MVP, none, 9 singles, 8 random,
+/// and 11 with the default handler: alone, beside full and MVP, each with
+/// and without internal entity expansion, and 5 random).
 fn masks() -> Vec<(String, HandlerMask)> {
     let mut v = vec![
         ("full".to_string(), HandlerMask::FULL),
@@ -140,6 +144,23 @@ fn masks() -> Vec<(String, HandlerMask)> {
     for _ in 0..8 {
         let bits = u32::try_from(r.next_u64() & all).unwrap_or(0);
         v.push((format!("random {bits:#07x}"), HandlerMask::from_bits(bits)));
+    }
+    let def = |m: HandlerMask, expand: bool| HandlerMask {
+        default_handler: !expand,
+        default_expand: expand,
+        ..m
+    };
+    for expand in [false, true] {
+        let e = if expand { " expand" } else { "" };
+        v.push((format!("default{e}"), def(HandlerMask::NONE, expand)));
+        v.push((format!("full + default{e}"), def(HandlerMask::FULL, expand)));
+        v.push((format!("mvp + default{e}"), def(MVP, expand)));
+    }
+    let mut r = Rng::new(0x6d61_736b_0000_0011);
+    for i in 0..5 {
+        let bits = u32::try_from(r.next_u64() & all).unwrap_or(0);
+        let m = def(HandlerMask::from_bits(bits), i % 2 == 1);
+        v.push((format!("random {:#07x}", m.bits()), m));
     }
     v
 }
@@ -179,6 +200,15 @@ fn mask_sensitive_docs() -> Vec<(String, Vec<u8>)> {
         "<r><e/><e/><!-- unterminated".to_string(),
         "<!DOCTYPE r [<!ENTITY e '<?p d?><!--c--><x/>'>]><r>&e;</r>".to_string(),
         "<r>\r\n<?pi a\r\nb?>\r\n<!--a\r\nb-->\u{e9}</r>".to_string(),
+        // Every declaration kind, for the default handler.
+        "<?xml version='1.0'?><!DOCTYPE r PUBLIC 'p' 's' [<!ENTITY % pe '<!ELEMENT a (#PCDATA|b)*>'>%pe;\
+         <!ATTLIST r a (x|y) 'x' b CDATA #IMPLIED c NOTATION (n) #REQUIRED d ID #FIXED 'i'>\
+         <!NOTATION n PUBLIC 'pn'><!NOTATION m SYSTEM 'sm'><!NOTATION o PUBLIC 'po' 'so'>\
+         <!ENTITY u SYSTEM 'u' NDATA n><!ENTITY x SYSTEM 'x'><!ENTITY y PUBLIC 'py' 'y'>\
+         <!ENTITY i 'a&amp;<b/>&#65;'><!ELEMENT r (a,(b|c)+)?><!ELEMENT b ANY><!ELEMENT c EMPTY>\
+         <!-- c --><?p d?>]>\r\n<r>&x;&i;&lt;&#66;<![CDATA[]]]]></r>\r\n<!--e--><?q?> "
+            .to_string(),
+        "<!DOCTYPE r [<!ENTITY % e SYSTEM 'e'>%e;<!ENTITY z 'z'>]><r>&z;&undeclared;</r>\r".to_string(),
     ];
     docs.into_iter()
         .enumerate()
@@ -273,7 +303,7 @@ fn no_mask_equals_explicit_full_mask() {
         }
     }
     // C tracker streams on the upstream vectors and the sensitive set.
-    for (id, doc) in docs.iter().take(540).chain(&docs[docs.len() - 8..]) {
+    for (id, doc) in docs.iter().take(540).chain(&docs[docs.len() - 10..]) {
         let o = ParseOptions::default();
         let (t0, e0) = parse_trace_with_tracker_events(doc, &o).expect("oracle");
         let (t1, e1) = parse_trace_with_tracker_events(doc, &with_mask(&o, HandlerMask::FULL))

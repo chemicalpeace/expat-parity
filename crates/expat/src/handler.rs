@@ -57,6 +57,17 @@ pub struct Events {
     /// [`Events::ALL`] and [`Events::NONE`], because counting lines and
     /// columns at every event costs a second pass over the text.
     pub position: bool,
+    /// [`Handler::default_data`] (`XML_SetDefaultHandler`): the text of
+    /// the document that no other event that is on reports. Off in both
+    /// [`Events::ALL`] and [`Events::NONE`].
+    pub default_data: bool,
+    /// Whether a reference to an internal general entity in content is
+    /// expanded (libexpat's `m_defaultExpandInternalEntities`). On in
+    /// both [`Events::ALL`] and [`Events::NONE`], as in libexpat. Off is
+    /// what `XML_SetDefaultHandler` sets: the reference is then not
+    /// expanded and goes to [`Handler::default_data`] as written;
+    /// `XML_SetDefaultHandlerExpand` keeps it on.
+    pub expand_internal_entities: bool,
 }
 
 impl Events {
@@ -72,6 +83,8 @@ impl Events {
         start_namespace_decl: true,
         end_namespace_decl: true,
         position: false,
+        default_data: false,
+        expand_internal_entities: true,
     };
 
     /// No event: the parser works as [`Parser::parse`] does.
@@ -88,6 +101,8 @@ impl Events {
         start_namespace_decl: false,
         end_namespace_decl: false,
         position: false,
+        default_data: false,
+        expand_internal_entities: true,
     };
 
     /// Sets [`Events::start_element`].
@@ -160,8 +175,22 @@ impl Events {
         self
     }
 
-    /// The parser core's handler flags: these nine and the position,
-    /// every other handler unset.
+    /// Sets [`Events::default_data`].
+    #[must_use]
+    pub const fn default_data(mut self, on: bool) -> Self {
+        self.default_data = on;
+        self
+    }
+
+    /// Sets [`Events::expand_internal_entities`].
+    #[must_use]
+    pub const fn expand_internal_entities(mut self, on: bool) -> Self {
+        self.expand_internal_entities = on;
+        self
+    }
+
+    /// The parser core's handler flags: these events, the position and
+    /// the default handler, every other handler unset.
     pub(crate) fn handler_set(self) -> parse::HandlerSet {
         parse::HandlerSet {
             start_element: self.start_element,
@@ -174,6 +203,8 @@ impl Events {
             start_namespace_decl: self.start_namespace_decl,
             end_namespace_decl: self.end_namespace_decl,
             event_position: self.position,
+            default: self.default_data,
+            no_default_expand: !self.expand_internal_entities,
             ..parse::HandlerSet::default()
         }
     }
@@ -294,9 +325,40 @@ pub trait Handler {
     /// # Ok::<(), expat::Error>(())
     /// ```
     fn position(&mut self, _line: u64, _column: u64, _byte_index: i64) {}
+
+    /// A piece of the document that no event that is on reports, as
+    /// written but converted to UTF-8 (`XML_DefaultHandler`), when
+    /// [`Events::default_data`] is on: markup, and character data,
+    /// comments, processing instructions or tags whose own event is off.
+    /// Line ends are not normalised. Inside the document type
+    /// declaration the C library passes only the parts that no set
+    /// declaration handler takes; the public API has no declaration
+    /// events yet, so the declarations are passed as written.
+    ///
+    /// ```
+    /// use expat::{Events, Handler, Parser};
+    ///
+    /// #[derive(Default)]
+    /// struct Copy(Vec<u8>);
+    ///
+    /// impl Handler for Copy {
+    ///     const EVENTS: Events = Events::NONE.default_data(true);
+    ///     fn default_data(&mut self, data: &[u8]) {
+    ///         self.0.extend_from_slice(data);
+    ///     }
+    /// }
+    ///
+    /// let doc = b"<?xml version='1.0'?>\r\n<a x='1'><!-- c -->t&amp;</a>";
+    /// let mut copy = Copy::default();
+    /// let mut p = Parser::new([7; 16]);
+    /// p.parse_with(&mut copy, doc, true)?;
+    /// assert_eq!(copy.0, doc);
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    fn default_data(&mut self, _data: &[u8]) {}
 }
 
-/// Passes the parser core's events to a public [`Handler`]. Only the nine
+/// Passes the parser core's events to a public [`Handler`]. Only the
 /// events of [`Events`] are set ([`Events::handler_set`]), so the core
 /// never calls the other methods, whose defaults do nothing (and refuse
 /// the two that return a value).
@@ -335,11 +397,15 @@ impl<H: Handler> parse::Handler for Adapter<'_, H> {
     fn end_namespace_decl(&mut self, prefix: Option<&[u8]>) {
         self.0.end_namespace_decl(prefix);
     }
+    fn default_data(&mut self, data: &[u8]) {
+        self.0.default_data(data);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
 
     #[test]
     fn all_and_none_map_to_the_nine_handlers_only() {
@@ -358,6 +424,62 @@ mod tests {
         };
         assert_eq!(all, expected);
         assert_eq!(Events::NONE.handler_set(), parse::HandlerSet::default());
+    }
+
+    #[derive(Default)]
+    struct Split<const EXPAND: bool> {
+        chars: Vec<u8>,
+        other: Vec<u8>,
+    }
+
+    impl<const EXPAND: bool> Handler for Split<EXPAND> {
+        const EVENTS: Events = Events::NONE
+            .character_data(true)
+            .default_data(true)
+            .expand_internal_entities(EXPAND);
+        fn character_data(&mut self, data: &[u8]) {
+            self.chars.extend_from_slice(data);
+        }
+        fn default_data(&mut self, data: &[u8]) {
+            self.other.extend_from_slice(data);
+        }
+    }
+
+    const DOC: &[u8] = b"<!DOCTYPE a [<!ENTITY e 'x&#65;'>]><a>t&e;<b/></a>";
+
+    #[test]
+    fn default_data_takes_what_no_other_event_reports() {
+        let mut h = Split::<true>::default();
+        let mut p = crate::Parser::new([7; 16]);
+        assert_eq!(p.parse_with(&mut h, DOC, true), Ok(()));
+        assert_eq!(h.chars, b"txA");
+        assert_eq!(h.other, b"<!DOCTYPE a [<!ENTITY e 'x&#65;'>]><a><b/></a>");
+    }
+
+    #[test]
+    fn unexpanded_internal_entities_go_to_default_data() {
+        let mut h = Split::<false>::default();
+        let mut p = crate::Parser::new([7; 16]);
+        assert_eq!(p.parse_with(&mut h, DOC, true), Ok(()));
+        assert_eq!(h.chars, b"t");
+        assert_eq!(
+            h.other,
+            b"<!DOCTYPE a [<!ENTITY e 'x&#65;'>]><a>&e;<b/></a>"
+        );
+    }
+
+    #[test]
+    fn default_data_is_converted_to_utf8() {
+        let doc: Vec<u8> = "<a>\u{e9}</a>"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let mut h = Split::<true>::default();
+        let mut p =
+            crate::Parser::with_options([7; 16], crate::Options::new().encoding(b"UTF-16LE"));
+        assert_eq!(p.parse_with(&mut h, &doc, true), Ok(()));
+        assert_eq!(h.chars, "\u{e9}".as_bytes());
+        assert_eq!(h.other, b"<a></a>");
     }
 
     #[test]

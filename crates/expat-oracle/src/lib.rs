@@ -311,6 +311,12 @@ pub struct HandlerMask {
     pub end_namespace_decl: bool,
     /// `XML_SetSkippedEntityHandler`
     pub skipped_entity: bool,
+    /// `XML_SetDefaultHandler` (bit 17, not in [`HandlerMask::FULL`]),
+    /// traced as `default <text>`.
+    pub default_handler: bool,
+    /// `XML_SetDefaultHandlerExpand` (bit 18, not in
+    /// [`HandlerMask::FULL`]), used when `default_handler` is off.
+    pub default_expand: bool,
 }
 
 impl HandlerMask {
@@ -324,8 +330,8 @@ impl HandlerMask {
     pub const NONE: HandlerMask = HandlerMask::from_bits(0);
 
     /// The mask of `bits`, in the order of the fields (bit 0
-    /// `xml_decl` ... bit 16 `skipped_entity`, the `ORACLE_H_*` values);
-    /// higher bits are ignored.
+    /// `xml_decl` ... bit 16 `skipped_entity`, bits 17 and 18 the default
+    /// handler, the `ORACLE_H_*` values); higher bits are ignored.
     #[must_use]
     pub const fn from_bits(bits: u32) -> HandlerMask {
         HandlerMask {
@@ -346,6 +352,8 @@ impl HandlerMask {
             start_namespace_decl: bits & (1 << 14) != 0,
             end_namespace_decl: bits & (1 << 15) != 0,
             skipped_entity: bits & (1 << 16) != 0,
+            default_handler: bits & (1 << 17) != 0,
+            default_expand: bits & (1 << 18) != 0,
         }
     }
 
@@ -370,6 +378,8 @@ impl HandlerMask {
             self.start_namespace_decl,
             self.end_namespace_decl,
             self.skipped_entity,
+            self.default_handler,
+            self.default_expand,
         ];
         let mut bits = 0;
         let mut i = 0;
