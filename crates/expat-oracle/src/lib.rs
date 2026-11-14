@@ -243,6 +243,10 @@ pub struct ParseOptions {
     /// taking its live heap above this many bytes (memory cap for bounded
     /// tests); see [`last_heap_peak`].
     pub heap_cap: usize,
+    /// Allocation failure injection: `Some(n)` grants `n` allocator calls
+    /// (`malloc`, or `realloc` to a larger size) after
+    /// `XML_ParserCreate_MM` returns and fails every later one.
+    pub fail_alloc_after: Option<u64>,
     /// External entity reference handler (module 11d, test handler: the
     /// library never fetches anything).
     pub ext_handler: ExtHandler,
@@ -700,6 +704,8 @@ pub fn parse_trace(doc: &[u8], opts: &ParseOptions) -> Result<Vec<u8>, OracleErr
         text_digest: c_int::from(opts.text_digest),
         trace_accounting: c_int::from(opts.trace_accounting),
         heap_cap: opts.heap_cap,
+        fail_allocs: c_int::from(opts.fail_alloc_after.is_some()),
+        fail_alloc_after: opts.fail_alloc_after.unwrap_or(0),
         ext_handler: match opts.ext_handler {
             ExtHandler::None => 0,
             ExtHandler::Fail => 1,

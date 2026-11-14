@@ -93,6 +93,12 @@ struct oracle_options {
      allocation failure inside libexpat). oracle_last_heap_peak() returns
      the peak live heap of the calling thread's last such parse. */
   size_t heap_cap;
+  /* 1: allocation failure injection. After XML_ParserCreate_MM returns,
+     the allocator grants fail_alloc_after more calls (malloc, or realloc
+     to a larger size) and fails every later one; the parser is created
+     with the allocator of heap_cap (no cap when heap_cap is 0). */
+  int fail_allocs;
+  unsigned long long fail_alloc_after;
   /* Module 11d: external entities through a test handler. The library
      never fetches anything; these handlers only trace their arguments.
      ext_handler: 0 no XML_SetExternalEntityRefHandler; 1 a handler that

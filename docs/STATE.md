@@ -41,8 +41,8 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   all three CI runners (CI run 38289234285). The encoding argument of
   external entity parsers is compared (PR #19, no difference). The
   coverage figures above are PR #13's tree (7,552 lines); see "Next steps"
-  5 for the latest recorded ones (not the current tree's). Next: OOM fault injection per allocation point,
-  then module 12. Module 12 slice 1 (public `expat::Parser` without
+  5 for the latest recorded ones (not the current tree's). Allocation failure injection per allocation
+  point: D-058. Module 12 slice 1 (public `expat::Parser` without
   callbacks, D-038) is merged (PR #22, merge commit 3fe249be); slice 2
   (error texts, `Display`, `std::error::Error`, D-039) is merged (PR #23,
   merge commit 64d3fca7); slice 3 (encoding name and namespace separator
@@ -147,8 +147,8 @@ with allocation failures, white-box).
    `XML_UnparsedEntityDeclHandler` and `m_nsAtts` growth are compared since
    PR #18, the encoding argument of external entity parsers since PR #19
    (docs/EXTERNAL-ENTITY-ENCODING.md, `ext_encoding_diff`, no difference).
-   Remaining: per-point allocation refusals (OOM fault injection per
-   allocation point, unblocked now that PR #16 has merged). The
+   Allocation failure injection at every allocation point is compared
+   since D-058 (`oom_diff.rs`, 83,023 failure points equal). The
    unknown-encoding handler branch is compared through the C interface
    since D-057.
 3. Part 2 of the coverage work is done on branch `part2-finish` (on top of

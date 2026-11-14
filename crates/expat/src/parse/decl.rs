@@ -718,6 +718,11 @@ impl Parser {
             Role::ContentAny | Role::ContentEmpty => {
                 if self.dtd.in_eldecl {
                     if self.handlers.element_decl {
+                        // C allocates the model with the plain `malloc_fcn`
+                        // (outside the tracker).
+                        if !self.tracker.t.allocator_call() {
+                            return Err(XmlError::NoMemory.into());
+                        }
                         let kind = if role == Role::ContentAny {
                             ContentType::Any
                         } else {
@@ -784,6 +789,11 @@ impl Parser {
                     }
                     if self.dtd.scaff_level == 0 {
                         if self.handlers.element_decl {
+                            // `build_model` allocates with the plain
+                            // `malloc_fcn` (outside the tracker).
+                            if !self.tracker.t.allocator_call() {
+                                return Err(XmlError::NoMemory.into());
+                            }
                             let model = self.dtd.build_model();
                             self.ev_end(enc, Some(s));
                             let name = self.decl_element_name();

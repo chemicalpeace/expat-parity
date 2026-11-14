@@ -54,6 +54,9 @@ All notable changes are documented here. The format follows
 - `crates/expat-capi` (not published): a first part of libexpat's C
   interface over the crate, compared with libexpat by
   `scripts/capi-check.sh` (D-047 to D-057).
+- Allocation failure injection: the oracle's memory suite can fail from
+  the n-th call on, and the port fails at the same C allocation through
+  its tracker; every allocation point is compared (`oom_diff.rs`, D-058).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.

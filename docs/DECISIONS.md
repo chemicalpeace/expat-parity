@@ -1769,3 +1769,41 @@ recorded in DIVERGENCES.md.
   declaration or creation, refused and rejected maps, malformed
   sequences, byte-by-byte input, without and with namespaces. 541
   documents x 282 runs plus 48 (152610), output equal to libexpat 2.10.0.
+
+## D-058 Allocation failure injection compared with libexpat (2026-11-15)
+
+- **Decision.** The oracle gains `ParseOptions::fail_alloc_after`: the
+  parser is created with `XML_ParserCreate_MM` and, once it exists, its
+  memory suite grants `n` more calls (`malloc_fcn`, or `realloc_fcn` to a
+  larger size) and returns `NULL` for every later one, as the allocators
+  in libexpat's own tests do. The port has no allocator call at these
+  points, so it fails at the same C allocation through the tracker that
+  replays C's allocations (D-034): `AllocTracker::fail_allocations_after`
+  counts one call per tracked `MALLOC` or growing `REALLOC` that the
+  tracker allowed (C asks the memory suite only after
+  `expat_heap_increase_tolerable`), plus the three plain `malloc_fcn`
+  calls outside the tracker: the input buffer of `XML_GetBuffer` and the
+  content models built for the element declaration handler (empty/any
+  and `build_model`). A failed call is not recorded as a tracker event.
+  Nothing changes when the injection is off.
+- **Why.** Every allocation failure path of the parser (reported as
+  `XML_ERROR_NO_MEMORY`, with the events before it) had only been
+  reached through the tracker's amplification limit, at a few points per
+  document. This compares every allocation point, including the ones
+  inside external entity parsers, which share the root's memory suite.
+- **Verification.** `tests/tests/oom_diff.rs` compares, for each document
+  and option set, every failure point from the first allocator call
+  after creation to the first one at which the parse no longer fails:
+  the 541 upstream vectors under 4 option sets, 1,500 generated
+  documents and 1,500 generated external entity cases under random
+  options; 83,023 failure points, traces equal. Removing any one of the
+  three untracked calls from the port makes the test fail.
+- **Not covered.** A `realloc_fcn` call that shrinks a block is never
+  failed (the port cannot tell it from a free in the tracker events;
+  libexpat's callers treat its failure as out of memory). Through the C
+  interface, `XML_ParserCreate_MM` still uses the suite only for content
+  models and `XML_MemMalloc`/`XML_MemRealloc`/`XML_MemFree` (D-054), so a
+  C caller's failing allocator does not make the port fail where
+  libexpat would. A failure of the system allocator in the port aborts
+  the process (README, "Limitations"); this decision does not change
+  that.

@@ -146,6 +146,10 @@ pub struct AllocTracker {
     /// name), so that [`AllocTracker::log_events`], switched on after the
     /// parser exists, can report them as C does: one event each.
     creation: [u64; 5],
+    /// Allocation failure injection (tests only; `None` normally): the
+    /// number of allocator calls still granted before every further one
+    /// fails ([`AllocTracker::fail_allocations_after`]).
+    fail_after: Option<u64>,
 }
 
 impl Default for AllocTracker {
@@ -159,6 +163,7 @@ impl Default for AllocTracker {
             activation_threshold_bytes: ALLOC_ACTIVATION_THRESHOLD_DEFAULT,
             events: None,
             creation: [0; 5],
+            fail_after: None,
         }
     }
 }
@@ -199,6 +204,32 @@ impl AllocTracker {
         self.events = Some(events);
     }
 
+    /// Allocation failure injection for the differential tests: after
+    /// `calls` more allocator calls every further one fails, as with a
+    /// `malloc_fcn`/`realloc_fcn` passed to `XML_ParserCreate_MM` that
+    /// starts returning `NULL` (`None` switches it off). An allocator call
+    /// is what C passes to the memory suite after its own checks: a tracked
+    /// `MALLOC` or growing `REALLOC` that the tracker allowed, the input
+    /// buffer of `XML_GetBuffer` and the content models handed to the
+    /// element declaration handler. A failed call is not recorded as a
+    /// tracker event (C reports none).
+    pub fn fail_allocations_after(&mut self, calls: Option<u64>) {
+        self.fail_after = calls;
+    }
+
+    /// One allocator call (see [`AllocTracker::fail_allocations_after`]):
+    /// `false` = it fails.
+    pub fn allocator_call(&mut self) -> bool {
+        match self.fail_after.as_mut() {
+            None => true,
+            Some(0) => false,
+            Some(n) => {
+                *n -= 1;
+                true
+            }
+        }
+    }
+
     fn record(&mut self, increase: bool, refused: bool, size: u64) {
         let (total, peak) = (self.bytes_allocated, self.peak_bytes_allocated);
         if let Some(e) = self.events.as_mut() {
@@ -235,8 +266,10 @@ impl AllocTracker {
         let ok = self.increase_tolerable(increase, direct);
         if !ok {
             self.record(true, true, increase);
+            return false;
         }
-        ok
+        // C asks the memory suite only after the tracker allowed it.
+        self.allocator_call()
     }
 
     /// `setAllocTrackerMaximumAmplification` on a root parser: `false`,

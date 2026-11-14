@@ -346,6 +346,7 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
         opts.ns_separator,
         ORACLE_HASH_SALT,
     );
+    p.fail_allocations_after(opts.fail_alloc_after);
     if LOG_EVENTS.with(std::cell::Cell::get) {
         p.log_tracker_events(true);
     }
