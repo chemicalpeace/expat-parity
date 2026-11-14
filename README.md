@@ -159,7 +159,10 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
 - **Real out-of-memory aborts.** When the system allocator itself fails,
   the crate does not return `ErrorCode::NoMemory` as libexpat does; Rust's
   allocation-error handler runs, which by default aborts the process.
-- **Performance** has not been measured against libexpat.
+- **Performance** was measured on one aarch64 Linux VM only: the port
+  reached 0.68x-1.24x of libexpat 2.10.0 built with clang `-O2`, slowest
+  on UTF-16 input (`docs/REPORT.md`, "Benchmarks"). Other platforms are
+  not measured.
 - **MSRV:** Rust 1.99 (edition 2024).
 
 These are deferred, with no commitment to implement them.
