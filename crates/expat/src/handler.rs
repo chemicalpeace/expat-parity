@@ -3,7 +3,7 @@
 //!
 //! [`Parser::parse_with`]: crate::Parser::parse_with
 
-use crate::parse;
+use crate::parse::{self, ContentModel};
 
 /// Which of the [`Handler`] events a parser reports: the C handler
 /// pointers that are set (non-`NULL`).
@@ -51,6 +51,24 @@ pub struct Events {
     pub start_namespace_decl: bool,
     /// [`Handler::end_namespace_decl`] (`XML_SetEndNamespaceDeclHandler`).
     pub end_namespace_decl: bool,
+    /// [`Handler::xml_decl`] (`XML_SetXmlDeclHandler`).
+    pub xml_decl: bool,
+    /// [`Handler::start_doctype_decl`] (`XML_SetStartDoctypeDeclHandler`).
+    pub start_doctype_decl: bool,
+    /// [`Handler::end_doctype_decl`] (`XML_SetEndDoctypeDeclHandler`).
+    pub end_doctype_decl: bool,
+    /// [`Handler::entity_decl`] (`XML_SetEntityDeclHandler`).
+    pub entity_decl: bool,
+    /// [`Handler::unparsed_entity_decl`] (`XML_SetUnparsedEntityDeclHandler`).
+    pub unparsed_entity_decl: bool,
+    /// [`Handler::notation_decl`] (`XML_SetNotationDeclHandler`).
+    pub notation_decl: bool,
+    /// [`Handler::element_decl`] (`XML_SetElementDeclHandler`).
+    pub element_decl: bool,
+    /// [`Handler::attlist_decl`] (`XML_SetAttlistDeclHandler`).
+    pub attlist_decl: bool,
+    /// [`Handler::skipped_entity`] (`XML_SetSkippedEntityHandler`).
+    pub skipped_entity: bool,
     /// [`Handler::position`] before each reported event: the position
     /// `XML_GetCurrentLineNumber`, `XML_GetCurrentColumnNumber` and
     /// `XML_GetCurrentByteIndex` return inside a C handler. Off in both
@@ -86,6 +104,15 @@ impl Events {
         end_cdata_section: true,
         start_namespace_decl: true,
         end_namespace_decl: true,
+        xml_decl: true,
+        start_doctype_decl: true,
+        end_doctype_decl: true,
+        entity_decl: true,
+        unparsed_entity_decl: true,
+        notation_decl: true,
+        element_decl: true,
+        attlist_decl: true,
+        skipped_entity: true,
         position: false,
         default_data: false,
         expand_internal_entities: true,
@@ -105,6 +132,15 @@ impl Events {
         end_cdata_section: false,
         start_namespace_decl: false,
         end_namespace_decl: false,
+        xml_decl: false,
+        start_doctype_decl: false,
+        end_doctype_decl: false,
+        entity_decl: false,
+        unparsed_entity_decl: false,
+        notation_decl: false,
+        element_decl: false,
+        attlist_decl: false,
+        skipped_entity: false,
         position: false,
         default_data: false,
         expand_internal_entities: true,
@@ -174,6 +210,69 @@ impl Events {
         self
     }
 
+    /// Sets [`Events::xml_decl`].
+    #[must_use]
+    pub const fn xml_decl(mut self, on: bool) -> Self {
+        self.xml_decl = on;
+        self
+    }
+
+    /// Sets [`Events::start_doctype_decl`].
+    #[must_use]
+    pub const fn start_doctype_decl(mut self, on: bool) -> Self {
+        self.start_doctype_decl = on;
+        self
+    }
+
+    /// Sets [`Events::end_doctype_decl`].
+    #[must_use]
+    pub const fn end_doctype_decl(mut self, on: bool) -> Self {
+        self.end_doctype_decl = on;
+        self
+    }
+
+    /// Sets [`Events::entity_decl`].
+    #[must_use]
+    pub const fn entity_decl(mut self, on: bool) -> Self {
+        self.entity_decl = on;
+        self
+    }
+
+    /// Sets [`Events::unparsed_entity_decl`].
+    #[must_use]
+    pub const fn unparsed_entity_decl(mut self, on: bool) -> Self {
+        self.unparsed_entity_decl = on;
+        self
+    }
+
+    /// Sets [`Events::notation_decl`].
+    #[must_use]
+    pub const fn notation_decl(mut self, on: bool) -> Self {
+        self.notation_decl = on;
+        self
+    }
+
+    /// Sets [`Events::element_decl`].
+    #[must_use]
+    pub const fn element_decl(mut self, on: bool) -> Self {
+        self.element_decl = on;
+        self
+    }
+
+    /// Sets [`Events::attlist_decl`].
+    #[must_use]
+    pub const fn attlist_decl(mut self, on: bool) -> Self {
+        self.attlist_decl = on;
+        self
+    }
+
+    /// Sets [`Events::skipped_entity`].
+    #[must_use]
+    pub const fn skipped_entity(mut self, on: bool) -> Self {
+        self.skipped_entity = on;
+        self
+    }
+
     /// Sets [`Events::position`].
     #[must_use]
     pub const fn position(mut self, on: bool) -> Self {
@@ -215,6 +314,15 @@ impl Events {
             end_cdata_section: self.end_cdata_section,
             start_namespace_decl: self.start_namespace_decl,
             end_namespace_decl: self.end_namespace_decl,
+            xml_decl: self.xml_decl,
+            start_doctype_decl: self.start_doctype_decl,
+            end_doctype_decl: self.end_doctype_decl,
+            entity_decl: self.entity_decl,
+            unparsed_entity_decl: self.unparsed_entity_decl,
+            notation_decl: self.notation_decl,
+            element_decl: self.element_decl,
+            attlist_decl: self.attlist_decl,
+            skipped_entity: self.skipped_entity,
             event_position: self.position,
             default: self.default_data,
             no_default_expand: !self.expand_internal_entities,
@@ -310,6 +418,102 @@ pub trait Handler {
     /// event of its element (`XML_EndNamespaceDeclHandler`).
     fn end_namespace_decl(&mut self, _prefix: Option<&[u8]>) {}
 
+    /// An XML declaration or text declaration (`XML_XmlDeclHandler`).
+    /// `version` is `None` in a text declaration without one, `encoding`
+    /// is `None` when absent, and `standalone` is `None` when absent.
+    fn xml_decl(
+        &mut self,
+        _version: Option<&[u8]>,
+        _encoding: Option<&[u8]>,
+        _standalone: Option<bool>,
+    ) {
+    }
+
+    /// The start of a document type declaration, after its name and
+    /// external identifier (`XML_StartDoctypeDeclHandler`).
+    /// `has_internal_subset` is true when the declaration has an
+    /// internal subset (`[...]`).
+    fn start_doctype_decl(
+        &mut self,
+        _name: &[u8],
+        _system_id: Option<&[u8]>,
+        _public_id: Option<&[u8]>,
+        _has_internal_subset: bool,
+    ) {
+    }
+
+    /// The end of a document type declaration, after its internal subset
+    /// (`XML_EndDoctypeDeclHandler`).
+    fn end_doctype_decl(&mut self) {}
+
+    /// An entity declaration (`XML_EntityDeclHandler`). `value` is the
+    /// replacement text of an internal entity and `None` for an external
+    /// one; `base` is the base set with [`Parser::set_base`]; `notation`
+    /// is the notation of an unparsed entity, which goes here only when
+    /// [`Events::unparsed_entity_decl`] is off.
+    ///
+    /// [`Parser::set_base`]: crate::Parser::set_base
+    #[allow(clippy::too_many_arguments)] // reason: mirrors XML_EntityDeclHandler.
+    fn entity_decl(
+        &mut self,
+        _name: &[u8],
+        _is_parameter_entity: bool,
+        _value: Option<&[u8]>,
+        _base: Option<&[u8]>,
+        _system_id: Option<&[u8]>,
+        _public_id: Option<&[u8]>,
+        _notation: Option<&[u8]>,
+    ) {
+    }
+
+    /// An unparsed entity declaration, one with an `NDATA` notation
+    /// (`XML_UnparsedEntityDeclHandler`).
+    fn unparsed_entity_decl(
+        &mut self,
+        _name: &[u8],
+        _base: Option<&[u8]>,
+        _system_id: Option<&[u8]>,
+        _public_id: Option<&[u8]>,
+        _notation: &[u8],
+    ) {
+    }
+
+    /// A notation declaration (`XML_NotationDeclHandler`).
+    fn notation_decl(
+        &mut self,
+        _name: &[u8],
+        _base: Option<&[u8]>,
+        _system_id: Option<&[u8]>,
+        _public_id: Option<&[u8]>,
+    ) {
+    }
+
+    /// An element type declaration and its content model
+    /// (`XML_ElementDeclHandler`).
+    fn element_decl(&mut self, _name: &[u8], _model: &ContentModel) {}
+
+    /// One attribute of an attribute-list declaration
+    /// (`XML_AttlistDeclHandler`): a declaration with several attributes
+    /// is reported once per attribute. `default` is `None` for
+    /// `#IMPLIED` and `#REQUIRED`; `is_required` is true for `#REQUIRED`
+    /// and for a `#FIXED` default.
+    fn attlist_decl(
+        &mut self,
+        _element: &[u8],
+        _attribute: &[u8],
+        _attribute_type: &[u8],
+        _default: Option<&[u8]>,
+        _is_required: bool,
+    ) {
+    }
+
+    /// A reference to an entity that is not expanded
+    /// (`XML_SkippedEntityHandler`): an entity with no declaration read,
+    /// where that is not an error (for example after a parameter entity
+    /// reference that was not read), or an internal general entity when
+    /// [`Events::expand_internal_entities`] is off.
+    fn skipped_entity(&mut self, _name: &[u8], _is_parameter_entity: bool) {}
+
     /// The position of the event reported next, when [`Events::position`]
     /// is on: its line (from 1) and column (from 0), and its byte offset
     /// in the whole input, as `XML_GetCurrentLineNumber`,
@@ -345,9 +549,8 @@ pub trait Handler {
     /// [`Events::default_data`] is on: markup, and character data,
     /// comments, processing instructions or tags whose own event is off.
     /// Line ends are not normalised. Inside the document type
-    /// declaration the C library passes only the parts that no set
-    /// declaration handler takes; the public API has no declaration
-    /// events yet, so the declarations are passed as written.
+    /// declaration it receives the parts that no declaration event that
+    /// is on takes, as in libexpat.
     ///
     /// ```
     /// use expat::{Events, Handler, Parser};
@@ -447,6 +650,77 @@ impl<H: Handler> parse::Handler for Adapter<'_, H> {
     fn default_data(&mut self, data: &[u8]) {
         self.0.default_data(data);
     }
+    fn xml_decl(&mut self, version: Option<&[u8]>, encoding: Option<&[u8]>, standalone: i32) {
+        let standalone = match standalone {
+            0 => Some(false),
+            1 => Some(true),
+            _ => None,
+        };
+        self.0.xml_decl(version, encoding, standalone);
+    }
+    fn start_doctype_decl(
+        &mut self,
+        name: &[u8],
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+        has_internal_subset: bool,
+    ) {
+        self.0
+            .start_doctype_decl(name, sysid, pubid, has_internal_subset);
+    }
+    fn end_doctype_decl(&mut self) {
+        self.0.end_doctype_decl();
+    }
+    fn entity_decl(
+        &mut self,
+        name: &[u8],
+        is_param: bool,
+        value: Option<&[u8]>,
+        base: Option<&[u8]>,
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+        notation: Option<&[u8]>,
+    ) {
+        self.0
+            .entity_decl(name, is_param, value, base, sysid, pubid, notation);
+    }
+    fn unparsed_entity_decl(
+        &mut self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+        notation: &[u8],
+    ) {
+        self.0
+            .unparsed_entity_decl(name, base, sysid, pubid, notation);
+    }
+    fn notation_decl(
+        &mut self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        sysid: Option<&[u8]>,
+        pubid: Option<&[u8]>,
+    ) {
+        self.0.notation_decl(name, base, sysid, pubid);
+    }
+    fn element_decl(&mut self, name: &[u8], model: &ContentModel) {
+        self.0.element_decl(name, model);
+    }
+    fn attlist_decl(
+        &mut self,
+        elname: &[u8],
+        attname: &[u8],
+        att_type: &[u8],
+        dflt: Option<&[u8]>,
+        is_required: bool,
+    ) {
+        self.0
+            .attlist_decl(elname, attname, att_type, dflt, is_required);
+    }
+    fn skipped_entity(&mut self, name: &[u8], is_param: bool) {
+        self.0.skipped_entity(name, is_param);
+    }
     fn event_text(&mut self, pieces: &[&[u8]]) {
         self.0.event_text(pieces);
     }
@@ -458,7 +732,7 @@ mod tests {
     use alloc::vec::Vec;
 
     #[test]
-    fn all_and_none_map_to_the_nine_handlers_only() {
+    fn all_and_none_map_to_the_document_handlers_only() {
         let all = Events::ALL.handler_set();
         let expected = parse::HandlerSet {
             start_element: true,
@@ -470,6 +744,15 @@ mod tests {
             end_cdata_section: true,
             start_namespace_decl: true,
             end_namespace_decl: true,
+            xml_decl: true,
+            start_doctype_decl: true,
+            end_doctype_decl: true,
+            entity_decl: true,
+            unparsed_entity_decl: true,
+            notation_decl: true,
+            element_decl: true,
+            attlist_decl: true,
+            skipped_entity: true,
             ..parse::HandlerSet::default()
         };
         assert_eq!(all, expected);
@@ -604,7 +887,7 @@ mod tests {
     fn each_builder_sets_its_own_flag() {
         type Builder = fn(Events, bool) -> Events;
         type Flag = fn(&parse::HandlerSet) -> bool;
-        let builders: [(Builder, Flag); 9] = [
+        let builders: [(Builder, Flag); 18] = [
             (Events::start_element, |h| h.start_element),
             (Events::end_element, |h| h.end_element),
             (Events::character_data, |h| h.character_data),
@@ -614,6 +897,15 @@ mod tests {
             (Events::end_cdata_section, |h| h.end_cdata_section),
             (Events::start_namespace_decl, |h| h.start_namespace_decl),
             (Events::end_namespace_decl, |h| h.end_namespace_decl),
+            (Events::xml_decl, |h| h.xml_decl),
+            (Events::start_doctype_decl, |h| h.start_doctype_decl),
+            (Events::end_doctype_decl, |h| h.end_doctype_decl),
+            (Events::entity_decl, |h| h.entity_decl),
+            (Events::unparsed_entity_decl, |h| h.unparsed_entity_decl),
+            (Events::notation_decl, |h| h.notation_decl),
+            (Events::element_decl, |h| h.element_decl),
+            (Events::attlist_decl, |h| h.attlist_decl),
+            (Events::skipped_entity, |h| h.skipped_entity),
         ];
         for (i, (set, get)) in builders.iter().enumerate() {
             let one = set(Events::NONE, true).handler_set();
