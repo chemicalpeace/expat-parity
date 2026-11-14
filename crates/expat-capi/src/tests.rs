@@ -404,6 +404,9 @@ unsafe extern "C" fn on_external(
     let second = unsafe { XML_ExternalEntityParserCreate(parser, context, std::ptr::null()) };
     assert!(second.is_null());
     let status = parse(child, b"<x>t</x>", true);
+    // The child's handlers borrowed the `Log` again: take it anew.
+    // SAFETY: as above; no other borrow of it is live.
+    let log = unsafe { self::log(user) };
     log.lines.push(format!("child {status}"));
     if log.nested_parse.is_some() {
         log.parser = child;
