@@ -14,8 +14,10 @@
 //!
 //! - Inside a handler, `XML_GetCurrentLineNumber`,
 //!   `XML_GetCurrentColumnNumber` and `XML_GetCurrentByteIndex` (and their
-//!   64-bit forms) return 0, 0 and -1; libexpat returns the position of
-//!   the event. Between calls they match libexpat.
+//!   64-bit forms) return the position of the event, counted at every
+//!   event while any handler is set (D-048). libexpat counts only when
+//!   asked; the two differ only if a carriage return and the line feed
+//!   after it fall on either side of an event boundary.
 //! - The set of handlers is read when `XML_Parse` starts: a handler set or
 //!   cleared from inside a handler takes effect from the next call. (A
 //!   handler replaced by another non-`NULL` handler is used at once, as in
@@ -114,6 +116,9 @@ pub struct XML_ParserStruct {
     busy: Cell<bool>,
     error_code: Cell<XML_Error>,
     specified: Cell<c_int>,
+    /// The position of the event being reported (line from 1, column,
+    /// byte index), for the position functions inside a handler.
+    event_position: Cell<(u64, u64, i64)>,
     start_element: Cell<XML_StartElementHandler>,
     end_element: Cell<XML_EndElementHandler>,
     character_data: Cell<XML_CharacterDataHandler>,
@@ -146,6 +151,7 @@ impl XML_ParserStruct {
             busy: Cell::new(false),
             error_code: Cell::new(XML_ERROR_NONE),
             specified: Cell::new(0),
+            event_position: Cell::new((0, 0, -1)),
             start_element: Cell::new(None),
             end_element: Cell::new(None),
             character_data: Cell::new(None),
@@ -163,9 +169,10 @@ impl XML_ParserStruct {
         }
     }
 
-    /// The events whose handler is set (non-`NULL`).
+    /// The events whose handler is set (non-`NULL`), and the position of
+    /// each event when any is set.
     fn events(&self) -> Events {
-        Events::NONE
+        let events = Events::NONE
             .start_element(self.start_element.get().is_some())
             .end_element(self.end_element.get().is_some())
             .character_data(self.character_data.get().is_some())
@@ -174,7 +181,21 @@ impl XML_ParserStruct {
             .start_cdata_section(self.start_cdata_section.get().is_some())
             .end_cdata_section(self.end_cdata_section.get().is_some())
             .start_namespace_decl(self.start_namespace_decl.get().is_some())
-            .end_namespace_decl(self.end_namespace_decl.get().is_some())
+            .end_namespace_decl(self.end_namespace_decl.get().is_some());
+        events.position(events != Events::NONE)
+    }
+
+    /// Runs `f` on the Rust parser between calls, or returns the field of
+    /// the event position `g` picks while a handler is running.
+    fn position<T>(
+        &self,
+        f: impl FnOnce(&mut Parser) -> T,
+        g: impl FnOnce((u64, u64, i64)) -> T,
+    ) -> T {
+        match self.with_parser(f) {
+            Some(v) => v,
+            None => g(self.event_position.get()),
+        }
     }
 
     /// Runs `f` on the Rust parser, or returns `None` while a handler is
@@ -244,6 +265,10 @@ impl Dispatch<'_> {
 }
 
 impl Handler for Dispatch<'_> {
+    fn position(&mut self, line: u64, column: u64, byte_index: i64) {
+        self.state.event_position.set((line, column, byte_index));
+    }
+
     fn start_element(&mut self, name: &[u8], attributes: &[(&[u8], &[u8])], specified: usize) {
         let Some(h) = self.state.start_element.get() else {
             return;
@@ -683,7 +708,8 @@ pub extern "C" fn XML_ErrorString(code: XML_Error) -> *const XML_Char {
         .map_or(std::ptr::null(), |(_, t)| t.as_ptr())
 }
 
-/// `XML_GetCurrentLineNumber64`; 0 for `NULL` and inside a handler.
+/// `XML_GetCurrentLineNumber64`; 0 for `NULL`. Inside a handler, the
+/// line of the event.
 ///
 /// # Safety
 ///
@@ -691,12 +717,11 @@ pub extern "C" fn XML_ErrorString(code: XML_Error) -> *const XML_Char {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XML_GetCurrentLineNumber64(parser: XML_Parser) -> u64 {
     // SAFETY: forwarded from this function's contract.
-    unsafe { state(parser) }
-        .and_then(|s| s.with_parser(|p| p.current_line()))
-        .unwrap_or(0)
+    unsafe { state(parser) }.map_or(0, |s| s.position(|p| p.current_line(), |e| e.0))
 }
 
-/// `XML_GetCurrentColumnNumber64`; 0 for `NULL` and inside a handler.
+/// `XML_GetCurrentColumnNumber64`; 0 for `NULL`. Inside a handler, the
+/// column of the event.
 ///
 /// # Safety
 ///
@@ -704,12 +729,11 @@ pub unsafe extern "C" fn XML_GetCurrentLineNumber64(parser: XML_Parser) -> u64 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XML_GetCurrentColumnNumber64(parser: XML_Parser) -> u64 {
     // SAFETY: forwarded from this function's contract.
-    unsafe { state(parser) }
-        .and_then(|s| s.with_parser(|p| p.current_column()))
-        .unwrap_or(0)
+    unsafe { state(parser) }.map_or(0, |s| s.position(|p| p.current_column(), |e| e.1))
 }
 
-/// `XML_GetCurrentByteIndex64`; -1 for `NULL` and inside a handler.
+/// `XML_GetCurrentByteIndex64`; -1 for `NULL`. Inside a handler, the
+/// byte index of the event.
 ///
 /// # Safety
 ///
@@ -717,9 +741,7 @@ pub unsafe extern "C" fn XML_GetCurrentColumnNumber64(parser: XML_Parser) -> u64
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn XML_GetCurrentByteIndex64(parser: XML_Parser) -> i64 {
     // SAFETY: forwarded from this function's contract.
-    unsafe { state(parser) }
-        .and_then(|s| s.with_parser(|p| p.current_byte_index()))
-        .unwrap_or(-1)
+    unsafe { state(parser) }.map_or(-1, |s| s.position(|p| p.current_byte_index(), |e| e.2))
 }
 
 /// `XML_GetCurrentLineNumber`: `XML_GetCurrentLineNumber64` converted to

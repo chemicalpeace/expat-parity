@@ -1379,3 +1379,35 @@ recorded in DIVERGENCES.md.
   handler, memory suite, reset, billion-laughs setters, hash salt
   setters), positions inside handlers, `XML_UNICODE` builds, a generated
   symbol map or a shared-library version script.
+
+## D-048 Event positions (module 13, slice 2a) (2026-11-14)
+
+- **Decision.** A handler can be told the position of each event before
+  the event: `Events::position` (off in `Events::ALL` and `Events::NONE`)
+  and `Handler::position(line, column, byte_index)`, with the values
+  `XML_GetCurrentLineNumber`, `XML_GetCurrentColumnNumber` and
+  `XML_GetCurrentByteIndex` return inside that event's C handler. The
+  parser core reports it through `HandlerSet::event_position` before each
+  of the nine events of `Events`.
+- **Counting.** The line and column are counted from the previous event
+  of the same call (`located`), or from `m_positionPtr` and `m_position`
+  for the first one, which is what libexpat computes when the
+  application asks at every event. `m_position` and `m_positionPtr` are
+  not changed, so the position after the call is the same with and
+  without event positions. The two can differ from libexpat only when the
+  application asks at some events and not at others and a carriage return
+  and the line feed after it fall on either side of an event boundary.
+- **Input buffer.** The input buffer is an `Arc<Vec<u8>>`: the processors
+  read it through their own handle while the event position reads it
+  through the parser. It is only written between parses, when the parser
+  holds the only handle, so `Arc::make_mut` does not copy.
+- **C interface.** `expat-capi` turns `Events::position` on whenever any
+  handler is set, since it cannot know whether a handler will ask, and
+  answers the position functions from the last reported event while
+  `XML_Parse` runs. This removes the first gap listed in D-047.
+- **Cost.** Off by default for the Rust API. With it on, every byte up to
+  each event is counted once more. Not measured yet.
+- **Verification.** `scripts/capi-check.sh` adds a third run to each
+  configuration in which every handler prints its event's position: 541
+  documents x 18 runs, output equal to libexpat. A deliberate change of
+  the reported column is caught.

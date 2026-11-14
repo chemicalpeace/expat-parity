@@ -204,7 +204,7 @@ fn errors_and_positions_match_the_rust_api() {
 }
 
 #[test]
-fn calls_from_inside_a_handler_are_refused() {
+fn calls_from_inside_a_handler_are_refused_and_positions_answered() {
     // SAFETY: NULL selects the default encoding.
     let p = unsafe { XML_ParserCreate(std::ptr::null()) };
     let mut log = Log {
@@ -218,7 +218,8 @@ fn calls_from_inside_a_handler_are_refused() {
     }
     assert_eq!(parse(p, b"<a/>", true), XML_STATUS_OK);
     assert_eq!(log.nested_parse, Some(XML_STATUS_ERROR));
-    assert_eq!(log.lines, ["inside line=0 col=0 byte=-1"]);
+    // The position functions answer with the position of the event.
+    assert_eq!(log.lines, ["inside line=1 col=0 byte=0"]);
     // SAFETY: the parser survived the refused free.
     unsafe {
         assert_eq!(XML_GetErrorCode(p), XML_ERROR_NONE);

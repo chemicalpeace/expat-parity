@@ -2,7 +2,8 @@
  * document given on the command line, through the expat.h functions that
  * expat-capi implements. scripts/capi-check.sh builds this file once
  * against the vendored libexpat and once against expat-capi and compares
- * the two outputs. */
+ * the two outputs. In the third run of each configuration every handler
+ * also prints the position of its event. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +11,17 @@
 #include "expat.h"
 
 static XML_Parser g_parser;
+/* Whether each handler also prints the position of its event. */
+static int g_where;
+
+static void position(void);
+
+static void where(void) {
+  if (g_where) {
+    printf("   at");
+    position();
+  }
+}
 
 static void put(const char *s) {
   for (; *s; s++) {
@@ -41,6 +53,7 @@ static void XMLCALL on_start(void *ud, const XML_Char *name,
     put(atts[i]);
   }
   printf(" [%d]\n", XML_GetSpecifiedAttributeCount(g_parser));
+  where();
 }
 
 static void XMLCALL on_end(void *ud, const XML_Char *name) {
@@ -48,6 +61,7 @@ static void XMLCALL on_end(void *ud, const XML_Char *name) {
   printf("  end ");
   put(name);
   putchar('\n');
+  where();
 }
 
 static void XMLCALL on_chars(void *ud, const XML_Char *s, int len) {
@@ -55,6 +69,7 @@ static void XMLCALL on_chars(void *ud, const XML_Char *s, int len) {
   printf("  chars ");
   putn(s, len);
   putchar('\n');
+  where();
 }
 
 static void XMLCALL on_pi(void *ud, const XML_Char *t, const XML_Char *d) {
@@ -64,6 +79,7 @@ static void XMLCALL on_pi(void *ud, const XML_Char *t, const XML_Char *d) {
   putchar(' ');
   put(d);
   putchar('\n');
+  where();
 }
 
 static void XMLCALL on_comment(void *ud, const XML_Char *d) {
@@ -71,16 +87,19 @@ static void XMLCALL on_comment(void *ud, const XML_Char *d) {
   printf("  comment ");
   put(d);
   putchar('\n');
+  where();
 }
 
 static void XMLCALL on_cdata_start(void *ud) {
   (void)ud;
   printf("  cdata(\n");
+  where();
 }
 
 static void XMLCALL on_cdata_end(void *ud) {
   (void)ud;
   printf("  )cdata\n");
+  where();
 }
 
 static void XMLCALL on_ns_start(void *ud, const XML_Char *p,
@@ -91,6 +110,7 @@ static void XMLCALL on_ns_start(void *ud, const XML_Char *p,
   putchar(' ');
   put(u ? u : "(null)");
   putchar('\n');
+  where();
 }
 
 static void XMLCALL on_ns_end(void *ud, const XML_Char *p) {
@@ -98,6 +118,7 @@ static void XMLCALL on_ns_end(void *ud, const XML_Char *p) {
   printf("  /ns ");
   put(p ? p : "(null)");
   putchar('\n');
+  where();
 }
 
 static void position(void) {
@@ -109,6 +130,7 @@ static void position(void) {
 
 static void run(const char *doc, long len, long chunk, int ns, int handlers) {
   printf(" config chunk=%ld ns=%d handlers=%d\n", chunk, ns, handlers);
+  g_where = handlers == 2;
   g_parser = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
   if (handlers) {
     XML_SetElementHandler(g_parser, on_start, on_end);
@@ -156,7 +178,7 @@ int main(int argc, char **argv) {
     static const long chunks[] = {0, 1, 7};
     for (int c = 0; c < 3; c++)
       for (int ns = 0; ns < 2; ns++)
-        for (int h = 0; h < 2; h++)
+        for (int h = 0; h < 3; h++)
           run(doc, len, chunks[c], ns, h);
     free(doc);
   }
