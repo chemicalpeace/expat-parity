@@ -391,6 +391,7 @@ impl Parser {
                 child.pending_value = core::mem::take(&mut self.pending_value);
                 child.charged_len = self.charged_len;
                 child.is_param_entity = true;
+                child.control.set_param_entity(true);
                 child.prolog_state.init_external_entity();
                 child.processor = Processor::ExternalParEntInit;
             }
@@ -706,7 +707,7 @@ impl Parser {
                 // A change of encoding takes effect for the following
                 // tokens (C: `m_encoding` is replaced).
                 let _ = with_known!(k, e => self.process_xml_decl(h, e, buf, start, next, true))?;
-                match self.parsing {
+                match self.control.get() {
                     Parsing::Suspended => {
                         *end_ptr = next;
                         return Ok(());
@@ -844,7 +845,7 @@ impl Parser {
                         return Err(XmlError::UnexpectedState.into());
                     };
                     let _ = with_known!(k, e => self.process_xml_decl(h, e, buf, start, next, false))?;
-                    if self.parsing == Parsing::Finished {
+                    if self.control.get() == Parsing::Finished {
                         return Err(XmlError::Aborted.into());
                     }
                     *next_ptr = next;
@@ -1025,7 +1026,7 @@ impl Parser {
             Scan::Token(Tok::IgnoreSect) => {
                 *start = Some(next);
                 *next_ptr = next;
-                if self.parsing == Parsing::Finished {
+                if self.control.get() == Parsing::Finished {
                     return Err(XmlError::Aborted.into());
                 }
                 Ok(())

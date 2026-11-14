@@ -316,7 +316,7 @@ impl Parser {
                 // Every other role belongs to a document type declaration.
                 _ => self.dtd_role(h, enc, buf, role, t, s, next, allow_closing_doctype)?,
             }
-            match self.parsing {
+            match self.control.get() {
                 Parsing::Suspended => {
                     *next_ptr = next;
                     return Ok(PrologDone::Done);

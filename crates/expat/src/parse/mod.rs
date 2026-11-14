@@ -51,6 +51,7 @@
 mod accounting;
 pub mod c_layout;
 mod content;
+mod control;
 mod decl;
 mod dtd;
 mod entity;
@@ -71,6 +72,7 @@ pub use dtd::{
     PrefixId,
 };
 pub use model::{ContentModel, ContentNode, ContentQuant, ContentType, Scaffold};
+pub use control::Control;
 pub use error::{Stop, XmlError};
 pub use external::{ExternalEntities, ExternalEntityParser};
 
@@ -451,8 +453,8 @@ pub struct Parser {
     pub(crate) processor: Processor,
     /// `m_errorCode`
     pub(crate) error_code: Stop,
-    /// `m_parsingStatus.parsing`
-    pub(crate) parsing: Parsing,
+    /// `m_parsingStatus.parsing`, shared with the stop handles.
+    pub(crate) control: Arc<Control>,
     /// `m_parsingStatus.finalBuffer`
     pub(crate) final_buffer: bool,
     /// `m_reenter`
@@ -582,7 +584,7 @@ impl Parser {
             prolog_state: crate::role::PrologState::new(),
             processor: Processor::PrologInit,
             error_code: Stop::Error(XmlError::None),
-            parsing: Parsing::Initialized,
+            control: Arc::new(Control::default()),
             final_buffer: false,
             reenter: false,
             tag_level: 0,
@@ -634,7 +636,7 @@ impl Parser {
     /// `XML_SetReturnNSTriplet`. Like C, it has no effect once parsing has
     /// started.
     pub fn set_return_ns_triplet(&mut self, on: bool) {
-        if self.parsing == Parsing::Initialized {
+        if self.control.get() == Parsing::Initialized {
             self.ns_triplets = on;
         }
     }
@@ -643,7 +645,7 @@ impl Parser {
     /// `XML_ERROR_CANT_CHANGE_FEATURE_ONCE_PARSING`) once parsing has
     /// started.
     pub fn use_foreign_dtd(&mut self, on: bool) -> bool {
-        if matches!(self.parsing, Parsing::Parsing | Parsing::Suspended) {
+        if matches!(self.control.get(), Parsing::Parsing | Parsing::Suspended) {
             return false;
         }
         self.use_foreign_dtd = on;
@@ -652,7 +654,7 @@ impl Parser {
 
     /// `XML_SetParamEntityParsing`: `false` once parsing has started.
     pub fn set_param_entity_parsing(&mut self, mode: ParamEntityParsing) -> bool {
-        if matches!(self.parsing, Parsing::Parsing | Parsing::Suspended) {
+        if matches!(self.control.get(), Parsing::Parsing | Parsing::Suspended) {
             return false;
         }
         self.param_entity_parsing = mode;
@@ -810,7 +812,7 @@ impl Parser {
 
     /// `m_parsingStatus.parsing`.
     pub fn parsing_status(&self) -> Parsing {
-        self.parsing
+        self.control.get()
     }
 
     /// The billion-laughs counters.
@@ -953,7 +955,7 @@ impl Parser {
             self.error_code = XmlError::InvalidArgument.into();
             return Status::Error;
         };
-        match self.parsing {
+        match self.control.get() {
             Parsing::Suspended => {
                 self.error_code = XmlError::Suspended.into();
                 return Status::Error;
@@ -967,7 +969,7 @@ impl Parser {
                     self.error_code = XmlError::NoMemory.into();
                     return Status::Error;
                 }
-                self.parsing = Parsing::Parsing;
+                self.control.set(Parsing::Parsing);
             }
             Parsing::Parsing => {}
         }
@@ -1005,7 +1007,7 @@ impl Parser {
             self.error_code = XmlError::NoMemory.into();
             return false;
         }
-        match self.parsing {
+        match self.control.get() {
             Parsing::Suspended => {
                 self.error_code = XmlError::Suspended.into();
                 return false;
@@ -1096,7 +1098,7 @@ impl Parser {
             self.error_code = XmlError::InvalidArgument.into();
             return Status::Error;
         }
-        match self.parsing {
+        match self.control.get() {
             Parsing::Suspended => {
                 self.error_code = XmlError::Suspended.into();
                 return Status::Error;
@@ -1114,7 +1116,7 @@ impl Parser {
                     self.error_code = XmlError::NoMemory.into();
                     return Status::Error;
                 }
-                self.parsing = Parsing::Parsing;
+                self.control.set(Parsing::Parsing);
             }
             Parsing::Parsing => {}
         }
@@ -1152,11 +1154,63 @@ impl Parser {
             return Status::Error;
         }
         self.error_code = XmlError::None.into();
-        let status = match self.parsing {
+        let status = match self.control.get() {
             Parsing::Suspended => Status::Suspended,
             Parsing::Initialized | Parsing::Parsing => {
                 if is_final {
-                    self.parsing = Parsing::Finished;
+                    self.control.set(Parsing::Finished);
+                    return Status::Ok;
+                }
+                Status::Ok
+            }
+            Parsing::Finished => Status::Ok,
+        };
+        if let Some(pos) = self.position_ptr {
+            self.update_position(pos, self.buffer_ptr);
+        }
+        self.position_ptr = Some(self.buffer_ptr);
+        status
+    }
+
+    /// `XML_StopParser`: [`Control::stop`], storing the error code when it
+    /// refuses.
+    pub fn stop_parser(&mut self, resumable: bool) -> Status {
+        match self.control.stop(resumable) {
+            Ok(()) => Status::Ok,
+            Err(e) => {
+                self.error_code = e.into();
+                Status::Error
+            }
+        }
+    }
+
+    /// `XML_ResumeParser`: continues a parse that a handler suspended,
+    /// from where it stopped.
+    pub fn resume_parser<H: Handler>(&mut self, h: &mut H) -> Status {
+        if self.control.get() != Parsing::Suspended {
+            self.error_code = XmlError::NotSuspended.into();
+            return Status::Error;
+        }
+        self.control.set(Parsing::Parsing);
+        // C keeps `m_positionPtr` here; the event count starts again from it.
+        self.located = None;
+        let start = self.buffer_ptr;
+        let end = self.parse_end_ptr.unwrap_or(start);
+        let mut end_ptr = start;
+        let result = self.call_processor(h, start, end, &mut end_ptr);
+        self.buffer_ptr = end_ptr;
+        if let Err(e) = result {
+            self.error_code = e;
+            self.event_end_ptr = self.event_ptr;
+            self.processor = Processor::Error;
+            return Status::Error;
+        }
+        self.error_code = XmlError::None.into();
+        let status = match self.control.get() {
+            Parsing::Suspended => Status::Suspended,
+            Parsing::Initialized | Parsing::Parsing => {
+                if self.final_buffer {
+                    self.control.set(Parsing::Finished);
                     return Status::Ok;
                 }
                 Status::Ok
@@ -1206,7 +1260,7 @@ impl Parser {
             let ret = self.run_processor(h, buf, *end_ptr, end_ptr);
             // Make parsing status (and in particular XML_SUSPENDED) take
             // precedence over re-enter flag when they disagree.
-            if self.parsing != Parsing::Parsing {
+            if self.control.get() != Parsing::Parsing {
                 self.reenter = false;
             }
             if !self.reenter {

@@ -1439,3 +1439,38 @@ recorded in DIVERGENCES.md.
   inside a handler, 3000 small requests that move and grow the buffer):
   output equal to libexpat. Unit tests cover the same cases for the Rust
   API and, under Miri in CI, the C functions.
+
+## D-050 Stop and resume (module 13, slice 3) (2026-11-14)
+
+- **Decision.** The parsing state (`m_parsingStatus.parsing`) moves into
+  a shared `parse::Control` (an `Arc` holding an atomic byte), so that a
+  handler can change it while the parser is borrowed by the running call.
+  The public API gets `Parser::stopper()`, which returns a `Stopper`
+  (`XML_StopParser`), and `Parser::is_suspended`, `resume`, `resume_with`
+  and `resume_with_events` (`XML_ResumeParser`). The C interface exports
+  `XML_StopParser` and `XML_ResumeParser` and returns
+  `XML_STATUS_SUSPENDED` from the parsing calls.
+- **Core.** `Control::stop` is `XML_StopParser` without the error code,
+  including the `XML_ERROR_SUSPEND_PE` check for external parameter
+  entity parsers. `Parser::resume_parser` is `XML_ResumeParser`. The
+  processors already checked the parsing state after each handler as C
+  does; they now read it through `Control`. The event position count
+  (D-048) starts again at each resume, since C keeps `m_positionPtr`
+  there and its position can be ahead of the event.
+- **Public result.** A suspended call returns `Ok(())`, and
+  `is_suspended` reports the suspension, instead of a new return type.
+  This keeps the signatures of `parse` and the buffer functions; a caller
+  only sees a suspension after creating a `Stopper`. A refused stop
+  returns its `ErrorCode` and, unlike C, does not change
+  `Parser::error_code`; the C interface stores it as libexpat does.
+- **Threads.** The state is atomic (relaxed), so a `Stopper` is `Send`
+  and `Sync`. A stop from another thread is memory-safe, but when it takes
+  effect is unspecified; libexpat parsers are not thread-safe either.
+- **Verification.** `scripts/capi-check.sh` adds runs that stop the parser
+  from the handlers (suspended at every event, at every third event,
+  aborted at the fifth), resume after each suspension and try to parse
+  while suspended (541 documents x 48 runs in total), and checks the
+  error cases (before the start, twice, from inside a handler, outside a
+  handler, after the final piece, a stop without resume while suspended):
+  output equal to libexpat. Unit tests cover the Rust API and the C
+  functions.
