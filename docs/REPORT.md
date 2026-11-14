@@ -1655,6 +1655,10 @@ compilers and inputs; x86_64 was not measured.
   the port copies it for every entity, so it charges at least C's bytes.
   The child encoding-name charge is untested. The input buffer is not
   tracked, as in C.
+- The W3C XML Conformance Test Suite (2,586 documents, five option sets)
+  is compared with libexpat (D-059); the suite is downloaded by
+  `scripts/w3c-check.sh`, not vendored. External entities are resolved
+  by a lexical scan of `SYSTEM` literals, first resolution wins.
 - Allocation failures are compared at every allocation point (D-058),
   except shrinking `realloc_fcn` calls; through the C interface a
   failing `XML_ParserCreate_MM` allocator only reaches content models and

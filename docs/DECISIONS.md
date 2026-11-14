@@ -1807,3 +1807,35 @@ recorded in DIVERGENCES.md.
   libexpat would. A failure of the system allocator in the port aborts
   the process (README, "Limitations"); this decision does not change
   that.
+
+## D-059 W3C XML Conformance Test Suite compared with libexpat (2026-11-15)
+
+- **Decision.** `tests/tests/w3c_diff.rs` runs every test document of the
+  W3C XML Conformance Test Suite (xmlts20130923, the 2,586 `TEST`
+  entries of the sub-catalogues named in `xmlconf.xml`) through libexpat
+  and the port and compares the traces, under five option sets: no
+  external entities; every external entity read (parameter entity
+  parsing always, the not-standalone handler returning true) fed whole,
+  in 1-byte chunks, through the buffer API in 7-byte chunks, and with
+  namespaces. The suite is not vendored: `scripts/w3c-check.sh`
+  downloads it, checks its SHA-256 and runs the test (also a CI step);
+  without `XMLCONF_DIR` the test prints a note and passes.
+- **External entities.** They are read in memory through the oracle's
+  `ExtHandler::Read`, keyed by system identifier as written. Before a
+  test, every `SYSTEM` literal (and the system literal after `PUBLIC`) in
+  the document and, transitively, in the files it names is resolved
+  against the directory of the file containing it. The first resolution
+  of a literal wins, so a literal that names different files from
+  different directories (eduni errata-2e E18) gets one of them; both
+  parsers see the same files.
+- **Why.** The upstream vectors (541 documents) come from libexpat's own
+  unit tests; the suite adds 2,586 documents written by other parties
+  against the specification.
+- **Result.** 12,930 runs, traces equal; 325 external entities read in
+  the whole-input set. The assertion is equality with libexpat only. How
+  libexpat classifies the documents (whole-input set): valid 480
+  accepted, 332 rejected (306 in eduni errata-4e, the XML 1.0 fifth
+  edition name characters; 25 XML 1.1; 1 eduni errata-2e); not-wf 1,414 rejected, 85
+  accepted; invalid 227 accepted, 15 rejected; error 18 accepted, 15
+  rejected. libexpat is a non-validating XML 1.0 (fourth edition names)
+  parser, so these figures describe libexpat, not defects of the port.
