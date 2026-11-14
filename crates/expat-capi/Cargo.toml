@@ -1,0 +1,25 @@
+[package]
+name = "expat-capi"
+description = "libexpat-compatible C interface (expat.h) over the expat crate; a first slice, see the crate documentation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[dependencies]
+expat = { path = "../expat" }

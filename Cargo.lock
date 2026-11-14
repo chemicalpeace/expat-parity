@@ -266,6 +266,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "expat-capi"
+version = "0.0.1"
+dependencies = [
+ "expat",
+]
+
+[[package]]
 name = "expat-difftest"
 version = "0.0.1"
 dependencies = [

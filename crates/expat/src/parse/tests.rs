@@ -314,3 +314,25 @@ fn accounting_counts_direct_and_expanded_bytes() {
     assert!(acc.diff_tolerated(tok, 1, Account::None));
     assert!(acc.diff_tolerated(crate::tok::Scan::Partial, 1, Account::Direct));
 }
+
+#[test]
+fn direct_only_amplification_matches_division() {
+    for &(direct, factor) in &[
+        (1u64, 1.0f32),
+        (9_000_000, 1.0),
+        (u64::MAX, 1.0),
+        (16_777_217, 1.0),
+        (9_000_000, 100.0),
+        (9_000_000, 0.5),
+        (9_000_000, f32::NAN),
+    ] {
+        let acc = Accounting {
+            count_bytes_direct: direct,
+            count_bytes_indirect: 0,
+            maximum_amplification_factor: factor,
+            activation_threshold_bytes: 0,
+        };
+        let by_division = acc.amplification_with(0) <= factor;
+        assert_eq!(acc.amplification_tolerated(0), by_division, "{direct} {factor}");
+    }
+}

@@ -50,7 +50,8 @@
 //! - Only the nine events of [`Events`]: no default handler, no DTD,
 //!   entity or XML declaration events, no unknown-encoding handler.
 //! - A handler cannot read the position or stop the parse; the position is
-//!   reported only with an [`Error`].
+//!   reported with an [`Error`] and between calls
+//!   ([`Parser::current_line`]).
 //! - External entities and DTD subsets are never loaded: the crate does no
 //!   I/O and has no external entity handler, and the parser behaves as
 //!   libexpat does when none is set. The internal DTD subset is parsed and

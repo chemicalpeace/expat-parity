@@ -87,13 +87,26 @@ impl Accounting {
             .count_bytes_direct
             .wrapping_add(self.count_bytes_indirect);
         let output_with_extra = output.saturating_add(extra_indirect_bytes);
-        output_with_extra < self.activation_threshold_bytes
-            || self.amplification_with(extra_indirect_bytes) <= self.maximum_amplification_factor
+        if output_with_extra < self.activation_threshold_bytes {
+            return true;
+        }
+        // With no indirect bytes the factor is `d / d`, exactly 1.0 in
+        // `float`, so the division can be skipped while the maximum is at
+        // least 1.0 (the setter refuses anything lower).
+        if extra_indirect_bytes == 0
+            && self.count_bytes_indirect == 0
+            && self.count_bytes_direct != 0
+            && self.maximum_amplification_factor >= 1.0
+        {
+            return true;
+        }
+        self.amplification_with(extra_indirect_bytes) <= self.maximum_amplification_factor
     }
 
     /// `accountingDiffTolerated` for `bytes` bytes of a token of kind `tok`
     /// read by the root parser (`false` = stop with
     /// `XML_ERROR_AMPLIFICATION_LIMIT_BREACH`).
+    #[inline]
     pub fn diff_tolerated(&mut self, tok: Scan, bytes: usize, account: Account) -> bool {
         if matches!(
             tok,
