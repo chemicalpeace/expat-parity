@@ -174,6 +174,16 @@ pub struct HandlerSet {
     /// Report each event's position first ([`Handler::event_position`]),
     /// for a caller that asks for positions from inside its handlers.
     pub event_position: bool,
+    /// `XML_SetDefaultHandler` / `XML_SetDefaultHandlerExpand`: the text
+    /// of the document that no other set handler reports, as written
+    /// (converted to UTF-8).
+    pub default: bool,
+    /// `!m_defaultExpandInternalEntities`: set by `XML_SetDefaultHandler`
+    /// (even with a `NULL` handler), cleared by
+    /// `XML_SetDefaultHandlerExpand`. A reference to an internal general
+    /// entity in content is then not expanded; it goes to the skipped
+    /// entity handler, or else the default handler.
+    pub no_default_expand: bool,
 }
 
 /// Receives the parser's events. Only the methods whose [`HandlerSet`]
@@ -207,6 +217,8 @@ pub trait Handler {
     fn start_namespace_decl(&mut self, _prefix: Option<&[u8]>, _uri: Option<&[u8]>) {}
     /// `XML_EndNamespaceDeclHandler`.
     fn end_namespace_decl(&mut self, _prefix: Option<&[u8]>) {}
+    /// `XML_DefaultHandler`: a piece of the document's text, as written.
+    fn default_data(&mut self, _data: &[u8]) {}
     /// `XML_SkippedEntityHandler`.
     fn skipped_entity(&mut self, _name: &[u8], _is_param: bool) {}
     /// `XML_ExternalEntityRefHandler`: `context` is `None` for parameter

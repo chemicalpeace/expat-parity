@@ -266,14 +266,25 @@ impl Parser {
                 return Err(XmlError::AmplificationLimitBreach.into());
             }
             let mut rescan = false;
+            // `handleDefault`: whether the token goes to the default
+            // handler after the role is processed.
+            let handle_default;
             match role {
-                Role::XmlDecl => rescan = self.process_xml_decl(h, enc, buf, s, next, false)?,
+                Role::XmlDecl => {
+                    rescan = self.process_xml_decl(h, enc, buf, s, next, false)?;
+                    handle_default = false;
+                }
                 // A text declaration of an external parameter entity or
                 // the external subset.
-                Role::TextDecl => rescan = self.process_xml_decl(h, enc, buf, s, next, true)?,
+                Role::TextDecl => {
+                    rescan = self.process_xml_decl(h, enc, buf, s, next, true)?;
+                    handle_default = false;
+                }
                 Role::IgnoreSect => {
+                    self.report_default(h, enc, buf, s, next);
+                    handle_default = false;
                     let mut start = Some(next);
-                    self.do_ignore_section(enc, buf, &mut start, next_ptr, have_more)?;
+                    self.do_ignore_section(h, enc, buf, &mut start, next_ptr, have_more)?;
                     match start {
                         Some(n) => next = n,
                         None => {
@@ -300,9 +311,16 @@ impl Parser {
                     self.content_processor(h, buf, s, next_ptr)?;
                     return Ok(PrologDone::Done);
                 }
-                Role::Pi => self.report_processing_instruction(h, enc, buf, s, next)?,
-                Role::Comment => self.report_comment(h, enc, buf, s, next)?,
-                Role::None | Role::DoctypeNone => {}
+                Role::Pi => {
+                    self.report_processing_instruction(h, enc, buf, s, next)?;
+                    handle_default = false;
+                }
+                Role::Comment => {
+                    self.report_comment(h, enc, buf, s, next)?;
+                    handle_default = false;
+                }
+                Role::None => handle_default = t != Tok::Bom,
+                Role::DoctypeNone => handle_default = !self.handlers.start_doctype_decl,
                 Role::Error => {
                     return Err(match t {
                         // PE references in internal subset are not allowed
@@ -314,7 +332,12 @@ impl Parser {
                     .into());
                 }
                 // Every other role belongs to a document type declaration.
-                _ => self.dtd_role(h, enc, buf, role, t, s, next, allow_closing_doctype)?,
+                _ => {
+                    handle_default = self.dtd_role(h, enc, buf, role, t, s, next, allow_closing_doctype)?;
+                }
+            }
+            if handle_default {
+                self.report_default(h, enc, buf, s, next);
             }
             match self.control.get() {
                 Parsing::Suspended => {
@@ -399,6 +422,8 @@ impl Parser {
                 self.tracker.store_text(Pool::Temp2, v, direct).map_err(no_mem)?;
             }
             h.xml_decl(version.as_deref(), enc_name.as_deref(), standalone);
+        } else {
+            self.report_default(h, enc, buf, s, next);
         }
         let stored = self.handlers.xml_decl && (d.encoding_name.is_some() || d.version.is_some());
         let r = self.process_xml_decl_encoding(enc, buf, &d, stored);
