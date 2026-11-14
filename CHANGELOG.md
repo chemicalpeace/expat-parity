@@ -31,10 +31,12 @@ All notable changes are documented here. The format follows
   (`Stopper`, `Parser::stopper`, `is_suspended`, `resume`,
   `resume_with`, `resume_with_events`, D-050), the default handler
   (`Events::default_data`, `Events::expand_internal_entities`,
-  `Handler::default_data`, D-051).
+  `Handler::default_data`, D-051), the text of each event
+  (`Events::event_text`, `Handler::event_text`,
+  `Stopper::mark_default_current`, D-052).
 - `crates/expat-capi` (not published): a first part of libexpat's C
   interface over the crate, compared with libexpat by
-  `scripts/capi-check.sh` (D-047 to D-051).
+  `scripts/capi-check.sh` (D-047 to D-052).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.

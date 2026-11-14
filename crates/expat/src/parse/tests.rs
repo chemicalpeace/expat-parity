@@ -84,6 +84,7 @@ fn all() -> HandlerSet {
         event_position: false,
         default: false,
         no_default_expand: false,
+        event_text: false,
     }
 }
 

@@ -1513,3 +1513,37 @@ recorded in DIVERGENCES.md.
   every declaration kind, compared with libexpat on the T2 corpus,
   whole and in pieces, with parameter entity parsing and external
   entity parsers. Unit tests cover the Rust API.
+
+## D-052 `XML_DefaultCurrent` (module 13, slice 5) (2026-11-14)
+
+- **Decision.** `XML_DefaultCurrent` is called from inside a handler, so
+  the parser cannot be borrowed again to run `reportDefault`. Instead
+  the core passes the text of each event before its handler runs
+  (`HandlerSet::event_text`, `Handler::event_text`), in the pieces
+  `reportDefault` would pass: the innermost open internal entity's
+  event as it is, or else the document's event, converted to UTF-8
+  through the 1024-byte data buffer when the encoding is not UTF-8. The
+  C interface asks for it while a default handler is set, keeps a copy,
+  and passes it to the default handler when `XML_DefaultCurrent` is
+  called.
+- **Moved event pointer.** When it converts, `reportDefault` leaves
+  `m_eventPtr` at the end of the event, so a later handler of the same
+  event (the start element handler after the namespace declaration
+  handlers) gets empty text and the end position. `XML_DefaultCurrent`
+  records the call on the parser's shared control
+  (`Stopper::mark_default_current`); before the next event is reported,
+  and when the parse call returns, the core moves its event pointer to
+  the end if it is still at the event whose text it passed.
+- **Empty text.** The C interface now calls a length-taking handler
+  once with length 0 for empty text, as libexpat does (the end element
+  event of an empty element).
+- **Difference.** Inside the default handler that `XML_DefaultCurrent`
+  calls, the position of a piece after the first (an event of more than
+  1024 bytes of UTF-8 in a document not in UTF-8) is the position of the
+  event, where libexpat moves it with each piece.
+- **Verification.** `scripts/capi-check.sh` adds two handler sets with
+  every handler and the default handler, without and with expansion,
+  where each handler calls `XML_DefaultCurrent` (the second also prints
+  positions, except inside that call), and a call outside a handler:
+  541 documents x 122 runs, output equal to libexpat. A unit test and a
+  doc example cover `Handler::event_text`.

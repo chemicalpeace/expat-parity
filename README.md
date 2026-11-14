@@ -101,10 +101,11 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   processing instruction, comment, CDATA section start and end, namespace
   declaration start and end — and the default handler
   (`Handler::default_data`, `XML_SetDefaultHandler`), which receives the
-  rest of the document as written. There is no handler for DTD
+  rest of the document as written; `Handler::event_text` gives each
+  event's text for `XML_DefaultCurrent`. There is no handler for DTD
   declarations, entity declarations, XML declarations or skipped
   entities (inside the document type declaration everything goes to the
-  default handler), no `XML_DefaultCurrent`, and no unknown-encoding
+  default handler), and no unknown-encoding
   handler (only libexpat's built-in encodings: UTF-8, UTF-16, UTF-16BE,
   UTF-16LE, ISO-8859-1, US-ASCII).
 - **Positions:** the position of each event is reported to

@@ -11,7 +11,10 @@
  * cases of the two functions. Handler sets 3 to 6 add the default
  * handler: alone, beside every other handler with internal entities
  * expanded, beside the element and comment handlers, and set to NULL
- * beside every other handler (which still turns expansion off). */
+ * beside every other handler (which still turns expansion off). Handler
+ * sets 7 and 8 set every handler and the default handler, without and
+ * with expansion, and each handler other than the default handler passes
+ * its event to the default handler with XML_DefaultCurrent. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,13 +29,26 @@ static int g_where;
 static int g_every;
 static int g_resumable;
 static long g_events;
+/* Whether each handler calls XML_DefaultCurrent, and whether it is doing
+ * so now. */
+static int g_current;
+static int g_in_current;
 
 static void position(void);
 
 static void where(void) {
-  if (g_where) {
+  /* Inside the default handler called by XML_DefaultCurrent the position
+   * of a piece after the first differs (see the expat-capi crate docs);
+   * the call is printed without it. */
+  if (g_where && ! g_in_current) {
     printf("   at");
     position();
+  }
+  if (g_current && ! g_in_current) {
+    printf("   current\n");
+    g_in_current = 1;
+    XML_DefaultCurrent(g_parser);
+    g_in_current = 0;
   }
   if (g_every && ++g_events % g_every == 0) {
     int st = XML_StopParser(g_parser, (XML_Bool)g_resumable);
@@ -160,12 +176,14 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
   if (every)
     printf(" stop=%d resumable=%d", every, resumable);
   putchar('\n');
-  g_where = handlers == 2 || handlers == 3 || handlers == 5;
+  g_where = handlers == 2 || handlers == 3 || handlers == 5 || handlers == 8;
+  g_current = handlers == 7 || handlers == 8;
   g_every = every;
   g_resumable = resumable;
   g_events = 0;
   g_parser = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
-  if (handlers == 1 || handlers == 2 || handlers == 4 || handlers == 6) {
+  if (handlers == 1 || handlers == 2 || handlers == 4 || handlers == 6 ||
+      handlers == 7 || handlers == 8) {
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCharacterDataHandler(g_parser, on_chars);
     XML_SetProcessingInstructionHandler(g_parser, on_pi);
@@ -177,9 +195,9 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCommentHandler(g_parser, on_comment);
   }
-  if (handlers == 3 || handlers == 5)
+  if (handlers == 3 || handlers == 5 || handlers == 7)
     XML_SetDefaultHandler(g_parser, on_default);
-  else if (handlers == 4)
+  else if (handlers == 4 || handlers == 8)
     XML_SetDefaultHandlerExpand(g_parser, on_default);
   else if (handlers == 6)
     XML_SetDefaultHandler(g_parser, NULL);
@@ -222,6 +240,9 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
   const XML_Char *msg = XML_ErrorString(XML_GetErrorCode(g_parser));
   printf(" end error=%d text=%s\n", (int)XML_GetErrorCode(g_parser),
          msg ? msg : "(null)");
+  /* Outside a handler XML_DefaultCurrent does nothing. */
+  if (g_current)
+    XML_DefaultCurrent(g_parser);
   XML_ParserFree(g_parser);
 }
 
@@ -374,7 +395,7 @@ int main(int argc, char **argv) {
     static const long chunks[] = {0, 1, 7};
     for (int c = 0; c < 3; c++)
       for (int ns = 0; ns < 2; ns++)
-        for (int h = 0; h < 7; h++)
+        for (int h = 0; h < 9; h++)
           for (int b = 0; b < 2; b++)
             run(doc, len, chunks[c], ns, h, b, 0, 0);
     /* Stopped from the handlers: suspended at every event, at every third

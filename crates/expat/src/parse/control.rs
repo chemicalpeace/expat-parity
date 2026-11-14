@@ -11,6 +11,9 @@ pub struct Control {
     parsing: AtomicU8,
     /// `m_isParamEntity`, for the `XML_ERROR_SUSPEND_PE` check.
     param_entity: AtomicBool,
+    /// Set by `XML_DefaultCurrent` from inside a handler: the event
+    /// reported last went to the default handler.
+    default_current: AtomicBool,
 }
 
 impl Default for Control {
@@ -18,6 +21,7 @@ impl Default for Control {
         Self {
             parsing: AtomicU8::new(encode(Parsing::Initialized)),
             param_entity: AtomicBool::new(false),
+            default_current: AtomicBool::new(false),
         }
     }
 }
@@ -51,6 +55,18 @@ impl Control {
 
     pub(crate) fn set_param_entity(&self, on: bool) {
         self.param_entity.store(on, Ordering::Relaxed);
+    }
+
+    /// Records that a handler passed the event reported last to the
+    /// default handler (`XML_DefaultCurrent`).
+    pub fn mark_default_current(&self) {
+        self.default_current.store(true, Ordering::Relaxed);
+    }
+
+    /// Whether [`Control::mark_default_current`] was called since the
+    /// last call of this function.
+    pub(crate) fn take_default_current(&self) -> bool {
+        self.default_current.swap(false, Ordering::Relaxed)
     }
 
     /// `XML_StopParser`, without the error code: the caller stores the
