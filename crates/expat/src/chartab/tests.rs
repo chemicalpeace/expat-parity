@@ -41,3 +41,24 @@ fn utf8_lead_bytes() {
     assert_eq!(Table::Utf8.byte_type(0xF0), ByteType::Lead4);
     assert_eq!(Table::Utf8.byte_type(0x80), ByteType::Trail);
 }
+
+#[test]
+fn entries_follow_the_variant_order() {
+    use core::ptr;
+    let expected: [(Table, &[ByteType; 256]); 10] = [
+        (Table::Utf8, &UTF8),
+        (Table::Utf8Ns, &UTF8_NS),
+        (Table::InternalUtf8, &INTERNAL_UTF8),
+        (Table::InternalUtf8Ns, &INTERNAL_UTF8_NS),
+        (Table::Latin1, &LATIN1),
+        (Table::Latin1Ns, &LATIN1_NS),
+        (Table::Ascii, &ASCII),
+        (Table::AsciiNs, &ASCII_NS),
+        (Table::Little2, &LATIN1),
+        (Table::Little2Ns, &LATIN1_NS),
+    ];
+    for (i, (t, e)) in expected.into_iter().enumerate() {
+        assert_eq!(Table::ALL[i], t);
+        assert!(ptr::eq(t.entries(), e), "{t:?}");
+    }
+}

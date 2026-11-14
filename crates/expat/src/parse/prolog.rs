@@ -63,6 +63,33 @@ pub(crate) fn to_utf8<E: Encoding>(enc: &E, from: &[u8]) -> Vec<u8> {
     }
 }
 
+/// [`to_utf8`] appending to `out`, for the bytes of a token the scanner
+/// accepted (a name, an attribute value without references). Such bytes are
+/// whole characters, so where the input is already UTF-8 (`isUtf8`) the
+/// conversion is a copy, as `utf8_toUtf8` makes it.
+pub(crate) fn to_utf8_token_into<E: Encoding>(enc: &E, from: &[u8], out: &mut Vec<u8>) {
+    if enc.is_utf8() {
+        out.extend_from_slice(from);
+        #[cfg(debug_assertions)]
+        {
+            let start = out.len() - from.len();
+            debug_assert_eq!(out.get(start..), Some(to_utf8(enc, from).as_slice()));
+        }
+        return;
+    }
+    let mut chunk = [0u8; 64];
+    let mut rest = from;
+    loop {
+        let r = enc.to_utf8(rest, &mut chunk);
+        out.extend_from_slice(chunk.get(..r.written).unwrap_or_default());
+        rest = rest.get(r.read..).unwrap_or_default();
+        if r.result != crate::tok::ConvertResult::OutputExhausted || (r.read == 0 && r.written == 0)
+        {
+            return;
+        }
+    }
+}
+
 impl Parser {
     /// `initializeEncoding`: the initial encoding for the name the
     /// application gave. An unknown name goes to `handleUnknownEncoding`,
