@@ -636,11 +636,11 @@ pub trait Handler {
     ///
     /// let mut h = Rebase::default();
     /// let mut p = Parser::new([7; 16]);
-    /// p.set_base(Some(b"first/")).map_err(|_| "no memory")?;
+    /// assert_eq!(p.set_base(Some(b"first/")), Ok(()));
     /// p.parse_with(&mut h, b"<!DOCTYPE d [<!NOTATION n SYSTEM 'a'><!NOTATION m SYSTEM 'b'>]><d/>", true)?;
     /// assert_eq!(h.1, [Some(b"first/".to_vec()), Some(b"second/".to_vec())]);
     /// assert_eq!(p.base(), Some(&b"second/"[..]));
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), expat::Error>(())
     /// ```
     ///
     /// [`Parser::set_base`]: crate::Parser::set_base

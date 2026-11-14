@@ -38,7 +38,7 @@ const PENDING_AT_THRESHOLD: u8 = 8;
 const PENDING_REPARSE: u8 = 16;
 
 /// Settings changed by a handler during a parse, taken by the parser with
-/// [`Control::take_pending`].
+/// `Control::take_pending`.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Pending {
     /// The billion laughs maximum amplification.
