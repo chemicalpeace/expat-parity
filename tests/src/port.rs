@@ -256,6 +256,7 @@ fn masked_handlers(mask: HandlerMask) -> HandlerSet {
         default: mask.default_handler || mask.default_expand,
         // `XML_SetDefaultHandler` turns expansion off, `...Expand` keeps it.
         no_default_expand: mask.default_handler,
+        event_text: false,
     }
 }
 

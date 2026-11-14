@@ -68,6 +68,10 @@ pub struct Events {
     /// expanded and goes to [`Handler::default_data`] as written;
     /// `XML_SetDefaultHandlerExpand` keeps it on.
     pub expand_internal_entities: bool,
+    /// [`Handler::event_text`] before each reported event: the text
+    /// `XML_DefaultCurrent` passes to the default handler from inside a C
+    /// handler. Off in both [`Events::ALL`] and [`Events::NONE`].
+    pub event_text: bool,
 }
 
 impl Events {
@@ -85,6 +89,7 @@ impl Events {
         position: false,
         default_data: false,
         expand_internal_entities: true,
+        event_text: false,
     };
 
     /// No event: the parser works as [`Parser::parse`] does.
@@ -103,6 +108,7 @@ impl Events {
         position: false,
         default_data: false,
         expand_internal_entities: true,
+        event_text: false,
     };
 
     /// Sets [`Events::start_element`].
@@ -189,6 +195,13 @@ impl Events {
         self
     }
 
+    /// Sets [`Events::event_text`].
+    #[must_use]
+    pub const fn event_text(mut self, on: bool) -> Self {
+        self.event_text = on;
+        self
+    }
+
     /// The parser core's handler flags: these events, the position and
     /// the default handler, every other handler unset.
     pub(crate) fn handler_set(self) -> parse::HandlerSet {
@@ -205,6 +218,7 @@ impl Events {
             event_position: self.position,
             default: self.default_data,
             no_default_expand: !self.expand_internal_entities,
+            event_text: self.event_text,
             ..parse::HandlerSet::default()
         }
     }
@@ -356,6 +370,39 @@ pub trait Handler {
     /// # Ok::<(), expat::Error>(())
     /// ```
     fn default_data(&mut self, _data: &[u8]) {}
+
+    /// The text of the event reported next, when [`Events::event_text`]
+    /// is on: the event as written, converted to UTF-8, in the pieces
+    /// that [`Handler::default_data`] would receive for it
+    /// (`XML_DefaultCurrent`). Inside an expanded internal entity it is
+    /// the text of the entity's current event.
+    ///
+    /// ```
+    /// use expat::{Events, Handler, Parser};
+    ///
+    /// #[derive(Default)]
+    /// struct Tags {
+    ///     current: Vec<u8>,
+    ///     tags: Vec<Vec<u8>>,
+    /// }
+    ///
+    /// impl Handler for Tags {
+    ///     const EVENTS: Events = Events::NONE.start_element(true).event_text(true);
+    ///     fn event_text(&mut self, pieces: &[&[u8]]) {
+    ///         self.current = pieces.concat();
+    ///     }
+    ///     fn start_element(&mut self, _name: &[u8], _atts: &[(&[u8], &[u8])], _specified: usize) {
+    ///         self.tags.push(self.current.clone());
+    ///     }
+    /// }
+    ///
+    /// let mut tags = Tags::default();
+    /// let mut p = Parser::new([7; 16]);
+    /// p.parse_with(&mut tags, b"<a x = '1'><b/></a>", true)?;
+    /// assert_eq!(tags.tags, [&b"<a x = '1'>"[..], b"<b/>"]);
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    fn event_text(&mut self, _pieces: &[&[u8]]) {}
 }
 
 /// Passes the parser core's events to a public [`Handler`]. Only the
@@ -399,6 +446,9 @@ impl<H: Handler> parse::Handler for Adapter<'_, H> {
     }
     fn default_data(&mut self, data: &[u8]) {
         self.0.default_data(data);
+    }
+    fn event_text(&mut self, pieces: &[&[u8]]) {
+        self.0.event_text(pieces);
     }
 }
 
@@ -480,6 +530,74 @@ mod tests {
         assert_eq!(p.parse_with(&mut h, &doc, true), Ok(()));
         assert_eq!(h.chars, "\u{e9}".as_bytes());
         assert_eq!(h.other, b"<a></a>");
+    }
+
+    /// Records the text of each start and end element event, and marks
+    /// each start element as passed to the default handler.
+    struct Texts {
+        stopper: Option<crate::Stopper>,
+        current: Vec<u8>,
+        seen: Vec<Vec<u8>>,
+    }
+
+    impl Handler for Texts {
+        const EVENTS: Events = Events::NONE
+            .start_element(true)
+            .end_element(true)
+            .start_namespace_decl(true)
+            .event_text(true);
+        fn event_text(&mut self, pieces: &[&[u8]]) {
+            self.current = pieces.concat();
+        }
+        fn start_namespace_decl(&mut self, _prefix: Option<&[u8]>, _uri: Option<&[u8]>) {
+            self.seen.push(self.current.clone());
+            if let Some(s) = &self.stopper {
+                s.mark_default_current();
+            }
+        }
+        fn start_element(&mut self, _name: &[u8], _atts: &[(&[u8], &[u8])], _specified: usize) {
+            self.seen.push(self.current.clone());
+        }
+        fn end_element(&mut self, _name: &[u8]) {
+            self.seen.push(self.current.clone());
+        }
+    }
+
+    #[test]
+    fn event_text_is_converted_and_moved_after_default_current() {
+        let doc: Vec<u8> = "<a xmlns='u'>\u{e9}</a>"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let mut p = crate::Parser::with_options(
+            [7; 16],
+            crate::Options::new()
+                .encoding(b"UTF-16LE")
+                .namespace_separator(b'|'),
+        );
+        let mut h = Texts {
+            stopper: None,
+            current: Vec::new(),
+            seen: Vec::new(),
+        };
+        assert_eq!(p.parse_with(&mut h, &doc, true), Ok(()));
+        assert_eq!(h.seen, [&b"<a xmlns='u'>"[..], b"<a xmlns='u'>", b"</a>"]);
+
+        // Marked in the namespace handler, the start tag counts as reported
+        // for the start element handler of the same event.
+        let mut p = crate::Parser::with_options(
+            [7; 16],
+            crate::Options::new()
+                .encoding(b"UTF-16LE")
+                .namespace_separator(b'|'),
+        );
+        let mut h = Texts {
+            stopper: Some(p.stopper()),
+            current: Vec::new(),
+            seen: Vec::new(),
+        };
+        assert_eq!(p.parse_with(&mut h, &doc, true), Ok(()));
+        assert_eq!(h.seen, [&b"<a xmlns='u'>"[..], b"", b"</a>"]);
     }
 
     #[test]
