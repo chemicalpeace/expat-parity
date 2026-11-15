@@ -485,6 +485,18 @@ impl Stopper {
             .stop(resumable)
             .map_err(|e| ErrorCode::from_internal(e).unwrap_or(ErrorCode::UnexpectedState))
     }
+
+    /// Records that a handler passed its event, as
+    /// [`Handler::event_text`] gave it, to its own default handler
+    /// (`XML_DefaultCurrent`). As in libexpat, when the document's text
+    /// is converted to UTF-8 the event then counts as reported: its
+    /// position moves to its end, and its text reported again to a later
+    /// handler of the same event is empty.
+    ///
+    /// [`Handler::event_text`]: crate::Handler::event_text
+    pub fn mark_default_current(&self) {
+        self.0.mark_default_current();
+    }
 }
 
 /// A length as the C `int` the core takes: lengths above `i32::MAX` become

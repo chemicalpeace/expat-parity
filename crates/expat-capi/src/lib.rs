@@ -8,7 +8,8 @@
 //! data, the nine handlers of [`expat::Events`], `XML_Parse`,
 //! `XML_GetBuffer` and `XML_ParseBuffer` (D-049), `XML_StopParser` and
 //! `XML_ResumeParser` (D-050), `XML_SetDefaultHandler` and
-//! `XML_SetDefaultHandlerExpand` (D-051), the error code and its
+//! `XML_SetDefaultHandlerExpand` (D-051), `XML_DefaultCurrent` (D-052),
+//! the error code and its
 //! text, the position between calls and inside handlers (D-048) and the
 //! version. Every
 //! other `expat.h` function is missing, so a program that uses one fails
@@ -31,8 +32,11 @@
 //! - `XML_Parse`, `XML_ParseBuffer`, `XML_GetBuffer`, `XML_ResumeParser`
 //!   and `XML_ParserFree` called from inside a handler do nothing (`XML_STATUS_ERROR` or
 //!   `NULL`, without an error code), as in libexpat 2.10.0.
-//! - `XML_DefaultCurrent` is missing: a handler cannot pass its event to
-//!   the default handler.
+//! - `XML_DefaultCurrent` works only if a default handler was set when
+//!   `XML_Parse` started. Inside the default handler it calls, for an
+//!   event of a document not in UTF-8 whose text takes more than one
+//!   1024-byte piece, the position functions return the position of the
+//!   event rather than of each piece.
 //! - The hash salt comes from the standard library's `RandomState` keys,
 //!   which are seeded from the operating system.
 //!
@@ -45,7 +49,7 @@
 // reason: the function, type and constant names are those of expat.h.
 #![allow(non_snake_case, non_camel_case_types)]
 
-use std::cell::{Cell, UnsafeCell};
+use std::cell::{Cell, RefCell, UnsafeCell};
 use std::ffi::{CStr, CString, c_char, c_int, c_long, c_ulong, c_void};
 use std::hash::BuildHasher;
 use std::sync::OnceLock;
@@ -142,6 +146,10 @@ pub struct XML_ParserStruct {
     /// `m_defaultExpandInternalEntities`: cleared by
     /// `XML_SetDefaultHandler`, set by `XML_SetDefaultHandlerExpand`.
     default_expand: Cell<bool>,
+    /// The text of the event being reported, as the default handler
+    /// would receive it (each piece's end in the text), for
+    /// `XML_DefaultCurrent`. Kept only while a default handler is set.
+    current: RefCell<(Vec<u8>, Vec<usize>)>,
     /// Stops the parser from inside a handler (`XML_StopParser`).
     stopper: Stopper,
     inner: UnsafeCell<Inner>,
@@ -180,6 +188,7 @@ impl XML_ParserStruct {
             end_namespace_decl: Cell::new(None),
             default: Cell::new(None),
             default_expand: Cell::new(true),
+            current: RefCell::new((Vec::new(), Vec::new())),
             stopper: parser.stopper(),
             inner: UnsafeCell::new(Inner {
                 parser,
@@ -203,7 +212,8 @@ impl XML_ParserStruct {
             .start_namespace_decl(self.start_namespace_decl.get().is_some())
             .end_namespace_decl(self.end_namespace_decl.get().is_some())
             .default_data(self.default.get().is_some())
-            .expand_internal_entities(self.default_expand.get());
+            .expand_internal_entities(self.default_expand.get())
+            .event_text(self.default.get().is_some());
         events.position(events != Events::NONE)
     }
 
@@ -340,6 +350,17 @@ impl Handler for Dispatch<'_> {
         }
     }
 
+    fn event_text(&mut self, parts: &[&[u8]]) {
+        let mut current = self.state.current.borrow_mut();
+        let (text, ends) = &mut *current;
+        text.clear();
+        ends.clear();
+        for part in parts {
+            text.extend_from_slice(part);
+            ends.push(text.len());
+        }
+    }
+
     fn processing_instruction(&mut self, target: &[u8], data: &[u8]) {
         let Some(h) = self.state.processing_instruction.get() else {
             return;
@@ -412,12 +433,20 @@ impl Handler for Dispatch<'_> {
 /// Calls a handler that takes a length (`XML_CharacterDataHandler`,
 /// `XML_DefaultHandler`) with `data`. `XML_Parse` takes an `int` length,
 /// so a piece never exceeds it; the split only keeps the conversion total.
+/// Empty text is passed as one call with length 0, as libexpat does.
 fn pieces(
     h: unsafe extern "C" fn(*mut c_void, *const XML_Char, c_int),
     arg: *mut c_void,
     data: &[u8],
 ) {
-    for piece in data.chunks(usize::try_from(c_int::MAX).unwrap_or(usize::MAX)) {
+    let max = usize::try_from(c_int::MAX).unwrap_or(usize::MAX);
+    let empty: [&[u8]; 1] = [data];
+    let chunks: Box<dyn Iterator<Item = &[u8]>> = if data.is_empty() {
+        Box::new(empty.into_iter())
+    } else {
+        Box::new(data.chunks(max))
+    };
+    for piece in chunks {
         let len = c_int::try_from(piece.len()).unwrap_or(c_int::MAX);
         // SAFETY: `h` is a handler the program set; `piece` is valid for
         // `len` bytes for the call (this text is not NUL-terminated in
@@ -630,6 +659,40 @@ pub unsafe extern "C" fn XML_SetDefaultHandlerExpand(
     if let Some(s) = unsafe { state(parser) } {
         s.default.set(handler);
         s.default_expand.set(true);
+    }
+}
+
+/// `XML_DefaultCurrent`: passes the event being reported to the default
+/// handler, as libexpat would have passed it had the event's own handler
+/// not been set. Does nothing outside a handler or without a default
+/// handler.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_DefaultCurrent(parser: XML_Parser) {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return;
+    };
+    if !s.busy.get() {
+        return;
+    }
+    let Some(h) = s.default.get() else {
+        return;
+    };
+    // A copy, so that the handler may call this function again.
+    let (text, ends) = s.current.borrow().clone();
+    s.stopper.mark_default_current();
+    let mut from = 0;
+    for end in ends {
+        pieces(
+            h,
+            s.handler_arg.get(),
+            text.get(from..end).unwrap_or_default(),
+        );
+        from = end;
     }
 }
 

@@ -81,7 +81,9 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::siphash::SipKey;
-use crate::tok::{Attribute, InitEncoding, Known, Position, update_position};
+use crate::tok::{
+    Attribute, ConvertResult, Encoding, InitEncoding, Known, Position, update_position,
+};
 
 /// `INIT_BUFFER_SIZE`: the first buffer is twice this.
 const INIT_BUFFER_SIZE: i32 = 1024;
@@ -184,6 +186,10 @@ pub struct HandlerSet {
     /// entity in content is then not expanded; it goes to the skipped
     /// entity handler, or else the default handler.
     pub no_default_expand: bool,
+    /// Report each event's text first ([`Handler::event_text`]), for a
+    /// caller that passes the current event to the default handler from
+    /// inside its handlers (`XML_DefaultCurrent`).
+    pub event_text: bool,
 }
 
 /// Receives the parser's events. Only the methods whose [`HandlerSet`]
@@ -195,6 +201,10 @@ pub trait Handler {
     /// `XML_GetCurrentLineNumber64`, `XML_GetCurrentColumnNumber64` and
     /// `XML_GetCurrentByteIndex64` return inside its handler.
     fn event_position(&mut self, _line: u64, _column: u64, _byte_index: i64) {}
+    /// The text of the event reported next, when [`HandlerSet::event_text`]
+    /// is set: what `XML_DefaultCurrent` passes to the default handler, in
+    /// the pieces `reportDefault` would pass.
+    fn event_text(&mut self, _pieces: &[&[u8]]) {}
     /// `XML_XmlDeclHandler`: `standalone` is -1 (absent), 0 or 1.
     fn xml_decl(&mut self, _version: Option<&[u8]>, _encoding: Option<&[u8]>, _standalone: i32) {}
     /// `XML_StartElementHandler`: the attributes as (name, value) pairs in
@@ -467,6 +477,10 @@ pub struct Parser {
     pub(crate) error_code: Stop,
     /// `m_parsingStatus.parsing`, shared with the stop handles.
     pub(crate) control: Arc<Control>,
+    /// The document event whose text [`Handler::event_text`] reported
+    /// last (`m_eventPtr`, `m_eventEndPtr`), for
+    /// [`Parser::settle_default_current`].
+    text_event: (Option<usize>, Option<usize>),
     /// `m_parsingStatus.finalBuffer`
     pub(crate) final_buffer: bool,
     /// `m_reenter`
@@ -597,6 +611,7 @@ impl Parser {
             processor: Processor::PrologInit,
             error_code: Stop::Error(XmlError::None),
             control: Arc::new(Control::default()),
+            text_event: (None, None),
             final_buffer: false,
             reenter: false,
             tag_level: 0,
@@ -924,15 +939,70 @@ impl Parser {
     /// Reports the current event's position to `h` before the event, when
     /// [`HandlerSet::event_position`] is set.
     pub(crate) fn locate<H: Handler>(&mut self, h: &mut H) {
-        if !self.handlers.event_position {
+        self.settle_default_current();
+        if self.handlers.event_position {
+            let pos = self.event_position();
+            h.event_position(
+                pos.line_number.wrapping_add(1),
+                pos.column_number,
+                self.current_byte_index(),
+            );
+        }
+        if self.handlers.event_text {
+            self.report_event_text(h);
+        }
+    }
+
+    /// Applies an `XML_DefaultCurrent` call made by the handler of the
+    /// event reported last, if the parser is still at that event: when
+    /// the document's text is converted, `reportDefault` leaves
+    /// `m_eventPtr` at the end of the event (an event of an internal
+    /// entity, or of a UTF-8 document, is left as it was).
+    fn settle_default_current(&mut self) {
+        if !self.control.take_default_current() {
             return;
         }
-        let pos = self.event_position();
-        h.event_position(
-            pos.line_number.wrapping_add(1),
-            pos.column_number,
-            self.current_byte_index(),
-        );
+        let converts = match self.enc {
+            Enc::Known(Known::Normal(n)) => !n.is_utf8(),
+            Enc::Known(Known::Utf16(_)) => true,
+            Enc::Init(_) => false,
+        };
+        if converts
+            && self.open_internal_entities.is_empty()
+            && (self.event_ptr, self.event_end_ptr) == self.text_event
+        {
+            self.event_ptr = self.event_end_ptr;
+        }
+    }
+
+    /// The text `XML_DefaultCurrent` would pass to the default handler
+    /// now: the innermost open internal entity's event in the internal
+    /// encoding, or else the document's event in `m_encoding`, converted
+    /// to UTF-8 through the 1024-byte data buffer as in `reportDefault`.
+    fn report_event_text<H: Handler>(&mut self, h: &mut H) {
+        let slice = |text: &[u8], s: Option<usize>, e: Option<usize>| -> (usize, usize) {
+            let s = s.unwrap_or(0).min(text.len());
+            let e = e.unwrap_or(s).clamp(s, text.len());
+            (s, e)
+        };
+        if let Some(open) = self.open_internal_entities.last() {
+            let text = self
+                .dtd
+                .entity(open.entity)
+                .and_then(|e| e.text.clone())
+                .unwrap_or_else(|| Arc::from(&[][..]));
+            let (s, e) = slice(&text, open.internal_event_ptr, open.internal_event_end_ptr);
+            h.event_text(&[text.get(s..e).unwrap_or_default()]);
+            return;
+        }
+        self.text_event = (self.event_ptr, self.event_end_ptr);
+        let (s, e) = slice(&self.buffer, self.event_ptr, self.event_end_ptr);
+        let raw = self.buffer.get(s..e).unwrap_or_default();
+        match self.enc {
+            Enc::Known(Known::Normal(n)) if !n.is_utf8() => event_pieces(h, &n, raw),
+            Enc::Known(Known::Utf16(u)) => event_pieces(h, &u, raw),
+            _ => h.event_text(&[raw]),
+        }
     }
 
     /// `XML_GetCurrentLineNumber64`.
@@ -1236,9 +1306,22 @@ impl Parser {
         status
     }
 
+    /// `callProcessor`, then any `XML_DefaultCurrent` left to apply.
+    fn call_processor<H: Handler>(
+        &mut self,
+        h: &mut H,
+        start: usize,
+        end: usize,
+        end_ptr: &mut usize,
+    ) -> Result<(), Stop> {
+        let result = self.process_range(h, start, end, end_ptr);
+        self.settle_default_current();
+        result
+    }
+
     /// `callProcessor`: runs the processors on `buffer[start..end]`, with
     /// the reparse-deferral heuristic.
-    fn call_processor<H: Handler>(
+    fn process_range<H: Handler>(
         &mut self,
         h: &mut H,
         start: usize,
@@ -1325,4 +1408,29 @@ impl Parser {
             },
         }
     }
+}
+
+/// [`Handler::event_text`] for text that needs converting: the pieces of
+/// UTF-8 that `reportDefault` writes to its 1024-byte data buffer.
+fn event_pieces<E: Encoding, H: Handler>(h: &mut H, enc: &E, raw: &[u8]) {
+    let mut out = Vec::new();
+    let mut ends = Vec::new();
+    let mut s = 0;
+    loop {
+        let mut data = [0u8; INIT_DATA_BUF_SIZE];
+        let r = enc.to_utf8(raw.get(s..).unwrap_or_default(), &mut data);
+        s += r.read;
+        out.extend_from_slice(data.get(..r.written).unwrap_or_default());
+        ends.push(out.len());
+        if matches!(r.result, ConvertResult::Completed | ConvertResult::InputIncomplete) {
+            break;
+        }
+    }
+    let mut pieces = Vec::with_capacity(ends.len());
+    let mut from = 0;
+    for end in ends {
+        pieces.push(out.get(from..end).unwrap_or_default());
+        from = end;
+    }
+    h.event_text(&pieces);
 }
