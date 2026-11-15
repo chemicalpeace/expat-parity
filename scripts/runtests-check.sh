@@ -32,15 +32,17 @@ OUT_DROPIN=$OUT/dropin TARGET_DIR=target/runtests-build \
   scripts/build-dropin.sh --features testing
 inc=$OUT/dropin/include
 libdir=$PWD/$OUT/dropin/lib
-vendor=crates/expat-oracle/vendor/expat/lib
+vendor=${EXPAT_LIB:-crates/expat-oracle/vendor/expat/lib}
 
 for f in acc_tests alloc_tests basic_tests chardata common dummy handlers \
   hash_tests entities_tests memcheck minicheck misc_tests ns_tests \
   nsalloc_tests props_tests runtests structdata xcs_tests; do
   # The tests also include libexpat's internal headers (declarations of
-  # the internals listed as white-box), taken from the vendored copy.
+  # the internals listed as white-box), taken from the vendored copy, and
+  # expat_config.h, from the release or else the oracle's (a git checkout
+  # has none).
   "$CC" -c -O1 -w -DXML_TESTING "-I$inc" "-I$vendor" "-I$EXPAT_SRC" \
-    "$EXPAT_SRC/tests/$f.c" -o "$OUT/obj/$f.o"
+    -Icrates/expat-oracle/shim "$EXPAT_SRC/tests/$f.c" -o "$OUT/obj/$f.o"
 done
 # The xcs string helpers the tests use are plain C, not part of the parser.
 "$CC" -c -O1 -w "-I$vendor" "$vendor/xcs.c" -o "$OUT/obj/xcs.o"

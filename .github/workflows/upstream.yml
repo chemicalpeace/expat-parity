@@ -1,0 +1,31 @@
+name: libexpat development branch
+
+# Compares the port with libexpat's development branch (D-062,
+# docs/RELEASING.md). It does not run on pull requests: a failure means
+# libexpat changed, not that a pull request broke something.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: libexpat branch or tag
+        default: master
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  upstream:
+    name: compare with libexpat ${{ inputs.ref || 'master' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain
+      - name: C interface and libexpat's test suite against the branch
+        env:
+          UPSTREAM_REF: ${{ inputs.ref || 'master' }}
+        run: scripts/upstream-check.sh

@@ -1917,3 +1917,22 @@ recorded in DIVERGENCES.md.
   entity's shared text (`Arc<Vec<u8>>`) is allocated infallibly, since
   stable Rust has no fallible `Arc` constructor; the test exempts it.
   A shrinking `realloc` was never failed by the test.
+
+## D-062 Release procedure and comparison with libexpat's development branch (2026-11-15)
+
+- **Decision.** `docs/RELEASING.md` writes down how the port follows a
+  libexpat release (read the release, re-vendor, compare, port, record,
+  release the crate), with D-042 as the worked example.
+  `scripts/upstream-check.sh` compares the port with a libexpat branch
+  (default `master`): it lists the library files that differ from the
+  vendored copy, runs `scripts/capi-check.sh` with the branch as the C
+  side and `scripts/runtests-check.sh` with the branch's test suite. The
+  two scripts take `EXPAT_LIB` for this. `.github/workflows/upstream.yml`
+  runs it every Monday and on demand, outside pull request CI.
+- **First run** (master at `ab16d92`, 2026-11-13): six library files
+  differ. The traces differ in `XML_GetInputContext` after an error
+  (master returns the current input where 2.10.0 returns none), and the
+  branch's test suite does not build against the port because it calls
+  `XML_Parse64`, `XML_GetBuffer64` and `XML_ParseBuffer64`, new in the
+  coming 2.11.0. Both are ported with the release that contains them,
+  as the procedure says; until then the weekly job fails.

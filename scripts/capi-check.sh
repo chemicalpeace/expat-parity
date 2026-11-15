@@ -9,7 +9,9 @@ cd "$(dirname "$0")/.."
 CC=${CC:-cc}
 OUT=${OUT:-target/capi-check}
 mkdir -p "$OUT/docs"
-lib=crates/expat-oracle/vendor/expat/lib
+# EXPAT_LIB selects another libexpat lib/ directory for the C side
+# (scripts/upstream-check.sh uses the development branch).
+lib=${EXPAT_LIB:-crates/expat-oracle/vendor/expat/lib}
 
 cargo build -q --release -p expat-capi
 "$CC" -O1 -w -DXML_STATIC -Icrates/expat-oracle/shim "-I$lib" \
