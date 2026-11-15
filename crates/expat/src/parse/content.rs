@@ -441,6 +441,7 @@ impl Parser {
                             None if check => return Err(XmlError::UndefinedEntity.into()),
                             None => {
                                 if self.handlers.skipped_entity {
+                                    self.locate(h);
                                     h.skipped_entity(&name, false);
                                 } else {
                                     self.report_default(h, enc, buf, s, next);
@@ -463,6 +464,7 @@ impl Parser {
                                 }
                                 if text && self.handlers.no_default_expand {
                                     if self.handlers.skipped_entity {
+                                        self.locate(h);
                                         h.skipped_entity(&name, false);
                                     } else {
                                         self.report_default(h, enc, buf, s, next);

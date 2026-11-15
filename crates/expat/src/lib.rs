@@ -47,10 +47,11 @@
 //!
 //! # Limitations
 //!
-//! - Only the nine events of [`Events`]: no default handler, no DTD,
-//!   entity or XML declaration events, no unknown-encoding handler.
-//! - A handler cannot read the position or stop the parse; the position is
-//!   reported with an [`Error`] and between calls
+//! - The events of [`Events`], the default handler and the declaration
+//!   events; no unknown-encoding handler and no external entity handler.
+//! - A handler reads the position of its event through
+//!   [`Handler::position`] and stops the parse through a [`Stopper`]; the
+//!   position is also reported with an [`Error`] and between calls
 //!   ([`Parser::current_line`]).
 //! - External entities and DTD subsets are never loaded: the crate does no
 //!   I/O and has no external entity handler, and the parser behaves as
@@ -82,6 +83,7 @@ mod api;
 mod handler;
 pub use api::{Error, ErrorCode, Options, Parser, Stopper};
 pub use handler::{Events, Handler};
+pub use parse::{ContentModel, ContentNode, ContentQuant, ContentType};
 
 /// Declares an internal module that is private by default and public under
 /// the `internal-api` feature.

@@ -428,6 +428,35 @@ impl Parser {
         self.inner.current_byte_index()
     }
 
+    /// Sets the base passed to [`Handler::entity_decl`],
+    /// [`Handler::unparsed_entity_decl`] and [`Handler::notation_decl`]
+    /// for the declarations read from now on (`XML_SetBase`), or clears
+    /// it with `None`. Like libexpat, the parser keeps a copy in its
+    /// DTD's string pool, which counts towards its memory limit;
+    /// [`ErrorCode::NoMemory`] when that copy fails, and the base is then
+    /// unchanged. [`Parser::error_code`] is not changed.
+    ///
+    /// ```
+    /// let mut p = expat::Parser::new([7; 16]);
+    /// p.set_base(Some(b"http://example.org/"))?;
+    /// assert_eq!(p.base(), Some(&b"http://example.org/"[..]));
+    /// p.set_base(None)?;
+    /// assert_eq!(p.base(), None);
+    /// # Ok::<(), expat::ErrorCode>(())
+    /// ```
+    ///
+    /// [`Handler::entity_decl`]: crate::Handler::entity_decl
+    /// [`Handler::unparsed_entity_decl`]: crate::Handler::unparsed_entity_decl
+    /// [`Handler::notation_decl`]: crate::Handler::notation_decl
+    pub fn set_base(&mut self, base: Option<&[u8]>) -> Result<(), ErrorCode> {
+        self.inner.set_base(base).map_err(|_| ErrorCode::NoMemory)
+    }
+
+    /// The base set with [`Parser::set_base`] (`XML_GetBase`).
+    pub fn base(&self) -> Option<&[u8]> {
+        self.inner.base()
+    }
+
     /// The public result of a call that returned `status`.
     fn result(&mut self, status: Status) -> Result<(), Error> {
         match status {

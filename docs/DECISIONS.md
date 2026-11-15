@@ -1547,3 +1547,45 @@ recorded in DIVERGENCES.md.
   positions, except inside that call), and a call outside a handler:
   541 documents x 122 runs, output equal to libexpat. A unit test and a
   doc example cover `Handler::event_text`.
+
+## D-053 Declaration handlers (module 13, slice 6) (2026-11-14)
+
+- **Decision.** The core already reported the XML declaration, the
+  document type declaration, entity, unparsed entity, notation, element
+  type and attribute-list declarations, and skipped entities. The public
+  `Handler` gets one method for each (`xml_decl` to `skipped_entity`)
+  and `Events` one flag for each; `Events::ALL` turns them on.
+  `standalone` is `Option<bool>` (C's -1, 0, 1) and the content model is
+  the core's `ContentModel`, now public with `ContentNode`,
+  `ContentType` and `ContentQuant`.
+- **Base.** `Parser::set_base` copies the base into the DTD's string
+  pool as `XML_SetBase` does (`poolCopyString`), so it counts towards
+  the memory limit; a failed copy returns `ErrorCode::NoMemory` and
+  leaves the base and `error_code` unchanged. `Parser::base` returns it.
+- **Positions and event text.** Each declaration event now reports its
+  position and, for `XML_DefaultCurrent`, its text before its handler
+  runs, like the other events: the declaration handlers were called
+  without them, so inside them the position functions returned the
+  previous event's position.
+- **C interface.** `XML_SetXmlDeclHandler`,
+  `XML_SetStartDoctypeDeclHandler`, `XML_SetEndDoctypeDeclHandler`,
+  `XML_SetDoctypeDeclHandler`, `XML_SetEntityDeclHandler`,
+  `XML_SetUnparsedEntityDeclHandler`, `XML_SetNotationDeclHandler`,
+  `XML_SetElementDeclHandler`, `XML_SetAttlistDeclHandler`,
+  `XML_SetSkippedEntityHandler`, `XML_FreeContentModel`, `XML_SetBase`
+  and `XML_GetBase`. The element declaration handler receives the model
+  as one array of `XML_Content` in libexpat's layout (node 0 the root,
+  each node's children contiguous); the parser keeps it until
+  `XML_FreeContentModel` or `XML_ParserFree`.
+- **Differences.** `XML_SetBase` from inside a handler returns
+  `XML_STATUS_ERROR` and does nothing; `XML_MemFree` is not provided;
+  the entity value is NUL-terminated.
+- **Verification.** `scripts/capi-check.sh` adds three handler sets: the
+  declaration handlers with the element and character data handlers and
+  positions (unparsed entities then reach the entity declaration
+  handler); every handler with the default handler and a base; and the
+  declaration handlers with the default handler expanded and
+  `XML_DefaultCurrent` called from each handler; plus the declaration
+  handlers suspended at every event and the error cases of
+  `XML_SetBase` and `XML_GetBase`: 541 documents x 160 runs (86560),
+  output equal to libexpat. Unit tests cover the new `Events` flags.

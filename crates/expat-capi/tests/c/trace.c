@@ -14,7 +14,12 @@
  * beside every other handler (which still turns expansion off). Handler
  * sets 7 and 8 set every handler and the default handler, without and
  * with expansion, and each handler other than the default handler passes
- * its event to the default handler with XML_DefaultCurrent. */
+ * its event to the default handler with XML_DefaultCurrent. Handler sets
+ * 9 to 11 add the declaration handlers: 9 with the element and character
+ * data handlers and positions (unparsed entities then reach the entity
+ * declaration handler), 10 with every handler, the default handler and a
+ * base set with XML_SetBase, 11 with the default handler expanded and
+ * XML_DefaultCurrent called from each handler. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -162,6 +167,153 @@ static void XMLCALL on_default(void *ud, const XML_Char *s, int len) {
   where();
 }
 
+static void putz(const char *s) { put(s ? s : "(null)"); }
+
+static void XMLCALL on_xml_decl(void *ud, const XML_Char *v, const XML_Char *e,
+                                int sa) {
+  (void)ud;
+  printf("  xmldecl ");
+  putz(v);
+  putchar(' ');
+  putz(e);
+  printf(" %d\n", sa);
+  where();
+}
+
+static void XMLCALL on_doctype_start(void *ud, const XML_Char *n,
+                                     const XML_Char *sys, const XML_Char *pub,
+                                     int sub) {
+  (void)ud;
+  printf("  doctype ");
+  putz(n);
+  putchar(' ');
+  putz(sys);
+  putchar(' ');
+  putz(pub);
+  printf(" %d\n", sub);
+  where();
+}
+
+static void XMLCALL on_doctype_end(void *ud) {
+  (void)ud;
+  printf("  /doctype\n");
+  where();
+}
+
+static void XMLCALL on_entity(void *ud, const XML_Char *n, int pe,
+                              const XML_Char *v, int vlen, const XML_Char *b,
+                              const XML_Char *sys, const XML_Char *pub,
+                              const XML_Char *nt) {
+  (void)ud;
+  printf("  entity ");
+  putz(n);
+  printf(" %d ", pe);
+  if (v)
+    putn(v, vlen);
+  else
+    printf("(null)");
+  printf(" %d ", vlen);
+  putz(b);
+  putchar(' ');
+  putz(sys);
+  putchar(' ');
+  putz(pub);
+  putchar(' ');
+  putz(nt);
+  putchar('\n');
+  where();
+}
+
+static void XMLCALL on_unparsed(void *ud, const XML_Char *n,
+                                const XML_Char *b, const XML_Char *sys,
+                                const XML_Char *pub, const XML_Char *nt) {
+  (void)ud;
+  printf("  unparsed ");
+  putz(n);
+  putchar(' ');
+  putz(b);
+  putchar(' ');
+  putz(sys);
+  putchar(' ');
+  putz(pub);
+  putchar(' ');
+  putz(nt);
+  putchar('\n');
+  where();
+}
+
+static void XMLCALL on_notation(void *ud, const XML_Char *n,
+                                const XML_Char *b, const XML_Char *sys,
+                                const XML_Char *pub) {
+  (void)ud;
+  printf("  notation ");
+  putz(n);
+  putchar(' ');
+  putz(b);
+  putchar(' ');
+  putz(sys);
+  putchar(' ');
+  putz(pub);
+  putchar('\n');
+  where();
+}
+
+static void model(const XML_Content *m) {
+  printf("(%d,%d,", (int)m->type, (int)m->quant);
+  putz(m->name);
+  for (unsigned i = 0; i < m->numchildren; i++)
+    model(&m->children[i]);
+  putchar(')');
+}
+
+static void XMLCALL on_element_decl(void *ud, const XML_Char *n,
+                                    XML_Content *m) {
+  (void)ud;
+  printf("  elementdecl ");
+  putz(n);
+  putchar(' ');
+  model(m);
+  putchar('\n');
+  XML_FreeContentModel(g_parser, m);
+  where();
+}
+
+static void XMLCALL on_attlist(void *ud, const XML_Char *el,
+                               const XML_Char *att, const XML_Char *type,
+                               const XML_Char *dflt, int req) {
+  (void)ud;
+  printf("  attlist ");
+  putz(el);
+  putchar(' ');
+  putz(att);
+  putchar(' ');
+  putz(type);
+  putchar(' ');
+  putz(dflt);
+  printf(" %d\n", req);
+  where();
+}
+
+static void XMLCALL on_skipped(void *ud, const XML_Char *n, int pe) {
+  (void)ud;
+  printf("  skipped ");
+  putz(n);
+  printf(" %d\n", pe);
+  where();
+}
+
+static void set_decl_handlers(int unparsed) {
+  XML_SetXmlDeclHandler(g_parser, on_xml_decl);
+  XML_SetDoctypeDeclHandler(g_parser, on_doctype_start, on_doctype_end);
+  XML_SetEntityDeclHandler(g_parser, on_entity);
+  if (unparsed)
+    XML_SetUnparsedEntityDeclHandler(g_parser, on_unparsed);
+  XML_SetNotationDeclHandler(g_parser, on_notation);
+  XML_SetElementDeclHandler(g_parser, on_element_decl);
+  XML_SetAttlistDeclHandler(g_parser, on_attlist);
+  XML_SetSkippedEntityHandler(g_parser, on_skipped);
+}
+
 static void position(void) {
   printf(" line=%llu col=%llu byte=%lld\n",
          (unsigned long long)XML_GetCurrentLineNumber(g_parser),
@@ -176,14 +328,15 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
   if (every)
     printf(" stop=%d resumable=%d", every, resumable);
   putchar('\n');
-  g_where = handlers == 2 || handlers == 3 || handlers == 5 || handlers == 8;
-  g_current = handlers == 7 || handlers == 8;
+  g_where = handlers == 2 || handlers == 3 || handlers == 5 || handlers == 8 ||
+            handlers == 9;
+  g_current = handlers == 7 || handlers == 8 || handlers == 11;
   g_every = every;
   g_resumable = resumable;
   g_events = 0;
   g_parser = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
   if (handlers == 1 || handlers == 2 || handlers == 4 || handlers == 6 ||
-      handlers == 7 || handlers == 8) {
+      handlers == 7 || handlers == 8 || handlers == 10 || handlers == 11) {
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCharacterDataHandler(g_parser, on_chars);
     XML_SetProcessingInstructionHandler(g_parser, on_pi);
@@ -195,9 +348,21 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCommentHandler(g_parser, on_comment);
   }
-  if (handlers == 3 || handlers == 5 || handlers == 7)
+  if (handlers == 9) {
+    XML_SetElementHandler(g_parser, on_start, on_end);
+    XML_SetCharacterDataHandler(g_parser, on_chars);
+  }
+  if (handlers >= 9)
+    set_decl_handlers(handlers != 9);
+  if (handlers == 10) {
+    enum XML_Status bs = XML_SetBase(g_parser, "http://example.org/b/");
+    printf(" base status=%d ", (int)bs);
+    putz(XML_GetBase(g_parser));
+    putchar('\n');
+  }
+  if (handlers == 3 || handlers == 5 || handlers == 7 || handlers == 10)
     XML_SetDefaultHandler(g_parser, on_default);
-  else if (handlers == 4 || handlers == 8)
+  else if (handlers == 4 || handlers == 8 || handlers == 11)
     XML_SetDefaultHandlerExpand(g_parser, on_default);
   else if (handlers == 6)
     XML_SetDefaultHandler(g_parser, NULL);
@@ -372,9 +537,23 @@ static void stop_edge(void) {
   XML_ParserFree(g_parser);
 }
 
+/* XML_SetBase and XML_GetBase. */
+static void base_edge(void) {
+  g_parser = XML_ParserCreate(NULL);
+  printf("edge base-initial ");
+  putz(XML_GetBase(g_parser));
+  printf("\nedge setbase status=%d ", (int)XML_SetBase(g_parser, "a/b"));
+  putz(XML_GetBase(g_parser));
+  printf("\nedge setbase-null status=%d ", (int)XML_SetBase(g_parser, NULL));
+  putz(XML_GetBase(g_parser));
+  printf("\nedge setbase-null-parser status=%d\n", (int)XML_SetBase(NULL, "x"));
+  XML_ParserFree(g_parser);
+}
+
 int main(int argc, char **argv) {
   printf("version %s\n", XML_ExpatVersion());
   edge();
+  base_edge();
   stop_edge();
   for (int i = 1; i < argc; i++) {
     FILE *f = fopen(argv[i], "rb");
@@ -395,7 +574,7 @@ int main(int argc, char **argv) {
     static const long chunks[] = {0, 1, 7};
     for (int c = 0; c < 3; c++)
       for (int ns = 0; ns < 2; ns++)
-        for (int h = 0; h < 9; h++)
+        for (int h = 0; h < 12; h++)
           for (int b = 0; b < 2; b++)
             run(doc, len, chunks[c], ns, h, b, 0, 0);
     /* Stopped from the handlers: suspended at every event, at every third
@@ -405,9 +584,12 @@ int main(int argc, char **argv) {
       for (int ns = 0; ns < 2; ns++)
         for (int k = 0; k < 3; k++)
           run(doc, len, chunks[c], ns, 2, k == 1, stops[k][0], stops[k][1]);
-    /* The default handler alone, suspended at every event. */
-    for (int ns = 0; ns < 2; ns++)
+    /* The default handler alone, and the declaration handlers, suspended
+     * at every event. */
+    for (int ns = 0; ns < 2; ns++) {
       run(doc, len, 0, ns, 3, 0, 1, 1);
+      run(doc, len, 0, ns, 9, 0, 1, 1);
+    }
     free(doc);
   }
   return 0;

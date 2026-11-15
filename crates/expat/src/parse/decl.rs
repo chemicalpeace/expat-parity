@@ -154,6 +154,7 @@ impl Parser {
             .unwrap_or_default()
             .to_vec();
         let att_type = self.decl_attribute_type.clone().unwrap_or_default();
+        self.locate(h);
         h.attlist_decl(&elname, &attname, &att_type, dflt, is_required);
         self.tracker.temp_pool.clear();
         Ok(())
@@ -197,6 +198,7 @@ impl Parser {
             Role::DoctypeInternalSubset => {
                 if self.handlers.start_doctype_decl {
                     let name = self.doctype_name.take().unwrap_or_default();
+                    self.locate(h);
                     h.start_doctype_decl(
                         &name,
                         self.doctype_sysid.as_deref(),
@@ -254,6 +256,7 @@ impl Parser {
                     return Err(XmlError::InvalidToken.into());
                 }
                 if let Some(name) = self.doctype_name.take() {
+                    self.locate(h);
                     h.start_doctype_decl(
                         &name,
                         self.doctype_sysid.as_deref(),
@@ -279,6 +282,7 @@ impl Parser {
                     self.use_foreign_dtd = false;
                 }
                 if self.handlers.end_doctype_decl {
+                    self.locate(h);
                     h.end_doctype_decl();
                     hd = false;
                 }
@@ -436,6 +440,7 @@ impl Parser {
                         {
                             self.ev_end(enc, Some(s));
                             let name = self.dtd.entity_name(r).to_vec();
+                            self.locate(h);
                             h.entity_decl(
                                 &name,
                                 is_param,
@@ -505,6 +510,7 @@ impl Parser {
                 {
                     self.ev_end(enc, Some(s));
                     let name = self.dtd.entity_name(r).to_vec();
+                    self.locate(h);
                     if let Some(e) = self.dtd.entity(r) {
                         h.entity_decl(
                             &name,
@@ -533,6 +539,7 @@ impl Parser {
                     if self.handlers.unparsed_entity_decl || self.handlers.entity_decl {
                         self.ev_end(enc, Some(s));
                         hd = false;
+                        self.locate(h);
                     }
                     if let Some(e) = self.dtd.entity(r) {
                         if self.handlers.unparsed_entity_decl {
@@ -616,6 +623,7 @@ impl Parser {
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Temp, &sysid, direct).map_err(no_mem)?;
                     self.ev_end(enc, Some(s));
+                    self.locate(h);
                     h.notation_decl(
                         &name,
                         self.cur_base.as_deref(),
@@ -632,6 +640,7 @@ impl Parser {
                 {
                     let name = self.decl_notation_name.clone().unwrap_or_default();
                     self.ev_end(enc, Some(s));
+                    self.locate(h);
                     h.notation_decl(&name, self.cur_base.as_deref(), None, Some(&pubid));
                     hd = false;
                 }
@@ -715,6 +724,7 @@ impl Parser {
                         };
                         self.ev_end(enc, Some(s));
                         let name = self.decl_element_name();
+                        self.locate(h);
                         h.element_decl(&name, &ContentModel::leaf(kind));
                         hd = false;
                     }
@@ -776,6 +786,7 @@ impl Parser {
                             let model = self.dtd.build_model();
                             self.ev_end(enc, Some(s));
                             let name = self.decl_element_name();
+                            self.locate(h);
                             h.element_decl(&name, &model);
                         }
                         self.dtd.in_eldecl = false;
@@ -881,6 +892,7 @@ impl Parser {
             self.dtd.keep_processing = self.dtd.standalone;
             // Cannot report skipped entities in declarations.
             if role == Role::ParamEntityRef && self.handlers.skipped_entity {
+                self.locate(h);
                 h.skipped_entity(&name, true);
                 return Ok(false);
             }
