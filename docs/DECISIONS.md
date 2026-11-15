@@ -1839,3 +1839,58 @@ recorded in DIVERGENCES.md.
   accepted; invalid 227 accepted, 15 rejected; error 18 accepted, 15
   rejected. libexpat is a non-validating XML 1.0 (fourth edition names)
   parser, so these figures describe libexpat, not defects of the port.
+
+## D-060 Drop-in shared library and libexpat's test suite against it (2026-11-15)
+
+- **Decision.** `scripts/build-dropin.sh` builds `expat-capi` as
+  `libexpat.so.1.10.0` with the soname `libexpat.so.1`, with libexpat's
+  installed headers. `scripts/runtests-check.sh` builds libexpat 2.10.0's
+  own test suite (`tests/runtests`, `XML_TESTING`, downloaded and checked
+  against its SHA-256) against that shared library and runs it under all
+  12 chunk size and reparse deferral settings (also a CI step). The 12
+  tests that call libexpat internals instead of `expat.h` (the hash
+  table, internal scanners and helpers, `expat_malloc` and friends) are
+  listed in `crates/expat-capi/tests/runtests-white-box.txt` with the
+  internal each calls; `crates/expat-capi/tests/c/runtests_whitebox.c`
+  makes those internals fail the test that calls them. The check fails
+  when any other test fails or a listed one passes.
+- **What the suite found, and the changes.**
+  - `XML_ParserFree` called from the `release` function of an unknown
+    encoding freed the parser twice. The C interface now runs `release`
+    first in `XML_ParserFree` and `XML_ParserReset`, as a handler (calls
+    that would change the parser are refused; the position queries
+    answer the current position), through the new
+    `Parser::take_encoding_release`.
+  - `XML_ExternalEntityParserCreate` returned `NULL` outside the external
+    entity reference handler; libexpat allows it at any time. The new
+    `Parser::external_parser` creates such a parser; the C interface keeps
+    the parent busy until the child is freed (D-055 otherwise unchanged).
+  - The amplification setters on an external entity parser returned
+    success; libexpat returns `XML_PROP_ERROR_PARSER_NOT_ROOT` / `XML_FALSE`.
+  - `XML_ParserCreate_MM` used the program's memory functions only for
+    content models and `XML_Mem*` (D-054). The allocation tracker now
+    drives an optional `MemorySuite` (public trait, `Parser::with_memory_suite`):
+    one call wherever libexpat calls `malloc_fcn`, `realloc_fcn` or
+    `free_fcn`, with libexpat's sizes: parser creation, every tracked
+    allocation, external entity parsers, the input buffer, content models
+    (the block the tracker allocated is the one handed to the element
+    declaration handler) and the encoding name copied by
+    `XML_ParserReset`. The C interface keeps the blocks by size and frees
+    the rest with the parser. A failing call fails the parse where
+    libexpat's fails, which D-058 compared at every allocation point.
+  - `XML_ParserReset` keeps the parser's bindings on the free list with
+    their URI buffers, as libexpat does (`moveToFreeBindingList`), so a
+    later longer URI reallocates as in libexpat; they are counted by the
+    new parser's tracker before the reset point.
+  - Testing hooks behind the `testing` feature of `expat-capi`:
+    `g_reparseDeferralEnabledDefault`, `g_bytesScanned` (from the new
+    `Parser::bytes_scanned`) and `testingAccountingGetCountBytes*` (from
+    `Parser::amplification_counts`).
+- **Result.** 5,328 test runs (444 tests x 12 settings): 5,230 pass; the
+  98 failing runs are the 12 white-box tests. Before these changes the
+  suite aborted with a double free; with only the release fix, 1,130 runs
+  failed.
+- **Not covered.** After `XML_ParserReset`, the parser does not keep its
+  tags, pools and other tables as libexpat does, so allocator calls after
+  a reset can differ beyond bindings. The drop-in build is for Linux;
+  other platforms' library names are not set up.

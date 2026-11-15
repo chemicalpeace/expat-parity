@@ -67,7 +67,7 @@ mod unknown;
 mod tests;
 
 pub use accounting::{Account, Accounting};
-pub use tracker::{AllocTracker, PoolShadow, TableShadow, Tracker, TrackerEvent, TrackerHeap, CREATION_CHARGE, TRACKER_SIZES};
+pub use tracker::{AllocTracker, MemorySuite, PoolShadow, TableShadow, Tracker, TrackerEvent, TrackerHeap, CREATION_CHARGE, TRACKER_SIZES};
 pub use dtd::{
     AttributeId, Binding, BindingId, DefaultAttribute, Dtd, ElementType, Entity, EntityRef, Prefix,
     PrefixId,
@@ -483,6 +483,9 @@ pub struct Parser {
     pub(crate) parse_end_ptr: Option<usize>,
     /// `m_partialTokenBytesBefore`
     pub(crate) partial_token_bytes_before: usize,
+    /// Bytes handed to the processors so far (what libexpat's test build
+    /// adds to `g_bytesScanned` in `callProcessor`).
+    pub(crate) bytes_scanned: u64,
     /// `m_reparseDeferralEnabled`
     pub(crate) reparse_deferral_enabled: bool,
     /// `m_lastBufferRequestSize`
@@ -646,6 +649,7 @@ impl Parser {
             parse_end_byte_index: 0,
             parse_end_ptr: None,
             partial_token_bytes_before: 0,
+            bytes_scanned: 0,
             reparse_deferral_enabled: true,
             last_buffer_request_size: 0,
             event_ptr: None,
@@ -808,12 +812,42 @@ impl Parser {
         let sep = self.ns.then_some(self.namespace_separator);
         // `callUnknownEncodingRelease` before anything else.
         self.free_unknown_encoding();
+        if !self
+            .tracker
+            .t
+            .reset_encoding_name(self.tracker.t.creation_name_block(), encoding.map(<[u8]>::len))
+        {
+            return false;
+        }
         let mut fresh = Parser::new(encoding, sep, salt);
         fresh.ns_triplets = self.ns_triplets;
         fresh.accounting.maximum_amplification_factor = self.accounting.maximum_amplification_factor;
         fresh.accounting.activation_threshold_bytes = self.accounting.activation_threshold_bytes;
         let _ = fresh.tracker.t.set_maximum_amplification(self.tracker.t.maximum_amplification_factor);
         let _ = fresh.tracker.t.set_activation_threshold(self.tracker.t.activation_threshold_bytes);
+        // `moveToFreeBindingList`: C keeps every binding, with its URI
+        // buffer, on the free binding list for the next parse.
+        let mut free = core::mem::take(&mut self.dtd.free_bindings);
+        let mut is_free = alloc::vec![false; self.dtd.bindings.len()];
+        for id in &free {
+            if let Some(f) = is_free.get_mut(id.0) {
+                *f = true;
+            }
+        }
+        for (i, f) in is_free.iter().enumerate() {
+            if !f {
+                free.push(BindingId(i));
+            }
+        }
+        let bindings = core::mem::take(&mut self.dtd.bindings);
+        let binding_alloc = core::mem::take(&mut self.tracker.binding_alloc);
+        for i in 0..bindings.len() {
+            fresh.tracker.t.keep(tracker::BINDING_SIZE);
+            fresh.tracker.t.keep(binding_alloc.get(i).copied().unwrap_or(0));
+        }
+        fresh.dtd.bindings = bindings;
+        fresh.dtd.free_bindings = free;
+        fresh.tracker.binding_alloc = binding_alloc;
         // C keeps the memory it has and counts against the limit only what
         // is charged after the reset; the new parser's own allocations
         // stand for what C keeps.
@@ -821,6 +855,9 @@ impl Parser {
         self.control.reset();
         fresh.control = Arc::clone(&self.control);
         fresh.tracker.t.control = tracker::SharedControl(Some(Arc::clone(&self.control)));
+        // The memory suite stays; the blocks it holds stand for what C
+        // keeps (the new parser's creation is not allocated again).
+        fresh.tracker.t.suite = self.tracker.t.suite.clone();
         *self = fresh;
         true
     }
@@ -1415,10 +1452,14 @@ impl Parser {
                 // C allocates the input buffer with the plain `malloc_fcn`,
                 // outside the allocation tracker ("to leave limiting the
                 // input size to the application", `xmlparse.c` 2601-2603),
-                // so the port does not charge it either.
-                if !self.tracker.t.allocator_call() {
+                // so the port does not charge it either; it frees the old
+                // buffer after copying.
+                if !self.tracker.t.untracked_malloc(size as usize) {
                     self.error_code = XmlError::NoMemory.into();
                     return false;
+                }
+                if self.has_buffer {
+                    self.tracker.t.untracked_free(self.buffer.len());
                 }
                 let mut new_buf = vec![0u8; size as usize];
                 if self.has_buffer {
@@ -1623,6 +1664,7 @@ impl Parser {
                 return Ok(());
             }
         }
+        self.bytes_scanned = self.bytes_scanned.wrapping_add(have_now as u64);
         // The processors read the buffer while they update the parser.
         let buffer = Arc::clone(&self.buffer);
         let buf = buffer.get(..end).unwrap_or(&buffer);

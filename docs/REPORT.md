@@ -1655,15 +1655,17 @@ compilers and inputs; x86_64 was not measured.
   the port copies it for every entity, so it charges at least C's bytes.
   The child encoding-name charge is untested. The input buffer is not
   tracked, as in C.
+- libexpat 2.10.0's own test suite passes against the drop-in shared
+  library except for 12 tests of libexpat internals (D-060,
+  `scripts/runtests-check.sh`).
 - The W3C XML Conformance Test Suite (2,586 documents, five option sets)
   is compared with libexpat (D-059); the suite is downloaded by
   `scripts/w3c-check.sh`, not vendored. External entities are resolved
   by a lexical scan of `SYSTEM` literals, first resolution wins.
 - Allocation failures are compared at every allocation point (D-058),
-  except shrinking `realloc_fcn` calls; through the C interface a
-  failing `XML_ParserCreate_MM` allocator only reaches content models and
-  the `XML_Mem*` functions. A failure of the system allocator aborts the
-  process.
+  except shrinking `realloc_fcn` calls; through the C interface
+  `XML_ParserCreate_MM` receives every allocator call libexpat makes
+  (D-060). A failure of the system allocator aborts the process.
 - D-017: on targets where C `char` is unsigned (aarch64 Linux) C's
   `utf8_toUtf16` zero-extends stray bytes that the port sign-extends; the
   parser never passes such bytes to the converter, and the tokenizer

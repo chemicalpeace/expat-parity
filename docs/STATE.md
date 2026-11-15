@@ -150,7 +150,9 @@ with allocation failures, white-box).
    Allocation failure injection at every allocation point is compared
    since D-058 (`oom_diff.rs`, 83,023 failure points equal). The W3C
    XML Conformance Test Suite is compared since D-059 (`w3c_diff.rs`,
-   2,586 documents, 12,930 runs equal). The
+   2,586 documents, 12,930 runs equal). libexpat's own test suite runs
+   against the drop-in `libexpat.so.1` since D-060 (all but 12 tests of
+   libexpat internals pass). The
    unknown-encoding handler branch is compared through the C interface
    since D-057.
 3. Part 2 of the coverage work is done on branch `part2-finish` (on top of

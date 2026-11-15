@@ -432,11 +432,18 @@ fn external_entities_through_the_c_functions() {
             XML_SetElementHandler(p, Some(on_start), Some(on_end));
             XML_SetExternalEntityRefHandler(p, Some(on_external));
         }
-        // Outside the handler no external entity parser is created.
+        // Outside the handler an external entity parser is created, as in
+        // libexpat, and keeps `p` busy until it is freed.
         // SAFETY: `p` is live.
         let outside =
             unsafe { XML_ExternalEntityParserCreate(p, std::ptr::null(), std::ptr::null()) };
-        assert!(outside.is_null());
+        assert!(!outside.is_null());
+        // SAFETY: `p` is live; a second one while the first is open is refused.
+        let second =
+            unsafe { XML_ExternalEntityParserCreate(p, std::ptr::null(), std::ptr::null()) };
+        assert!(second.is_null());
+        // SAFETY: `outside` is live and not running.
+        unsafe { XML_ParserFree(outside) };
         let doc = b"<!DOCTYPE a [<!ENTITY e SYSTEM 'e.xml'>]><a>&e;</a>";
         assert_eq!(parse(p, doc, true), XML_STATUS_OK);
         assert_eq!(

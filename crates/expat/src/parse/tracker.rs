@@ -120,6 +120,47 @@ impl PartialEq for SharedControl {
     }
 }
 
+/// The memory functions of a parser created with `XML_ParserCreate_MM`,
+/// as the allocation tracker drives them: one call wherever libexpat
+/// calls `malloc_fcn`, `realloc_fcn` or `free_fcn`, with libexpat's sizes
+/// (an allocation's size includes the header `expat_malloc` adds). The
+/// port keeps its data in Rust collections; a suite only sees the calls,
+/// so that an allocator that fails, counts or limits behaves as with
+/// libexpat. Sizes identify blocks: `realloc` and `free` name the size the
+/// block was allocated with.
+pub trait MemorySuite: Send + Sync {
+    /// `malloc_fcn(size)`; `false` is `NULL` (out of memory).
+    fn malloc(&self, size: usize) -> bool;
+    /// `realloc_fcn` of a block of `old` bytes to `size` bytes; `false` is
+    /// `NULL` (the block keeps its size).
+    fn realloc(&self, old: usize, size: usize) -> bool;
+    /// `free_fcn` of a block of `size` bytes.
+    fn free(&self, size: usize);
+    /// `malloc_fcn(size)` for a content model handed to the element
+    /// declaration handler, which the application frees; `false` is
+    /// `NULL`.
+    fn content_model(&self, size: usize) -> bool {
+        self.malloc(size)
+    }
+}
+
+/// A parser's [`MemorySuite`] as the tracker holds it: ignored by
+/// comparisons, which are about the counts.
+#[derive(Clone, Default)]
+pub struct SharedSuite(pub Option<alloc::sync::Arc<dyn MemorySuite>>);
+
+impl core::fmt::Debug for SharedSuite {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(if self.0.is_some() { "SharedSuite(Some)" } else { "SharedSuite(None)" })
+    }
+}
+
+impl PartialEq for SharedSuite {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
 /// `MALLOC_TRACKER` of the root parser.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AllocTracker {
@@ -150,6 +191,9 @@ pub struct AllocTracker {
     /// number of allocator calls still granted before every further one
     /// fails ([`AllocTracker::fail_allocations_after`]).
     fail_after: Option<u64>,
+    /// The memory functions of `XML_ParserCreate_MM` (`None`: the port's
+    /// own allocations only).
+    pub suite: SharedSuite,
 }
 
 impl Default for AllocTracker {
@@ -164,6 +208,7 @@ impl Default for AllocTracker {
             events: None,
             creation: [0; 5],
             fail_after: None,
+            suite: SharedSuite::default(),
         }
     }
 }
@@ -227,6 +272,48 @@ impl AllocTracker {
                 *n -= 1;
                 true
             }
+        }
+    }
+
+    /// `malloc_fcn(size)` outside the tracker (the input buffer): the
+    /// failure injection, then the suite; `false` = it fails.
+    pub fn untracked_malloc(&mut self, size: usize) -> bool {
+        self.allocator_call() && self.suite.0.as_ref().is_none_or(|s| s.malloc(size))
+    }
+
+    /// `free_fcn` of a block from [`AllocTracker::untracked_malloc`].
+    pub fn untracked_free(&mut self, size: usize) {
+        if let Some(s) = &self.suite.0 {
+            s.free(size);
+        }
+    }
+
+    /// `malloc_fcn(size)` of a content model for the element declaration
+    /// handler: the failure injection, then the suite.
+    pub fn content_model_malloc(&mut self, size: usize) -> bool {
+        self.allocator_call() && self.suite.0.as_ref().is_none_or(|s| s.content_model(size))
+    }
+
+    fn suite_malloc(&self, size: u64) -> bool {
+        match &self.suite.0 {
+            None => true,
+            Some(s) => usize::try_from(size).is_ok_and(|n| s.malloc(n)),
+        }
+    }
+
+    fn suite_realloc(&self, old: u64, size: u64) -> bool {
+        match &self.suite.0 {
+            None => true,
+            Some(s) => match (usize::try_from(old), usize::try_from(size)) {
+                (Ok(o), Ok(n)) => s.realloc(o, n),
+                _ => false,
+            },
+        }
+    }
+
+    fn suite_free(&self, size: u64) {
+        if let (Some(s), Ok(n)) = (&self.suite.0, usize::try_from(size)) {
+            s.free(n);
         }
     }
 
@@ -325,7 +412,7 @@ impl AllocTracker {
         else {
             return false;
         };
-        if !self.tolerable(increase, direct) {
+        if !self.tolerable(increase, direct) || !self.suite_malloc(increase) {
             return false;
         }
         self.add(increase);
@@ -337,12 +424,16 @@ impl AllocTracker {
     /// always granted.
     pub fn realloc(&mut self, old: usize, size: usize, direct: u64) -> bool {
         let (old, size) = (old as u64, size as u64);
+        let (old_block, new_block) = (old.saturating_add(MALLOC_HEADER), size.saturating_add(MALLOC_HEADER));
         if size > old {
-            if !self.tolerable(size - old, direct) {
+            if !self.tolerable(size - old, direct) || !self.suite_realloc(old_block, new_block) {
                 return false;
             }
             self.add(size - old);
         } else {
+            // A shrinking `realloc_fcn` that fails leaves the block as it
+            // was; libexpat's callers only shrink what they keep.
+            let _ = self.suite_realloc(old_block, new_block);
             self.release(old - size);
         }
         true
@@ -350,7 +441,9 @@ impl AllocTracker {
 
     /// Releases a charged allocation of `size` bytes (`FREE`).
     pub fn free(&mut self, size: usize) {
-        self.release((size as u64).saturating_add(MALLOC_HEADER));
+        let block = (size as u64).saturating_add(MALLOC_HEADER);
+        self.suite_free(block);
+        self.release(block);
     }
 
     /// `parserCreate` of an external entity parser (`xmlparse.c`
@@ -364,23 +457,23 @@ impl AllocTracker {
     /// the DTD, `m_atts`, `m_dataBuf` and the structure) and returns
     /// `NULL`: `false`, the count back where it was.
     pub fn charge_child_creation(&mut self, encoding_name_len: Option<usize>, own_dtd: bool, direct: u64) -> bool {
-        if !self.tolerable(PARSER_STRUCT_CHARGE, direct) {
+        if !self.tolerable(PARSER_STRUCT_CHARGE, direct) || !self.suite_malloc(PARSER_STRUCT_CHARGE) {
             return false;
         }
         self.add(PARSER_STRUCT_CHARGE);
         if !self.alloc(CREATION_ARRAYS[0], direct) {
-            self.release(PARSER_STRUCT_CHARGE);
+            self.release_parser_struct();
             return false;
         }
         if !self.alloc(CREATION_ARRAYS[1], direct) {
             self.free(CREATION_ARRAYS[0]);
-            self.release(PARSER_STRUCT_CHARGE);
+            self.release_parser_struct();
             return false;
         }
         if own_dtd && !self.alloc(CREATION_DTD, direct) {
             self.free(CREATION_ARRAYS[1]);
             self.free(CREATION_ARRAYS[0]);
-            self.release(PARSER_STRUCT_CHARGE);
+            self.release_parser_struct();
             return false;
         }
         if let Some(n) = encoding_name_len
@@ -394,7 +487,7 @@ impl AllocTracker {
             }
             self.free(CREATION_ARRAYS[0]);
             self.free(CREATION_ARRAYS[1]);
-            self.release(PARSER_STRUCT_CHARGE);
+            self.release_parser_struct();
             return false;
         }
         true
@@ -408,7 +501,59 @@ impl AllocTracker {
     /// `FREE(parser, parser)` at the end of `XML_ParserFree`: the parser
     /// structure.
     pub fn release_parser_struct(&mut self) {
+        self.suite_free(PARSER_STRUCT_CHARGE);
         self.release(PARSER_STRUCT_CHARGE);
+    }
+
+    /// `XML_ParserReset` with a memory suite: `FREE` of the protocol
+    /// encoding name of the parser being reset (`name_block`, as
+    /// [`AllocTracker::creation_name_block`] gave it) and `MALLOC` of the
+    /// copy of the new one (`copyString` in `parserInit`). `false` when
+    /// that copy fails (libexpat then returns `XML_FALSE`).
+    pub fn reset_encoding_name(&self, name_block: Option<u64>, new_name_len: Option<usize>) -> bool {
+        if let Some(b) = name_block {
+            self.suite_free(b);
+        }
+        match new_name_len {
+            Some(n) => self.suite_malloc((n as u64).saturating_add(1).saturating_add(MALLOC_HEADER)),
+            None => true,
+        }
+    }
+
+    /// Counts an allocation of `size` bytes that a reset parser keeps from
+    /// before the reset (no suite call: the block exists already).
+    pub fn keep(&mut self, size: usize) {
+        self.add((size as u64).saturating_add(MALLOC_HEADER));
+    }
+
+    /// The block of the protocol encoding name charged at creation, if any.
+    pub fn creation_name_block(&self) -> Option<u64> {
+        self.creation.get(4).copied().filter(|&b| b > 0)
+    }
+
+    /// Attaches `suite` to a root parser just created and makes the calls
+    /// `XML_ParserCreate_MM` makes for what [`AllocTracker::charge_creation`]
+    /// charged: the parser structure, then `m_atts`, `m_dataBuf`, the DTD
+    /// and the encoding name. `false` when one fails; the blocks allocated
+    /// before it are freed in reverse order and the suite is detached, as
+    /// libexpat frees them and returns `NULL`.
+    pub fn attach_suite(&mut self, suite: alloc::sync::Arc<dyn MemorySuite>) -> bool {
+        let sizes: alloc::vec::Vec<usize> = self
+            .creation
+            .iter()
+            .take_while(|&&c| c > 0)
+            .map(|&c| usize::try_from(c).unwrap_or(usize::MAX))
+            .collect();
+        for (i, &size) in sizes.iter().enumerate() {
+            if !suite.malloc(size) {
+                for &prev in sizes.iter().take(i).rev() {
+                    suite.free(prev);
+                }
+                return false;
+            }
+        }
+        self.suite = SharedSuite(Some(suite));
+        true
     }
 
     /// `parserCreate` of a root parser: the parser structure (counted

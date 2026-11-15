@@ -21,5 +21,12 @@ unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
 
+[features]
+# libexpat's `XML_TESTING` hooks (`g_reparseDeferralEnabledDefault`,
+# `g_bytesScanned`, `testingAccountingGetCountBytes*`), only for running
+# libexpat's own test suite against this library
+# (`scripts/runtests-check.sh`). Not part of the interface.
+testing = []
+
 [dependencies]
 expat = { path = "../expat" }

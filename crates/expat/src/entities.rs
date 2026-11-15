@@ -99,6 +99,25 @@ impl<'a> ExternalEntities<'a> {
     }
 }
 
+impl<'a> ExternalEntities<'a> {
+    /// [`ExternalEntities::create`] keeping the whole borrow, for
+    /// [`Parser::external_parser`].
+    pub(crate) fn into_parser(
+        self,
+        context: Option<&[u8]>,
+        encoding: Option<&[u8]>,
+    ) -> Option<ExternalParser<'a>> {
+        let (child, bytes_before) = self
+            .parent
+            .external_entity_parser_create(context, encoding)?;
+        Some(ExternalParser {
+            parent: self.parent,
+            child: Parser::from_inner(child),
+            bytes_before,
+        })
+    }
+}
+
 /// The parser of an external entity, created by
 /// [`ExternalEntities::create`]. It dereferences to a [`Parser`]; dropping
 /// it is `XML_ParserFree`.

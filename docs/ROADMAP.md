@@ -12,14 +12,14 @@ Status words: **done** (implemented and compared with libexpat),
 
 | # | Point | Status |
 |---|-------|--------|
-| 1 | Drop-in C header and shared library, all public functions working | partial |
+| 1 | Drop-in C header and shared library, all public functions working | done on Linux |
 | 2 | Graceful handling of out-of-memory situations | partial |
 | 3 | Protection against billion laughs, parameter laughs and quadratic runtime, without rejecting benign documents | done, as libexpat |
 | 4 | External entities available, disabled by default | done, as libexpat |
 | 5 | Security beyond memory safety | partial |
 | 6 | XML 1.0 fifth edition rather than fourth edition or 1.1 | open |
 | 7 | Full support for DTD, parameter entities, general entities | done, as libexpat |
-| 8 | Testing against the XML specification and libexpat's test suite | partial |
+| 8 | Testing against the XML specification and libexpat's test suite | done |
 | 9 | Parsing speed above libexpat compiled with Fil-C | done on one machine |
 | 10 | Continuous bug and feature parity with libexpat | partial |
 | 11 | Sharing bugs found in libexpat with upstream | open |
@@ -34,14 +34,15 @@ library. A C trace program built once against libexpat and once against
 `expat-capi` gives equal output on the upstream vectors under every
 handler set (`scripts/capi-check.sh`, 152,610 runs at D-057).
 
+`scripts/build-dropin.sh` builds it as `libexpat.so.1` with libexpat's
+headers, and libexpat's own test suite passes against that library except
+for 12 tests of libexpat internals (`scripts/runtests-check.sh`, D-060).
+`XML_ParserCreate_MM` receives every allocator call libexpat makes.
+
 Remaining:
-- Ship `expat.h` and `expat_external.h` with the crate and build the shared
-  library as `libexpat.so.1` with libexpat's symbol set, so it can replace
-  the system library without relinking.
-- Run libexpat's own C test suite (`tests/runtests`) against the shared
-  library; today the C interface is checked through the trace program only.
-- A failing allocator passed to `XML_ParserCreate_MM` reaches only content
-  models and `XML_Mem*` (D-054); route every parser allocation through it.
+- Library names and symbol versioning for macOS and Windows.
+- After `XML_ParserReset`, keep tags, pools and tables as libexpat does
+  (bindings are kept), so allocator calls after a reset match too.
 - Known differences are documented: `XML_GetIdAttributeIndex` before the
   first start tag (D-056), converter call counts of unknown encodings
   (D-057).
@@ -108,7 +109,8 @@ option sets (`tests/vectors/upstream.jsonl`); the W3C XML Conformance Test
 Suite is compared (D-059, 2,586 documents, 12,930 runs, equal); fuzzing
 compares both parsers on generated input.
 
-Remaining: libexpat's C test suite against the shared library (see 1).
+Done as well: libexpat's own test suite against the drop-in library
+(D-060, see 1).
 
 ## 9. Speed
 
@@ -131,7 +133,7 @@ branch.
 
 ## 11. Upstream
 
-Open. Two findings are to be reported to libexpat:
+Open, not planned at present. Two findings could be reported to libexpat:
 - `m_idAttIndex` is read before it is first set, and stays stale after
   `XML_ParserReset` (D-056).
 - Undefined behaviour in the accounting of a name cut off by the end of
@@ -149,11 +151,8 @@ MIT, as libexpat.
 
 ## Order of work
 
-1. Report the two upstream findings (11).
-2. Shared library as a drop-in replacement and libexpat's C test suite
-   against it (1, 8).
-3. Fallible allocation (2).
-4. Release procedure and a comparison with libexpat's development branch
+1. Fallible allocation (2).
+2. Release procedure and a comparison with libexpat's development branch
    (10).
-5. x86_64 and Fil-C benchmarks (9); DocBook and DITA documents (3).
-6. Fifth edition names, after discussion with upstream (6).
+3. x86_64 and Fil-C benchmarks (9); DocBook and DITA documents (3).
+4. Fifth edition names, after discussion with upstream (6).

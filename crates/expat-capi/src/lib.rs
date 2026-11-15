@@ -22,7 +22,11 @@
 //! `XML_GetIdAttributeIndex` and `XML_GetInputContext` (D-056),
 //! `XML_SetUnknownEncodingHandler` (D-057), the error code and its text,
 //! the position between calls and inside handlers (D-048) and the
-//! version.
+//! version. `scripts/build-dropin.sh` builds it as `libexpat.so.1`, and
+//! libexpat's own test suite passes against it except for the tests of
+//! libexpat internals (`scripts/runtests-check.sh`, D-060). The `release`
+//! function of an `XML_Encoding` runs first in `XML_ParserFree` and
+//! `XML_ParserReset`, as a handler, as in libexpat.
 //!
 //! Differences from libexpat:
 //!
@@ -57,23 +61,21 @@
 //!   `XML_SetReparseDeferralEnabled` set from inside a handler take
 //!   effect from the next token (libexpat: at once); the allocation
 //!   tracker limits take effect at the next allocation, as in libexpat.
-//! - The `release` function of an `XML_Encoding` runs while the parser is
-//!   being freed or reset; it must not call functions on that parser
-//!   (libexpat 2.10.0 refuses the calls that would change it, D-057).
-//! - `XML_ParserCreate_MM`: only the memory handed to the program
-//!   (content models, `XML_MemMalloc`, `XML_MemRealloc`, `XML_MemFree`)
-//!   comes from the suite; the parser's own memory comes from the Rust
-//!   allocator. When the suite fails to allocate a content model, the
-//!   parse is aborted (`XML_ERROR_ABORTED`) where libexpat reports
-//!   `XML_ERROR_NO_MEMORY`.
-//! - `XML_ExternalEntityParserCreate` works only inside the external
-//!   entity reference handler of the parser it is given, for one open
-//!   external entity parser at a time, and the new parser lives at most
-//!   until that handler returns: one still open then is closed, and its
-//!   parsing calls fail with `XML_ERROR_FINISHED` until `XML_ParserFree`.
-//!   libexpat lets the program create such parsers at any time and use
-//!   them later. Programs that create, use and free the entity's parser
-//!   inside the handler, as `xmlwf` does, see no difference.
+//! - `XML_ParserCreate_MM` with a suite: the parser's data lives in the
+//!   Rust allocator, and the suite receives the calls libexpat would make,
+//!   in libexpat's order and with libexpat's sizes, on blocks this library
+//!   keeps and frees with the parser (D-060). A failing call makes the
+//!   parse fail where libexpat's does. After `XML_ParserReset` the parser
+//!   keeps its bindings, as libexpat does, but not its other buffers and
+//!   tables, so later calls can differ from libexpat's.
+//! - An external entity parser created outside the external entity
+//!   reference handler (libexpat allows this at any time) keeps its parent
+//!   busy until it is freed: meanwhile the parent refuses parsing, reset
+//!   and release as from inside a handler, and a second such parser
+//!   cannot be created. Inside the handler, one external entity parser can
+//!   be open at a time, and it lives at most until that handler returns:
+//!   one still open then is closed, and its parsing calls fail with
+//!   `XML_ERROR_FINISHED` until `XML_ParserFree`.
 //! - After `XML_ParserReset`, the memory limit applies, as in libexpat,
 //!   to what is counted after the reset, but the parser counts its
 //!   buffers and tables again where libexpat reuses the ones it has.
@@ -88,6 +90,10 @@
 
 // reason: the function, type and constant names are those of expat.h.
 #![allow(non_snake_case, non_camel_case_types)]
+
+mod mem;
+#[cfg(feature = "testing")]
+mod testing;
 
 use std::cell::{Cell, RefCell, UnsafeCell};
 use std::ffi::{CStr, CString, c_char, c_int, c_long, c_ulong, c_void};
@@ -321,7 +327,7 @@ impl Default for Mem {
 /// `build_model` lays it out: the nodes in the crate's order (node 0 the
 /// root, each node's children contiguous), then their names. `NULL` when
 /// the allocation fails.
-fn build_model(model: &ContentModel, alloc: XML_MallocFcn) -> *mut XML_Content {
+fn build_model(model: &ContentModel, alloc: impl FnOnce(usize) -> *mut c_void) -> *mut XML_Content {
     let n = model.nodes.len();
     let names: usize = model
         .nodes
@@ -335,9 +341,7 @@ fn build_model(model: &ContentModel, alloc: XML_MallocFcn) -> *mut XML_Content {
     else {
         return std::ptr::null_mut();
     };
-    // SAFETY: `alloc` is `malloc` or the program's `malloc_fcn`, which
-    // takes any size.
-    let block = unsafe { alloc(size) }.cast::<XML_Content>();
+    let block = alloc(size).cast::<XML_Content>();
     if block.is_null() {
         return block;
     }
@@ -400,6 +404,9 @@ pub struct XML_ParserStruct {
     user_data: Cell<*mut c_void>,
     handler_arg: Cell<*mut c_void>,
     busy: Cell<bool>,
+    /// An external entity parser created outside its parent's handler: its
+    /// parent stays `busy` until it is freed.
+    lent: Cell<bool>,
     error_code: Cell<XML_Error>,
     specified: Cell<c_int>,
     /// The position of the event being reported (line from 1, column,
@@ -449,6 +456,9 @@ pub struct XML_ParserStruct {
     parent: Cell<XML_Parser>,
     /// The allocation functions for the memory handed to the program
     /// (content models, `XML_MemMalloc`).
+    /// The tracker-driven memory suite of `XML_ParserCreate_MM`, shared
+    /// with external entity parsers (D-060).
+    suite: std::cell::RefCell<Option<std::sync::Arc<mem::CSuite>>>,
     mem: Cell<Mem>,
     /// A base set by `XML_SetBase` from inside a handler, for the parser
     /// to take ([`Handler::take_base`]).
@@ -516,7 +526,16 @@ struct Inner {
 
 impl XML_ParserStruct {
     fn new(options: Options) -> Self {
-        Self::with_core(Core::Own(Parser::with_options(salt(), options)))
+        Self::own(Parser::with_options(salt(), options))
+    }
+
+    /// The state of a root parser.
+    // reason: `parser` is changed only with the `testing` feature.
+    #[cfg_attr(not(feature = "testing"), allow(unused_mut))]
+    fn own(mut parser: Parser) -> Self {
+        #[cfg(feature = "testing")]
+        parser.set_reparse_deferral_enabled(testing::reparse_deferral_default());
+        Self::with_core(Core::Own(parser))
     }
 
     fn with_core(mut core: Core) -> Self {
@@ -526,6 +545,7 @@ impl XML_ParserStruct {
             user_data: Cell::new(std::ptr::null_mut()),
             handler_arg: Cell::new(std::ptr::null_mut()),
             busy: Cell::new(false),
+            lent: Cell::new(false),
             error_code: Cell::new(XML_ERROR_NONE),
             specified: Cell::new(0),
             event_position: Cell::new((0, 0, -1)),
@@ -557,6 +577,7 @@ impl XML_ParserStruct {
             entities: Cell::new(std::ptr::null_mut()),
             open_child: Cell::new(std::ptr::null_mut()),
             parent: Cell::new(std::ptr::null_mut()),
+            suite: std::cell::RefCell::new(None),
             mem: Cell::new(Mem::default()),
             pending_base: RefCell::new(None),
             salt_set: Cell::new(false),
@@ -641,6 +662,28 @@ impl XML_ParserStruct {
         }
     }
 
+    /// `callUnknownEncodingRelease` at the start of `XML_ParserFree` and
+    /// `XML_ParserReset`: the release function of an unknown encoding runs
+    /// as a handler would (the parser cannot be freed, reset or fed from
+    /// it), with the position queries answering the parser's current
+    /// position.
+    fn run_encoding_release(&self) {
+        let Some((release, pos)) = self
+            .with_parser(|p| {
+                let pos = (p.current_line(), p.current_column(), p.current_byte_index());
+                p.take_encoding_release().map(|r| (r, pos))
+            })
+            .flatten()
+        else {
+            return;
+        };
+        let saved = self.event_position.replace(pos);
+        self.busy.set(true);
+        release();
+        self.busy.set(false);
+        self.event_position.set(saved);
+    }
+
     /// Drops the Rust parser of an external entity parser whose creating
     /// handler call returns: the state it shares with its parent goes
     /// back to the parent, and later parsing calls fail.
@@ -668,6 +711,11 @@ impl XML_ParserStruct {
         matches!(inner.parser, Core::Closed(_))
     }
 
+    /// `m_parentParser != NULL`: an external entity parser, open or closed.
+    fn is_child(&self) -> bool {
+        !self.parent.get().is_null() || self.closed()
+    }
+
     /// `parserBusy`: a parse has started and has not finished.
     fn parser_busy(&self) -> bool {
         matches!(
@@ -678,6 +726,9 @@ impl XML_ParserStruct {
 
     /// `setBillionLaughsAttackProtectionMaximumAmplification`.
     fn set_bl_maximum(&self, factor: f32) -> XML_Prop_Error {
+        if self.is_child() {
+            return XML_PROP_ERROR_PARSER_NOT_ROOT;
+        }
         if factor.is_nan() || factor < 1.0 {
             return XML_PROP_ERROR_INVALID_VALUE;
         }
@@ -695,6 +746,9 @@ impl XML_ParserStruct {
 
     /// `setBillionLaughsAttackProtectionActivationThreshold`.
     fn set_bl_threshold(&self, bytes: u64) -> XML_Prop_Error {
+        if self.is_child() {
+            return XML_PROP_ERROR_PARSER_NOT_ROOT;
+        }
         self.bl_threshold.set(bytes);
         if self
             .with_parser(|p| p.set_billion_laughs_activation_threshold(bytes))
@@ -707,6 +761,9 @@ impl XML_ParserStruct {
 
     /// `setAllocTrackerMaximumAmplification`.
     fn set_at_maximum(&self, factor: f32) -> XML_Prop_Error {
+        if self.is_child() {
+            return XML_PROP_ERROR_PARSER_NOT_ROOT;
+        }
         if factor.is_nan() || factor < 1.0 {
             return XML_PROP_ERROR_INVALID_VALUE;
         }
@@ -722,6 +779,9 @@ impl XML_ParserStruct {
 
     /// `setAllocTrackerActivationThreshold`.
     fn set_at_threshold(&self, bytes: u64) -> XML_Prop_Error {
+        if self.is_child() {
+            return XML_PROP_ERROR_PARSER_NOT_ROOT;
+        }
         self.at_threshold.set(bytes);
         if self
             .with_parser(|p| p.set_alloc_tracker_activation_threshold(bytes))
@@ -1168,7 +1228,18 @@ impl Handler for Dispatch<'_> {
         let Some(h) = self.state.element_decl.get() else {
             return;
         };
-        let root = build_model(model, self.state.mem.get().malloc);
+        let suite = self.state.suite.borrow().clone();
+        let malloc = self.state.mem.get().malloc;
+        let root = build_model(model, |size| {
+            // The block the tracker allocated for this declaration through
+            // the suite (D-060), else a new one.
+            match suite.as_ref().and_then(|s| s.take_model(size)) {
+                Some(p) => p,
+                // SAFETY: `malloc` or the program's `malloc_fcn`, which
+                // takes any size.
+                None => unsafe { malloc(size) },
+            }
+        });
         if root.is_null() {
             // libexpat ends the parse with `XML_ERROR_NO_MEMORY`; the
             // nearest this interface can do is to abort it.
@@ -1337,9 +1408,23 @@ pub unsafe extern "C" fn XML_ParserFree(parser: XML_Parser) {
         }
         _ => return,
     }
+    // SAFETY: as above; `run_encoding_release` leaves `busy` false again.
+    if let Some(s) = unsafe { state(parser) } {
+        s.run_encoding_release();
+    }
+    // A child created outside a handler lends its parent back once dropped.
+    // SAFETY: as above.
+    let lender = unsafe { state(parser) }
+        .filter(|s| s.lent.get())
+        .map(|s| s.parent.get());
     // SAFETY: the handle came from `Box::into_raw` in `create`, is live and
     // no handler is running, so no reference to it is left.
     drop(unsafe { Box::from_raw(parser) });
+    // SAFETY: the parent of a lent child outlives it (its `XML_ParserFree`
+    // does nothing while `busy`).
+    if let Some(p) = lender.and_then(|p| unsafe { state(p) }) {
+        p.busy.set(false);
+    }
 }
 
 /// `XML_SetUserData`.
@@ -1509,18 +1594,19 @@ pub unsafe extern "C" fn XML_SetExternalEntityRefHandlerArg(parser: XML_Parser, 
     }
 }
 
-/// `XML_ExternalEntityParserCreate`: the parser of the external entity
-/// whose reference handler is running on `parser`, with `context` as the
+/// `XML_ExternalEntityParserCreate`: the parser of an external entity of
+/// `parser`'s document, with `context` as the external entity reference
 /// handler received it (`NULL` for a parameter entity or the external
 /// subset) and the encoding `encoding` names (`NULL` for the entity's
 /// own). It starts with the handlers, user data and settings `parser`
-/// has. `NULL` where libexpat returns `NULL`, and also outside the
-/// external entity reference handler of `parser` and while an external
-/// entity parser created in the same handler call is still open: the
-/// new parser lives at most until that handler call returns. Free it
-/// with `XML_ParserFree`; one the handler did not free is closed when
-/// the handler returns, and its parsing calls then fail with
-/// `XML_ERROR_FINISHED` until it is freed.
+/// has. `NULL` where libexpat returns `NULL`, and also while another
+/// external entity parser of `parser` created in the same handler call,
+/// or outside a handler, is still open. Inside the handler, the new
+/// parser lives at most until that handler call returns: one the handler
+/// did not free is closed then, and its parsing calls fail with
+/// `XML_ERROR_FINISHED` until it is freed. Outside a handler, `parser`
+/// stays busy (as from inside a handler) until the new parser is freed
+/// with `XML_ParserFree` (D-060).
 ///
 /// # Safety
 ///
@@ -1537,27 +1623,51 @@ pub unsafe extern "C" fn XML_ExternalEntityParserCreate(
         return std::ptr::null_mut();
     };
     let entities = s.entities.get();
-    if entities.is_null() || !s.open_child.get().is_null() {
+    if !s.open_child.get().is_null() {
         return std::ptr::null_mut();
     }
     // SAFETY: forwarded from this function's contract.
     let (context, encoding) = unsafe { (c_bytes(context), c_bytes(encoding)) };
-    // SAFETY: `entities` is set only while the external entity reference
-    // handler of `parser` runs (`Dispatch::external_entity_ref`), and
-    // points to the `ExternalEntities` that call received; no other
-    // reference to it is used meanwhile.
-    let entities = unsafe { &mut *entities };
-    let Some(child) = entities.create(context, encoding) else {
+    let lent = entities.is_null();
+    let child = if lent {
+        // Outside the external entity reference handler: the child borrows
+        // the parser until it is freed, and the parser refuses parsing,
+        // reset and release meanwhile, as from inside a handler.
+        s.with_parser(|p| {
+            // SAFETY: the child borrows `parser`'s Rust parser; `busy` is
+            // set below before anything else can run, so `with_parser` and
+            // the parsing functions (the only other ways to reach it)
+            // leave it alone until `XML_ParserFree` of the child clears
+            // `busy` after dropping it.
+            p.external_parser(context, encoding).map(|c| unsafe {
+                std::mem::transmute::<ExternalParser<'_>, ExternalParser<'static>>(c)
+            })
+        })
+        .flatten()
+    } else {
+        // SAFETY: `entities` is set only while the external entity
+        // reference handler of `parser` runs (`Dispatch::external_entity_ref`),
+        // and points to the `ExternalEntities` that call received; no other
+        // reference to it is used meanwhile.
+        let entities = unsafe { &mut *entities };
+        entities.create(context, encoding).map(|c| {
+            // SAFETY: the child borrows `parser`'s Rust parser, which stays
+            // borrowed by the running parse (and unused) until the handler
+            // call returns. The child is dropped before then: by
+            // `XML_ParserFree`, or by `close` when the handler returns
+            // (`open_child` holds it until one of the two happens), so the
+            // borrow never outlives the call.
+            unsafe { std::mem::transmute::<ExternalParser<'_>, ExternalParser<'static>>(c) }
+        })
+    };
+    let Some(child) = child else {
         return std::ptr::null_mut();
     };
-    // SAFETY: the child borrows `parser`'s Rust parser, which stays
-    // borrowed by the running parse (and unused) until the handler call
-    // returns. The child is dropped before then: by `XML_ParserFree`, or
-    // by `close` when the handler returns (`open_child` holds it until
-    // one of the two happens), so the borrow never outlives the call.
-    let child =
-        unsafe { std::mem::transmute::<ExternalParser<'_>, ExternalParser<'static>>(child) };
+    if lent {
+        s.busy.set(true);
+    }
     let c = XML_ParserStruct::with_core(Core::Child(child));
+    c.lent.set(lent);
     // `XML_ExternalEntityParserCreate` copies the handlers, the user data
     // and the handler argument.
     c.user_data.set(s.user_data.get());
@@ -1592,6 +1702,7 @@ pub unsafe extern "C" fn XML_ExternalEntityParserCreate(
     c.unknown_encoding.set(s.unknown_encoding.get());
     c.default_expand.set(s.default_expand.get());
     c.mem.set(s.mem.get());
+    c.suite.replace(s.suite.borrow().clone());
     c.salt_set.set(s.salt_set.get());
     c.bl_maximum.set(s.bl_maximum.get());
     c.bl_threshold.set(s.bl_threshold.get());
@@ -1606,7 +1717,9 @@ pub unsafe extern "C" fn XML_ExternalEntityParserCreate(
             c.handler_arg.set(child.cast());
         }
     }
-    s.open_child.set(child);
+    if !lent {
+        s.open_child.set(child);
+    }
     child
 }
 
@@ -1926,7 +2039,11 @@ fn run(
     let Inner { parser, text, atts } = inner;
     let parser = parser.get();
     let mut dispatch = Dispatch { state, text, atts };
+    #[cfg(feature = "testing")]
+    let scanned = parser.bytes_scanned();
     let result = f(parser, &mut dispatch, events);
+    #[cfg(feature = "testing")]
+    testing::add_bytes_scanned(parser.bytes_scanned().wrapping_sub(scanned));
     state.busy.set(false);
     state
         .error_code
@@ -2327,6 +2444,8 @@ pub const XML_PROP_ERROR_INVALID_TYPE: XML_Prop_Error = 2;
 pub const XML_PROP_ERROR_INVALID_VALUE: XML_Prop_Error = 3;
 /// `XML_PROP_ERROR_PARSER_NULL`.
 pub const XML_PROP_ERROR_PARSER_NULL: XML_Prop_Error = 4;
+/// `XML_PROP_ERROR_PARSER_NOT_ROOT`.
+pub const XML_PROP_ERROR_PARSER_NOT_ROOT: XML_Prop_Error = 5;
 
 /// `enum XML_Parser_Property`.
 pub type XML_Parser_Property = c_int;
@@ -2819,8 +2938,18 @@ pub unsafe extern "C" fn XML_ParserReset(
     };
     // SAFETY: forwarded from this function's contract.
     let name = unsafe { c_bytes(encoding) };
+    if s.busy.get() || !s.parent.get().is_null() || s.closed() {
+        return 0;
+    }
+    s.run_encoding_release();
     if s.with_parser(|p| p.reset(name, salt())) != Some(true) {
         return 0;
+    }
+    #[cfg(feature = "testing")]
+    {
+        let on = testing::reparse_deferral_default();
+        s.reparse_deferral.set(on);
+        let _ = s.with_parser(|p| p.set_reparse_deferral_enabled(on));
     }
     s.user_data.set(std::ptr::null_mut());
     s.handler_arg.set(std::ptr::null_mut());
@@ -2867,9 +2996,11 @@ pub unsafe extern "C" fn XML_ParserReset(
 /// `XML_ParserCreate_MM`: a parser whose memory handed to the program
 /// (content models, `XML_MemMalloc`, `XML_MemRealloc`, `XML_MemFree`)
 /// comes from `memsuite` (the C library's functions for `NULL`), with
-/// namespace processing when `namespace_separator` is not `NULL`. The
-/// parser's own memory comes from the Rust allocator. `NULL` when a
-/// suite lacks one of its functions.
+/// namespace processing when `namespace_separator` is not `NULL`. With a
+/// suite, every call libexpat makes to it is made too, with libexpat's
+/// sizes, and a failing call fails the parser where libexpat fails
+/// (D-060); the parser's data itself lives in the Rust allocator. `NULL`
+/// when a suite lacks one of its functions or a creation call fails.
 ///
 /// # Safety
 ///
@@ -2907,12 +3038,17 @@ pub unsafe extern "C" fn XML_ParserCreate_MM(
     if let Some(name) = unsafe { c_bytes(encoding) } {
         options = options.encoding(name);
     }
-    let p = create(options);
-    // SAFETY: `p` was just created and is live.
-    if let Some(s) = unsafe { state(p) } {
-        s.mem.set(mem);
+    if memsuite.is_null() {
+        return create(options);
     }
-    p
+    let suite = std::sync::Arc::new(mem::CSuite::new(mem));
+    let Some(parser) = Parser::with_memory_suite(salt(), options, suite.clone()) else {
+        return std::ptr::null_mut();
+    };
+    let state = XML_ParserStruct::own(parser);
+    state.mem.set(mem);
+    state.suite.replace(Some(suite));
+    Box::into_raw(Box::new(state))
 }
 
 /// `XML_FeatureEnum`.
