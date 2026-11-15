@@ -60,10 +60,10 @@ use core::ops::{Deref, DerefMut};
 use super::accounting::Account;
 use super::dtd::{BindingId, Dtd, PrefixId};
 use super::error::{Stop, XmlError};
-use super::prolog::{PrologDone, with_enc, with_known};
+use super::prolog::{PrologDone, with_enc};
 use super::tracker::Pool;
 use super::{Enc, Handler, Parser, Parsing, Processor};
-use crate::tok::{Encoding, InitEncoding, Normal, Scan, Scanned, State, Tok, ignore_section_tok, init_scan};
+use crate::tok::{Encoding, InitEncoding, Normal, Scan, Scanned, State, Tok, ignore_section_tok, init_scan_names};
 
 /// `CONTEXT_SEP`: separates the items of a context string.
 const CONTEXT_SEP: u8 = 0x0C;
@@ -398,6 +398,7 @@ impl Parser {
         child.handlers = self.handlers;
         child.ns_triplets = self.ns_triplets;
         child.reparse_deferral_enabled = self.reparse_deferral_enabled;
+        child.fifth_edition_names = self.fifth_edition_names;
         child.param_entity_parsing = self.param_entity_parsing;
         child.prolog_state.in_entity_value = self.prolog_state.in_entity_value;
         child.decl_element_type = self.decl_element_type;
@@ -649,13 +650,13 @@ impl Parser {
     fn scan_any(&mut self, state: State, buf: &[u8], s: usize) -> Scanned {
         match self.enc {
             Enc::Init(init) => {
-                let r = init_scan(&init, state, buf, s);
+                let r = init_scan_names(&init, self.fifth_edition_names, state, buf, s);
                 if let Some(k) = r.encoding {
                     self.enc = Enc::Known(k);
                 }
                 r.scanned
             }
-            Enc::Known(k) => k.tok(state, buf, s),
+            Enc::Known(k) => k.tok_names(self.fifth_edition_names, state, buf, s),
             Enc::Unknown => match self.decided_enc() {
                 Some(a) => a.tok(state, buf, s),
                 None => Scanned { scan: Scan::None, next: None },
@@ -806,11 +807,12 @@ impl Parser {
         start_tag_level: i32,
     ) -> Result<(), Stop> {
         self.event_ptr = Some(s);
-        let r = init_scan(&init, State::Content, buf, s);
+        let r = init_scan_names(&init, self.fifth_edition_names, State::Content, buf, s);
         if let Some(k) = r.encoding {
             // Detected after all: the regular path.
             self.enc = Enc::Known(k);
-            return with_known!(k, e => self.do_content(h, e, start_tag_level, buf, s, next_ptr, have_more, Account::Direct));
+            let k = self.known_enc(k);
+            return with_enc!(k, e => self.do_content(h, e, start_tag_level, buf, s, next_ptr, have_more, Account::Direct));
         }
         let next = r.scanned.next.unwrap_or(s);
         self.event_end_ptr = Some(next);

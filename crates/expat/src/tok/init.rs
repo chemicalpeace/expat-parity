@@ -127,6 +127,16 @@ impl Known {
         }
     }
 
+    /// [`Known::tok`] with the name rules of XML 1.0 Fifth Edition when
+    /// `fifth` is set (see [`super::Fifth`]).
+    pub fn tok_names(self, fifth: bool, state: State, buf: &[u8], ptr: usize) -> Scanned {
+        match (self, fifth) {
+            (k, false) => k.tok(state, buf, ptr),
+            (Known::Normal(e), true) => tok(&super::Fifth(e), state, buf, ptr),
+            (Known::Utf16(e), true) => tok(&super::Fifth(e), state, buf, ptr),
+        }
+    }
+
     /// `minBytesPerChar`.
     pub fn min_bytes_per_char(self) -> usize {
         match self {
@@ -208,6 +218,18 @@ pub struct InitScan {
 /// `initScan` (as `NS(initScanProlog)` / `NS(initScanContent)`): detects the
 /// encoding from `buf[ptr..]` and scans the first token in `state`.
 pub fn init_scan(init: &InitEncoding, state: State, buf: &[u8], ptr: usize) -> InitScan {
+    init_scan_names(init, false, state, buf, ptr)
+}
+
+/// [`init_scan`] with the name rules of XML 1.0 Fifth Edition for the first
+/// token when `fifth` is set.
+pub fn init_scan_names(
+    init: &InitEncoding,
+    fifth: bool,
+    state: State,
+    buf: &[u8],
+    ptr: usize,
+) -> InitScan {
     use EncodingIndex as I;
     let undecided = |scan| InitScan {
         scanned: Scanned { scan, next: None },
@@ -216,7 +238,7 @@ pub fn init_scan(init: &InitEncoding, state: State, buf: &[u8], ptr: usize) -> I
     let select = |index: EncodingIndex| {
         let e = Known::from_index(index, init.ns);
         InitScan {
-            scanned: e.tok(state, buf, ptr),
+            scanned: e.tok_names(fifth, state, buf, ptr),
             encoding: Some(e),
         }
     };

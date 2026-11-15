@@ -17,7 +17,7 @@ Status words: **done** (implemented and compared with libexpat),
 | 3 | Protection against billion laughs, parameter laughs and quadratic runtime, without rejecting benign documents | done, as libexpat |
 | 4 | External entities available, disabled by default | done, as libexpat |
 | 5 | Security beyond memory safety | partial |
-| 6 | XML 1.0 fifth edition rather than fourth edition or 1.1 | open |
+| 6 | XML 1.0 fifth edition rather than fourth edition or 1.1 | option for names |
 | 7 | Full support for DTD, parameter entities, general entities | done, as libexpat |
 | 8 | Testing against the XML specification and libexpat's test suite | done |
 | 9 | Parsing speed above libexpat compiled with Fil-C | done on one machine |
@@ -102,11 +102,11 @@ disclosure together with libexpat for issues that affect both.
 
 ## 6. XML 1.0 fifth edition
 
-Open. The port follows libexpat's name rules (fourth edition); in the W3C
-suite 306 fifth-edition name-character tests are rejected by both
-(D-059). Changing this departs from libexpat, so it needs a decision with
-upstream: either both move to fifth edition, or the port offers it as an
-option outside the parity tests.
+By default the port follows libexpat's name rules (fourth edition); in
+the W3C suite 306 fifth-edition name-character tests are rejected by both
+(D-059). `Parser::set_fifth_edition_names` turns on the fifth-edition
+name rules, outside the parity tests (D-064); with it, all 306 are
+accepted. The default stays as libexpat's. Not in the C interface.
 
 ## 7. DTD and entities
 
@@ -168,4 +168,4 @@ MIT, as libexpat.
 ## Order of work
 
 1. x86_64 and Fil-C benchmarks (9).
-2. Fifth edition names, after discussion with upstream (6).
+2. Fifth edition names: option done (D-064); the default follows libexpat (6).

@@ -166,6 +166,12 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   reached 0.68x-1.24x of libexpat 2.10.0 built with clang `-O2`, slowest
   on UTF-16 input (`docs/REPORT.md`, "Benchmarks"). Other platforms are
   not measured.
+- **Names** follow libexpat: the XML 1.0 Fourth Edition character
+  classes, within the Basic Multilingual Plane. `Parser::set_fifth_edition_names`
+  switches to the Fifth Edition rules, which also accept letters added to
+  Unicode later and characters outside the BMP. This option is not part of
+  libexpat, is off by default and is not available through the C interface
+  (D-064).
 - **MSRV:** Rust 1.99 (edition 2024).
 
 These are deferred, with no commitment to implement them.

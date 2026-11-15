@@ -187,3 +187,39 @@ mod q5 {
         Ok(())
     }
 }
+
+mod fifth_unknown {
+    use super::*;
+
+    /// ASCII identity; byte 0x80 maps to U+0221 (a letter only the Fifth
+    /// Edition knows), 0x81 to U+00D7 (never a name character), 0xC3 leads
+    /// a two-byte sequence; `C3 80` converts to U+0221.
+    type Enc = Unknown<fn(&[u8]) -> i32>;
+
+    fn enc(fifth: bool) -> Result<Enc, InvalidMap> {
+        let mut map = [-1i32; 256];
+        for (i, m) in map.iter_mut().enumerate().take(128) {
+            *m = i32::try_from(i).unwrap_or_default();
+        }
+        map[0x80] = 0x221;
+        map[0x81] = 0xD7;
+        map[0xC3] = -2;
+        let convert: fn(&[u8]) -> i32 = |seq| if seq == b"\xC3\x80" { 0x221 } else { -1 };
+        let e = Unknown::new(&map, Some(convert), false)?;
+        Ok(if fifth { e.with_fifth_edition_names() } else { e })
+    }
+
+    #[test]
+    fn unknown_encoding_names() -> Result<(), InvalidMap> {
+        for doc in [&b"<\x80/>"[..], b"<\xC3\x80/>", b"<a\x80\xC3\x80/>"] {
+            assert_eq!(content_tok(&enc(false)?, doc, 0).scan, Scan::Invalid, "{doc:?}");
+            assert_eq!(
+                content_tok(&enc(true)?, doc, 0).scan,
+                Scan::Token(Tok::EmptyElementNoAtts),
+                "{doc:?}"
+            );
+        }
+        assert_eq!(content_tok(&enc(true)?, b"<\x81/>", 0).scan, Scan::Invalid);
+        Ok(())
+    }
+}

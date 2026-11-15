@@ -6,7 +6,9 @@
 //! libexpat classifies names with the XML 1.0 *Fourth Edition* (Appendix B)
 //! character classes, restricted to the BMP: 4-byte UTF-8 sequences are
 //! never name characters (`utf8_isName4` is `isNever`). The port keeps that
-//! behaviour; it is observable (which documents are well-formed).
+//! behaviour by default; it is observable (which documents are
+//! well-formed). The Fifth Edition classes below ([`fifth_is_name_start`],
+//! [`fifth_is_name_char`]) serve the opt-in of `crate::tok::Fifth` (D-064).
 //!
 //! The multi-byte predicates take fixed-size arrays, so a caller can only
 //! ask about exactly as many bytes as the C macro reads.
@@ -89,6 +91,57 @@ pub fn utf8_is_name_start2(b: [u8; 2]) -> bool {
 /// `utf8_isNmstrt3`.
 pub fn utf8_is_name_start3(b: [u8; 3]) -> bool {
     utf8_naming3(&NMSTRT_PAGES, b)
+}
+
+/// `NameStartChar` of XML 1.0 Fifth Edition (production \[4\]), for a
+/// code point. Used only when a parser is configured with
+/// [`Parser::set_fifth_edition_names`](crate::Parser::set_fifth_edition_names);
+/// libexpat itself uses the Fourth Edition classes above.
+pub fn fifth_is_name_start(c: u32) -> bool {
+    matches!(
+        c,
+        0x3A | 0x41..=0x5A
+            | 0x5F
+            | 0x61..=0x7A
+            | 0xC0..=0xD6
+            | 0xD8..=0xF6
+            | 0xF8..=0x2FF
+            | 0x370..=0x37D
+            | 0x37F..=0x1FFF
+            | 0x200C..=0x200D
+            | 0x2070..=0x218F
+            | 0x2C00..=0x2FEF
+            | 0x3001..=0xD7FF
+            | 0xF900..=0xFDCF
+            | 0xFDF0..=0xFFFD
+            | 0x1_0000..=0xE_FFFF
+    )
+}
+
+/// `NameChar` of XML 1.0 Fifth Edition (production \[4a\]).
+pub fn fifth_is_name_char(c: u32) -> bool {
+    fifth_is_name_start(c)
+        || matches!(
+            c,
+            0x2D | 0x2E | 0x30..=0x39 | 0xB7 | 0x300..=0x36F | 0x203F..=0x2040
+        )
+}
+
+/// The code point of a well-formed UTF-8 sequence of 2 to 4 bytes, or
+/// `None` for a sequence that [`utf8_is_invalid2`] (and the 3- and 4-byte
+/// checks) reject.
+pub fn utf8_decode(b: &[u8]) -> Option<u32> {
+    let cont = |x: u8| u32::from(x & 0x3F);
+    match *b {
+        [b0, b1] if !utf8_is_invalid2([b0, b1]) => Some((u32::from(b0 & 0x1F) << 6) | cont(b1)),
+        [b0, b1, b2] if !utf8_is_invalid3([b0, b1, b2]) => {
+            Some((u32::from(b0 & 0x0F) << 12) | (cont(b1) << 6) | cont(b2))
+        }
+        [b0, b1, b2, b3] if b0 <= 0xF4 && !utf8_is_invalid4([b0, b1, b2, b3]) => Some(
+            (u32::from(b0 & 0x07) << 18) | (cont(b1) << 12) | (cont(b2) << 6) | cont(b3),
+        ),
+        _ => None,
+    }
 }
 
 fn is_continuation(b: u8) -> bool {

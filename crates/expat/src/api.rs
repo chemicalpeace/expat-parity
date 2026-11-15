@@ -699,6 +699,45 @@ impl Parser {
         self.inner.reparse_deferral_enabled()
     }
 
+    /// Classifies the characters of names (element and attribute names,
+    /// entity names, processing-instruction targets, name tokens) by XML
+    /// 1.0 Fifth Edition, productions \[4\] and \[4a\], instead of the
+    /// Fourth Edition classes (Appendix B) that libexpat uses.
+    ///
+    /// This is not a libexpat feature, and it is off by default, so a
+    /// parser behaves as libexpat unless it is turned on. Every name the
+    /// Fourth Edition accepts is also accepted by the Fifth Edition; the
+    /// Fifth Edition additionally accepts letters added to Unicode later
+    /// and characters outside the Basic Multilingual Plane. Characters
+    /// outside names, and everything else about well-formedness, are
+    /// unchanged. See `docs/DECISIONS.md` (D-064).
+    ///
+    /// Takes effect for the next parse: `false`, and no change, while the
+    /// parser is busy ([`ParsingStatus::Parsing`] or
+    /// [`ParsingStatus::Suspended`]). External entity parsers take the
+    /// setting of their parent. [`Parser::reset`] turns it off again.
+    ///
+    /// ```
+    /// use expat::{ErrorCode, Parser};
+    /// // U+0221 is a letter added in Unicode 4.0, after the Fourth Edition.
+    /// let doc = "<\u{221}/>".as_bytes();
+    ///
+    /// let mut p = Parser::new([7; 16]);
+    /// assert_eq!(p.parse(doc, true).unwrap_err().code(), ErrorCode::InvalidToken);
+    ///
+    /// let mut p = Parser::new([7; 16]);
+    /// assert!(p.set_fifth_edition_names(true));
+    /// assert_eq!(p.parse(doc, true), Ok(()));
+    /// ```
+    pub fn set_fifth_edition_names(&mut self, on: bool) -> bool {
+        self.inner.set_fifth_edition_names(on)
+    }
+
+    /// Whether [`Parser::set_fifth_edition_names`] is on.
+    pub fn fifth_edition_names(&self) -> bool {
+        self.inner.fifth_edition_names()
+    }
+
     /// The parsing state (`XML_GetParsingStatus`).
     pub fn parsing_status(&self) -> ParsingStatus {
         self.inner.parsing_status()

@@ -61,6 +61,8 @@ pub struct Unknown<C> {
     /// Length (0 for a lead byte) and UTF-8 bytes of each single byte.
     utf8: [[u8; 4]; 256],
     convert: Option<C>,
+    /// Names by XML 1.0 Fifth Edition ([`Unknown::with_fifth_edition_names`]).
+    fifth: bool,
 }
 
 /// Why [`Unknown::new`] rejected a map (C: `XmlInitUnknownEncoding` returns
@@ -88,6 +90,7 @@ impl<C: Converter> Unknown<C> {
             utf16: [0; 256],
             utf8: [[0; 4]; 256],
             convert: None,
+            fifth: false,
         };
         let entries = e.types.iter_mut().zip(e.utf16.iter_mut()).zip(e.utf8.iter_mut());
         for (i, (((ty, u16_), u8_), &c)) in (0u8..=0xFF).zip(entries.zip(map.iter())) {
@@ -150,6 +153,47 @@ impl<C: Converter> Unknown<C> {
         Ok(e)
     }
 
+    /// The same encoding with the name rules of XML 1.0 Fifth Edition
+    /// (see [`super::Fifth`]): single bytes that map to a character of
+    /// U+0080 or above are classified again, and multi-byte sequences are
+    /// checked against the Fifth Edition classes.
+    pub fn with_fifth_edition_names(mut self) -> Self {
+        for (ty, &unit) in self.types.iter_mut().zip(self.utf16.iter()) {
+            if unit >= 0x80 && unit != 0xFFFF && matches!(*ty, ByteType::Nmstrt | ByteType::Name | ByteType::Other) {
+                let c = u32::from(unit);
+                *ty = if naming::fifth_is_name_start(c) {
+                    ByteType::Nmstrt
+                } else if naming::fifth_is_name_char(c) {
+                    ByteType::Name
+                } else {
+                    ByteType::Other
+                };
+            }
+        }
+        self.fifth = true;
+        self
+    }
+
+    /// Whether [`Unknown::with_fifth_edition_names`] applies.
+    pub fn fifth_edition_names(&self) -> bool {
+        self.fifth
+    }
+
+    fn name_test(&self, buf: &[u8], p: usize, start: bool) -> bool {
+        let Some(c) = self.convert_at(buf, p) else {
+            return false;
+        };
+        let Ok(unit) = u16::try_from(c) else {
+            return false;
+        };
+        match (self.fifth, start) {
+            (false, false) => naming::ucs2_is_name_char(unit),
+            (false, true) => naming::ucs2_is_name_start(unit),
+            (true, false) => naming::fifth_is_name_char(u32::from(unit)),
+            (true, true) => naming::fifth_is_name_start(u32::from(unit)),
+        }
+    }
+
     /// The converter's code point for the sequence at `p`, whose length the
     /// byte type of `buf[p]` gives; `None` if the sequence is not complete in
     /// `buf` or the byte is not a lead byte.
@@ -198,16 +242,12 @@ impl<C: Converter> Encoding for Unknown<C> {
 
     /// `unknown_isName`.
     fn is_name_char(&self, buf: &[u8], p: usize, _n: usize) -> bool {
-        self.convert_at(buf, p)
-            .and_then(|c| u16::try_from(c).ok())
-            .is_some_and(naming::ucs2_is_name_char)
+        self.name_test(buf, p, false)
     }
 
     /// `unknown_isNmstrt`.
     fn is_nmstrt_char(&self, buf: &[u8], p: usize, _n: usize) -> bool {
-        self.convert_at(buf, p)
-            .and_then(|c| u16::try_from(c).ok())
-            .is_some_and(naming::ucs2_is_name_start)
+        self.name_test(buf, p, true)
     }
 
     /// `unknown_isInvalid`.

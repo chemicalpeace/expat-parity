@@ -33,6 +33,7 @@
 //! ```
 
 mod convert;
+mod fifth;
 mod init;
 mod normal;
 pub mod scan;
@@ -43,8 +44,9 @@ mod xmldecl;
 pub use convert::{ConvertResult, Converted, trim_to_complete_utf8_characters};
 pub use init::{
     EncodingIndex, InitEncoding, InitScan, Known, State, get_encoding_index, init_scan,
-    internal_encoding, tok,
+    internal_encoding, init_scan_names, tok,
 };
+pub use fifth::Fifth;
 pub use normal::Normal;
 pub use scan::{
     Attribute, Position, attribute_value_tok, cdata_section_tok, char_ref_number, content_tok,
@@ -105,6 +107,14 @@ pub trait Encoding {
     /// those of the innermost open internal entity.
     fn is_internal(&self) -> bool {
         false
+    }
+
+    /// The code point of the `n`-byte character at `p`, for the name rules
+    /// of [`Fifth`]; `None` when the encoding cannot tell (the default) or
+    /// the sequence is malformed. `n` is `MINBPC` for
+    /// [`ByteType::NonAscii`] or the length of a lead byte's sequence.
+    fn code_point(&self, _buf: &[u8], _p: usize, _n: usize) -> Option<u32> {
+        None
     }
 
     /// `XmlUtf8Convert`: converts from the start of `from` into `to`.

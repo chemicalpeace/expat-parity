@@ -22,7 +22,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use expat_difftest::port::port_trace;
+use expat_difftest::port::{port_trace, port_trace_fifth_edition_names};
 use expat_difftest::trace::first_difference;
 use expat_oracle::{ExtHandler, ParamEntityParsing, ParseOptions, parse_trace};
 
@@ -31,6 +31,9 @@ struct Case {
     id: String,
     kind: String,
     path: PathBuf,
+    /// The `EDITION` attribute: the XML 1.0 editions the expected result
+    /// holds for, empty when it holds for all.
+    edition: String,
 }
 
 /// Attribute `name` of the start tag `tag` (either quote style).
@@ -82,6 +85,7 @@ fn catalogue(root: &Path) -> Vec<Case> {
                 id,
                 kind,
                 path: dir.join(uri),
+                edition: attr(tag, "EDITION").unwrap_or_default(),
             });
         }
     }
@@ -254,4 +258,74 @@ fn w3c_conformance_suite_matches_c() {
         "W3C suite: {} mismatches",
         failures.len()
     );
+}
+
+/// The suite with names by XML 1.0 Fifth Edition (D-064), an option of the
+/// port that libexpat does not have. Each test document is parsed by the
+/// C oracle and by the port with the option, under the "read" option set.
+/// Asserted: wherever the results differ, the C library rejected the
+/// document (the option only widens the names; the port either accepts it
+/// or reports a later error), and no document whose expected result is "not-wf" for the Fifth
+/// Edition becomes accepted. The differences are printed for
+/// docs/REPORT.md.
+#[test]
+fn w3c_suite_with_fifth_edition_names() {
+    let Some(root) = std::env::var_os("XMLCONF_DIR") else {
+        eprintln!("XMLCONF_DIR not set: W3C suite skipped (scripts/w3c-check.sh runs it)");
+        return;
+    };
+    let root = PathBuf::from(root);
+    let cases = catalogue(&root);
+    let mut problems = Vec::new();
+    // (expected type, edition) -> number of documents now accepted
+    let mut newly_accepted: BTreeMap<(String, String), usize> = BTreeMap::new();
+    let mut other_error = 0;
+    // Newly accepted documents whose expected result holds for every edition.
+    let mut all_editions = Vec::new();
+    for case in &cases {
+        let doc = std::fs::read(&case.path)
+            .unwrap_or_else(|e| panic!("{}: {}: {e}", case.id, case.path.display()));
+        let ents = entities(&case.path, &doc);
+        let Some((_, o)) = option_sets(&ents).into_iter().find(|(n, _)| *n == "read") else {
+            panic!("no read option set");
+        };
+        let c = result_code(&parse_trace(&doc, &o).expect("oracle"));
+        let t = result_code(&port_trace_fifth_edition_names(&doc, &o));
+        if c == t {
+            continue;
+        }
+        let fifth_applies = case.edition.is_empty() || case.edition.split(' ').any(|e| e == "5");
+        if c == 0 {
+            problems.push(format!("{}: C {c}, port {t}", case.id));
+        } else if t != 0 {
+            // Rejected by both, at a later token: the name is now
+            // accepted and the error is found further on.
+            other_error += 1;
+        } else if case.kind == "not-wf" && fifth_applies {
+            problems.push(format!(
+                "{}: not-wf (edition {:?}) accepted",
+                case.id, case.edition
+            ));
+        } else {
+            *newly_accepted
+                .entry((case.kind.clone(), case.edition.clone()))
+                .or_default() += 1;
+            if case.edition.is_empty() {
+                all_editions.push(case.id.as_str());
+            }
+        }
+    }
+    let total: usize = newly_accepted.values().sum();
+    eprintln!(
+        "W3C suite, Fifth Edition names: {total} documents accepted that libexpat rejects; \
+         {other_error} rejected by both with a different error"
+    );
+    for ((kind, edition), n) in &newly_accepted {
+        eprintln!("  {kind:8} edition {edition:10} {n}");
+    }
+    eprintln!("  for every edition: {}", all_editions.join(" "));
+    for p in problems.iter().take(20) {
+        eprintln!("{p}");
+    }
+    assert!(problems.is_empty(), "{} problems", problems.len());
 }

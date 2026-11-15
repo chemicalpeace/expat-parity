@@ -157,7 +157,9 @@ with allocation failures, white-box).
    835 failure points, none aborts). libexpat's development branch is
    compared weekly since D-062 (`scripts/upstream-check.sh`). Large
    DocBook and DITA documents are measured against the default limits
-   (D-063). The
+   (D-063). Names by XML 1.0 Fifth Edition are an option outside parity
+   since D-064 (`fifth_names.rs`; with the option all 306 Fifth Edition
+   tests of the W3C suite are accepted). The
    unknown-encoding handler branch is compared through the C interface
    since D-057.
 3. Part 2 of the coverage work is done on branch `part2-finish` (on top of
