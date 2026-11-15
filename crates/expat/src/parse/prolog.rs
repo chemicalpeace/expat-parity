@@ -94,10 +94,11 @@ pub(crate) fn to_utf8_token_into<E: Encoding>(
         #[cfg(debug_assertions)]
         {
             let start = out.len() - from.len();
-            debug_assert_eq!(
-                out.get(start..),
-                to_utf8(enc, from).ok().as_deref()
-            );
+            // The check needs memory of its own; without it there is
+            // nothing to compare (D-061).
+            if let Ok(copy) = to_utf8(enc, from) {
+                debug_assert_eq!(out.get(start..), Some(copy.as_slice()));
+            }
         }
         return Ok(());
     }
