@@ -247,6 +247,7 @@ impl Parser {
             return;
         }
         if enc.is_utf8() {
+            self.locate(h);
             h.character_data(bytes(buf, s, next));
             return;
         }
@@ -260,6 +261,7 @@ impl Parser {
                 DataIn::Cdata => next,
             };
             self.ev_end(enc, Some(end_at));
+            self.locate(h);
             h.character_data(data.get(..r.written).unwrap_or_default());
             if matches!(
                 r.result,
@@ -316,6 +318,7 @@ impl Parser {
                     }
                     self.ev_end(enc, Some(end));
                     if self.handlers.character_data {
+                        self.locate(h);
                         h.character_data(b"\n");
                     }
                     if start_tag_level == 0 {
@@ -369,6 +372,7 @@ impl Parser {
                             Account::EntityExpansion,
                         );
                         if self.handlers.character_data {
+                            self.locate(h);
                             h.character_data(&[ch]);
                         }
                     } else {
@@ -448,6 +452,7 @@ impl Parser {
                     }
                     res?;
                     if self.handlers.start_element {
+                        self.locate(h);
                         self.call_start_element(h, &name);
                     }
                     if let Some(tag) = self.tag_stack.last_mut() {
@@ -476,12 +481,14 @@ impl Parser {
                         return Err(e);
                     }
                     if self.handlers.start_element {
+                        self.locate(h);
                         self.call_start_element(h, &name);
                     }
                     if self.handlers.end_element {
                         if self.handlers.start_element {
                             self.ev(enc, self.ev_end_get(enc));
                         }
+                        self.locate(h);
                         h.end_element(&name);
                     }
                     self.tracker.temp_pool.clear();
@@ -509,6 +516,7 @@ impl Parser {
                     self.tracker.close_tag();
                     self.tag_level -= 1;
                     if self.handlers.end_element {
+                        self.locate(h);
                         h.end_element(&tag.name);
                     }
                     let tag_bindings = tag.bindings;
@@ -526,17 +534,20 @@ impl Parser {
                     if self.handlers.character_data {
                         let mut out = [0u8; 4];
                         let k = utf8_encode(c, &mut out);
+                        self.locate(h);
                         h.character_data(out.get(..k).unwrap_or_default());
                     }
                 }
                 Scan::Token(Tok::XmlDecl) => return Err(XmlError::MisplacedXmlPi.into()),
                 Scan::Token(Tok::DataNewline) => {
                     if self.handlers.character_data {
+                        self.locate(h);
                         h.character_data(b"\n");
                     }
                 }
                 Scan::Token(Tok::CdataSectOpen) => {
                     if self.handlers.start_cdata_section {
+                        self.locate(h);
                         h.start_cdata_section();
                     }
                     let mut after = Some(next);
@@ -557,10 +568,12 @@ impl Parser {
                     }
                     if self.handlers.character_data {
                         if enc.is_utf8() {
+                            self.locate(h);
                             h.character_data(bytes(buf, s, end));
                         } else {
                             let mut data = [0u8; INIT_DATA_BUF_SIZE];
                             let r = enc.to_utf8(bytes(buf, s, end), &mut data);
+                            self.locate(h);
                             h.character_data(data.get(..r.written).unwrap_or_default());
                         }
                     }
@@ -681,6 +694,7 @@ impl Parser {
             match r.scan {
                 Scan::Token(Tok::CdataSectClose) => {
                     if self.handlers.end_cdata_section {
+                        self.locate(h);
                         h.end_cdata_section();
                     }
                     *start = Some(next);
@@ -692,6 +706,7 @@ impl Parser {
                 }
                 Scan::Token(Tok::DataNewline) => {
                     if self.handlers.character_data {
+                        self.locate(h);
                         h.character_data(b"\n");
                     }
                 }
@@ -764,6 +779,7 @@ impl Parser {
         self.tracker.store_text(Pool::Temp, &target, direct).map_err(no_mem)?;
         self.tracker.store_text(Pool::Temp, &data, direct).map_err(no_mem)?;
         normalize_lines(&mut data);
+        self.locate(h);
         h.processing_instruction(&target, &data);
         self.tracker.temp_pool.clear();
         Ok(())
@@ -789,6 +805,7 @@ impl Parser {
             .store_text(Pool::Temp, &data, direct)
             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
         normalize_lines(&mut data);
+        self.locate(h);
         h.comment(&data);
         self.tracker.temp_pool.clear();
         Ok(())
@@ -1221,6 +1238,7 @@ impl Parser {
         self.dtd.set_prefix_binding(prefix, bound.then_some(b));
         *bindings = Some(b);
         if att_id.is_some() && self.handlers.start_namespace_decl {
+            self.locate(h);
             h.start_namespace_decl(pname.as_deref(), bound.then_some(uri));
         }
         Ok(())
@@ -1240,6 +1258,7 @@ impl Parser {
             let (prefix, next, prev) = (b.prefix, b.next_tag_binding, b.prev_prefix_binding);
             if self.handlers.end_namespace_decl {
                 let name = self.dtd.prefix_name(prefix).map(<[u8]>::to_vec);
+                self.locate(h);
                 h.end_namespace_decl(name.as_deref());
             }
             self.dtd.free_bindings.push(id);

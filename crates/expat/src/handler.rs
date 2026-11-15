@@ -51,10 +51,16 @@ pub struct Events {
     pub start_namespace_decl: bool,
     /// [`Handler::end_namespace_decl`] (`XML_SetEndNamespaceDeclHandler`).
     pub end_namespace_decl: bool,
+    /// [`Handler::position`] before each reported event: the position
+    /// `XML_GetCurrentLineNumber`, `XML_GetCurrentColumnNumber` and
+    /// `XML_GetCurrentByteIndex` return inside a C handler. Off in both
+    /// [`Events::ALL`] and [`Events::NONE`], because counting lines and
+    /// columns at every event costs a second pass over the text.
+    pub position: bool,
 }
 
 impl Events {
-    /// Every event.
+    /// Every event; [`Events::position`] stays off.
     pub const ALL: Events = Events {
         start_element: true,
         end_element: true,
@@ -65,6 +71,7 @@ impl Events {
         end_cdata_section: true,
         start_namespace_decl: true,
         end_namespace_decl: true,
+        position: false,
     };
 
     /// No event: the parser works as [`Parser::parse`] does.
@@ -80,6 +87,7 @@ impl Events {
         end_cdata_section: false,
         start_namespace_decl: false,
         end_namespace_decl: false,
+        position: false,
     };
 
     /// Sets [`Events::start_element`].
@@ -145,8 +153,15 @@ impl Events {
         self
     }
 
-    /// The parser core's handler flags: these nine, every other handler
-    /// unset.
+    /// Sets [`Events::position`].
+    #[must_use]
+    pub const fn position(mut self, on: bool) -> Self {
+        self.position = on;
+        self
+    }
+
+    /// The parser core's handler flags: these nine and the position,
+    /// every other handler unset.
     pub(crate) fn handler_set(self) -> parse::HandlerSet {
         parse::HandlerSet {
             start_element: self.start_element,
@@ -158,6 +173,7 @@ impl Events {
             end_cdata_section: self.end_cdata_section,
             start_namespace_decl: self.start_namespace_decl,
             end_namespace_decl: self.end_namespace_decl,
+            event_position: self.position,
             ..parse::HandlerSet::default()
         }
     }
@@ -182,8 +198,9 @@ impl Events {
 /// namespace processing, names are as written and the namespace
 /// declaration events never occur.
 ///
-/// The handler cannot query the parser's position or stop the parse from
-/// a callback; see D-041.
+/// The handler cannot call the parser or stop the parse from a callback
+/// (D-041); with [`Events::position`] it is told the position of each
+/// event before the event (D-048).
 ///
 /// ```
 /// use expat::{Events, Handler, Parser};
@@ -247,6 +264,36 @@ pub trait Handler {
     /// A namespace declaration goes out of scope, after the end element
     /// event of its element (`XML_EndNamespaceDeclHandler`).
     fn end_namespace_decl(&mut self, _prefix: Option<&[u8]>) {}
+
+    /// The position of the event reported next, when [`Events::position`]
+    /// is on: its line (from 1) and column (from 0), and its byte offset
+    /// in the whole input, as `XML_GetCurrentLineNumber`,
+    /// `XML_GetCurrentColumnNumber` and `XML_GetCurrentByteIndex` return
+    /// them inside that event's C handler.
+    ///
+    /// ```
+    /// use expat::{Events, Handler, Parser};
+    ///
+    /// #[derive(Default)]
+    /// struct Lines(u64, Vec<u64>);
+    ///
+    /// impl Handler for Lines {
+    ///     const EVENTS: Events = Events::NONE.start_element(true).position(true);
+    ///     fn position(&mut self, line: u64, _column: u64, _byte_index: i64) {
+    ///         self.0 = line;
+    ///     }
+    ///     fn start_element(&mut self, _name: &[u8], _attributes: &[(&[u8], &[u8])], _specified: usize) {
+    ///         self.1.push(self.0);
+    ///     }
+    /// }
+    ///
+    /// let mut lines = Lines::default();
+    /// let mut p = Parser::new([7; 16]);
+    /// p.parse_with(&mut lines, b"<a>\n  <b/>\n<c/></a>", true)?;
+    /// assert_eq!(lines.1, [1, 2, 3]);
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    fn position(&mut self, _line: u64, _column: u64, _byte_index: i64) {}
 }
 
 /// Passes the parser core's events to a public [`Handler`]. Only the nine
@@ -256,6 +303,9 @@ pub trait Handler {
 pub(crate) struct Adapter<'a, H: Handler>(pub(crate) &'a mut H);
 
 impl<H: Handler> parse::Handler for Adapter<'_, H> {
+    fn event_position(&mut self, line: u64, column: u64, byte_index: i64) {
+        self.0.position(line, column, byte_index);
+    }
     fn start_element(&mut self, name: &[u8], atts: &[(&[u8], &[u8])], specified: i32) {
         // C's count is twice the number of attributes given in the tag.
         let specified = usize::try_from(specified).unwrap_or(0) / 2;

@@ -81,6 +81,7 @@ fn all() -> HandlerSet {
         attlist_decl: true,
         external_entity_ref: false,
         not_standalone: false,
+        event_position: false,
     }
 }
 

@@ -249,6 +249,7 @@ fn masked_handlers(mask: HandlerMask) -> HandlerSet {
         attlist_decl: mask.attlist_decl,
         external_entity_ref: false,
         not_standalone: false,
+        event_position: false,
     }
 }
 

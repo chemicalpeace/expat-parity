@@ -240,6 +240,99 @@ impl Parser {
         self.result(status)
     }
 
+    /// Space for the next `len` bytes of input in the parser's own buffer
+    /// (`XML_GetBuffer`), to be filled by the caller and parsed with
+    /// [`Parser::parse_buffer`] or [`Parser::parse_buffer_with`]. This
+    /// avoids the copy [`Parser::parse`] makes of its input.
+    ///
+    /// The space is valid until the next call on the parser. Its contents
+    /// are unspecified: only the first bytes written and then passed to
+    /// `parse_buffer` are read. As in C, the request fails with
+    /// [`ErrorCode::NoMemory`] when the buffer would grow past `i32::MAX`
+    /// bytes, and with [`ErrorCode::Finished`] after the final piece.
+    ///
+    /// ```
+    /// let mut p = expat::Parser::new([7; 16]);
+    /// let doc = b"<a>text</a>";
+    /// p.buffer(doc.len())?[..doc.len()].copy_from_slice(doc);
+    /// p.parse_buffer(doc.len(), true)?;
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    pub fn buffer(&mut self, len: usize) -> Result<&mut [u8], Error> {
+        let len = c_len(len);
+        if !self.inner.reserve_buffer(len) {
+            let code = self.error_code().unwrap_or(ErrorCode::UnexpectedState);
+            return Err(self.error(code));
+        }
+        match self.inner.buffer_space(len) {
+            Some(space) => Ok(space),
+            // `reserve_buffer` made room for `len` bytes, so the space
+            // exists; reaching this would be a parser defect.
+            None => Err(Error {
+                code: ErrorCode::UnexpectedState,
+                line: 0,
+                column: 0,
+                byte_index: -1,
+            }),
+        }
+    }
+
+    /// Parses the first `len` bytes of the space [`Parser::buffer`]
+    /// returned (`XML_ParseBuffer`), with no handler; `is_final` marks the
+    /// last piece. The result is that of [`Parser::parse`]. Without an
+    /// earlier successful `buffer` call the first call fails with
+    /// [`ErrorCode::NoBuffer`], and a `len` larger than the space fails
+    /// with [`ErrorCode::InvalidArgument`].
+    pub fn parse_buffer(&mut self, len: usize, is_final: bool) -> Result<(), Error> {
+        self.inner.set_handlers(parse::HandlerSet::default());
+        let status = self
+            .inner
+            .parse_buffer(&mut NoCallbacks, c_len(len), is_final);
+        self.result(status)
+    }
+
+    /// [`Parser::parse_buffer`] reporting the events to `handler`, as
+    /// [`Parser::parse_with`] does for [`Parser::parse`].
+    pub fn parse_buffer_with<H: Handler>(
+        &mut self,
+        handler: &mut H,
+        len: usize,
+        is_final: bool,
+    ) -> Result<(), Error> {
+        self.parse_buffer_with_events(handler, H::EVENTS, len, is_final)
+    }
+
+    /// [`Parser::parse_buffer_with`] with the events given for this call,
+    /// as [`Parser::parse_with_events`] does for [`Parser::parse_with`].
+    pub fn parse_buffer_with_events<H: Handler>(
+        &mut self,
+        handler: &mut H,
+        events: Events,
+        len: usize,
+        is_final: bool,
+    ) -> Result<(), Error> {
+        self.inner.set_handlers(events.handler_set());
+        let status = self
+            .inner
+            .parse_buffer(&mut Adapter(handler), c_len(len), is_final);
+        self.result(status)
+    }
+
+    /// The code of the error the last call on the parser set
+    /// (`XML_GetErrorCode`), or `None` when it set none. A call that
+    /// succeeds clears it, as in C, except a successful [`Parser::buffer`],
+    /// which leaves it as it was.
+    ///
+    /// ```
+    /// let mut p = expat::Parser::new([7; 16]);
+    /// assert!(p.parse(b"<a></b>", true).is_err());
+    /// assert_eq!(p.error_code(), Some(expat::ErrorCode::TagMismatch));
+    /// ```
+    pub fn error_code(&self) -> Option<ErrorCode> {
+        let Stop::Error(e) = self.inner.error_code();
+        ErrorCode::from_internal(e)
+    }
+
     /// The line of the parser's current position, from 1
     /// (`XML_GetCurrentLineNumber64` between calls). After an error it is
     /// the line of [`Error::line`].
@@ -295,6 +388,14 @@ impl Parser {
             byte_index: self.inner.current_byte_index(),
         }
     }
+}
+
+/// A length as the C `int` the core takes: lengths above `i32::MAX` become
+/// -1, which the core refuses as C refuses a negative length
+/// (`XML_GetBuffer`: [`ErrorCode::NoMemory`]; `XML_ParseBuffer`:
+/// [`ErrorCode::InvalidArgument`]).
+fn c_len(len: usize) -> i32 {
+    i32::try_from(len).unwrap_or(-1)
 }
 
 /// A parse error: its code and where the parser stood when it occurred.
@@ -591,6 +692,62 @@ mod tests {
     #[test]
     fn there_are_44_error_codes() {
         assert_eq!(ErrorCode::ALL.len(), 44);
+    }
+
+    /// Writes `data` into the space of `p.buffer`, or returns its error.
+    fn fill(p: &mut Parser, data: &[u8]) -> Result<(), ErrorCode> {
+        let space = p.buffer(data.len()).map_err(|e| e.code())?;
+        space.copy_from_slice(data);
+        Ok(())
+    }
+
+    #[test]
+    fn buffer_errors_are_those_of_c() {
+        let mut p = Parser::new([7; 16]);
+        let code = |r: Result<(), Error>| r.map_err(|e| e.code());
+        assert_eq!(code(p.parse_buffer(0, false)), Err(ErrorCode::NoBuffer));
+        assert_eq!(
+            p.buffer(usize::MAX).map(|b| b.len()).map_err(|e| e.code()),
+            Err(ErrorCode::NoMemory)
+        );
+        assert_eq!(p.buffer(4).map(|b| b.len()), Ok(4));
+        // A successful request leaves the last error code.
+        assert_eq!(p.error_code(), Some(ErrorCode::NoMemory));
+        assert_eq!(
+            code(p.parse_buffer(1 << 20, false)),
+            Err(ErrorCode::InvalidArgument)
+        );
+        assert_eq!(fill(&mut p, b"<a>"), Ok(()));
+        assert_eq!(p.parse_buffer(3, false), Ok(()));
+        assert_eq!(p.error_code(), None);
+        assert_eq!(p.parse(b"</a>", true), Ok(()));
+        assert_eq!(fill(&mut p, b"x"), Err(ErrorCode::Finished));
+        assert_eq!(code(p.parse_buffer(0, true)), Err(ErrorCode::Finished));
+    }
+
+    #[test]
+    fn buffer_pieces_give_the_events_of_one_parse() {
+        #[derive(Default)]
+        struct Text(Vec<u8>);
+        impl Handler for Text {
+            fn character_data(&mut self, data: &[u8]) {
+                self.0.extend_from_slice(data);
+            }
+        }
+        let doc: Vec<u8> = b"<r>"
+            .iter()
+            .chain(&[b'x'; 5000])
+            .chain(b"</r>")
+            .copied()
+            .collect();
+        let mut text = Text::default();
+        let mut p = Parser::new([7; 16]);
+        for (i, piece) in doc.chunks(61).enumerate() {
+            let last = (i + 1) * 61 >= doc.len();
+            assert_eq!(fill(&mut p, piece), Ok(()));
+            assert_eq!(p.parse_buffer_with(&mut text, piece.len(), last), Ok(()));
+        }
+        assert_eq!(text.0, [b'x'; 5000]);
     }
 
     #[test]

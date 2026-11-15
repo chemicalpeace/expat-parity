@@ -103,9 +103,11 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   DTD declarations, entity declarations, XML declarations or skipped
   entities, and no unknown-encoding handler (only libexpat's built-in
   encodings: UTF-8, UTF-16, UTF-16BE, UTF-16LE, ISO-8859-1, US-ASCII).
-- **No position in callbacks, no stop or resume:** a handler cannot read the
-  parser's position or stop the parse (`XML_StopParser` /
-  `XML_ResumeParser`). The position is reported only with an error.
+- **No stop or resume:** a handler cannot stop the parse (`XML_StopParser` /
+  `XML_ResumeParser`). The position of each event is reported to
+  `Handler::position` when `Events::position` is set, and the position
+  between calls is `Parser::current_line`, `current_column` and
+  `current_byte_index`.
 - **External entities and DTDs are never loaded.** The crate does no I/O, and
   the public API has no external entity handler: the parser behaves as
   libexpat does when no `XML_SetExternalEntityRefHandler` is set (compared
