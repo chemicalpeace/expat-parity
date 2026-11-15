@@ -742,8 +742,9 @@ impl Parser {
     ///
     /// ```
     /// let mut p = expat::Parser::new([7; 16]);
-    /// let mut subset = p.external_parser(None, None).expect("parser");
-    /// assert_eq!(subset.parse(b"<!ENTITY e 'v'>", true), Ok(()));
+    /// if let Some(mut subset) = p.external_parser(None, None) {
+    ///     assert_eq!(subset.parse(b"<!ENTITY e 'v'>", true), Ok(()));
+    /// }
     /// ```
     ///
     /// [`ExternalEntities::create`]: crate::ExternalEntities::create

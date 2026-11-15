@@ -530,6 +530,7 @@ impl XML_ParserStruct {
     }
 
     /// The state of a root parser.
+    // reason: `parser` is changed only with the `testing` feature.
     #[cfg_attr(not(feature = "testing"), allow(unused_mut))]
     fn own(mut parser: Parser) -> Self {
         #[cfg(feature = "testing")]
