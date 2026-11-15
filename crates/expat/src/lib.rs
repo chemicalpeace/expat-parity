@@ -47,16 +47,18 @@
 //!
 //! # Limitations
 //!
-//! - The events of [`Events`], the default handler and the declaration
-//!   events; no unknown-encoding handler and no external entity handler.
+//! - The events of [`Events`], the default handler, the declaration
+//!   events and external entity references; no unknown-encoding handler.
 //! - A handler reads the position of its event through
 //!   [`Handler::position`] and stops the parse through a [`Stopper`]; the
 //!   position is also reported with an [`Error`] and between calls
 //!   ([`Parser::current_line`]).
-//! - External entities and DTD subsets are never loaded: the crate does no
-//!   I/O and has no external entity handler, and the parser behaves as
-//!   libexpat does when none is set. The internal DTD subset is parsed and
-//!   internal entities are expanded.
+//! - The crate does no I/O, so external entities and DTD subsets are
+//!   never loaded by the parser: [`Handler::external_entity_ref`] receives
+//!   each reference and may parse the entity's bytes, which it obtains
+//!   itself, with an [`ExternalParser`] (see [`entities`]). Without that
+//!   event the parser behaves as libexpat does when no external entity
+//!   reference handler is set.
 //! - The amplification limits start at libexpat 2.10.0's defaults and are
 //!   set as in libexpat ([`Parser::set_billion_laughs_maximum_amplification`]
 //!   and the other setters). The parser counts its allocations as libexpat does and
@@ -81,8 +83,10 @@ extern crate alloc;
 extern crate std;
 
 mod api;
+pub mod entities;
 mod handler;
 pub use api::{Error, ErrorCode, Options, Parser, Stopper};
+pub use entities::{ExternalEntities, ExternalParser};
 pub use handler::{Events, Handler};
 pub use parse::{
     ContentModel, ContentNode, ContentQuant, ContentType, ParamEntityParsing,

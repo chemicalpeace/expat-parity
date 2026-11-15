@@ -81,6 +81,12 @@ impl<'a> ExternalEntities<'a> {
         ExternalEntities { parent }
     }
 
+    /// The parser whose handler is running, for the public
+    /// [`crate::ExternalEntities`].
+    pub(crate) fn parent(&mut self) -> &mut Parser {
+        self.parent
+    }
+
     /// `XML_ExternalEntityParserCreate(parser, context, encoding)`: `context`
     /// as the handler received it (`None` for a parameter entity or the
     /// external subset). `None` when C returns `NULL`: the allocation
@@ -336,7 +342,7 @@ impl Dtd {
 impl Parser {
     /// `XML_ExternalEntityParserCreate`. Returns the child and the root
     /// tracker's byte count before it was created.
-    fn external_entity_parser_create(&mut self, context: Option<&[u8]>, encoding: Option<&[u8]>) -> Option<(Parser, u64)> {
+    pub(crate) fn external_entity_parser_create(&mut self, context: Option<&[u8]>, encoding: Option<&[u8]>) -> Option<(Parser, u64)> {
         let bytes_before = self.tracker.t.bytes_allocated;
         let direct = self.direct();
         // The root's tracker moves into the child and back when the child
@@ -406,7 +412,7 @@ impl Parser {
     /// growth stays (shared); the port releases its creation charge and
     /// the structures the child owns itself (`Tracker::own_bytes`), which
     /// C frees with the child.
-    fn external_entity_parser_free(&mut self, child: &mut Parser, bytes_before: u64) {
+    pub(crate) fn external_entity_parser_free(&mut self, child: &mut Parser, bytes_before: u64) {
         // `XML_ParserFree` of the child, through the root's tracker, in
         // C's order; a general entity parser returns the count to its
         // value before the creation, a parameter entity parser leaves the

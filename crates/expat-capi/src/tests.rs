@@ -380,3 +380,87 @@ fn error_strings_and_version() {
         }
     );
 }
+
+/// Parses `<x>t</x>` for each external entity in a parser it creates, and
+/// frees that parser in the handler unless the user data's `Log` was
+/// marked to keep it (`nested_parse` set).
+unsafe extern "C" fn on_external(
+    parser: XML_Parser,
+    context: *const XML_Char,
+    _base: *const XML_Char,
+    system_id: *const XML_Char,
+    _public_id: *const XML_Char,
+) -> c_int {
+    // SAFETY: test contract; the user data is a `Log`.
+    let user = unsafe { (*parser).user_data.get() };
+    // SAFETY: as above.
+    let log = unsafe { log(user) };
+    log.lines
+        .push(format!("external {} {}", text(context), text(system_id)));
+    // SAFETY: called from the reference handler of `parser`.
+    let child = unsafe { XML_ExternalEntityParserCreate(parser, context, std::ptr::null()) };
+    assert!(!child.is_null());
+    // SAFETY: a second child while the first is open is refused.
+    let second = unsafe { XML_ExternalEntityParserCreate(parser, context, std::ptr::null()) };
+    assert!(second.is_null());
+    let status = parse(child, b"<x>t</x>", true);
+    // The child's handlers borrowed the `Log` again: take it anew.
+    // SAFETY: as above; no other borrow of it is live.
+    let log = unsafe { self::log(user) };
+    log.lines.push(format!("child {status}"));
+    if log.nested_parse.is_some() {
+        log.parser = child;
+    } else {
+        // SAFETY: `child` is live and not running.
+        unsafe { XML_ParserFree(child) };
+    }
+    status
+}
+
+#[test]
+fn external_entities_through_the_c_functions() {
+    for keep in [false, true] {
+        let mut log = Log {
+            nested_parse: keep.then_some(XML_STATUS_OK),
+            ..Log::default()
+        };
+        // SAFETY: plain creation and setup; the log outlives the parser.
+        let p = unsafe { XML_ParserCreate(std::ptr::null()) };
+        // SAFETY: as above.
+        unsafe {
+            XML_SetUserData(p, std::ptr::from_mut(&mut log).cast());
+            XML_SetElementHandler(p, Some(on_start), Some(on_end));
+            XML_SetExternalEntityRefHandler(p, Some(on_external));
+        }
+        // Outside the handler no external entity parser is created.
+        // SAFETY: `p` is live.
+        let outside =
+            unsafe { XML_ExternalEntityParserCreate(p, std::ptr::null(), std::ptr::null()) };
+        assert!(outside.is_null());
+        let doc = b"<!DOCTYPE a [<!ENTITY e SYSTEM 'e.xml'>]><a>&e;</a>";
+        assert_eq!(parse(p, doc, true), XML_STATUS_OK);
+        assert_eq!(
+            log.lines,
+            [
+                "start a [-1]",
+                "external e e.xml",
+                "start x [-1]",
+                "end x",
+                "child 1",
+                "end a"
+            ]
+        );
+        if keep {
+            // The child the handler kept was closed when the handler returned.
+            let child = log.parser;
+            assert_eq!(parse(child, b"", true), XML_STATUS_ERROR);
+            // SAFETY: `child` is live.
+            let code = unsafe { XML_GetErrorCode(child) };
+            assert_eq!(code, error(ErrorCode::Finished));
+            // SAFETY: as above.
+            unsafe { XML_ParserFree(child) };
+        }
+        // SAFETY: `p` is live and not running.
+        unsafe { XML_ParserFree(p) };
+    }
+}

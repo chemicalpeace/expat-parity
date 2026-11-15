@@ -16,14 +16,13 @@
 //! `XML_UseForeignDTD`, `XML_SetParamEntityParsing`, the amplification
 //! limits, `XML_SetReparseDeferralEnabled` and the property functions),
 //! `XML_GetParsingStatus`, the memory functions and `XML_GetFeatureList`
-//! (D-054), the error code and its text, the position between calls and
+//! (D-054), external entities (`XML_SetExternalEntityRefHandler`,
+//! `XML_SetExternalEntityRefHandlerArg`, `XML_ExternalEntityParserCreate`)
+//! and `XML_SetNotStandaloneHandler` (D-055), the error code and its text, the position between calls and
 //! inside handlers (D-048) and the version.
 //!
 //! Not provided yet, so that a program using them fails to link rather
-//! than run with different behaviour: external entities
-//! (`XML_SetExternalEntityRefHandler`, `XML_SetExternalEntityRefHandlerArg`,
-//! `XML_ExternalEntityParserCreate`), `XML_SetNotStandaloneHandler`,
-//! `XML_SetUnknownEncodingHandler`, `XML_GetCurrentByteCount`,
+//! than run with different behaviour: `XML_SetUnknownEncodingHandler`, `XML_GetCurrentByteCount`,
 //! `XML_GetIdAttributeIndex` and `XML_GetInputContext`.
 //!
 //! Differences from libexpat:
@@ -62,6 +61,14 @@
 //!   allocator. When the suite fails to allocate a content model, the
 //!   parse is aborted (`XML_ERROR_ABORTED`) where libexpat reports
 //!   `XML_ERROR_NO_MEMORY`.
+//! - `XML_ExternalEntityParserCreate` works only inside the external
+//!   entity reference handler of the parser it is given, for one open
+//!   external entity parser at a time, and the new parser lives at most
+//!   until that handler returns: one still open then is closed, and its
+//!   parsing calls fail with `XML_ERROR_FINISHED` until `XML_ParserFree`.
+//!   libexpat lets the program create such parsers at any time and use
+//!   them later. Programs that create, use and free the entity's parser
+//!   inside the handler, as `xmlwf` does, see no difference.
 //! - After `XML_ParserReset`, the memory limit applies, as in libexpat,
 //!   to what is counted after the reset, but the parser counts its
 //!   buffers and tables again where libexpat reuses the ones it has.
@@ -83,8 +90,8 @@ use std::hash::BuildHasher;
 use std::sync::OnceLock;
 
 use expat::{
-    ContentModel, ErrorCode, Events, Handler, Options, ParamEntityParsing, Parser, ParsingStatus,
-    Stopper,
+    ContentModel, ErrorCode, Events, ExternalEntities, ExternalParser, Handler, Options,
+    ParamEntityParsing, Parser, ParsingStatus, Stopper,
 };
 
 /// `XML_Char` without `XML_UNICODE`.
@@ -194,6 +201,20 @@ pub type XML_AttlistDeclHandler = Option<
 /// `XML_SkippedEntityHandler`.
 pub type XML_SkippedEntityHandler =
     Option<unsafe extern "C" fn(*mut c_void, *const XML_Char, c_int)>;
+/// `XML_ExternalEntityRefHandler`: parser, context, base, system id,
+/// public id; returns `XML_STATUS_OK` or `XML_STATUS_ERROR`.
+pub type XML_ExternalEntityRefHandler = Option<
+    unsafe extern "C" fn(
+        XML_Parser,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+        *const XML_Char,
+    ) -> c_int,
+>;
+/// `XML_NotStandaloneHandler`: returns 0 to stop the parse with
+/// `XML_ERROR_NOT_STANDALONE`.
+pub type XML_NotStandaloneHandler = Option<unsafe extern "C" fn(*mut c_void) -> c_int>;
 
 /// `XML_Content` (`struct XML_cp`): one node of an element declaration's
 /// content model. `type` and `quant` hold the values of
@@ -364,6 +385,19 @@ pub struct XML_ParserStruct {
     element_decl: Cell<XML_ElementDeclHandler>,
     attlist_decl: Cell<XML_AttlistDeclHandler>,
     skipped_entity: Cell<XML_SkippedEntityHandler>,
+    external_entity_ref: Cell<XML_ExternalEntityRefHandler>,
+    /// `m_externalEntityRefHandlerArg`; `NULL` for the parser itself.
+    external_entity_ref_arg: Cell<XML_Parser>,
+    not_standalone: Cell<XML_NotStandaloneHandler>,
+    /// While the external entity reference handler runs: what creates the
+    /// entity's parser (`XML_ExternalEntityParserCreate`); `NULL` otherwise.
+    entities: Cell<*mut ExternalEntities<'static>>,
+    /// The external entity parser created during the current external
+    /// entity reference handler call and not yet freed.
+    open_child: Cell<XML_Parser>,
+    /// For an external entity parser: the parser it was created from,
+    /// while that parser's handler call lasts; `NULL` otherwise.
+    parent: Cell<XML_Parser>,
     /// The allocation functions for the memory handed to the program
     /// (content models, `XML_MemMalloc`).
     mem: Cell<Mem>,
@@ -399,9 +433,32 @@ pub struct XML_ParserStruct {
 /// `XML_Parser`.
 pub type XML_Parser = *mut XML_ParserStruct;
 
+/// The Rust parser of a handle.
+enum Core {
+    /// A parser made by `XML_ParserCreate` and the like.
+    Own(Parser),
+    /// An external entity parser. Its lifetime is that of the external
+    /// entity reference handler call that created it (see
+    /// `XML_ExternalEntityParserCreate`); it is dropped by
+    /// `XML_ParserFree` or when that call returns.
+    Child(ExternalParser<'static>),
+    /// An external entity parser whose creating handler call has
+    /// returned: every parsing call fails (`XML_ERROR_FINISHED`).
+    Closed(Parser),
+}
+
+impl Core {
+    fn get(&mut self) -> &mut Parser {
+        match self {
+            Core::Own(p) | Core::Closed(p) => p,
+            Core::Child(c) => c,
+        }
+    }
+}
+
 /// The state only the parsing, buffer and position functions use.
 struct Inner {
-    parser: Parser,
+    parser: Core,
     /// NUL-terminated copies of the strings passed to a handler.
     text: Vec<u8>,
     /// The `atts` array of a start element handler.
@@ -410,7 +467,12 @@ struct Inner {
 
 impl XML_ParserStruct {
     fn new(options: Options) -> Self {
-        let parser = Parser::with_options(salt(), options);
+        Self::with_core(Core::Own(Parser::with_options(salt(), options)))
+    }
+
+    fn with_core(mut core: Core) -> Self {
+        let parser = core.get();
+        let base = parser.base().and_then(|b| CString::new(b).ok());
         XML_ParserStruct {
             user_data: Cell::new(std::ptr::null_mut()),
             handler_arg: Cell::new(std::ptr::null_mut()),
@@ -437,6 +499,12 @@ impl XML_ParserStruct {
             element_decl: Cell::new(None),
             attlist_decl: Cell::new(None),
             skipped_entity: Cell::new(None),
+            external_entity_ref: Cell::new(None),
+            external_entity_ref_arg: Cell::new(std::ptr::null_mut()),
+            not_standalone: Cell::new(None),
+            entities: Cell::new(std::ptr::null_mut()),
+            open_child: Cell::new(std::ptr::null_mut()),
+            parent: Cell::new(std::ptr::null_mut()),
             mem: Cell::new(Mem::default()),
             pending_base: RefCell::new(None),
             salt_set: Cell::new(false),
@@ -445,12 +513,12 @@ impl XML_ParserStruct {
             at_maximum: Cell::new(parser.alloc_tracker_maximum_amplification()),
             at_threshold: Cell::new(parser.alloc_tracker_activation_threshold()),
             reparse_deferral: Cell::new(parser.reparse_deferral_enabled()),
-            base: RefCell::new(None),
+            base: RefCell::new(base),
             default_expand: Cell::new(true),
             current: RefCell::new((Vec::new(), Vec::new())),
             stopper: parser.stopper(),
             inner: UnsafeCell::new(Inner {
-                parser,
+                parser: core,
                 text: Vec::new(),
                 atts: Vec::new(),
             }),
@@ -481,7 +549,9 @@ impl XML_ParserStruct {
             .skipped_entity(self.skipped_entity.get().is_some())
             .default_data(self.default.get().is_some())
             .expand_internal_entities(self.default_expand.get())
-            .event_text(self.default.get().is_some());
+            .event_text(self.default.get().is_some())
+            .external_entity_ref(self.external_entity_ref.get().is_some())
+            .not_standalone(self.not_standalone.get().is_some());
         events.position(events != Events::NONE)
     }
 
@@ -509,7 +579,37 @@ impl XML_ParserStruct {
         // anything else can run on this thread; the handle is not shared
         // between threads (libexpat parsers are not thread-safe either).
         let inner = unsafe { &mut *self.inner.get() };
-        Some(f(&mut inner.parser))
+        match &mut inner.parser {
+            Core::Closed(_) => None,
+            core => Some(f(core.get())),
+        }
+    }
+
+    /// Drops the Rust parser of an external entity parser whose creating
+    /// handler call returns: the state it shares with its parent goes
+    /// back to the parent, and later parsing calls fail.
+    fn close(&self) {
+        self.parent.set(std::ptr::null_mut());
+        if self.busy.get() {
+            return;
+        }
+        // SAFETY: as in `with_parser`: no parsing call is running on this
+        // handle, so nothing else borrows `inner`.
+        let inner = unsafe { &mut *self.inner.get() };
+        if matches!(inner.parser, Core::Child(_)) {
+            inner.parser = Core::Closed(Parser::new([0; 16]));
+        }
+    }
+
+    /// Whether this is an external entity parser whose creating handler
+    /// call has returned.
+    fn closed(&self) -> bool {
+        if self.busy.get() {
+            return false;
+        }
+        // SAFETY: as in `with_parser`.
+        let inner = unsafe { &*self.inner.get() };
+        matches!(inner.parser, Core::Closed(_))
     }
 
     /// `parserBusy`: a parse has started and has not finished.
@@ -661,6 +761,52 @@ impl Dispatch<'_> {
 impl Handler for Dispatch<'_> {
     fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
         self.state.pending_base.borrow_mut().take()
+    }
+
+    fn external_entity_ref(
+        &mut self,
+        entities: &mut ExternalEntities<'_>,
+        context: Option<&[u8]>,
+        base: Option<&[u8]>,
+        system_id: Option<&[u8]>,
+        public_id: Option<&[u8]>,
+    ) -> bool {
+        let Some(h) = self.state.external_entity_ref.get() else {
+            return false;
+        };
+        let this: XML_Parser = std::ptr::from_ref(self.state).cast_mut();
+        let arg = match self.state.external_entity_ref_arg.get() {
+            p if p.is_null() => this,
+            p => p,
+        };
+        let [c, b, sys, public] = self.strs([context, base, system_id, public_id]);
+        let entities: *mut ExternalEntities<'_> = entities;
+        let previous = self.state.entities.replace(entities.cast());
+        // SAFETY: a handler of the C type `expat.h` declares; the strings
+        // are NUL-terminated copies that live until `text` is next changed,
+        // which nothing does during the call (an external entity parser
+        // has its own buffers).
+        let status = unsafe { h(arg, c, b, sys, public) };
+        // An external entity parser the handler did not free is closed
+        // now: it borrows this parser, which goes on after the return.
+        let child = self.state.open_child.replace(std::ptr::null_mut());
+        // SAFETY: `open_child` only holds a live handle created by
+        // `XML_ExternalEntityParserCreate` during this call (it is cleared
+        // when that handle is freed).
+        if let Some(child) = unsafe { state(child) } {
+            child.close();
+        }
+        self.state.entities.set(previous);
+        status != XML_STATUS_ERROR as c_int
+    }
+
+    fn not_standalone(&mut self) -> bool {
+        match self.state.not_standalone.get() {
+            // SAFETY: a handler of the C type `expat.h` declares, called
+            // with the handler argument the program chose.
+            Some(h) => (unsafe { h(self.state.handler_arg.get()) }) != 0,
+            None => true,
+        }
     }
 
     fn position(&mut self, line: u64, column: u64, byte_index: i64) {
@@ -1068,7 +1214,15 @@ pub unsafe extern "C" fn XML_ParserCreateNS(
 pub unsafe extern "C" fn XML_ParserFree(parser: XML_Parser) {
     // SAFETY: forwarded from this function's contract.
     match unsafe { state(parser) } {
-        Some(s) if !s.busy.get() => {}
+        Some(s) if !s.busy.get() => {
+            // SAFETY: `parent` is NULL or the live parser whose external
+            // entity reference handler is running.
+            if let Some(p) = unsafe { state(s.parent.get()) }
+                && p.open_child.get() == parser
+            {
+                p.open_child.set(std::ptr::null_mut());
+            }
+        }
         _ => return,
     }
     // SAFETY: the handle came from `Box::into_raw` in `create`, is live and
@@ -1200,6 +1354,129 @@ setter!(
     /// `XML_SetSkippedEntityHandler`.
     XML_SetSkippedEntityHandler, skipped_entity, XML_SkippedEntityHandler
 );
+setter!(
+    /// `XML_SetExternalEntityRefHandler`. The handler creates the entity's
+    /// parser with `XML_ExternalEntityParserCreate`.
+    XML_SetExternalEntityRefHandler, external_entity_ref, XML_ExternalEntityRefHandler
+);
+setter!(
+    /// `XML_SetNotStandaloneHandler`.
+    XML_SetNotStandaloneHandler, not_standalone, XML_NotStandaloneHandler
+);
+
+/// `XML_SetExternalEntityRefHandlerArg`: the first argument of the
+/// external entity reference handler (`NULL` for the parser itself).
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetExternalEntityRefHandlerArg(parser: XML_Parser, arg: *mut c_void) {
+    // SAFETY: forwarded from this function's contract.
+    if let Some(s) = unsafe { state(parser) } {
+        s.external_entity_ref_arg.set(arg.cast());
+    }
+}
+
+/// `XML_ExternalEntityParserCreate`: the parser of the external entity
+/// whose reference handler is running on `parser`, with `context` as the
+/// handler received it (`NULL` for a parameter entity or the external
+/// subset) and the encoding `encoding` names (`NULL` for the entity's
+/// own). It starts with the handlers, user data and settings `parser`
+/// has. `NULL` where libexpat returns `NULL`, and also outside the
+/// external entity reference handler of `parser` and while an external
+/// entity parser created in the same handler call is still open: the
+/// new parser lives at most until that handler call returns. Free it
+/// with `XML_ParserFree`; one the handler did not free is closed when
+/// the handler returns, and its parsing calls then fail with
+/// `XML_ERROR_FINISHED` until it is freed.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; `context` and `encoding` are
+/// `NULL` or NUL-terminated strings.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_ExternalEntityParserCreate(
+    parser: XML_Parser,
+    context: *const XML_Char,
+    encoding: *const XML_Char,
+) -> XML_Parser {
+    // SAFETY: forwarded from this function's contract.
+    let Some(s) = (unsafe { state(parser) }) else {
+        return std::ptr::null_mut();
+    };
+    let entities = s.entities.get();
+    if entities.is_null() || !s.open_child.get().is_null() {
+        return std::ptr::null_mut();
+    }
+    // SAFETY: forwarded from this function's contract.
+    let (context, encoding) = unsafe { (c_bytes(context), c_bytes(encoding)) };
+    // SAFETY: `entities` is set only while the external entity reference
+    // handler of `parser` runs (`Dispatch::external_entity_ref`), and
+    // points to the `ExternalEntities` that call received; no other
+    // reference to it is used meanwhile.
+    let entities = unsafe { &mut *entities };
+    let Some(child) = entities.create(context, encoding) else {
+        return std::ptr::null_mut();
+    };
+    // SAFETY: the child borrows `parser`'s Rust parser, which stays
+    // borrowed by the running parse (and unused) until the handler call
+    // returns. The child is dropped before then: by `XML_ParserFree`, or
+    // by `close` when the handler returns (`open_child` holds it until
+    // one of the two happens), so the borrow never outlives the call.
+    let child =
+        unsafe { std::mem::transmute::<ExternalParser<'_>, ExternalParser<'static>>(child) };
+    let c = XML_ParserStruct::with_core(Core::Child(child));
+    // `XML_ExternalEntityParserCreate` copies the handlers, the user data
+    // and the handler argument.
+    c.user_data.set(s.user_data.get());
+    if s.handler_arg.get() == s.user_data.get() {
+        c.handler_arg.set(s.user_data.get());
+    }
+    c.start_element.set(s.start_element.get());
+    c.end_element.set(s.end_element.get());
+    c.character_data.set(s.character_data.get());
+    c.processing_instruction.set(s.processing_instruction.get());
+    c.comment.set(s.comment.get());
+    c.start_cdata_section.set(s.start_cdata_section.get());
+    c.end_cdata_section.set(s.end_cdata_section.get());
+    c.start_namespace_decl.set(s.start_namespace_decl.get());
+    c.end_namespace_decl.set(s.end_namespace_decl.get());
+    c.default.set(s.default.get());
+    c.xml_decl.set(s.xml_decl.get());
+    c.start_doctype_decl.set(s.start_doctype_decl.get());
+    c.end_doctype_decl.set(s.end_doctype_decl.get());
+    c.entity_decl.set(s.entity_decl.get());
+    c.unparsed_entity_decl.set(s.unparsed_entity_decl.get());
+    c.notation_decl.set(s.notation_decl.get());
+    c.element_decl.set(s.element_decl.get());
+    c.attlist_decl.set(s.attlist_decl.get());
+    c.skipped_entity.set(s.skipped_entity.get());
+    c.external_entity_ref.set(s.external_entity_ref.get());
+    if s.external_entity_ref_arg.get() != parser {
+        c.external_entity_ref_arg
+            .set(s.external_entity_ref_arg.get());
+    }
+    c.not_standalone.set(s.not_standalone.get());
+    c.default_expand.set(s.default_expand.get());
+    c.mem.set(s.mem.get());
+    c.salt_set.set(s.salt_set.get());
+    c.bl_maximum.set(s.bl_maximum.get());
+    c.bl_threshold.set(s.bl_threshold.get());
+    c.at_maximum.set(s.at_maximum.get());
+    c.at_threshold.set(s.at_threshold.get());
+    c.reparse_deferral.set(s.reparse_deferral.get());
+    c.parent.set(parser);
+    let child = Box::into_raw(Box::new(c));
+    if s.handler_arg.get() != s.user_data.get() {
+        // SAFETY: `child` was just made by `Box::into_raw`.
+        if let Some(c) = unsafe { state(child) } {
+            c.handler_arg.set(child.cast());
+        }
+    }
+    s.open_child.set(child);
+    child
+}
 
 /// `XML_SetDoctypeDeclHandler`: both document type declaration handlers.
 ///
@@ -1502,6 +1779,10 @@ fn run(
     state: &XML_ParserStruct,
     f: impl FnOnce(&mut Parser, &mut Dispatch<'_>, Events) -> Result<(), expat::Error>,
 ) -> XML_Status {
+    if state.closed() {
+        state.error_code.set(error(ErrorCode::Finished));
+        return XML_STATUS_ERROR;
+    }
     let events = state.events();
     state.busy.set(true);
     // SAFETY: the callers checked that `busy` was false, so nothing else
@@ -1511,6 +1792,7 @@ fn run(
     // fields.
     let inner = unsafe { &mut *state.inner.get() };
     let Inner { parser, text, atts } = inner;
+    let parser = parser.get();
     let mut dispatch = Dispatch { state, text, atts };
     let result = f(parser, &mut dispatch, events);
     state.busy.set(false);
@@ -2285,7 +2567,7 @@ pub unsafe extern "C" fn XML_ParserReset(
     };
     // SAFETY: forwarded from this function's contract.
     let name = unsafe { c_bytes(encoding) };
-    if s.with_parser(|p| p.reset(name, salt())).is_none() {
+    if s.with_parser(|p| p.reset(name, salt())) != Some(true) {
         return 0;
     }
     s.user_data.set(std::ptr::null_mut());
@@ -2312,6 +2594,9 @@ pub unsafe extern "C" fn XML_ParserReset(
     s.element_decl.set(None);
     s.attlist_decl.set(None);
     s.skipped_entity.set(None);
+    s.external_entity_ref.set(None);
+    s.external_entity_ref_arg.set(std::ptr::null_mut());
+    s.not_standalone.set(None);
     *s.base.borrow_mut() = None;
     *s.pending_base.borrow_mut() = None;
     s.default_expand.set(true);

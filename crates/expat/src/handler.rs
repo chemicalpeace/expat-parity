@@ -3,6 +3,7 @@
 //!
 //! [`Parser::parse_with`]: crate::Parser::parse_with
 
+use crate::entities::ExternalEntities;
 use crate::parse::{self, ContentModel};
 use alloc::vec::Vec;
 
@@ -91,6 +92,13 @@ pub struct Events {
     /// `XML_DefaultCurrent` passes to the default handler from inside a C
     /// handler. Off in both [`Events::ALL`] and [`Events::NONE`].
     pub event_text: bool,
+    /// [`Handler::external_entity_ref`] (`XML_SetExternalEntityRefHandler`).
+    /// Off in both [`Events::ALL`] and [`Events::NONE`], because the
+    /// handler's answer decides whether the parse goes on.
+    pub external_entity_ref: bool,
+    /// [`Handler::not_standalone`] (`XML_SetNotStandaloneHandler`). Off in
+    /// both [`Events::ALL`] and [`Events::NONE`], for the same reason.
+    pub not_standalone: bool,
 }
 
 impl Events {
@@ -118,6 +126,8 @@ impl Events {
         default_data: false,
         expand_internal_entities: true,
         event_text: false,
+        external_entity_ref: false,
+        not_standalone: false,
     };
 
     /// No event: the parser works as [`Parser::parse`] does.
@@ -146,6 +156,8 @@ impl Events {
         default_data: false,
         expand_internal_entities: true,
         event_text: false,
+        external_entity_ref: false,
+        not_standalone: false,
     };
 
     /// Sets [`Events::start_element`].
@@ -302,6 +314,20 @@ impl Events {
         self
     }
 
+    /// Sets [`Events::external_entity_ref`].
+    #[must_use]
+    pub const fn external_entity_ref(mut self, on: bool) -> Self {
+        self.external_entity_ref = on;
+        self
+    }
+
+    /// Sets [`Events::not_standalone`].
+    #[must_use]
+    pub const fn not_standalone(mut self, on: bool) -> Self {
+        self.not_standalone = on;
+        self
+    }
+
     /// The parser core's handler flags: these events, the position and
     /// the default handler, every other handler unset.
     pub(crate) fn handler_set(self) -> parse::HandlerSet {
@@ -328,7 +354,8 @@ impl Events {
             default: self.default_data,
             no_default_expand: !self.expand_internal_entities,
             event_text: self.event_text,
-            ..parse::HandlerSet::default()
+            external_entity_ref: self.external_entity_ref,
+            not_standalone: self.not_standalone,
         }
     }
 }
@@ -647,6 +674,43 @@ pub trait Handler {
     fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
         None
     }
+
+    /// A reference to an external entity (`XML_ExternalEntityRefHandler`):
+    /// a general entity in content (`context` is then the namespace and
+    /// entity context to pass on), or, with parameter entity parsing on,
+    /// a parameter entity or the external subset (`context` is `None`).
+    /// `base` is the base in effect ([`Parser::set_base`]), `system_id`
+    /// and `public_id` the entity's identifiers as declared.
+    ///
+    /// To parse the entity, create its parser with
+    /// [`ExternalEntities::create`] and feed it the entity's bytes, which
+    /// the handler obtains itself. Returning `false` stops the parse with
+    /// [`ErrorCode::ExternalEntityHandling`], as `XML_STATUS_ERROR` does;
+    /// the default refuses. See [`crate::entities`] for an example.
+    ///
+    /// [`Parser::set_base`]: crate::Parser::set_base
+    /// [`ErrorCode::ExternalEntityHandling`]: crate::ErrorCode::ExternalEntityHandling
+    fn external_entity_ref(
+        &mut self,
+        _entities: &mut ExternalEntities<'_>,
+        _context: Option<&[u8]>,
+        _base: Option<&[u8]>,
+        _system_id: Option<&[u8]>,
+        _public_id: Option<&[u8]>,
+    ) -> bool {
+        false
+    }
+
+    /// The document is not standalone and has an external subset or a
+    /// reference to a parameter entity (`XML_NotStandaloneHandler`).
+    /// Returning `false` stops the parse with
+    /// [`ErrorCode::NotStandalone`], as a C handler returning 0 does; the
+    /// default goes on.
+    ///
+    /// [`ErrorCode::NotStandalone`]: crate::ErrorCode::NotStandalone
+    fn not_standalone(&mut self) -> bool {
+        true
+    }
 }
 
 /// Passes the parser core's events to a public [`Handler`]. Only the
@@ -658,6 +722,21 @@ pub(crate) struct Adapter<'a, H: Handler>(pub(crate) &'a mut H);
 impl<H: Handler> parse::Handler for Adapter<'_, H> {
     fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
         self.0.take_base()
+    }
+    fn external_entity_ref(
+        &mut self,
+        parsers: &mut parse::ExternalEntities<'_>,
+        context: Option<&[u8]>,
+        base: Option<&[u8]>,
+        system_id: Option<&[u8]>,
+        public_id: Option<&[u8]>,
+    ) -> bool {
+        let mut entities = ExternalEntities::new(parsers.parent());
+        self.0
+            .external_entity_ref(&mut entities, context, base, system_id, public_id)
+    }
+    fn not_standalone(&mut self) -> bool {
+        self.0.not_standalone()
     }
     fn event_position(&mut self, line: u64, column: u64, byte_index: i64) {
         self.0.position(line, column, byte_index);
