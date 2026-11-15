@@ -72,7 +72,7 @@ pub use dtd::{
     PrefixId,
 };
 pub use model::{ContentModel, ContentNode, ContentQuant, ContentType, Scaffold};
-pub use control::Control;
+pub use control::{Control, Pending};
 pub use error::{Stop, XmlError};
 pub use external::{ExternalEntities, ExternalEntityParser};
 
@@ -205,6 +205,12 @@ pub trait Handler {
     /// is set: what `XML_DefaultCurrent` passes to the default handler, in
     /// the pieces `reportDefault` would pass.
     fn event_text(&mut self, _pieces: &[&[u8]]) {}
+    /// A base set by `XML_SetBase` from inside a handler, asked for before
+    /// the base is next used: `Some(base)` replaces the base, `None` keeps
+    /// it.
+    fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
+        None
+    }
     /// `XML_XmlDeclHandler`: `standalone` is -1 (absent), 0 or 1.
     fn xml_decl(&mut self, _version: Option<&[u8]>, _encoding: Option<&[u8]>, _standalone: i32) {}
     /// `XML_StartElementHandler`: the attributes as (name, value) pairs in
@@ -581,6 +587,7 @@ impl Parser {
     /// (D-023).
     pub fn new(encoding: Option<&[u8]>, ns_separator: Option<u8>, salt: [u8; 16]) -> Self {
         let ns = ns_separator.is_some();
+        let control = Arc::new(Control::default());
         Parser {
             buffer: Arc::new(Vec::new()),
             has_buffer: false,
@@ -610,7 +617,7 @@ impl Parser {
             prolog_state: crate::role::PrologState::new(),
             processor: Processor::PrologInit,
             error_code: Stop::Error(XmlError::None),
-            control: Arc::new(Control::default()),
+            control: Arc::clone(&control),
             text_event: (None, None),
             final_buffer: false,
             reenter: false,
@@ -648,6 +655,7 @@ impl Parser {
             free_entities: 0,
             tracker: {
                 let mut t = Tracker::default();
+                t.t.control = tracker::SharedControl(Some(control));
                 t.t.charge_creation(encoding.map(<[u8]>::len));
                 t
             },
@@ -660,11 +668,148 @@ impl Parser {
         self.handlers = handlers;
     }
 
-    /// `XML_SetReturnNSTriplet`. Like C, it has no effect once parsing has
-    /// started.
+    /// `XML_SetReturnNSTriplet`. Like C, it has no effect while a parse is
+    /// in progress or suspended.
     pub fn set_return_ns_triplet(&mut self, on: bool) {
-        if self.control.get() == Parsing::Initialized {
+        if !self.busy() {
             self.ns_triplets = on;
+        }
+    }
+
+    /// `parserBusy`: a parse is in progress or suspended.
+    pub fn busy(&self) -> bool {
+        matches!(self.control.get(), Parsing::Parsing | Parsing::Suspended)
+    }
+
+    /// `m_ns_triplets`.
+    pub fn return_ns_triplet(&self) -> bool {
+        self.ns_triplets
+    }
+
+    /// `XML_SetHashSalt16Bytes`: `false` while a parse is in progress or
+    /// suspended. A parser that has started keeps the salt its tables
+    /// were built with (C's tables are freed by `XML_ParserReset` before a
+    /// new salt can be used).
+    pub fn set_salt(&mut self, salt: [u8; 16]) -> bool {
+        if self.busy() {
+            return false;
+        }
+        if self.control.get() == Parsing::Initialized {
+            self.salt = SipKey::from_bytes(salt);
+        }
+        true
+    }
+
+    /// `XML_SetEncoding`: `false` while a parse is in progress or
+    /// suspended, or when the copy of the name is refused (C then has no
+    /// encoding name at all).
+    pub fn set_encoding(&mut self, name: Option<&[u8]>) -> bool {
+        if self.busy() {
+            return false;
+        }
+        if let Some(old) = self.protocol_encoding_name.take() {
+            self.tracker.t.free(old.len().saturating_add(1));
+        }
+        if let Some(n) = name {
+            let direct = self.direct();
+            if !self.tracker.t.alloc(n.len().saturating_add(1), direct) {
+                return false;
+            }
+            self.protocol_encoding_name = Some(n.to_vec());
+        }
+        true
+    }
+
+    /// The protocol encoding name (`XML_SetEncoding`).
+    pub fn encoding(&self) -> Option<&[u8]> {
+        self.protocol_encoding_name.as_deref()
+    }
+
+    /// `m_useForeignDTD`.
+    pub fn uses_foreign_dtd(&self) -> bool {
+        self.use_foreign_dtd
+    }
+
+    /// `m_paramEntityParsing`.
+    pub fn param_entity_parsing(&self) -> ParamEntityParsing {
+        self.param_entity_parsing
+    }
+
+    /// `m_reparseDeferralEnabled`.
+    pub fn reparse_deferral_enabled(&self) -> bool {
+        self.reparse_deferral_enabled
+    }
+
+    /// `XML_ParserReset`: the parser as `XML_ParserCreate(encoding)` (or
+    /// `XML_ParserCreateNS`) leaves it, keeping what libexpat keeps: the
+    /// namespace setting and separator, `XML_SetReturnNSTriplet`, the
+    /// amplification limits of both kinds, and the shared control, so
+    /// stop handles stay valid. `false` for an external entity parser
+    /// (the caller refuses a call from inside a handler). The memory
+    /// limit then applies to what is counted after the reset, as in C;
+    /// the count itself starts again from that of a new parser.
+    pub fn reset(&mut self, encoding: Option<&[u8]>, salt: [u8; 16]) -> bool {
+        if self.is_child {
+            return false;
+        }
+        self.apply_pending();
+        let sep = self.ns.then_some(self.namespace_separator);
+        let mut fresh = Parser::new(encoding, sep, salt);
+        fresh.ns_triplets = self.ns_triplets;
+        fresh.accounting.maximum_amplification_factor = self.accounting.maximum_amplification_factor;
+        fresh.accounting.activation_threshold_bytes = self.accounting.activation_threshold_bytes;
+        let _ = fresh.tracker.t.set_maximum_amplification(self.tracker.t.maximum_amplification_factor);
+        let _ = fresh.tracker.t.set_activation_threshold(self.tracker.t.activation_threshold_bytes);
+        // C keeps the memory it has and counts against the limit only what
+        // is charged after the reset; the new parser's own allocations
+        // stand for what C keeps.
+        fresh.tracker.t.bytes_allocated_when_last_reset = fresh.tracker.t.bytes_allocated;
+        self.control.reset();
+        fresh.control = Arc::clone(&self.control);
+        fresh.tracker.t.control = tracker::SharedControl(Some(Arc::clone(&self.control)));
+        *self = fresh;
+        true
+    }
+
+    /// Applies the settings a handler changed through the shared control
+    /// (`XML_SetBillionLaughsAttackProtection*`,
+    /// `XML_SetAllocTracker*`, `XML_SetReparseDeferralEnabled` from inside
+    /// a handler). Checked before each token and each event; libexpat
+    /// applies them at once, so a change takes effect at the next token
+    /// rather than inside the current one.
+    #[inline]
+    pub(crate) fn apply_pending(&mut self) {
+        if self.control.has_pending() {
+            self.apply_pending_now();
+        }
+    }
+
+    #[cold]
+    fn apply_pending_now(&mut self) {
+        let p = self.control.take_pending();
+        if let Some(f) = p.bl_maximum {
+            let _ = self.set_billion_laughs_maximum_amplification(f);
+        }
+        if let Some(b) = p.bl_threshold {
+            let _ = self.set_billion_laughs_activation_threshold(b);
+        }
+        if let Some(f) = p.at_maximum {
+            let _ = self.set_alloc_tracker_maximum_amplification(f);
+        }
+        if let Some(b) = p.at_threshold {
+            let _ = self.set_alloc_tracker_activation_threshold(b);
+        }
+        if let Some(on) = p.reparse_deferral {
+            self.reparse_deferral_enabled = on;
+        }
+    }
+
+    /// Applies a base set from inside a handler ([`Handler::take_base`]).
+    /// A copy refused by the allocation tracker leaves the base as it was
+    /// (libexpat would have returned `XML_STATUS_ERROR` to the handler).
+    pub(crate) fn poll_base<H: Handler>(&mut self, h: &mut H) {
+        if let Some(b) = h.take_base() {
+            let _ = self.set_base(b.as_deref());
         }
     }
 
@@ -804,6 +949,7 @@ impl Parser {
     /// they count as indirect.
     #[inline]
     pub(crate) fn diff_tolerated(&mut self, tok: crate::tok::Scan, bytes: usize, account: Account) -> bool {
+        self.apply_pending();
         let account = if self.is_child && account == Account::Direct {
             Account::EntityExpansion
         } else {
@@ -962,6 +1108,8 @@ impl Parser {
     /// [`HandlerSet::event_position`] is set.
     pub(crate) fn locate<H: Handler>(&mut self, h: &mut H) {
         self.settle_default_current();
+        self.apply_pending();
+        self.poll_base(h);
         if self.handlers.event_position {
             let pos = self.event_position();
             h.event_position(
@@ -1247,6 +1395,7 @@ impl Parser {
         self.parse_end_ptr = Some(self.buffer_end);
         self.parse_end_byte_index += u64::from(len as u32);
         self.final_buffer = is_final;
+        self.control.set_final_buffer(is_final);
 
         let mut end_ptr = start;
         let result = self.call_processor(h, start, self.buffer_end, &mut end_ptr);
@@ -1338,6 +1487,8 @@ impl Parser {
     ) -> Result<(), Stop> {
         let result = self.process_range(h, start, end, end_ptr);
         self.settle_default_current();
+        self.apply_pending();
+        self.poll_base(h);
         result
     }
 
@@ -1350,6 +1501,7 @@ impl Parser {
         end: usize,
         end_ptr: &mut usize,
     ) -> Result<(), Stop> {
+        self.apply_pending();
         let have_now = end - start;
         if self.reparse_deferral_enabled && !self.final_buffer {
             // Heuristic: don't try to parse a partial token again until the

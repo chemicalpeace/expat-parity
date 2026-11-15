@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use crate::handler::{Adapter, Events, Handler};
-use crate::parse::{self, Status, Stop, XmlError};
+use crate::parse::{self, ParamEntityParsing, Parsing as ParsingStatus, Status, Stop, XmlError};
 
 /// How a [`Parser`] is created: the encoding name and the namespace
 /// separator given to `XML_ParserCreate` / `XML_ParserCreateNS`.
@@ -457,6 +457,200 @@ impl Parser {
         self.inner.base()
     }
 
+    /// Sets the hash salt (`XML_SetHashSalt16Bytes`). `false`, and no
+    /// change, while the parser is busy (a parse has started and has not finished: [`ParsingStatus::Parsing`] or [`ParsingStatus::Suspended`], which is also the state after an error). A parser that has already
+    /// started keeps the salt its tables were built with; use
+    /// [`Parser::reset`] to start again with a new one.
+    pub fn set_salt(&mut self, salt: [u8; 16]) -> bool {
+        self.inner.set_salt(salt)
+    }
+
+    /// Sets the encoding the document is read in, overriding its own
+    /// declaration (`XML_SetEncoding`), or removes it with `None`. `false`
+    /// while the parser is busy (a parse has started and has not finished: [`ParsingStatus::Parsing`] or [`ParsingStatus::Suspended`], which is also the state after an error), or when the copy of the name is refused
+    /// by the memory limit, in which case no encoding name remains, as in
+    /// libexpat. The name is checked when parsing starts: an unknown name
+    /// fails then with [`ErrorCode::UnknownEncoding`].
+    ///
+    /// ```
+    /// let mut p = expat::Parser::new([7; 16]);
+    /// assert!(p.set_encoding(Some(b"ISO-8859-1")));
+    /// assert_eq!(p.encoding(), Some(&b"ISO-8859-1"[..]));
+    /// ```
+    pub fn set_encoding(&mut self, name: Option<&[u8]>) -> bool {
+        self.inner.set_encoding(name)
+    }
+
+    /// The encoding set with [`Options::encoding`] or
+    /// [`Parser::set_encoding`].
+    pub fn encoding(&self) -> Option<&[u8]> {
+        self.inner.encoding()
+    }
+
+    /// With namespace processing, reports element and attribute names as
+    /// URI, local name and prefix separated by the namespace separator
+    /// (`XML_SetReturnNSTriplet`). No effect while the parser is busy (a parse has started and has not finished: [`ParsingStatus::Parsing`] or [`ParsingStatus::Suspended`], which is also the state after an error).
+    ///
+    /// ```
+    /// use expat::{Events, Handler, Options, Parser};
+    ///
+    /// struct Names(Vec<Vec<u8>>);
+    /// impl Handler for Names {
+    ///     const EVENTS: Events = Events::NONE.start_element(true);
+    ///     fn start_element(&mut self, name: &[u8], _attributes: &[(&[u8], &[u8])], _specified: usize) {
+    ///         self.0.push(name.to_vec());
+    ///     }
+    /// }
+    ///
+    /// let mut p = Parser::with_options([7; 16], Options::new().namespace_separator(b'|'));
+    /// p.set_return_ns_triplet(true);
+    /// let mut h = Names(Vec::new());
+    /// p.parse_with(&mut h, b"<p:a xmlns:p='urn:x'/>", true)?;
+    /// assert_eq!(h.0, [b"urn:x|a|p".to_vec()]);
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    pub fn set_return_ns_triplet(&mut self, on: bool) {
+        self.inner.set_return_ns_triplet(on);
+    }
+
+    /// Whether [`Parser::set_return_ns_triplet`] is on.
+    pub fn return_ns_triplet(&self) -> bool {
+        self.inner.return_ns_triplet()
+    }
+
+    /// Treats the document as if its document type declaration named an
+    /// external subset (`XML_UseForeignDTD`). This crate never loads
+    /// external entities, so the effect is that of an external subset that
+    /// is not read. [`ErrorCode::CantChangeFeatureOnceParsing`] while the parser is busy (a parse has started and has not finished: [`ParsingStatus::Parsing`] or [`ParsingStatus::Suspended`], which is also the state after an error).
+    pub fn use_foreign_dtd(&mut self, on: bool) -> Result<(), ErrorCode> {
+        if self.inner.use_foreign_dtd(on) {
+            Ok(())
+        } else {
+            Err(ErrorCode::CantChangeFeatureOnceParsing)
+        }
+    }
+
+    /// Whether [`Parser::use_foreign_dtd`] is on.
+    pub fn uses_foreign_dtd(&self) -> bool {
+        self.inner.uses_foreign_dtd()
+    }
+
+    /// Sets when parameter entities and the external subset count as
+    /// read (`XML_SetParamEntityParsing`); they are never loaded, but the
+    /// mode changes how undefined entities and `standalone` are treated,
+    /// as in libexpat. `false`, and no change, while the parser is busy (a parse has started and has not finished: [`ParsingStatus::Parsing`] or [`ParsingStatus::Suspended`], which is also the state after an error).
+    pub fn set_param_entity_parsing(&mut self, mode: ParamEntityParsing) -> bool {
+        self.inner.set_param_entity_parsing(mode)
+    }
+
+    /// The mode set with [`Parser::set_param_entity_parsing`].
+    pub fn param_entity_parsing(&self) -> ParamEntityParsing {
+        self.inner.param_entity_parsing()
+    }
+
+    /// Sets the maximum ratio of expanded to direct input bytes allowed
+    /// once the activation threshold is reached
+    /// (`XML_SetBillionLaughsAttackProtectionMaximumAmplification`).
+    /// `false`, and no change, for NaN or a value below 1.0. Default
+    /// 100.0.
+    pub fn set_billion_laughs_maximum_amplification(&mut self, factor: f32) -> bool {
+        self.inner.set_billion_laughs_maximum_amplification(factor)
+    }
+
+    /// The factor set with
+    /// [`Parser::set_billion_laughs_maximum_amplification`].
+    pub fn billion_laughs_maximum_amplification(&self) -> f32 {
+        self.inner.accounting().maximum_amplification_factor
+    }
+
+    /// Sets the number of bytes of input and expansion after which the
+    /// amplification limit applies
+    /// (`XML_SetBillionLaughsAttackProtectionActivationThreshold`).
+    /// Default 8 MiB.
+    pub fn set_billion_laughs_activation_threshold(&mut self, bytes: u64) {
+        let _ = self.inner.set_billion_laughs_activation_threshold(bytes);
+    }
+
+    /// The threshold set with
+    /// [`Parser::set_billion_laughs_activation_threshold`].
+    pub fn billion_laughs_activation_threshold(&self) -> u64 {
+        self.inner.accounting().activation_threshold_bytes
+    }
+
+    /// Sets the maximum ratio of memory counted to direct input bytes
+    /// allowed once the activation threshold is reached
+    /// (`XML_SetAllocTrackerMaximumAmplification`). `false`, and no
+    /// change, for NaN or a value below 1.0. Default 100.0.
+    ///
+    /// ```
+    /// let mut p = expat::Parser::new([7; 16]);
+    /// assert!(!p.set_alloc_tracker_maximum_amplification(0.5));
+    /// assert!(p.set_alloc_tracker_maximum_amplification(200.0));
+    /// assert_eq!(p.alloc_tracker_maximum_amplification(), 200.0);
+    /// ```
+    pub fn set_alloc_tracker_maximum_amplification(&mut self, factor: f32) -> bool {
+        self.inner.set_alloc_tracker_maximum_amplification(factor)
+    }
+
+    /// The factor set with
+    /// [`Parser::set_alloc_tracker_maximum_amplification`].
+    pub fn alloc_tracker_maximum_amplification(&self) -> f32 {
+        self.inner.alloc_tracker().maximum_amplification_factor
+    }
+
+    /// Sets the number of bytes counted after which the memory limit
+    /// applies (`XML_SetAllocTrackerActivationThreshold`). Default 64 MiB.
+    pub fn set_alloc_tracker_activation_threshold(&mut self, bytes: u64) {
+        let _ = self.inner.set_alloc_tracker_activation_threshold(bytes);
+    }
+
+    /// The threshold set with
+    /// [`Parser::set_alloc_tracker_activation_threshold`].
+    pub fn alloc_tracker_activation_threshold(&self) -> u64 {
+        self.inner.alloc_tracker().activation_threshold_bytes
+    }
+
+    /// Turns the reparse-deferral heuristic on or off
+    /// (`XML_SetReparseDeferralEnabled`). On by default.
+    pub fn set_reparse_deferral_enabled(&mut self, on: bool) {
+        self.inner.set_reparse_deferral_enabled(on);
+    }
+
+    /// Whether the reparse-deferral heuristic is on.
+    pub fn reparse_deferral_enabled(&self) -> bool {
+        self.inner.reparse_deferral_enabled()
+    }
+
+    /// The parsing state (`XML_GetParsingStatus`).
+    pub fn parsing_status(&self) -> ParsingStatus {
+        self.inner.parsing_status()
+    }
+
+    /// Whether the input of the last call was marked final
+    /// (`XML_GetParsingStatus`, `finalBuffer`).
+    pub fn is_final_buffer(&self) -> bool {
+        self.inner.control.final_buffer()
+    }
+
+    /// Returns the parser to the state [`Parser::with_options`] leaves it
+    /// in, with `encoding` and a new `salt`, so that it can parse another
+    /// document (`XML_ParserReset`). As in libexpat, it keeps the
+    /// namespace setting, [`Parser::set_return_ns_triplet`] and the
+    /// amplification limits of both kinds; [`Stopper`] handles stay
+    /// valid. Everything else, the base included, starts again.
+    ///
+    /// ```
+    /// let mut p = expat::Parser::new([7; 16]);
+    /// assert!(p.parse(b"<a></b>", true).is_err());
+    /// p.reset(None, [8; 16]);
+    /// assert_eq!(p.parse(b"<a></a>", true), Ok(()));
+    /// ```
+    pub fn reset(&mut self, encoding: Option<&[u8]>, salt: [u8; 16]) {
+        // Refused only from inside a handler or for an external entity
+        // parser, neither of which a `&mut Parser` can be.
+        let _ = self.inner.reset(encoding, salt);
+    }
+
     /// The public result of a call that returned `status`.
     fn result(&mut self, status: Status) -> Result<(), Error> {
         match status {
@@ -525,6 +719,60 @@ impl Stopper {
     /// [`Handler::event_text`]: crate::Handler::event_text
     pub fn mark_default_current(&self) {
         self.0.mark_default_current();
+    }
+
+    /// The parsing state (`XML_GetParsingStatus` from inside a handler).
+    pub fn parsing_status(&self) -> ParsingStatus {
+        self.0.get()
+    }
+
+    /// Whether the input of the current call is marked final
+    /// (`XML_GetParsingStatus`, `finalBuffer`).
+    pub fn is_final_buffer(&self) -> bool {
+        self.0.final_buffer()
+    }
+
+    /// [`Parser::set_billion_laughs_maximum_amplification`] from inside a
+    /// handler. The value is checked at once (`false`, and no change, for
+    /// NaN or a value below 1.0); the parser applies it before its next
+    /// token or event, where libexpat applies it at once.
+    pub fn set_billion_laughs_maximum_amplification(&self, factor: f32) -> bool {
+        if factor.is_nan() || factor < 1.0 {
+            return false;
+        }
+        self.0.request_bl_maximum(factor);
+        true
+    }
+
+    /// [`Parser::set_billion_laughs_activation_threshold`] from inside a
+    /// handler, applied as [`Stopper::set_billion_laughs_maximum_amplification`]
+    /// is.
+    pub fn set_billion_laughs_activation_threshold(&self, bytes: u64) {
+        self.0.request_bl_threshold(bytes);
+    }
+
+    /// [`Parser::set_alloc_tracker_maximum_amplification`] from inside a
+    /// handler, checked and applied as
+    /// [`Stopper::set_billion_laughs_maximum_amplification`] is.
+    pub fn set_alloc_tracker_maximum_amplification(&self, factor: f32) -> bool {
+        if factor.is_nan() || factor < 1.0 {
+            return false;
+        }
+        self.0.request_at_maximum(factor);
+        true
+    }
+
+    /// [`Parser::set_alloc_tracker_activation_threshold`] from inside a
+    /// handler, applied as
+    /// [`Stopper::set_billion_laughs_maximum_amplification`] is.
+    pub fn set_alloc_tracker_activation_threshold(&self, bytes: u64) {
+        self.0.request_at_threshold(bytes);
+    }
+
+    /// [`Parser::set_reparse_deferral_enabled`] from inside a handler,
+    /// applied before the parser next decides whether to defer.
+    pub fn set_reparse_deferral_enabled(&self, on: bool) {
+        self.0.request_reparse_deferral(on);
     }
 }
 

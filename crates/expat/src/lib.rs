@@ -57,8 +57,9 @@
 //!   I/O and has no external entity handler, and the parser behaves as
 //!   libexpat does when none is set. The internal DTD subset is parsed and
 //!   internal entities are expanded.
-//! - The amplification limits are libexpat 2.10.0's defaults and cannot be
-//!   changed. The parser counts its allocations as libexpat does and
+//! - The amplification limits start at libexpat 2.10.0's defaults and are
+//!   set as in libexpat ([`Parser::set_billion_laughs_maximum_amplification`]
+//!   and the other setters). The parser counts its allocations as libexpat does and
 //!   refuses with [`ErrorCode::NoMemory`] or
 //!   [`ErrorCode::AmplificationLimitBreach`] where libexpat does (checked
 //!   by the differential tests).
@@ -83,7 +84,10 @@ mod api;
 mod handler;
 pub use api::{Error, ErrorCode, Options, Parser, Stopper};
 pub use handler::{Events, Handler};
-pub use parse::{ContentModel, ContentNode, ContentQuant, ContentType};
+pub use parse::{
+    ContentModel, ContentNode, ContentQuant, ContentType, ParamEntityParsing,
+    Parsing as ParsingStatus,
+};
 
 /// Declares an internal module that is private by default and public under
 /// the `internal-api` feature.

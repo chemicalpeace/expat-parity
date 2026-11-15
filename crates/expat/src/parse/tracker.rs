@@ -109,6 +109,17 @@ pub struct TrackerEvent {
     pub peak: u64,
 }
 
+/// A parser's shared control as the tracker holds it: ignored by
+/// comparisons, which are about the counts.
+#[derive(Debug, Clone, Default)]
+pub struct SharedControl(pub Option<alloc::sync::Arc<super::Control>>);
+
+impl PartialEq for SharedControl {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
 /// `MALLOC_TRACKER` of the root parser.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AllocTracker {
@@ -116,6 +127,13 @@ pub struct AllocTracker {
     pub bytes_allocated: u64,
     /// The highest `bytes_allocated` so far.
     pub peak_bytes_allocated: u64,
+    /// The parser's shared control, where a handler leaves new limits
+    /// (`XML_SetAllocTracker*` during a parse); they are applied before the
+    /// next check, as libexpat applies them at once.
+    pub control: SharedControl,
+    /// `bytesAllocatedWhenLastReset`: the count when `XML_ParserReset`
+    /// was last called; the limit applies to what was charged since.
+    pub bytes_allocated_when_last_reset: u64,
     /// `maximumAmplificationFactor` (>= 1.0)
     pub maximum_amplification_factor: f32,
     /// `activationThresholdBytes`
@@ -135,6 +153,8 @@ impl Default for AllocTracker {
         AllocTracker {
             bytes_allocated: 0,
             peak_bytes_allocated: 0,
+            bytes_allocated_when_last_reset: 0,
+            control: SharedControl::default(),
             maximum_amplification_factor: ALLOC_MAXIMUM_AMPLIFICATION_DEFAULT,
             activation_threshold_bytes: ALLOC_ACTIVATION_THRESHOLD_DEFAULT,
             events: None,
@@ -202,6 +222,16 @@ impl AllocTracker {
 
     /// `increase_tolerable` that records a refusal.
     fn tolerable(&mut self, increase: u64, direct: u64) -> bool {
+        if let Some(c) = &self.control.0
+            && let Some((maximum, threshold)) = c.take_tracker_pending()
+        {
+            if let Some(f) = maximum {
+                let _ = self.set_maximum_amplification(f);
+            }
+            if let Some(b) = threshold {
+                self.activation_threshold_bytes = b;
+            }
+        }
         let ok = self.increase_tolerable(increase, direct);
         if !ok {
             self.record(true, true, increase);
@@ -228,7 +258,10 @@ impl AllocTracker {
     /// `expat_heap_increase_tolerable` (`xmlparse.c` 860-894) with the root
     /// parser's direct byte count `direct`.
     pub fn increase_tolerable(&self, increase: u64, direct: u64) -> bool {
-        let Some(new_total) = self.bytes_allocated.checked_add(increase) else {
+        let allocated = self
+            .bytes_allocated
+            .saturating_sub(self.bytes_allocated_when_last_reset);
+        let Some(new_total) = allocated.checked_add(increase) else {
             return false;
         };
         if new_total >= self.activation_threshold_bytes {
