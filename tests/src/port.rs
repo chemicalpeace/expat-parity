@@ -314,6 +314,7 @@ std::thread_local! {
 
 std::thread_local! {
     static LOG_EVENTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static FIFTH_EDITION_NAMES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static LAST_EVENTS: std::cell::RefCell<(Vec<expat::internal::parse::TrackerEvent>, usize)> =
         const { std::cell::RefCell::new((Vec::new(), 0)) };
 }
@@ -339,6 +340,16 @@ pub fn last_port_tracker() -> PortTracker {
     LAST_TRACKER.with(std::cell::Cell::get)
 }
 
+/// [`port_trace`] with names classified by XML 1.0 Fifth Edition
+/// ([`Parser::set_fifth_edition_names`], D-064). libexpat has no such
+/// option, so there is no C trace to compare with.
+pub fn port_trace_fifth_edition_names(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
+    FIFTH_EDITION_NAMES.with(|c| c.set(true));
+    let t = port_trace(doc, opts);
+    FIFTH_EDITION_NAMES.with(|c| c.set(false));
+    t
+}
+
 /// Parses `doc` with the port under `opts` and returns its trace.
 pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
     let mut p = Parser::new(
@@ -346,6 +357,9 @@ pub fn port_trace(doc: &[u8], opts: &ParseOptions) -> Vec<u8> {
         opts.ns_separator,
         ORACLE_HASH_SALT,
     );
+    if FIFTH_EDITION_NAMES.with(std::cell::Cell::get) {
+        let _ = p.set_fifth_edition_names(true);
+    }
     p.fail_allocations_after(opts.fail_alloc_after);
     if LOG_EVENTS.with(std::cell::Cell::get) {
         p.log_tracker_events(true);

@@ -28,6 +28,22 @@ use super::tracker::{OPEN_ENTITY_SIZE, Pool};
 use super::{Handler, Parser, Parsing, Processor};
 use crate::tok::{Encoding, Normal, internal_encoding, prolog_tok};
 
+/// Calls `$body` with `$e` bound to the internal encoding of the parser
+/// `$p`, wrapped in [`crate::tok::Fifth`] when the parser classifies names
+/// by XML 1.0 Fifth Edition.
+macro_rules! with_internal {
+    ($p:expr, $e:ident => $body:expr) => {{
+        let n = $p.internal_encoding();
+        if $p.fifth_edition_names {
+            let $e = &$crate::tok::Fifth(n);
+            $body
+        } else {
+            let $e = &n;
+            $body
+        }
+    }};
+}
+
 /// `enum EntityType`: which list an open entity is on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EntityType {
@@ -217,42 +233,43 @@ impl Parser {
         let (text, processed, has_more, is_param) = self.entity_progress(r);
         let text: &[u8] = text.as_deref().map_or(&[], |t| t);
         if has_more {
-            let enc = self.internal_encoding();
             // Set a safe default value in case 'next' does not get set.
             let mut next = processed;
-            if is_param {
-                let t = prolog_tok(&enc, text, processed);
-                let tok_next = t.next.unwrap_or(processed);
-                let done = self.do_prolog(
-                    h,
-                    &enc,
-                    text,
-                    processed,
-                    t.scan,
-                    tok_next,
-                    &mut next,
-                    false,
-                    false,
-                    Account::EntityExpansion,
-                )?;
-                // An encoding change needs an XML declaration, whose role
-                // the prolog state machine only produces at the start of
-                // the document entity.
-                if let PrologDone::Rescan(_) = done {
-                    return Err(XmlError::UnexpectedState.into());
+            with_internal!(self, enc => {
+                if is_param {
+                    let t = prolog_tok(enc, text, processed);
+                    let tok_next = t.next.unwrap_or(processed);
+                    let done = self.do_prolog(
+                        h,
+                        enc,
+                        text,
+                        processed,
+                        t.scan,
+                        tok_next,
+                        &mut next,
+                        false,
+                        false,
+                        Account::EntityExpansion,
+                    )?;
+                    // An encoding change needs an XML declaration, whose role
+                    // the prolog state machine only produces at the start of
+                    // the document entity.
+                    if let PrologDone::Rescan(_) = done {
+                        return Err(XmlError::UnexpectedState.into());
+                    }
+                } else {
+                    self.do_content(
+                        h,
+                        enc,
+                        start_tag_level,
+                        text,
+                        processed,
+                        &mut next,
+                        false,
+                        Account::EntityExpansion,
+                    )?;
                 }
-            } else {
-                self.do_content(
-                    h,
-                    &enc,
-                    start_tag_level,
-                    text,
-                    processed,
-                    &mut next,
-                    false,
-                    Account::EntityExpansion,
-                )?;
-            }
+            });
             // Check if entity is complete, if not, mark down how much of it
             // is processed.
             if next != text.len()
@@ -332,20 +349,21 @@ impl Parser {
                 let (text, processed, has_more, _) = self.entity_progress(r);
                 let text: &[u8] = text.as_deref().map_or(&[], |t| t);
                 if has_more {
-                    let ienc = self.internal_encoding();
                     // Set a safe default value in case 'next' does not get
                     // set.
                     let mut next_in_entity = processed;
-                    self.append_attribute_value(
-                        &ienc,
-                        text,
-                        is_cdata,
-                        processed,
-                        out,
-                        Account::EntityExpansion,
-                        in_prolog,
-                        &mut next_in_entity,
-                    )?;
+                    with_internal!(self, ienc => {
+                        self.append_attribute_value(
+                            ienc,
+                            text,
+                            is_cdata,
+                            processed,
+                            out,
+                            Account::EntityExpansion,
+                            in_prolog,
+                            &mut next_in_entity,
+                        )?;
+                    });
                     // Check if entity is complete, if not, mark down how
                     // much of it is processed.
                     if next_in_entity < text.len() {
@@ -407,17 +425,18 @@ impl Parser {
                 let (text, processed, has_more, _) = self.entity_progress(r);
                 let text: &[u8] = text.as_deref().map_or(&[], |t| t);
                 if has_more {
-                    let ienc = self.internal_encoding();
                     let mut next_in_entity = processed;
-                    self.store_entity_value(
-                        h,
-                        &ienc,
-                        text,
-                        processed,
-                        out,
-                        Account::EntityExpansion,
-                        &mut next_in_entity,
-                    )?;
+                    with_internal!(self, ienc => {
+                        self.store_entity_value(
+                            h,
+                            ienc,
+                            text,
+                            processed,
+                            out,
+                            Account::EntityExpansion,
+                            &mut next_in_entity,
+                        )?;
+                    });
                     if next_in_entity != text.len() {
                         self.set_processed(r, next_in_entity);
                     } else {

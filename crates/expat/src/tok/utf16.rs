@@ -128,6 +128,20 @@ impl Encoding for Utf16 {
                 .is_none_or(|(_, hi)| hi & 0xFC != 0xDC)
     }
 
+    fn code_point(&self, buf: &[u8], p: usize, n: usize) -> Option<u32> {
+        let w1 = self.code_unit(buf, p)?;
+        match n {
+            2 if !(0xD800..=0xDFFF).contains(&w1) => Some(u32::from(w1)),
+            4 if (0xD800..=0xDBFF).contains(&w1) => {
+                let w2 = self.code_unit(buf, p.checked_add(2)?)?;
+                (0xDC00..=0xDFFF).contains(&w2).then(|| {
+                    0x1_0000 | (u32::from(w1 & 0x3FF) << 10) | u32::from(w2 & 0x3FF)
+                })
+            }
+            _ => None,
+        }
+    }
+
     fn is_utf8(&self) -> bool {
         false
     }

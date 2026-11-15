@@ -10,10 +10,10 @@ use alloc::vec::Vec;
 use super::accounting::Account;
 use super::error::{Stop, XmlError};
 use super::tracker::Pool;
-use super::{AnyEnc, Enc, Handler, ParamEntityParsing, Parser, Parsing, Processor};
+use super::{Enc, Handler, ParamEntityParsing, Parser, Parsing, Processor};
 use crate::role::Role;
 use crate::tok::{
-    Encoding, FoundEncoding, InitEncoding, Scan, State, Tok, init_scan, name_length,
+    Encoding, FoundEncoding, InitEncoding, Scan, State, Tok, init_scan_names, name_length,
     parse_xml_decl, prolog_tok,
 };
 
@@ -38,12 +38,31 @@ macro_rules! with_known {
 }
 pub(crate) use with_known;
 
+/// [`with_known`] with the encoding wrapped in [`crate::tok::Fifth`]
+/// (names by XML 1.0 Fifth Edition).
+macro_rules! with_known_fifth {
+    ($k:expr, $e:ident => $body:expr) => {
+        match $k {
+            $crate::tok::Known::Normal(e) => {
+                let $e = &$crate::tok::Fifth(e);
+                $body
+            }
+            $crate::tok::Known::Utf16(e) => {
+                let $e = &$crate::tok::Fifth(e);
+                $body
+            }
+        }
+    };
+}
+pub(crate) use with_known_fifth;
+
 /// Calls `$body` with `$e` bound to the encoding inside an [`AnyEnc`]:
 /// a built-in encoding through [`with_known`], or the application's.
 macro_rules! with_enc {
     ($k:expr, $e:ident => $body:expr) => {
         match $k {
             $crate::parse::AnyEnc::Known(k) => $crate::parse::prolog::with_known!(k, $e => $body),
+            $crate::parse::AnyEnc::Fifth(k) => $crate::parse::prolog::with_known_fifth!(k, $e => $body),
             $crate::parse::AnyEnc::Unknown(u) => {
                 let $e = &u.enc;
                 $body
@@ -157,11 +176,11 @@ impl Parser {
         loop {
             let (k, scanned) = match self.enc {
                 Enc::Init(init) => {
-                    let r = init_scan(&init, State::Prolog, buf, s);
+                    let r = init_scan_names(&init, self.fifth_edition_names, State::Prolog, buf, s);
                     match r.encoding {
                         Some(k) => {
                             self.enc = Enc::Known(k);
-                            (AnyEnc::Known(k), r.scanned)
+                            (self.known_enc(k), r.scanned)
                         }
                         None => return self.prolog_undecided(r.scanned.scan, s, next_ptr),
                     }

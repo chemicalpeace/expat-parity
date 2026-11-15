@@ -119,6 +119,15 @@ impl Encoding for Normal {
         }
     }
 
+    fn code_point(&self, buf: &[u8], p: usize, n: usize) -> Option<u32> {
+        // Latin-1 and ASCII have no lead bytes; their characters above
+        // 0x7F are classified by the table, which both editions agree on.
+        if !self.is_utf8() || n < 2 {
+            return None;
+        }
+        naming::utf8_decode(buf.get(p..p.checked_add(n)?)?)
+    }
+
     fn is_utf8(&self) -> bool {
         !matches!(self, Normal::Latin1 | Normal::Latin1Ns)
     }

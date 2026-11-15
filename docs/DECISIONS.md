@@ -1963,3 +1963,53 @@ recorded in DIVERGENCES.md.
   factor with `XML_SetBillionLaughsAttackProtectionMaximumAmplification`.
 - **Not done.** The documents are not part of the throughput benchmarks;
   the script needs network access and is run by hand.
+
+## D-064 Names by XML 1.0 Fifth Edition, as an option (2026-11-15)
+
+- **Context.** libexpat classifies the characters of names by the Fourth
+  Edition classes (Appendix B of XML 1.0), restricted to the Basic
+  Multilingual Plane. The Fifth Edition (2008) replaced them with the
+  broader productions [4] `NameStartChar` and [4a] `NameChar`, which
+  accept every name the Fourth Edition accepts and also letters added to
+  Unicode later and characters outside the BMP. In the W3C suite, 306
+  Fifth Edition name tests are rejected by libexpat and by the port
+  (D-059).
+- **Decision.** The port keeps libexpat's rules by default and offers the
+  Fifth Edition rules as an option, `Parser::set_fifth_edition_names`.
+  The option is not part of libexpat and not part of the parity
+  comparison: with it off, nothing changes, and every differential test
+  runs with it off. It changes only which characters may appear in names
+  (element and attribute names, entity and parameter-entity names,
+  processing-instruction targets, name tokens, namespace prefixes);
+  characters outside names and every other well-formedness rule stay as
+  in libexpat.
+- **How.** `tok::Fifth` wraps a built-in encoding and replaces only its
+  name predicates; byte types, validity checks and conversion are the
+  wrapped encoding's. Characters below U+0100 are classified alike by
+  both editions, so the byte-type tables are shared. For an encoding
+  from `Handler::unknown_encoding`, `Unknown::with_fifth_edition_names`
+  classifies the mapped single bytes again. The parser selects the
+  wrapped encoding where it selects an encoding (`decided_enc`, the
+  initial scan, internal entity text), so the default path is the code
+  it was before.
+- **Setting.** Refused while a parse is under way; external entity
+  parsers take their parent's setting; `Parser::reset` turns it off, as
+  `XML_ParserReset` restores `XML_SetReparseDeferralEnabled`. Not in the
+  C interface: a function there would be a symbol libexpat does not
+  have.
+- **Checks.** `naming/tests.rs` checks over the whole BMP that every
+  Fourth Edition name character is a Fifth Edition one.
+  `tests/fifth_names.rs` covers each kind of name in UTF-8, UTF-16LE and
+  UTF-16BE, characters that stay errors, malformed UTF-8, Latin-1, names
+  split across buffers, and the setting's rules. `w3c_diff.rs`
+  (`w3c_suite_with_fifth_edition_names`) runs the suite with the option
+  against libexpat and asserts that the option only turns rejections
+  into acceptances (or a later error) and accepts no document that is
+  not well-formed for the Fifth Edition.
+- **Result** (2026-11-15): with the option, 644 documents that libexpat
+  rejects are accepted: the 306 valid and 12 invalid Fifth Edition
+  tests, 304 tests marked not well-formed for editions 1 to 4 only, and
+  22 XML 1.1 tests whose names follow the same rules (19 valid, 3
+  invalid); 16 not-well-formed documents are still rejected, with an
+  error at a later token. No document is accepted that is not
+  well-formed for the Fifth Edition.

@@ -383,6 +383,9 @@ pub(crate) enum Enc {
 #[derive(Debug, Clone)]
 pub(crate) enum AnyEnc {
     Known(Known),
+    /// A built-in encoding with names by XML 1.0 Fifth Edition
+    /// ([`Parser::set_fifth_edition_names`]).
+    Fifth(Known),
     Unknown(Arc<unknown::UnknownEnc>),
 }
 
@@ -391,6 +394,7 @@ impl AnyEnc {
     pub(crate) fn tok(&self, state: crate::tok::State, buf: &[u8], s: usize) -> crate::tok::Scanned {
         match self {
             AnyEnc::Known(k) => k.tok(state, buf, s),
+            AnyEnc::Fifth(k) => k.tok_names(true, state, buf, s),
             AnyEnc::Unknown(u) => crate::tok::tok(&u.enc, state, buf, s),
         }
     }
@@ -489,6 +493,9 @@ pub struct Parser {
     pub(crate) bytes_scanned: u64,
     /// `m_reparseDeferralEnabled`
     pub(crate) reparse_deferral_enabled: bool,
+    /// Names by XML 1.0 Fifth Edition instead of libexpat's Fourth Edition
+    /// classes ([`Parser::set_fifth_edition_names`]); off by default.
+    pub(crate) fifth_edition_names: bool,
     /// `m_lastBufferRequestSize`
     pub(crate) last_buffer_request_size: i32,
     /// `m_eventPtr`
@@ -652,6 +659,7 @@ impl Parser {
             partial_token_bytes_before: 0,
             bytes_scanned: 0,
             reparse_deferral_enabled: true,
+            fifth_edition_names: false,
             last_buffer_request_size: 0,
             event_ptr: None,
             event_end_ptr: None,
@@ -1090,6 +1098,23 @@ impl Parser {
         self.reparse_deferral_enabled = enabled;
     }
 
+    /// Classifies name characters by XML 1.0 Fifth Edition (`on`) or by
+    /// the Fourth Edition classes libexpat uses (the default). Not part of
+    /// libexpat. `false`, and no change, while a parse is under way or on
+    /// an external entity parser, which takes its parent's setting.
+    pub fn set_fifth_edition_names(&mut self, on: bool) -> bool {
+        if self.is_child || matches!(self.control.get(), Parsing::Parsing | Parsing::Suspended) {
+            return false;
+        }
+        self.fifth_edition_names = on;
+        true
+    }
+
+    /// Whether [`Parser::set_fifth_edition_names`] is on.
+    pub fn fifth_edition_names(&self) -> bool {
+        self.fifth_edition_names
+    }
+
     /// `XML_GetErrorCode`.
     pub fn error_code(&self) -> Stop {
         self.error_code
@@ -1150,8 +1175,17 @@ impl Parser {
     pub(crate) fn decided_enc(&self) -> Option<AnyEnc> {
         match self.enc {
             Enc::Init(_) => None,
-            Enc::Known(k) => Some(AnyEnc::Known(k)),
+            Enc::Known(k) => Some(self.known_enc(k)),
             Enc::Unknown => self.unknown.clone().map(AnyEnc::Unknown),
+        }
+    }
+
+    /// A built-in encoding with the parser's name rules.
+    pub(crate) fn known_enc(&self, k: Known) -> AnyEnc {
+        if self.fifth_edition_names {
+            AnyEnc::Fifth(k)
+        } else {
+            AnyEnc::Known(k)
         }
     }
 

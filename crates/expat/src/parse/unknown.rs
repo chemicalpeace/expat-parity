@@ -110,6 +110,7 @@ impl Parser {
         self.unknown_encoding_mem = true;
         match Unknown::new(&info.map, info.convert.take(), self.ns) {
             Ok(enc) => {
+                let enc = if self.fifth_edition_names { enc.with_fifth_edition_names() } else { enc };
                 self.unknown = Some(Arc::new(UnknownEnc { enc, _release: release }));
                 self.enc = Enc::Unknown;
                 Ok(())
