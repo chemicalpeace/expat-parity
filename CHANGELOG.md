@@ -69,6 +69,9 @@ All notable changes are documented here. The format follows
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.
+- `docs/RELEASING.md`, the procedure for following a libexpat release,
+  and `scripts/upstream-check.sh` with a weekly workflow that compares
+  the port with libexpat's development branch (D-062).
 - `crates/expat-capi/tests/system_oom.rs`: fails each system
   allocation in turn while parsing and checks that none aborts (D-061).
 

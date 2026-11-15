@@ -132,10 +132,14 @@ input, the slowest case.
 Done: the port is pinned to libexpat 2.10.0 and compared with the vendored
 copy on every CI run.
 
-Remaining: a written procedure for each libexpat release (update the
-vendored copy, run the comparison, port the changes, record them in
-`CHANGELOG.md`), and a CI job that compares with libexpat's development
-branch.
+Done as well: the procedure for each libexpat release is written down
+(`docs/RELEASING.md`), and a weekly job compares the port with libexpat's
+development branch (`scripts/upstream-check.sh`, D-062).
+
+Remaining: the development branch has changes for 2.11.0 the port does
+not follow yet (`XML_Parse64`, `XML_GetBuffer64`, `XML_ParseBuffer64`,
+and `XML_GetInputContext` after an error); they are ported with that
+release.
 
 ## 11. Upstream
 
@@ -157,7 +161,5 @@ MIT, as libexpat.
 
 ## Order of work
 
-1. Release procedure and a comparison with libexpat's development branch
-   (10).
-2. x86_64 and Fil-C benchmarks (9); DocBook and DITA documents (3).
-3. Fifth edition names, after discussion with upstream (6).
+1. x86_64 and Fil-C benchmarks (9); DocBook and DITA documents (3).
+2. Fifth edition names, after discussion with upstream (6).
