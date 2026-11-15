@@ -60,6 +60,8 @@ All notable changes are documented here. The format follows
 - The W3C XML Conformance Test Suite (xmlts20130923, not vendored) is
   compared with libexpat: 2,586 documents under five option sets
   (`w3c_diff.rs`, `scripts/w3c-check.sh`, D-059).
+- `docs/ROADMAP.md`: status and planned work against the points in
+  "What a rewrite of libexpat needs" (libexpat maintainer, 2026-11-10).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.

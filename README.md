@@ -177,7 +177,7 @@ These are deferred, with no commitment to implement them.
 | `tests/` | differential harness, upstream-derived vectors |
 | `fuzz/` | cargo-fuzz targets and committed corpus |
 | `benches/` | criterion benchmarks |
-| `docs/` | decisions, architecture, divergences, report, state |
+| `docs/` | decisions, architecture, divergences, report, state, roadmap |
 
 ## Build and verify
 
