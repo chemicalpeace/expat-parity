@@ -67,6 +67,20 @@ impl Options {
         self
     }
 
+    /// [`Options::encoding`] that returns `None` instead of aborting when
+    /// the system allocator cannot copy the name (D-065).
+    ///
+    /// ```
+    /// let o = expat::Options::new().try_encoding(b"UTF-8");
+    /// assert_eq!(o, Some(expat::Options::new().encoding(b"UTF-8")));
+    /// ```
+    #[must_use]
+    pub fn try_encoding(mut self, name: &[u8]) -> Option<Self> {
+        let name = name.split(|&b| b == 0).next().unwrap_or_default();
+        self.encoding = Some(crate::fallible::try_copy(name).ok()?);
+        Some(self)
+    }
+
     /// Turns namespace processing on with `separator`
     /// (`XML_ParserCreateNS`): prefixes must be declared, and the reserved
     /// prefixes and names are checked. `0` is a valid separator, as in C:
@@ -163,19 +177,41 @@ impl Parser {
         }
     }
 
+    /// [`Parser::with_options`] that returns `None` instead of aborting
+    /// when the system allocator cannot provide the parser's initial
+    /// memory (D-065), as `XML_ParserCreate` returns `NULL`. Two small
+    /// fixed-size blocks (reference counts) are still allocated
+    /// infallibly, since stable Rust has no fallible `Arc` constructor.
+    ///
+    /// ```
+    /// let p = expat::Parser::try_with_options([7; 16], expat::Options::new());
+    /// assert!(p.is_some());
+    /// ```
+    pub fn try_with_options(salt: [u8; 16], options: Options) -> Option<Self> {
+        parse::Parser::try_new(
+            options.encoding.as_deref(),
+            options.namespace_separator,
+            salt,
+        )
+        .ok()
+        .map(|inner| Parser { inner })
+    }
+
     /// [`Parser::with_options`] whose allocations are also reported to
     /// `suite` (`XML_ParserCreate_MM`): one call for each call libexpat
     /// makes to its memory functions, with libexpat's sizes, so that an
     /// allocator that fails or counts sees what it would see with
     /// libexpat, and a failing call makes the parser fail where libexpat
     /// fails (`ErrorCode::NoMemory`). `None` when one of the creation
-    /// calls fails. The parser's own data still lives in Rust collections.
+    /// calls fails, or when the system allocator fails as in
+    /// [`Parser::try_with_options`]. The parser's own data still lives in
+    /// Rust collections.
     pub fn with_memory_suite(
         salt: [u8; 16],
         options: Options,
         suite: Arc<dyn crate::MemorySuite>,
     ) -> Option<Self> {
-        let mut p = Self::with_options(salt, options);
+        let mut p = Self::try_with_options(salt, options)?;
         p.inner.tracker.t.attach_suite(suite).then_some(p)
     }
 

@@ -11,10 +11,19 @@
 //! end normally: the parse returns `Ok(())` or fails with
 //! `ErrorCode::NoMemory`, and the process does not abort.
 //!
-//! One allocation is exempt: the reference-count block of a shared
-//! entity text (`Arc<Vec<u8>>`, the counts and the vector header), which
-//! stable Rust cannot allocate fallibly. Allocations of exactly that
-//! layout are neither counted nor refused.
+//! A second test does the same for creating, configuring and resetting
+//! parsers through the C interface (D-065): `XML_ParserCreateNS`,
+//! `XML_SetEncoding`, `XML_SetBase`, a parse, `XML_ParserReset`,
+//! `XML_ExternalEntityParserCreate` and `XML_ParserFree`, with the
+//! allocator armed from the start. Each call may fail as libexpat's
+//! does (`NULL`, `XML_STATUS_ERROR`, `XML_FALSE`); the process must not
+//! abort.
+//!
+//! Two layouts are exempt, since stable Rust has no fallible `Arc`
+//! constructor: the reference-count block of an `Arc<Vec<u8>>` (shared
+//! entity text and the input buffer: the counts and the vector header)
+//! and that of the parser's shared control. Allocations of exactly these
+//! layouts are neither counted nor refused.
 
 // Miri cannot spawn the child processes.
 #![cfg(not(miri))]
@@ -49,7 +58,8 @@ fn shared_text_block() -> Layout {
 
 impl Failing {
     fn refuse(layout: Layout) -> bool {
-        if layout == shared_text_block() {
+        if layout == shared_text_block() || layout == expat::internal::parse::control_block_layout()
+        {
             return false;
         }
         let r = ARMED.load(Ordering::Relaxed)
@@ -189,9 +199,94 @@ fn child_case() {
     println!("OUTCOME {code:?}");
 }
 
+/// Creates, configures, uses, resets and frees parsers through the C
+/// interface with the allocator armed from the start; the allocations
+/// counted. Any result is accepted; only an abort is a failure.
+fn run_creation(fail_at: u64) -> u64 {
+    use expat_capi as c;
+    let doc = b"<a xmlns:p='urn:p'><p:b x='1'>t</p:b></a>";
+    COUNT.store(0, Ordering::Relaxed);
+    FAIL_AT.store(fail_at, Ordering::Relaxed);
+    TRACE.store(std::env::var_os("OOM_TRACE").is_some(), Ordering::Relaxed);
+    ARMED.store(true, Ordering::Relaxed);
+    let len = std::ffi::c_int::try_from(doc.len()).expect("length");
+    // SAFETY: the strings are NUL-terminated literals, the document is a
+    // live slice of `len` bytes, and each handle is used only while live.
+    unsafe {
+        let p = c::XML_ParserCreateNS(c"UTF-8".as_ptr(), b'|' as c::XML_Char);
+        if !p.is_null() {
+            let _ = c::XML_SetEncoding(p, c"ISO-8859-1".as_ptr());
+            let _ = c::XML_SetBase(p, c"http://example.org/dir/".as_ptr());
+            let _ = c::XML_Parse(p, doc.as_ptr().cast(), len, 1);
+            if c::XML_ParserReset(p, c"UTF-8".as_ptr()) != 0 {
+                let _ = c::XML_SetBase(p, c"http://example.org/other/".as_ptr());
+                let e = c::XML_ExternalEntityParserCreate(p, c"e".as_ptr(), c"UTF-8".as_ptr());
+                if !e.is_null() {
+                    let _ = c::XML_Parse(e, b"<x/>".as_ptr().cast(), 4, 1);
+                    c::XML_ParserFree(e);
+                }
+                let _ = c::XML_Parse(p, doc.as_ptr().cast(), len, 1);
+            }
+            c::XML_ParserFree(p);
+        }
+        let q = c::XML_ParserCreate(std::ptr::null());
+        if !q.is_null() {
+            c::XML_ParserFree(q);
+        }
+    }
+    ARMED.store(false, Ordering::Relaxed);
+    COUNT.load(Ordering::Relaxed)
+}
+
+/// The child side of the creation test.
+#[test]
+fn child_creation_case() {
+    let Ok(at) = std::env::var("EXPAT_SYSTEM_OOM_CREATION") else {
+        return;
+    };
+    let _ = run_creation(at.parse().expect("number"));
+    println!("OUTCOME done");
+}
+
+#[test]
+fn every_allocation_failure_in_creation_and_reset_returns() {
+    if std::env::var_os("EXPAT_SYSTEM_OOM_CASE").is_some()
+        || std::env::var_os("EXPAT_SYSTEM_OOM_CREATION").is_some()
+    {
+        return;
+    }
+    let exe = std::env::current_exe().expect("test binary");
+    let total = run_creation(u64::MAX);
+    let mut aborted = Vec::new();
+    for at in 0..total {
+        let out = Command::new(&exe)
+            .args([
+                "--exact",
+                "child_creation_case",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("EXPAT_SYSTEM_OOM_CREATION", at.to_string())
+            .output()
+            .expect("child process");
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        if !(out.status.success() && stdout.contains("OUTCOME done")) {
+            aborted.push(at);
+        }
+    }
+    println!("system_oom creation: {total} failure points");
+    assert!(
+        aborted.is_empty(),
+        "{} of {total} failure points did not return: {aborted:?}",
+        aborted.len()
+    );
+}
+
 #[test]
 fn every_allocation_failure_ends_the_parse_normally() {
-    if std::env::var_os("EXPAT_SYSTEM_OOM_CASE").is_some() {
+    if std::env::var_os("EXPAT_SYSTEM_OOM_CASE").is_some()
+        || std::env::var_os("EXPAT_SYSTEM_OOM_CREATION").is_some()
+    {
         return;
     }
     let exe = std::env::current_exe().expect("test binary");

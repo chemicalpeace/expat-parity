@@ -1913,7 +1913,7 @@ recorded in DIVERGENCES.md.
   `expat-capi` because the `expat` crate forbids `unsafe`. Current run:
   835 failure points, each ending with a normal return.
 - **Not covered.** Creating, resetting and configuring a parser still
-  abort on allocation failure. The reference-count block of an internal
+  abort on allocation failure (covered since D-065). The reference-count block of an internal
   entity's shared text (`Arc<Vec<u8>>`) is allocated infallibly, since
   stable Rust has no fallible `Arc` constructor; the test exempts it.
   A shrinking `realloc` was never failed by the test.
@@ -2013,3 +2013,36 @@ recorded in DIVERGENCES.md.
   invalid); 16 not-well-formed documents are still rejected, with an
   error at a later token. No document is accepted that is not
   well-formed for the Fifth Edition.
+
+## D-065 Fallible allocation when creating, configuring and resetting a parser (2026-11-16)
+
+- **Decision.** `parse::Parser::try_new` makes the parser's initial
+  memory (the encoding name, the attribute array) with the fallible
+  functions of D-061; `Parser::new` keeps its signature and calls it.
+  The public API adds `Parser::try_with_options` and
+  `Options::try_encoding`, which return `None` on a failure of the
+  system allocator; `Parser::with_memory_suite` uses them.
+  `set_encoding`, `reset` and the creation of an external entity parser
+  copy fallibly and report failure as before (`false`, `None`).
+- **C interface.** The handle is allocated with `std::alloc::alloc` and
+  checked for `NULL` (`into_handle`), with the layout `Box` uses, so
+  `XML_ParserFree` is unchanged. `XML_ParserCreate`,
+  `XML_ParserCreateNS`, `XML_ParserCreate_MM` and
+  `XML_ExternalEntityParserCreate` return `NULL`; `XML_SetEncoding` and
+  `XML_SetBase` return `XML_STATUS_ERROR`, with `XML_SetBase` copying
+  first so that the old base stays; `XML_ParserReset` returns
+  `XML_FALSE`. These are the results libexpat gives when its `malloc`
+  fails in the same calls.
+- **Check.** `system_oom.rs` (`every_allocation_failure_in_creation_and_reset_returns`)
+  arms the failing allocator before `XML_ParserCreateNS` and runs
+  creation, `XML_SetEncoding`, `XML_SetBase`, a parse,
+  `XML_ParserReset`, `XML_ExternalEntityParserCreate`, a parse of the
+  child and `XML_ParserFree`, failing each allocation in turn in a
+  child process: 103 failure points, each returns. Without the C
+  interface changes all 103 abort.
+- **Not covered.** The reference-count blocks of the shared control and
+  the input buffer (`Arc`) are still allocated infallibly, like the
+  shared entity text of D-061; the test exempts their layouts
+  (`internal::parse::control_block_layout` under `internal-api`, a
+  dev-dependency feature of `expat-capi`). `XML_ParserCreate_MM` with a
+  suite also allocates the suite's `Arc` infallibly.

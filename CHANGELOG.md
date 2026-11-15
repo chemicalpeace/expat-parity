@@ -75,6 +75,12 @@ All notable changes are documented here. The format follows
 - `docs/RELEASING.md`, the procedure for following a libexpat release,
   and `scripts/upstream-check.sh` with a weekly workflow that compares
   the port with libexpat's development branch (D-062).
+- `Parser::try_with_options` and `Options::try_encoding`: creating a
+  parser reports a failure of the system allocator instead of aborting.
+  Through the C interface, `XML_ParserCreate`, `XML_ParserCreateNS`,
+  `XML_ParserCreate_MM` and `XML_ExternalEntityParserCreate` return
+  `NULL`, `XML_SetEncoding` and `XML_SetBase` return `XML_STATUS_ERROR`
+  and `XML_ParserReset` returns `XML_FALSE` in that case (D-065).
 - `Parser::set_fifth_edition_names`: an option, off by default and not
   part of libexpat, that classifies name characters by XML 1.0 Fifth
   Edition instead of the Fourth Edition classes libexpat uses (D-064).

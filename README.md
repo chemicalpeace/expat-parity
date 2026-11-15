@@ -158,10 +158,12 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   application.
 - **Out of memory.** While parsing, a failure of the system allocator
   makes the parse fail with `ErrorCode::NoMemory`, as in libexpat
-  (D-061). Creating, resetting or configuring a parser still aborts on
-  allocation failure, and so does the small reference-count block of
-  each internal entity's shared text, which stable Rust cannot allocate
-  fallibly.
+  (D-061). Creating, resetting and configuring a parser report it too
+  (`Parser::try_with_options`; through the C interface `NULL`,
+  `XML_STATUS_ERROR` or `XML_FALSE`, D-065). A few small fixed-size
+  reference-count blocks (the parser's shared control, the input buffer,
+  each internal entity's shared text) are still allocated infallibly,
+  since stable Rust has no fallible `Arc` constructor.
 - **Performance** was measured on one aarch64 Linux VM only: the port
   reached 0.68x-1.24x of libexpat 2.10.0 built with clang `-O2`, slowest
   on UTF-16 input (`docs/REPORT.md`, "Benchmarks"). Other platforms are

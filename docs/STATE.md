@@ -154,7 +154,9 @@ with allocation failures, white-box).
    against the drop-in `libexpat.so.1` since D-060 (all but 12 tests of
    libexpat internals pass). A failure of the system allocator while
    parsing ends the parse with `NoMemory` since D-061 (`system_oom.rs`,
-   835 failure points, none aborts). libexpat's development branch is
+   835 failure points, none aborts), and while creating, configuring and
+   resetting a parser since D-065 (103 failure points through the C
+   interface, none aborts). libexpat's development branch is
    compared weekly since D-062 (`scripts/upstream-check.sh`). Large
    DocBook and DITA documents are measured against the default limits
    (D-063). Names by XML 1.0 Fifth Edition are an option outside parity

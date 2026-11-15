@@ -381,6 +381,10 @@ impl Parser {
     pub(crate) fn external_entity_parser_create(&mut self, context: Option<&[u8]>, encoding: Option<&[u8]>) -> Option<(Parser, u64)> {
         let bytes_before = self.tracker.t.bytes_allocated;
         let direct = self.direct();
+        let ns_sep = self.ns.then_some(self.namespace_separator);
+        // Made before the charge, so that a failure of the system
+        // allocator leaves the root's tracker untouched (D-065).
+        let mut child = Parser::try_new(encoding, ns_sep, [0; 16]).ok()?;
         // The root's tracker moves into the child and back when the child
         // is dropped (D-032).
         let mut t = core::mem::take(&mut self.tracker.t);
@@ -391,8 +395,6 @@ impl Parser {
             self.tracker.t = t;
             return None;
         }
-        let ns_sep = self.ns.then_some(self.namespace_separator);
-        let mut child = Parser::new(encoding, ns_sep, [0; 16]);
         child.tracker.t = t;
         child.salt = self.salt;
         child.handlers = self.handlers;
