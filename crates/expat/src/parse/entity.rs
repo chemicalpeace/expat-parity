@@ -252,8 +252,8 @@ impl Parser {
             // Check if entity is complete, if not, mark down how much of it
             // is processed.
             if next != text.len()
-                && (self.parsing == Parsing::Suspended
-                    || (self.parsing == Parsing::Parsing && self.reenter))
+                && (self.control.get() == Parsing::Suspended
+                    || (self.control.get() == Parsing::Parsing && self.reenter))
             {
                 self.set_processed(r, next);
                 return Ok(());

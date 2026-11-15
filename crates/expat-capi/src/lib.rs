@@ -6,7 +6,8 @@
 //! `XML_Char` = `char`, UTF-8 output) can link against it instead of
 //! libexpat. This first slice covers parser creation and release, user
 //! data, the nine handlers of [`expat::Events`], `XML_Parse`,
-//! `XML_GetBuffer` and `XML_ParseBuffer` (D-049), the error code and its
+//! `XML_GetBuffer` and `XML_ParseBuffer` (D-049), `XML_StopParser` and
+//! `XML_ResumeParser` (D-050), the error code and its
 //! text, the position between calls and inside handlers (D-048) and the
 //! version. Every
 //! other `expat.h` function is missing, so a program that uses one fails
@@ -26,8 +27,8 @@
 //!   libexpat.)
 //! - `XML_GetSpecifiedAttributeCount` is updated only while a start
 //!   element handler is set, which is where libexpat documents its use.
-//! - `XML_Parse`, `XML_ParseBuffer`, `XML_GetBuffer` and `XML_ParserFree`
-//!   called from inside a handler do nothing (`XML_STATUS_ERROR` or
+//! - `XML_Parse`, `XML_ParseBuffer`, `XML_GetBuffer`, `XML_ResumeParser`
+//!   and `XML_ParserFree` called from inside a handler do nothing (`XML_STATUS_ERROR` or
 //!   `NULL`, without an error code), as in libexpat 2.10.0.
 //! - The hash salt comes from the standard library's `RandomState` keys,
 //!   which are seeded from the operating system.
@@ -46,7 +47,7 @@ use std::ffi::{CStr, CString, c_char, c_int, c_long, c_ulong, c_void};
 use std::hash::BuildHasher;
 use std::sync::OnceLock;
 
-use expat::{ErrorCode, Events, Handler, Options, Parser};
+use expat::{ErrorCode, Events, Handler, Options, Parser, Stopper};
 
 /// `XML_Char` without `XML_UNICODE`.
 pub type XML_Char = c_char;
@@ -65,6 +66,8 @@ pub type XML_Error = c_int;
 pub const XML_STATUS_ERROR: XML_Status = 0;
 /// `XML_STATUS_OK`.
 pub const XML_STATUS_OK: XML_Status = 1;
+/// `XML_STATUS_SUSPENDED`.
+pub const XML_STATUS_SUSPENDED: XML_Status = 2;
 /// `XML_ERROR_NONE`.
 pub const XML_ERROR_NONE: XML_Error = 0;
 
@@ -130,6 +133,8 @@ pub struct XML_ParserStruct {
     end_cdata_section: Cell<XML_EndCdataSectionHandler>,
     start_namespace_decl: Cell<XML_StartNamespaceDeclHandler>,
     end_namespace_decl: Cell<XML_EndNamespaceDeclHandler>,
+    /// Stops the parser from inside a handler (`XML_StopParser`).
+    stopper: Stopper,
     inner: UnsafeCell<Inner>,
 }
 
@@ -147,6 +152,7 @@ struct Inner {
 
 impl XML_ParserStruct {
     fn new(options: Options) -> Self {
+        let parser = Parser::with_options(salt(), options);
         XML_ParserStruct {
             user_data: Cell::new(std::ptr::null_mut()),
             handler_arg: Cell::new(std::ptr::null_mut()),
@@ -163,8 +169,9 @@ impl XML_ParserStruct {
             end_cdata_section: Cell::new(None),
             start_namespace_decl: Cell::new(None),
             end_namespace_decl: Cell::new(None),
+            stopper: parser.stopper(),
             inner: UnsafeCell::new(Inner {
-                parser: Parser::with_options(salt(), options),
+                parser,
                 text: Vec::new(),
                 atts: Vec::new(),
             }),
@@ -682,9 +689,56 @@ fn run(
         .error_code
         .set(parser.error_code().map_or(XML_ERROR_NONE, error));
     match result {
+        Ok(()) if parser.is_suspended() => XML_STATUS_SUSPENDED,
         Ok(()) => XML_STATUS_OK,
         Err(_) => XML_STATUS_ERROR,
     }
+}
+
+/// `XML_StopParser`: stops the parse after the current event, so that
+/// `XML_ResumeParser` can continue it when `resumable` is non-zero, or for
+/// good otherwise (`XML_ERROR_ABORTED`). Refusals set the error code as in
+/// libexpat (`XML_ERROR_NOT_STARTED`, `XML_ERROR_FINISHED`,
+/// `XML_ERROR_SUSPENDED`, `XML_ERROR_SUSPEND_PE`).
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_StopParser(parser: XML_Parser, resumable: XML_Bool) -> XML_Status {
+    // SAFETY: forwarded from this function's contract.
+    let Some(state) = (unsafe { state(parser) }) else {
+        return XML_STATUS_ERROR;
+    };
+    match state.stopper.stop(resumable != 0) {
+        Ok(()) => XML_STATUS_OK,
+        Err(code) => {
+            state.error_code.set(error(code));
+            XML_STATUS_ERROR
+        }
+    }
+}
+
+/// `XML_ResumeParser`: continues a suspended parse up to the end of the
+/// input given so far (`XML_ERROR_NOT_SUSPENDED` when it is not
+/// suspended). Refused without an error code from inside a handler, as in
+/// libexpat.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_ResumeParser(parser: XML_Parser) -> XML_Status {
+    // SAFETY: forwarded from this function's contract.
+    let Some(state) = (unsafe { state(parser) }) else {
+        return XML_STATUS_ERROR;
+    };
+    if state.busy.get() {
+        return XML_STATUS_ERROR;
+    }
+    run(state, |parser, dispatch, events| {
+        parser.resume_with_events(dispatch, events)
+    })
 }
 
 /// `XML_GetBuffer`: space for `len` bytes of input in the parser's buffer,

@@ -12,6 +12,7 @@
 //! error or after the final call are C's (D-023). [`Parser::parse_with`]
 //! is the same call with the [`Handler`] events of D-041.
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -333,6 +334,73 @@ impl Parser {
         ErrorCode::from_internal(e)
     }
 
+    /// A handle that stops this parser from inside a handler
+    /// (`XML_StopParser`); see [`Stopper`].
+    ///
+    /// ```
+    /// use expat::{Handler, Parser, Stopper};
+    ///
+    /// struct FirstElement(Stopper, Vec<u8>);
+    ///
+    /// impl Handler for FirstElement {
+    ///     fn start_element(&mut self, name: &[u8], _attributes: &[(&[u8], &[u8])], _specified: usize) {
+    ///         self.1 = name.to_vec();
+    ///         let _ = self.0.stop(true);
+    ///     }
+    /// }
+    ///
+    /// let mut p = Parser::new([7; 16]);
+    /// let mut h = FirstElement(p.stopper(), Vec::new());
+    /// p.parse_with(&mut h, b"<a><b/></a>", true)?;
+    /// assert!(p.is_suspended());
+    /// assert_eq!(h.1, b"a");
+    /// p.resume_with(&mut h)?;
+    /// assert_eq!(h.1, b"b");
+    /// p.resume_with(&mut h)?;
+    /// assert!(!p.is_suspended());
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    pub fn stopper(&self) -> Stopper {
+        Stopper(Arc::clone(&self.inner.control))
+    }
+
+    /// Whether a handler suspended the parse with [`Stopper::stop`]`(true)`
+    /// (C: the call returned `XML_STATUS_SUSPENDED`). A suspended parser
+    /// takes no input: [`Parser::parse`] and [`Parser::buffer`] fail with
+    /// [`ErrorCode::Suspended`] until [`Parser::resume`] continues it.
+    pub fn is_suspended(&self) -> bool {
+        self.inner.parsing_status() == parse::Parsing::Suspended
+    }
+
+    /// Continues a suspended parse with no handler (`XML_ResumeParser`),
+    /// from where it stopped, up to the end of the input given so far. The
+    /// result is that of [`Parser::parse`]; the parse may be suspended
+    /// again. Fails with [`ErrorCode::NotSuspended`] when the parser is not
+    /// suspended.
+    pub fn resume(&mut self) -> Result<(), Error> {
+        self.inner.set_handlers(parse::HandlerSet::default());
+        let status = self.inner.resume_parser(&mut NoCallbacks);
+        self.result(status)
+    }
+
+    /// [`Parser::resume`] reporting the events to `handler`, as
+    /// [`Parser::parse_with`] does for [`Parser::parse`].
+    pub fn resume_with<H: Handler>(&mut self, handler: &mut H) -> Result<(), Error> {
+        self.resume_with_events(handler, H::EVENTS)
+    }
+
+    /// [`Parser::resume_with`] with the events given for this call, as
+    /// [`Parser::parse_with_events`] does for [`Parser::parse_with`].
+    pub fn resume_with_events<H: Handler>(
+        &mut self,
+        handler: &mut H,
+        events: Events,
+    ) -> Result<(), Error> {
+        self.inner.set_handlers(events.handler_set());
+        let status = self.inner.resume_parser(&mut Adapter(handler));
+        self.result(status)
+    }
+
     /// The line of the parser's current position, from 1
     /// (`XML_GetCurrentLineNumber64` between calls). After an error it is
     /// the line of [`Error::line`].
@@ -371,9 +439,9 @@ impl Parser {
                 let code = ErrorCode::from_internal(e).unwrap_or(ErrorCode::UnexpectedState);
                 Err(self.error(code))
             }
-            // Only `XML_StopParser` suspends a parse, and this API cannot
-            // call it.
-            Status::Suspended => Err(self.error(ErrorCode::UnexpectedState)),
+            // A handler stopped the parse with `Stopper::stop(true)`; the
+            // caller sees it with `is_suspended` (D-050).
+            Status::Suspended => Ok(()),
         }
     }
 
@@ -387,6 +455,35 @@ impl Parser {
             column: self.inner.current_column_number(),
             byte_index: self.inner.current_byte_index(),
         }
+    }
+}
+
+/// Stops a [`Parser`] while it parses (`XML_StopParser`), from a handler
+/// that holds it ([`Parser::stopper`]).
+///
+/// The parser checks for a stop after each event, as C does, so the events
+/// already under way may still be reported. A stopped parse ends the call
+/// that was running: with [`Stopper::stop`]`(true)` the call returns
+/// `Ok(())` with [`Parser::is_suspended`] set, and [`Parser::resume`]
+/// continues it; with `stop(false)` the call fails with
+/// [`ErrorCode::Aborted`] and the parser takes no more input. A handle
+/// stays tied to its parser and has no effect once the parser is dropped.
+#[derive(Debug, Clone)]
+pub struct Stopper(Arc<parse::Control>);
+
+impl Stopper {
+    /// Stops the parse, resumable or not (`XML_StopParser(parser,
+    /// resumable)`). Refused as in C: before the first call
+    /// ([`ErrorCode::NotStarted`]), after the final piece or a stop without
+    /// resume ([`ErrorCode::Finished`]), a second resumable stop while
+    /// suspended ([`ErrorCode::Suspended`]), and a resumable stop inside an
+    /// external parameter entity ([`ErrorCode::SuspendPe`]). Unlike C, a
+    /// refusal does not change [`Parser::error_code`]. A stop without
+    /// resume while suspended ends the parse.
+    pub fn stop(&self, resumable: bool) -> Result<(), ErrorCode> {
+        self.0
+            .stop(resumable)
+            .map_err(|e| ErrorCode::from_internal(e).unwrap_or(ErrorCode::UnexpectedState))
     }
 }
 
@@ -748,6 +845,75 @@ mod tests {
             assert_eq!(p.parse_buffer_with(&mut text, piece.len(), last), Ok(()));
         }
         assert_eq!(text.0, [b'x'; 5000]);
+    }
+
+    /// Suspends at every start tag and records the element names.
+    struct Suspend(Stopper, Vec<Vec<u8>>);
+
+    impl Handler for Suspend {
+        fn start_element(
+            &mut self,
+            name: &[u8],
+            _attributes: &[(&[u8], &[u8])],
+            _specified: usize,
+        ) {
+            self.1.push(name.to_vec());
+            assert_eq!(self.0.stop(true), Ok(()));
+            assert_eq!(self.0.stop(true), Err(ErrorCode::Suspended));
+        }
+    }
+
+    #[test]
+    fn suspended_parse_resumes_where_it_stopped() {
+        let mut p = Parser::new([7; 16]);
+        let mut h = Suspend(p.stopper(), Vec::new());
+        let code = |r: Result<(), Error>| r.map_err(|e| e.code());
+        assert_eq!(h.0.stop(true), Err(ErrorCode::NotStarted));
+        assert_eq!(code(p.resume()), Err(ErrorCode::NotSuspended));
+        assert_eq!(p.parse_with(&mut h, b"<a><b/><c/>", false), Ok(()));
+        assert!(p.is_suspended());
+        assert_eq!(code(p.parse(b"</a>", true)), Err(ErrorCode::Suspended));
+        assert_eq!(
+            p.buffer(1).map(|_| ()).map_err(|e| e.code()),
+            Err(ErrorCode::Suspended)
+        );
+        let mut resumes = 0;
+        while p.is_suspended() {
+            assert_eq!(p.resume_with(&mut h), Ok(()));
+            resumes += 1;
+        }
+        assert_eq!(resumes, 3);
+        assert_eq!(h.1, [b"a".to_vec(), b"b".to_vec(), b"c".to_vec()]);
+        assert_eq!(p.parse_with(&mut h, b"</a>", true), Ok(()));
+        assert!(!p.is_suspended());
+        assert_eq!(h.0.stop(false), Err(ErrorCode::Finished));
+    }
+
+    #[test]
+    fn stop_without_resume_aborts() {
+        struct Abort(Stopper, usize);
+        impl Handler for Abort {
+            fn start_element(
+                &mut self,
+                _name: &[u8],
+                _attributes: &[(&[u8], &[u8])],
+                _specified: usize,
+            ) {
+                self.1 += 1;
+                assert_eq!(self.0.stop(false), Ok(()));
+            }
+        }
+        let mut p = Parser::new([7; 16]);
+        let mut h = Abort(p.stopper(), 0);
+        let r = p.parse_with(&mut h, b"<a><b/></a>", true);
+        assert_eq!(r.map_err(|e| e.code()), Err(ErrorCode::Aborted));
+        assert_eq!(h.1, 1);
+        assert!(!p.is_suspended());
+        assert_eq!(h.0.stop(true), Err(ErrorCode::Finished));
+        assert_eq!(
+            p.resume().map_err(|e| e.code()),
+            Err(ErrorCode::NotSuspended)
+        );
     }
 
     #[test]

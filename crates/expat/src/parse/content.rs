@@ -213,7 +213,7 @@ impl Parser {
                 }
                 _ => return Err(XmlError::JunkAfterDocElement.into()),
             }
-            match self.parsing {
+            match self.control.get() {
                 Parsing::Suspended => {
                     self.event_ptr = Some(next);
                     *next_ptr = next;
@@ -598,7 +598,7 @@ impl Parser {
                 // handler (module 12).
                 _ => {}
             }
-            match self.parsing {
+            match self.control.get() {
                 Parsing::Suspended => {
                     self.ev(enc, Some(next));
                     *next_ptr = next;
@@ -630,9 +630,9 @@ impl Parser {
         next: usize,
         next_ptr: &mut usize,
     ) -> Option<Result<(), Stop>> {
-        if self.tag_level == 0 && self.parsing != Parsing::Finished {
-            if self.parsing == Parsing::Suspended
-                || (self.parsing == Parsing::Parsing && self.reenter)
+        if self.tag_level == 0 && self.control.get() != Parsing::Finished {
+            if self.control.get() == Parsing::Suspended
+                || (self.control.get() == Parsing::Parsing && self.reenter)
             {
                 self.processor = Processor::Epilog;
             } else {
@@ -699,7 +699,7 @@ impl Parser {
                     }
                     *start = Some(next);
                     *next_ptr = next;
-                    if self.parsing == Parsing::Finished {
+                    if self.control.get() == Parsing::Finished {
                         return Err(XmlError::Aborted.into());
                     }
                     return Ok(());
@@ -736,7 +736,7 @@ impl Parser {
                     return Err(XmlError::UnexpectedState.into());
                 }
             }
-            match self.parsing {
+            match self.control.get() {
                 Parsing::Suspended => {
                     self.ev(enc, Some(next));
                     *next_ptr = next;

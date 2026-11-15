@@ -27,10 +27,12 @@ All notable changes are documented here. The format follows
   `current_column`, `current_byte_index`), event positions for handlers
   (`Events::position`, `Handler::position`, D-048), the buffer functions
   (`buffer`, `parse_buffer`, `parse_buffer_with`,
-  `parse_buffer_with_events`) and `error_code` (D-049).
+  `parse_buffer_with_events`) and `error_code` (D-049), stop and resume
+  (`Stopper`, `Parser::stopper`, `is_suspended`, `resume`,
+  `resume_with`, `resume_with_events`, D-050).
 - `crates/expat-capi` (not published): a first part of libexpat's C
   interface over the crate, compared with libexpat by
-  `scripts/capi-check.sh` (D-047 to D-049).
+  `scripts/capi-check.sh` (D-047 to D-050).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.
@@ -51,7 +53,6 @@ All notable changes are documented here. The format follows
   padding is now rejected in about 15 ms instead of about 30 s.
 
 ### Known limitations
-- No default handler, DTD or entity declaration events, unknown-encoding
-  handler, or stop/resume; external entities are
-  never loaded; real allocator failure aborts instead of returning
+- No default handler, DTD or entity declaration events, or
+  unknown-encoding handler; external entities are never loaded; real allocator failure aborts instead of returning
   `NoMemory`. See the README.

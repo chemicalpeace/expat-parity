@@ -223,6 +223,52 @@ fn buffer_pieces_reach_the_c_handlers() {
     }
 }
 
+unsafe extern "C" fn on_start_suspend(
+    arg: *mut c_void,
+    name: *const XML_Char,
+    _atts: *mut *const XML_Char,
+) {
+    // SAFETY: test contract.
+    let log = unsafe { log(arg) };
+    log.lines.push(format!("start {}", text(name)));
+    // SAFETY: the parser is live during its own parse.
+    unsafe {
+        assert_eq!(XML_StopParser(log.parser, 1), XML_STATUS_OK);
+        assert_eq!(XML_ResumeParser(log.parser), XML_STATUS_ERROR);
+    }
+}
+
+#[test]
+fn stop_and_resume_through_the_c_functions() {
+    // SAFETY: NULL selects the default encoding.
+    let p = unsafe { XML_ParserCreate(std::ptr::null()) };
+    let mut log = Log {
+        parser: p,
+        ..Log::default()
+    };
+    // SAFETY: `p` is live and `log` outlives the parse; a NULL handle is
+    // accepted.
+    unsafe {
+        XML_SetUserData(p, (&raw mut log).cast());
+        XML_SetStartElementHandler(p, Some(on_start_suspend));
+        assert_eq!(XML_StopParser(p, 1), XML_STATUS_ERROR);
+        assert_eq!(XML_GetErrorCode(p), error(ErrorCode::NotStarted));
+        let doc = b"<a><b/></a>";
+        assert_eq!(
+            XML_Parse(p, doc.as_ptr().cast(), 11, 1),
+            XML_STATUS_SUSPENDED
+        );
+        assert_eq!(XML_ResumeParser(p), XML_STATUS_SUSPENDED);
+        assert_eq!(XML_ResumeParser(p), XML_STATUS_OK);
+        assert_eq!(XML_ResumeParser(p), XML_STATUS_ERROR);
+        assert_eq!(XML_GetErrorCode(p), error(ErrorCode::NotSuspended));
+        assert_eq!(XML_StopParser(std::ptr::null_mut(), 0), XML_STATUS_ERROR);
+        assert_eq!(XML_ResumeParser(std::ptr::null_mut()), XML_STATUS_ERROR);
+        XML_ParserFree(p);
+    }
+    assert_eq!(log.lines, ["start a", "start b"]);
+}
+
 #[test]
 fn errors_and_positions_match_the_rust_api() {
     // SAFETY: NULL selects the default encoding.
