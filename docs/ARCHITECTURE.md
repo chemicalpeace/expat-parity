@@ -2,7 +2,7 @@
 
 ## Goal
 
-A memory-safe Rust implementation of libexpat 2.9.0 whose observable behaviour
+A memory-safe Rust implementation of libexpat 2.10.0 (2.9.0 before D-042) whose observable behaviour
 is *equal* (defined below) to the C library on every input, except for
 documented divergences (`docs/DIVERGENCES.md`).
 

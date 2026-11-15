@@ -26,6 +26,21 @@ All notable changes are documented here. The format follows
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.
 
+### Changed
+- Target and C oracle moved from libexpat 2.9.0 to 2.10.0 (D-042). The
+  vendored sources are re-vendored byte for byte; the port follows every
+  2.10.0 change that is observable: an entity declaration whose value
+  fails is no longer reported (#1415), an empty first input of an
+  external entity parser keeps the byte order mark and text declaration
+  detection (#1444), attribute counts above `INT_MAX` are refused (#1450).
+
+### Security
+- CVE-2026-115506 (billion-laughs variants): the expanded size of an
+  internal entity is computed on its first expansion and a reference
+  whose expansion would exceed the amplification limits is refused before
+  it is expanded, as in libexpat 2.10.0. A crafted document with 8 MiB of
+  padding is now rejected in about 15 ms instead of about 30 s.
+
 ### Known limitations
 - No default handler, DTD or entity declaration events, unknown-encoding
   handler, position in callbacks, or stop/resume; external entities are

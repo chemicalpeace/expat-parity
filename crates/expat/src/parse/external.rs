@@ -309,6 +309,11 @@ impl Dtd {
                         has_more: false,
                         is_param: e.is_param,
                         is_internal: e.is_internal,
+                        // `lookup` zeroes the new entry; `scanPtr` is set
+                        // to the copied text (2.10.0), i.e. offset 0.
+                        expanded_size: 0,
+                        being_analyzed: false,
+                        scan_pos: 0,
                     };
                 }
             }
@@ -658,6 +663,18 @@ impl Parser {
                 }
                 self.event_ptr = Some(start);
                 return Err(XmlError::PartialChar.into());
+            }
+            // libexpat 2.10.0 (#1444, CVE-2026-117610): an empty input
+            // leaves the processor here, so the byte order mark and text
+            // declaration of a later call are still recognised. 2.9.0 fell
+            // through to `externalEntityInitProcessor3` (and crashed on a
+            // non-final call). On a final call `*endPtr` is left alone and
+            // the event pointer is not set either.
+            Scan::None => {
+                if !self.final_buffer {
+                    *end_ptr = start;
+                }
+                return Ok(());
             }
             _ => {}
         }

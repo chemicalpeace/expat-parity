@@ -114,6 +114,10 @@ impl Parser {
         if ty == EntityType::Internal {
             self.processor = Processor::InternalEntity;
         }
+        // libexpat 2.10.0 (CVE-2026-115506): compute the size of the
+        // complete expansion on the first reference and refuse it before
+        // anything is opened when the limits would not tolerate it.
+        self.check_entity_expansion(r)?;
         // C reuses a freed OPEN_INTERNAL_ENTITY or allocates one; the port
         // keeps the count of reusable ones (`m_freeEntities`).
         if self.free_entities == 0 {

@@ -242,7 +242,10 @@ fn setters_match_c() {
 fn default_limits_match_c() {
     // Billion laughs (10 levels x 10 references, 3 * 10^9 bytes if
     // unchecked) under libexpat's defaults (100.0, 8 MiB): stopped with 43
-    // shortly after the output passes 8 MiB, in every context.
+    // in every context. Since 2.10.0 (CVE-2026-115506) the reference is
+    // refused before it is expanded, from its precomputed expansion size,
+    // so the counters never reach the 8 MiB threshold (2.9.0 stopped
+    // shortly after the output had passed it).
     let mut t = Tally::new();
     for ctx in CONTEXTS {
         let doc = laughs(10, 10, seed(ctx), ctx);
@@ -254,8 +257,8 @@ fn default_limits_match_c() {
             assert_eq!(code(&out), BREACH, "laughs-{ctx}: C must stop with 43");
             let (d, i) = counters(&out.c);
             assert!(
-                d + i >= 8_388_608,
-                "laughs-{ctx}: stopped below the threshold"
+                d + i < 8_388_608,
+                "laughs-{ctx}: expanded up to the threshold before stopping ({d} direct, {i} indirect)"
             );
         }
         // Below the activation threshold an amplification of thousands is

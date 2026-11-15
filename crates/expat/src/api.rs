@@ -406,7 +406,7 @@ impl ErrorCode {
     }
 
     /// The libexpat text of the code (`XML_ErrorString`), the same bytes as
-    /// the vendored libexpat 2.9.0 returns for its C value. This is also
+    /// the vendored libexpat 2.10.0 returns for its C value. This is also
     /// what [`Display`](core::fmt::Display) writes.
     ///
     /// ```

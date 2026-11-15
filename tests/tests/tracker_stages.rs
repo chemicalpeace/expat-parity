@@ -112,7 +112,7 @@ fn stage2_pool_growth_at_block_boundaries() {
             );
             for doc in [text.clone().into_bytes(), utf16le(&text)] {
                 let ev = assert_equal_streams("stage 2", &doc, &base());
-                grows += ev.iter().filter(|e| e.increase && e.line == 8608).count();
+                grows += ev.iter().filter(|e| e.increase && e.line == 9139).count();
             }
         }
     }
@@ -162,7 +162,7 @@ fn stage4b_entity_value_pool_block_for_an_empty_value() {
         let ev = assert_equal_streams("stage 4b", doc, &base());
         // Each document allocates at least one pool block after creation.
         assert!(
-            ev.iter().any(|e| e.increase && e.line == 8648),
+            ev.iter().any(|e| e.increase && e.line == 9179),
             "stage 4b: no pool block"
         );
     }
@@ -225,7 +225,7 @@ fn stage3_root_creation_allocations() {
     let created: u64 = ev.iter().take(4).map(|e| e.size).sum();
     assert_eq!(
         ev.iter().take(4).map(|e| e.line).collect::<Vec<_>>(),
-        [1395, 1405, 1410, 7865],
+        [1414, 1424, 1429, 8393],
         "stage 3: C's creation events"
     );
     assert_eq!(
@@ -247,7 +247,7 @@ fn stage3_root_creation_allocations() {
 
 /// Stage 3: an external entity parser's creation is checked and charged
 /// allocation by allocation; a refusal at any of them (the structure,
-/// `xmlparse.c` 1310; `m_atts`, 1405; `m_dataBuf`, 1410; the DTD, 7865)
+/// `xmlparse.c` 1329; `m_atts`, 1424; `m_dataBuf`, 1429; the DTD, 8393)
 /// frees what was allocated, like C.
 #[test]
 fn stage3_child_creation_refusals() {
@@ -266,7 +266,7 @@ fn stage3_child_creation_refusals() {
             lines.insert(e.line);
         }
     }
-    for line in [1310, 1405, 1410, 7865] {
+    for line in [1329, 1424, 1429, 8393] {
         assert!(
             lines.contains(&line),
             "stage 3: no refusal at xmlparse.c:{line} ({lines:?})"
@@ -359,9 +359,9 @@ fn stage7_partial_dtd_copy_released() {
         ..o.clone()
     }) {
         let ev = assert_equal_streams("stage 7 partial default values", doc.as_bytes(), &o);
-        // A refusal after the child parser's creation (its DTD, 7865).
+        // A refusal after the child parser's creation (its DTD, 8393).
         if let Some(k) = ev.iter().position(|e| e.refused)
-            && ev[..k].iter().filter(|e| e.line == 7865).count() == 2
+            && ev[..k].iter().filter(|e| e.line == 8393).count() == 2
         {
             at_copy += 1;
         }
@@ -385,11 +385,11 @@ fn fine_sweep(o: &ParseOptions, from: u64, to: u64) -> impl Iterator<Item = Pars
 }
 
 /// Refusals C tolerates: `getAttributeId` does not check the `lookup` of
-/// an `xmlns:` prefix (`xmlparse.c` 7650-7652), so when the tracker
+/// an `xmlns:` prefix (`xmlparse.c` 8178-8180), so when the tracker
 /// refuses that `PREFIX` (or the table's growth) the attribute id keeps a
 /// NULL prefix with `xmlns` set and the parse goes on; `storeAtts` then
-/// treats the attribute as an unprefixed one (4262, 4295) and `dtdCopy`
-/// copies `xmlns` only with a prefix (8011). The port stopped with
+/// treats the attribute as an unprefixed one (4330, 4368) and `dtdCopy`
+/// copies `xmlns` only with a prefix (8539). The port stopped with
 /// `XML_ERROR_NO_MEMORY` there (found by the tightened fuzz check: the
 /// port refused where C accepted).
 #[test]
@@ -428,10 +428,10 @@ fn refusal_of_an_xmlns_prefix_is_tolerated() {
                 expat_oracle::parse_trace_with_tracker_events(doc.as_bytes(), &o).expect("oracle");
             let c_trace = String::from_utf8_lossy(&c_trace).into_owned();
             // A refused `PREFIX` (24 bytes) or prefix table (520 bytes at
-            // 8260) that C went on from.
+            // 8791) that C went on from.
             if ev
                 .iter()
-                .any(|e| e.refused && ((e.size == 24 && e.line == 8331) || e.line == 8260))
+                .any(|e| e.refused && ((e.size == 24 && e.line == 8862) || e.line == 8791))
                 && !result_line(c_trace.as_bytes()).starts_with("result error 1 ")
             {
                 tolerated += 1;
@@ -451,17 +451,18 @@ fn refusal_of_an_xmlns_prefix_is_tolerated() {
     );
 }
 
-/// What C hands the entity declaration handler after a refused
-/// allocation: `XML_ROLE_ENTITY_VALUE` reports `dtd->entityValuePool`
-/// before returning `storeEntityValue`'s error (`xmlparse.c` 5935-5958):
-/// NULL when the pool's first block was refused (7126-7129), otherwise the
-/// characters written before the refused growth (`poolAppend` writes the
-/// whole characters that fit; `poolAppendChars` for a character reference
-/// writes nothing when it cannot grow).
-/// The port reported an empty value and the whole last token.
+/// A refused allocation while an entity value is stored: since 2.10.0
+/// (#1415) `XML_ROLE_ENTITY_VALUE` returns `storeEntityValue`'s error
+/// before the entity gets its text and before the entity declaration
+/// handler is called (`xmlparse.c` 6008-6015). 2.9.0 still reported
+/// what `dtd->entityValuePool` held (NULL when the first block was
+/// refused, otherwise the characters written before the refused growth),
+/// which the port had matched. Every run is compared with C; this checks
+/// that some runs were refused inside the value and none of them reported
+/// a partial or NULL value.
 #[test]
-fn refused_entity_value_reports_what_c_stored() {
-    let (mut null_values, mut partial_values) = (0, 0);
+fn refused_entity_value_is_not_reported() {
+    let mut unreported = 0;
     for piece in [
         "x",
         "\u{e9}",
@@ -482,24 +483,22 @@ fn refused_entity_value_reports_what_c_stored() {
                 if !ev.iter().any(|e| e.refused) {
                     continue;
                 }
-                if c_trace.contains("entity e 0 ~ ") {
-                    null_values += 1;
-                } else if c_trace.lines().any(|l| l.starts_with("entity e 0 ")) {
-                    partial_values += 1;
+                assert!(
+                    !c_trace.contains("entity e 0 ~ "),
+                    "C reported a NULL entity value:\n{c_trace}"
+                );
+                if !c_trace.lines().any(|l| l.starts_with("entity e 0 ")) {
+                    unreported += 1;
                 }
             }
         }
     }
-    assert!(null_values > 0, "no run with a NULL entity value");
-    assert!(
-        partial_values > 0,
-        "no run with a partly stored entity value"
-    );
+    assert!(unreported > 0, "no run refused inside the entity value");
 }
 
 /// A start tag whose buffer cannot grow is on `m_tagStack` already
-/// (`xmlparse.c` 3764-3766, 3790-3792), so `XML_ParserFree` releases it
-/// before its parent (1874-1887); the port put it on the free list.
+/// (`xmlparse.c` 3818-3820, 3844-3846), so `XML_ParserFree` releases it
+/// before its parent (1911-1924); the port put it on the free list.
 #[test]
 fn refused_tag_buffer_growth_released_first() {
     let mut refused = 0;
@@ -508,7 +507,7 @@ fn refused_tag_buffer_growth_released_first() {
         for doc in [text.clone().into_bytes(), utf16le(&text)] {
             for o in fine_sweep(&base(), 3_100, 7_000).step_by(2) {
                 let ev = assert_equal_streams("tag buffer refusal", &doc, &o);
-                if ev.iter().any(|e| e.refused && e.line == 3790) {
+                if ev.iter().any(|e| e.refused && e.line == 3844) {
                     refused += 1;
                 }
             }

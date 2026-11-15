@@ -57,18 +57,38 @@ impl Default for Accounting {
 }
 
 impl Accounting {
-    /// `accountingGetCurrentAmplification`, computed in `float` like C.
+    /// `accountingGetCurrentAmplification(rootParser, 0)`, computed in
+    /// `float` like C.
     pub fn current_amplification(&self) -> f32 {
+        self.amplification_with(0)
+    }
+
+    /// `accountingGetCurrentAmplification(rootParser, extraIndirectBytes)`
+    /// (libexpat 2.10.0): the counts are converted to `float` one by one
+    /// and added as floats (`(float)direct + ((float)indirect +
+    /// (float)extra)`), so the sum cannot wrap. Each operation rounds to
+    /// `float` like C's.
+    pub fn amplification_with(&self, extra_indirect_bytes: u64) -> f32 {
+        let indirect = self.count_bytes_indirect as f32 + extra_indirect_bytes as f32;
+        if self.count_bytes_direct != 0 {
+            (self.count_bytes_direct as f32 + indirect) / self.count_bytes_direct as f32
+        } else {
+            (LEN_OF_SHORTEST_INCLUDE as f32 + indirect) / LEN_OF_SHORTEST_INCLUDE as f32
+        }
+    }
+
+    /// `accountingCurrentAmplificationTolerated(rootParser,
+    /// extraIndirectBytes)` (libexpat 2.10.0): whether `extra_indirect_bytes`
+    /// more indirect bytes would still be within the limits. The output
+    /// count saturates instead of wrapping when the extra bytes would
+    /// overflow it.
+    pub fn amplification_tolerated(&self, extra_indirect_bytes: u64) -> bool {
         let output = self
             .count_bytes_direct
             .wrapping_add(self.count_bytes_indirect);
-        // Integer to float conversions round exactly like C's casts.
-        if self.count_bytes_direct != 0 {
-            output as f32 / self.count_bytes_direct as f32
-        } else {
-            LEN_OF_SHORTEST_INCLUDE.wrapping_add(self.count_bytes_indirect) as f32
-                / LEN_OF_SHORTEST_INCLUDE as f32
-        }
+        let output_with_extra = output.saturating_add(extra_indirect_bytes);
+        output_with_extra < self.activation_threshold_bytes
+            || self.amplification_with(extra_indirect_bytes) <= self.maximum_amplification_factor
     }
 
     /// `accountingDiffTolerated` for `bytes` bytes of a token of kind `tok`
@@ -91,10 +111,6 @@ impl Accounting {
             return false;
         };
         *target = sum;
-        let output = self
-            .count_bytes_direct
-            .wrapping_add(self.count_bytes_indirect);
-        output < self.activation_threshold_bytes
-            || self.current_amplification() <= self.maximum_amplification_factor
+        self.amplification_tolerated(0)
     }
 }

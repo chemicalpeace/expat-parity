@@ -865,6 +865,7 @@ oracle_c_sizes(size_t *out, size_t n) {
       sizeof(ACCOUNTING),
       sizeof(MALLOC_TRACKER),
       sizeof(ENTITY_STATS),
+      sizeof(ENTITY_ANALYSIS_TASK),
   };
   size_t i;
   for (i = 0; i < n && i < sizeof(v) / sizeof(v[0]); i++)

@@ -7,8 +7,8 @@
 //! All `unsafe` code of the project outside `expat-capi` lives in the private `ffi` module and
 //! the wrappers below; each block states why it is sound.
 //!
-//! The vendored sources are libexpat `R_2_9_0`
-//! (commit `a76b1174c1ea52abb639a4c69d52b630a8a106a2`), MIT licensed; see
+//! The vendored sources are libexpat `R_2_10_0`
+//! (commit `a70841d9ffa64ddde29ab824ed6305035ebe4c47`), MIT licensed; see
 //! `vendor/expat/COPYING` and the repository `NOTICE`.
 
 use std::ffi::{CStr, CString, c_char, c_int, c_uint, c_ushort};
@@ -18,9 +18,9 @@ mod ffi;
 pub mod tok;
 
 /// Upstream release tag of the vendored sources.
-pub const UPSTREAM_TAG: &str = "R_2_9_0";
+pub const UPSTREAM_TAG: &str = "R_2_10_0";
 /// Upstream commit hash of the vendored sources.
-pub const UPSTREAM_COMMIT: &str = "a76b1174c1ea52abb639a4c69d52b630a8a106a2";
+pub const UPSTREAM_COMMIT: &str = "a70841d9ffa64ddde29ab824ed6305035ebe4c47";
 
 /// Byte-type tables of the C encodings (`struct normal_encoding::type`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -495,7 +495,7 @@ pub fn last_tracker_bytes() -> TrackerBytes {
 /// `MALLOC_TRACKER` and `ENTITY_STATS` are the parser's members with an
 /// `unsigned long debugLevel` (stage 3: the parser structure is 32 bytes
 /// smaller on 64-bit Windows).
-pub const ORACLE_C_SIZE_NAMES: [&str; 22] = [
+pub const ORACLE_C_SIZE_NAMES: [&str; 23] = [
     "TAG",
     "BINDING",
     "PREFIX",
@@ -518,6 +518,7 @@ pub const ORACLE_C_SIZE_NAMES: [&str; 22] = [
     "ACCOUNTING",
     "MALLOC_TRACKER",
     "ENTITY_STATS",
+    "ENTITY_ANALYSIS_TASK",
 ];
 
 /// The C compiler's sizes of the structures named in
@@ -964,7 +965,7 @@ mod tests {
 
     #[test]
     fn version_matches_pin() {
-        assert_eq!(expat_version(), "expat_2.9.0");
+        assert_eq!(expat_version(), "expat_2.10.0");
     }
 
     #[test]

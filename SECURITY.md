@@ -10,7 +10,7 @@ security problems.
 
 Include a minimal reproducer (input bytes and parse options) if possible. A
 reproducer that makes the port panic, hang, use unbounded memory, or disagree
-with libexpat 2.9.0 on an observable result is in scope.
+with libexpat 2.10.0 on an observable result is in scope.
 
 ## Scope
 

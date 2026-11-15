@@ -1,4 +1,7 @@
-# Divergences from libexpat 2.9.0
+# Divergences from libexpat 2.10.0
+
+The oracle and the port moved from 2.9.0 to 2.10.0 with D-042; no new
+divergence came with it. Entries below written before then refer to 2.9.0.
 
 Every intentional difference between the port and the C oracle is listed here
 with: the input that shows it (reproducer), the spec reference that justifies

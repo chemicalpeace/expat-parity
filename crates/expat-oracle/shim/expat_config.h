@@ -33,8 +33,8 @@
 #define PACKAGE_NAME "expat"
 #define PACKAGE_TARNAME "expat"
 #define PACKAGE_URL ""
-#define PACKAGE_VERSION "2.9.0"
-#define PACKAGE_STRING "expat 2.9.0"
+#define PACKAGE_VERSION "2.10.0"
+#define PACKAGE_STRING "expat 2.10.0"
 #define PACKAGE_BUGREPORT ""
 
 #define XML_CONTEXT_BYTES 1024

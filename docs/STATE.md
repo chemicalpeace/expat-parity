@@ -5,7 +5,13 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
 
 ## Snapshot
 
-- **Target:** libexpat 2.9.0 (`R_2_9_0`, `a76b1174c1ea52abb639a4c69d52b630a8a106a2`) — frozen (D-001).
+- **Target:** libexpat 2.10.0 (`R_2_10_0`, `a70841d9ffa64ddde29ab824ed6305035ebe4c47`) — frozen (D-001, moved from 2.9.0 by D-042 on 2026-11-13).
+- **2.10.0 parity (local branch `cve-2-10-0-check`, not pushed):** oracle
+  re-vendored at 2.10.0; the port follows CVE-2026-115506 (precomputed
+  entity expansion sizes, `parse/expansion`), #1415, #1444 and #1450;
+  everything else in 2.10.0 has no observable effect in the port (D-042
+  lists it). Full suite green in debug and release on aarch64 Linux; not
+  yet run on macOS/Windows CI, under Miri or the fuzz smoke tests.
 - **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-10 done;
   module 11 in progress: 11a (declarations, PR #6), 11b (internal entity
   expansion and recursion, PR #7), 11b2 (billion-laughs limits, PR #8) and
