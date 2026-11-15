@@ -185,6 +185,16 @@ internal entity is opened:
 
 Line numbers in the rest of this document are 2.9.0's.
 
+### 4.2 Large benign documents (D-063)
+
+`scripts/doc-limits.sh` measures real documents with their DTDs; C and the
+port give the same results. All 352 documents of the DITA Open Toolkit
+4.3.4 user guide parse with the defaults (at most about 0.6 MB read,
+below the 8 MiB activation threshold). The PostgreSQL 17 manual (DocBook
+XML 4.5, about 8 MB in external entities under an 8,101-byte root file)
+is refused: external entity bytes count as indirect, so past the
+threshold the factor is about 1,687, against the default maximum of 100.
+
 ## 5. Allocation tracker
 
 ### What C does

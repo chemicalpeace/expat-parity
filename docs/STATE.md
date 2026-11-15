@@ -155,7 +155,9 @@ with allocation failures, white-box).
    libexpat internals pass). A failure of the system allocator while
    parsing ends the parse with `NoMemory` since D-061 (`system_oom.rs`,
    835 failure points, none aborts). libexpat's development branch is
-   compared weekly since D-062 (`scripts/upstream-check.sh`). The
+   compared weekly since D-062 (`scripts/upstream-check.sh`). Large
+   DocBook and DITA documents are measured against the default limits
+   (D-063). The
    unknown-encoding handler branch is compared through the C interface
    since D-057.
 3. Part 2 of the coverage work is done on branch `part2-finish` (on top of
