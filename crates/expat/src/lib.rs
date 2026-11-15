@@ -91,7 +91,7 @@ pub use api::{Error, ErrorCode, Options, Parser, Stopper};
 pub use entities::{ExternalEntities, ExternalParser};
 pub use handler::{Events, Handler};
 pub use parse::{
-    ContentModel, ContentNode, ContentQuant, ContentType, ConvertFn, EncodingInfo,
+    ContentModel, ContentNode, ContentQuant, ContentType, ConvertFn, EncodingInfo, MemorySuite,
     ParamEntityParsing, Parsing as ParsingStatus, ReleaseFn,
 };
 

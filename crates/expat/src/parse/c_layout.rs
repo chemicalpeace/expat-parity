@@ -105,6 +105,9 @@ pub const ENTITY: usize = c_struct(&[
 ])
 .0;
 
+/// `XML_Content` (`expat.h`): what `build_model` allocates per node.
+pub const XML_CONTENT: usize = c_struct(&[ENUM, ENUM, PTR, UINT, PTR]).0;
+
 /// `sizeof(CONTENT_SCAFFOLD)` (`xmlparse.c` 330-338): two enums, a
 /// pointer, four `int`s.
 pub const CONTENT_SCAFFOLD: usize = c_struct(&[ENUM, ENUM, PTR, INT, INT, INT, INT]).0;

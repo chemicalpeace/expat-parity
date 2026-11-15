@@ -33,6 +33,8 @@ jobs:
         run: scripts/capi-check.sh
       - name: W3C XML Conformance Test Suite against libexpat
         run: scripts/w3c-check.sh
+      - name: libexpat's test suite against the drop-in library
+        run: scripts/runtests-check.sh
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check

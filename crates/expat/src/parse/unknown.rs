@@ -118,6 +118,17 @@ impl Parser {
         }
     }
 
+    /// Takes the release function of the unknown encoding out, so that
+    /// the caller runs it (libexpat's `callUnknownEncodingRelease` at the
+    /// start of `XML_ParserFree` and `XML_ParserReset`, while the parser
+    /// can still be queried). `None` without a release function, or while
+    /// an external entity parser still shares the encoding (it then runs
+    /// when the last parser using it is dropped, as before).
+    pub(crate) fn take_encoding_release(&mut self) -> Option<ReleaseFn> {
+        let unknown = self.unknown.as_mut()?;
+        Arc::get_mut(unknown)?._release.0.take()
+    }
+
     /// The release function runs and `m_unknownEncodingMem` is freed
     /// (`XML_ParserFree`, `XML_ParserReset`).
     pub(crate) fn free_unknown_encoding(&mut self) {

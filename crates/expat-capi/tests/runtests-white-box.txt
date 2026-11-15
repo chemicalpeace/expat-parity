@@ -1,0 +1,15 @@
+# Tests of libexpat 2.10.0's test suite (tests/runtests) that call libexpat
+# internals instead of expat.h; scripts/runtests-check.sh expects exactly
+# these to fail (D-060). One test per line, then the internal it calls.
+test_alloc_tracker_getbuffer_unlimited expat_malloc, expat_realloc, expat_free
+test_alloc_tracker_maximum_amplification expat_malloc, expat_free
+test_alloc_tracker_pointer_alignment expat_malloc, expat_free
+test_alloc_tracker_size_recorded expat_malloc, expat_realloc, expat_free
+test_alloc_tracker_threshold expat_malloc, expat_free
+test_hash_salt_ulong xmlSetHashSalt
+test_hash_table hashTableInit, lookup, hashTableIter*
+test_helper_unsigned_char_to_printable unsignedCharToPrintable
+test_is_cdata_comment_or_pi_start isCDataCommentOrPIStart
+test_is_predefined_entity_name isPredefinedEntityName
+test_scan_entity_text scanEntityText
+test_utf8_auto_align _INTERNAL_trim_to_complete_utf8_characters

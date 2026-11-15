@@ -60,11 +60,22 @@ All notable changes are documented here. The format follows
 - The W3C XML Conformance Test Suite (xmlts20130923, not vendored) is
   compared with libexpat: 2,586 documents under five option sets
   (`w3c_diff.rs`, `scripts/w3c-check.sh`, D-059).
+- Drop-in shared library (`scripts/build-dropin.sh`, `libexpat.so.1`) and
+  libexpat 2.10.0's own test suite run against it
+  (`scripts/runtests-check.sh`): every test passes except 12 that call
+  libexpat internals (D-060).
 - `docs/ROADMAP.md`: status and planned work against the points in
   "What a rewrite of libexpat needs" (libexpat maintainer, 2026-11-10).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.
+
+### Fixed
+- C interface: `XML_ParserFree` from an unknown encoding's `release`
+  function freed the parser twice; external entity parsers can be created
+  outside a handler; the amplification setters refuse external entity
+  parsers; `XML_ParserCreate_MM` routes every allocation libexpat makes
+  through the program's memory functions (D-060).
 
 ### Changed
 - `Parser::reset` returns whether the parser was reset (`false` for an

@@ -719,8 +719,8 @@ impl Parser {
                 if self.dtd.in_eldecl {
                     if self.handlers.element_decl {
                         // C allocates the model with the plain `malloc_fcn`
-                        // (outside the tracker).
-                        if !self.tracker.t.allocator_call() {
+                        // (outside the tracker): one `XML_Content`.
+                        if !self.tracker.t.content_model_malloc(super::c_layout::XML_CONTENT) {
                             return Err(XmlError::NoMemory.into());
                         }
                         let kind = if role == Role::ContentAny {
@@ -790,8 +790,14 @@ impl Parser {
                     if self.dtd.scaff_level == 0 {
                         if self.handlers.element_decl {
                             // `build_model` allocates with the plain
-                            // `malloc_fcn` (outside the tracker).
-                            if !self.tracker.t.allocator_call() {
+                            // `malloc_fcn` (outside the tracker): the nodes
+                            // and their names in one block.
+                            let size = self
+                                .dtd
+                                .scaff_count
+                                .saturating_mul(super::c_layout::XML_CONTENT)
+                                .saturating_add(self.dtd.content_string_len as usize);
+                            if !self.tracker.t.content_model_malloc(size) {
                                 return Err(XmlError::NoMemory.into());
                             }
                             let model = self.dtd.build_model();

@@ -163,6 +163,22 @@ impl Parser {
         }
     }
 
+    /// [`Parser::with_options`] whose allocations are also reported to
+    /// `suite` (`XML_ParserCreate_MM`): one call for each call libexpat
+    /// makes to its memory functions, with libexpat's sizes, so that an
+    /// allocator that fails or counts sees what it would see with
+    /// libexpat, and a failing call makes the parser fail where libexpat
+    /// fails (`ErrorCode::NoMemory`). `None` when one of the creation
+    /// calls fails. The parser's own data still lives in Rust collections.
+    pub fn with_memory_suite(
+        salt: [u8; 16],
+        options: Options,
+        suite: Arc<dyn crate::MemorySuite>,
+    ) -> Option<Self> {
+        let mut p = Self::with_options(salt, options);
+        p.inner.tracker.t.attach_suite(suite).then_some(p)
+    }
+
     /// Parses the next piece of the document (`XML_Parse`); `is_final`
     /// marks the last piece.
     ///
@@ -604,6 +620,21 @@ impl Parser {
         self.inner.set_billion_laughs_maximum_amplification(factor)
     }
 
+    /// The amplification counts of the document so far: bytes read
+    /// directly from the input and bytes read from entity expansions
+    /// (`countBytesDirect` and `countBytesIndirect` of the root parser).
+    pub fn amplification_counts(&self) -> (u64, u64) {
+        let a = self.inner.accounting();
+        (a.count_bytes_direct, a.count_bytes_indirect)
+    }
+
+    /// The number of input bytes handed to the tokenizer so far; with
+    /// reparse deferral ([`Parser::set_reparse_deferral_enabled`]) a
+    /// partial token is not scanned again until enough input arrived.
+    pub fn bytes_scanned(&self) -> u64 {
+        self.inner.bytes_scanned
+    }
+
     /// The factor set with
     /// [`Parser::set_billion_laughs_maximum_amplification`].
     pub fn billion_laughs_maximum_amplification(&self) -> f32 {
@@ -700,6 +731,40 @@ impl Parser {
         // The core also refuses from inside a handler, which a `&mut
         // Parser` cannot be.
         self.inner.reset(encoding, salt)
+    }
+
+    /// `XML_ExternalEntityParserCreate` outside a handler: the parser of
+    /// an external entity of this document, as
+    /// [`ExternalEntities::create`] makes it inside
+    /// [`Handler::external_entity_ref`] (same arguments, same result).
+    /// libexpat allows the call at any time; the new parser borrows this
+    /// one until it is dropped.
+    ///
+    /// ```
+    /// let mut p = expat::Parser::new([7; 16]);
+    /// let mut subset = p.external_parser(None, None).expect("parser");
+    /// assert_eq!(subset.parse(b"<!ENTITY e 'v'>", true), Ok(()));
+    /// ```
+    ///
+    /// [`ExternalEntities::create`]: crate::ExternalEntities::create
+    pub fn external_parser(
+        &mut self,
+        context: Option<&[u8]>,
+        encoding: Option<&[u8]>,
+    ) -> Option<crate::ExternalParser<'_>> {
+        crate::entities::ExternalEntities::new(&mut self.inner).into_parser(context, encoding)
+    }
+
+    /// Takes the release function of the encoding that
+    /// [`Handler::unknown_encoding`] supplied out of the parser, so that
+    /// the caller runs it at a point of its choosing, for example before
+    /// dropping or resetting the parser while it can still be queried
+    /// (libexpat calls `release` first in `XML_ParserFree` and
+    /// `XML_ParserReset`). Without this call the function runs when the
+    /// parser is reset or dropped. `None` when there is none, or while an
+    /// external entity parser still shares the encoding.
+    pub fn take_encoding_release(&mut self) -> Option<crate::ReleaseFn> {
+        self.inner.take_encoding_release()
     }
 
     /// The public result of a call that returned `status`.
