@@ -152,7 +152,9 @@ with allocation failures, white-box).
    XML Conformance Test Suite is compared since D-059 (`w3c_diff.rs`,
    2,586 documents, 12,930 runs equal). libexpat's own test suite runs
    against the drop-in `libexpat.so.1` since D-060 (all but 12 tests of
-   libexpat internals pass). The
+   libexpat internals pass). A failure of the system allocator while
+   parsing ends the parse with `NoMemory` since D-061 (`system_oom.rs`,
+   835 failure points, none aborts). The
    unknown-encoding handler branch is compared through the C interface
    since D-057.
 3. Part 2 of the coverage work is done on branch `part2-finish` (on top of

@@ -55,7 +55,7 @@
 #[cfg(test)]
 mod tests;
 
-use alloc::vec;
+use crate::fallible::{try_filled, TryGrow};
 use alloc::vec::Vec;
 
 use crate::heap::{BLOCK_HEADER_SIZE, Heap, NoMemory};
@@ -232,6 +232,7 @@ impl StringPool {
         let used = self.end().saturating_sub(self.start); // `end - start`
         if let Some(free_size) = self.free_blocks.last().map(Block::size) {
             if self.is_null() {
+                self.blocks.try_room(1)?;
                 if let Some(b) = self.free_blocks.pop() {
                     self.blocks.push(b);
                 }
@@ -240,6 +241,7 @@ impl StringPool {
                 return Ok(());
             }
             if i64::try_from(used).unwrap_or(i64::MAX) < i64::from(free_size) {
+                self.blocks.try_room(1)?;
                 if let Some(mut b) = self.free_blocks.pop() {
                     // C copies `end - start` characters (the current string
                     // and whatever follows it in the old block).
@@ -270,10 +272,14 @@ impl StringPool {
             let Some(head) = self.blocks.last_mut() else {
                 return Err(NoMemory);
             };
+            let new_len = usize::try_from(block_size).unwrap_or(0);
+            // The Rust memory first, so that a refusal of the global
+            // allocator leaves the heap's record unchanged (D-061).
+            head.s.try_room(new_len.saturating_sub(head.s.len()))?;
             if !heap.realloc(bytes_to_allocate_for(head.size()), bytes) {
                 return Err(NoMemory);
             }
-            head.s.resize(usize::try_from(block_size).unwrap_or(0), 0);
+            head.s.resize(new_len, 0);
         } else {
             let Ok(mut block_size) = i32::try_from(used) else {
                 return Err(NoMemory);
@@ -287,12 +293,16 @@ impl StringPool {
             if bytes == 0 {
                 return Err(NoMemory);
             }
+            // The Rust memory first (D-061): the block, a slot for it, and
+            // room on the free list for every block, so that `clear` never
+            // allocates.
+            let s = try_filled(0, usize::try_from(block_size).unwrap_or(0))?;
+            self.blocks.try_room(1)?;
+            self.free_blocks.try_room(self.blocks.len() + 1)?;
             if !heap.alloc(bytes) {
                 return Err(NoMemory);
             }
-            let mut b = Block {
-                s: vec![0; usize::try_from(block_size).unwrap_or(0)],
-            };
+            let mut b = Block { s };
             let cur = self.current();
             if let Some(dst) = b.s.get_mut(..cur.len()) {
                 dst.copy_from_slice(cur);

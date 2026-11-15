@@ -37,6 +37,7 @@
 //! (`m_entity_stats`) are not ported (they are only printed), so the
 //! depth bookkeeping of the search is left out.
 
+use crate::fallible::TryGrow;
 use super::dtd::EntityRef;
 use super::error::{Stop, XmlError};
 use super::{Parser, c_layout};
@@ -302,11 +303,12 @@ impl Parser {
         let Some(e) = self.dtd.entity(r) else {
             return EntityScanResult::Complete;
         };
-        let text = e.text.clone().unwrap_or_else(|| alloc::sync::Arc::from(&[][..]));
+        let text = e.text.clone();
+        let text: &[u8] = text.as_deref().map_or(&[], |t| t);
         let is_param = e.is_param;
         let mut pos = e.scan_pos;
         let mut size = e.expanded_size;
-        let result = scan_entity_text(&text, is_param, &mut pos, &mut size, |name| {
+        let result = scan_entity_text(text, is_param, &mut pos, &mut size, |name| {
             self.scan_lookup(is_param, name)
         });
         if !matches!(result, EntityScanResult::Overflow)
@@ -346,7 +348,7 @@ impl Parser {
             return Err(XmlError::NoMemory.into());
         }
         let mut stack: alloc::vec::Vec<EntityRef> = alloc::vec::Vec::new();
-        stack.push(root);
+        stack.try_push(root)?;
         self.set_being_analyzed(root, true);
         while let Some(&e) = stack.last() {
             match self.scan_entity(e) {
@@ -364,7 +366,7 @@ impl Parser {
                     // A blocker's size is still uncomputed and it is never
                     // on the stack already, so each entity is pushed at
                     // most once.
-                    stack.push(blocker);
+                    stack.try_push(blocker)?;
                     self.set_being_analyzed(blocker, true);
                 }
             }

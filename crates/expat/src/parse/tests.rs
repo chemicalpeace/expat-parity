@@ -213,10 +213,10 @@ fn internal_entities_expand_without_recursion() {
 #[test]
 fn public_ids_are_normalized_like_c() {
     use super::decl::normalize_public_id;
-    assert_eq!(normalize_public_id(b"  a \r\n b  "), b"a b");
-    assert_eq!(normalize_public_id(b""), b"");
-    assert_eq!(normalize_public_id(b"   "), b"");
-    assert_eq!(normalize_public_id(b"x\t y"), b"x\t y");
+    assert_eq!(normalize_public_id(b"  a \r\n b  "), Ok(b"a b".to_vec()));
+    assert_eq!(normalize_public_id(b""), Ok(Vec::new()));
+    assert_eq!(normalize_public_id(b"   "), Ok(Vec::new()));
+    assert_eq!(normalize_public_id(b"x\t y"), Ok(b"x\t y".to_vec()));
 }
 
 #[test]

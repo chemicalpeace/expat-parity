@@ -16,6 +16,7 @@
 //! until the entity and everything opened inside it are closed, exactly as
 //! C does.
 
+use crate::fallible::TryGrow;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -120,6 +121,12 @@ impl Parser {
         self.check_entity_expansion(r)?;
         // C reuses a freed OPEN_INTERNAL_ENTITY or allocates one; the port
         // keeps the count of reusable ones (`m_freeEntities`).
+        // The Rust memory before the tracker's record (D-061).
+        match ty {
+            EntityType::Internal => self.open_internal_entities.try_room(1)?,
+            EntityType::Attribute => self.open_attribute_entities.try_room(1)?,
+            EntityType::Value => self.open_value_entities.try_room(1)?,
+        }
         if self.free_entities == 0 {
             let direct = self.direct();
             if !self.tracker.t.alloc(OPEN_ENTITY_SIZE, direct) {
@@ -180,15 +187,11 @@ impl Parser {
     }
 
     /// The text, `processed` offset, `hasMore` and `is_param` of `r`.
-    fn entity_progress(&self, r: EntityRef) -> (Arc<[u8]>, usize, bool, bool) {
+    /// `None` stands for an empty text.
+    fn entity_progress(&self, r: EntityRef) -> (Option<Arc<Vec<u8>>>, usize, bool, bool) {
         match self.dtd.entity(r) {
-            Some(e) => (
-                e.text.clone().unwrap_or_else(|| Arc::from(&[][..])),
-                e.processed,
-                e.has_more,
-                e.is_param,
-            ),
-            None => (Arc::from(&[][..]), 0, false, false),
+            Some(e) => (e.text.clone(), e.processed, e.has_more, e.is_param),
+            None => (None, 0, false, false),
         }
     }
 
@@ -212,17 +215,18 @@ impl Parser {
         };
         let (r, start_tag_level) = (open.entity, open.start_tag_level);
         let (text, processed, has_more, is_param) = self.entity_progress(r);
+        let text: &[u8] = text.as_deref().map_or(&[], |t| t);
         if has_more {
             let enc = self.internal_encoding();
             // Set a safe default value in case 'next' does not get set.
             let mut next = processed;
             if is_param {
-                let t = prolog_tok(&enc, &text, processed);
+                let t = prolog_tok(&enc, text, processed);
                 let tok_next = t.next.unwrap_or(processed);
                 let done = self.do_prolog(
                     h,
                     &enc,
-                    &text,
+                    text,
                     processed,
                     t.scan,
                     tok_next,
@@ -242,7 +246,7 @@ impl Parser {
                     h,
                     &enc,
                     start_tag_level,
-                    &text,
+                    text,
                     processed,
                     &mut next,
                     false,
@@ -326,6 +330,7 @@ impl Parser {
             let result = if let Some(open) = self.open_attribute_entities.last() {
                 let r = open.entity;
                 let (text, processed, has_more, _) = self.entity_progress(r);
+                let text: &[u8] = text.as_deref().map_or(&[], |t| t);
                 if has_more {
                     let ienc = self.internal_encoding();
                     // Set a safe default value in case 'next' does not get
@@ -333,7 +338,7 @@ impl Parser {
                     let mut next_in_entity = processed;
                     self.append_attribute_value(
                         &ienc,
-                        &text,
+                        text,
                         is_cdata,
                         processed,
                         out,
@@ -400,13 +405,14 @@ impl Parser {
             let result = if let Some(open) = self.open_value_entities.last() {
                 let r = open.entity;
                 let (text, processed, has_more, _) = self.entity_progress(r);
+                let text: &[u8] = text.as_deref().map_or(&[], |t| t);
                 if has_more {
                     let ienc = self.internal_encoding();
                     let mut next_in_entity = processed;
                     self.store_entity_value(
                         h,
                         &ienc,
-                        &text,
+                        text,
                         processed,
                         out,
                         Account::EntityExpansion,
@@ -448,12 +454,14 @@ impl Parser {
     fn get_context(&mut self) -> Result<Vec<u8>, Stop> {
         const CONTEXT_SEP: u8 = 0x0C;
         let strip = usize::from(self.namespace_separator != 0);
-        let uri_of = |uri: &[u8]| uri.get(..uri.len().saturating_sub(strip)).unwrap_or_default().to_vec();
+        fn uri_of(uri: &[u8], strip: usize) -> &[u8] {
+            uri.get(..uri.len().saturating_sub(strip)).unwrap_or_default()
+        }
         let mut out = Vec::new();
         let mut need_sep = false;
         if let Some(b) = self.dtd.default_prefix.binding.and_then(|b| self.dtd.binding(b)) {
-            out.push(b'=');
-            out.extend_from_slice(&uri_of(&b.uri));
+            out.try_push(b'=')?;
+            out.try_extend(uri_of(&b.uri, strip))?;
             need_sep = true;
         }
         for id in self.dtd.prefixes.iter() {
@@ -467,11 +475,11 @@ impl Parser {
                 continue;
             };
             if need_sep {
-                out.push(CONTEXT_SEP);
+                out.try_push(CONTEXT_SEP)?;
             }
-            out.extend_from_slice(self.dtd.prefixes.key(id).unwrap_or_default());
-            out.push(b'=');
-            out.extend_from_slice(&uri_of(&binding.uri));
+            out.try_extend(self.dtd.prefixes.key(id).unwrap_or_default())?;
+            out.try_push(b'=')?;
+            out.try_extend(uri_of(&binding.uri, strip))?;
             need_sep = true;
         }
         for id in self.dtd.general_entities.iter() {
@@ -479,9 +487,9 @@ impl Parser {
                 continue;
             }
             if need_sep {
-                out.push(CONTEXT_SEP);
+                out.try_push(CONTEXT_SEP)?;
             }
-            out.extend_from_slice(self.dtd.general_entities.key(id).unwrap_or_default());
+            out.try_extend(self.dtd.general_entities.key(id).unwrap_or_default())?;
             need_sep = true;
         }
         // The terminating NUL is appended to the pool too.
@@ -503,7 +511,11 @@ impl Parser {
         self.set_entity_open(r, false);
         let context = context?;
         let (base, system_id, public_id) = match self.dtd.entity(r) {
-            Some(e) => (e.base.clone(), e.system_id.clone(), e.public_id.clone()),
+            Some(e) => (
+                crate::fallible::try_copy_opt(&e.base)?,
+                crate::fallible::try_copy_opt(&e.system_id)?,
+                crate::fallible::try_copy_opt(&e.public_id)?,
+            ),
             None => (None, None, None),
         };
         if !h.external_entity_ref(
@@ -536,7 +548,11 @@ impl Parser {
             self.set_entity_open(r, true);
         }
         let (base, system_id, public_id) = match self.dtd.entity(r) {
-            Some(e) => (e.base.clone(), e.system_id.clone(), e.public_id.clone()),
+            Some(e) => (
+                crate::fallible::try_copy_opt(&e.base)?,
+                crate::fallible::try_copy_opt(&e.system_id)?,
+                crate::fallible::try_copy_opt(&e.public_id)?,
+            ),
             None => (None, None, None),
         };
         let ok = h.external_entity_ref(

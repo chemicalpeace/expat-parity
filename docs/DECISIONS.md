@@ -1894,3 +1894,26 @@ recorded in DIVERGENCES.md.
   tags, pools and other tables as libexpat does, so allocator calls after
   a reset can differ beyond bindings. The drop-in build is for Linux;
   other platforms' library names are not set up.
+
+## D-061 Fallible allocation while parsing (2026-11-15)
+
+- **Decision.** The parser's collections grow through
+  `crates/expat/src/fallible.rs` (`TryGrow`, `try_copy`,
+  `try_with_capacity`, `SortedMap`, `SeenNames`), which use
+  `try_reserve` and report `NoMemory`. Pools, the hash tables, the tag
+  stack, bindings, open entities, scaffolds, content models, attribute
+  lists, the input buffer and entity text all go through it. A failure
+  of the system allocator while parsing then ends the parse with
+  `ErrorCode::NoMemory` (`XML_ERROR_NO_MEMORY` through the C interface)
+  instead of aborting the process.
+- **Check.** `crates/expat-capi/tests/system_oom.rs` installs a global
+  allocator that fails the n-th allocation, for each n in turn, over a
+  set of documents (namespaces, DTD with defaults and entities, content
+  models, many attributes, external entities). The test is in
+  `expat-capi` because the `expat` crate forbids `unsafe`. Current run:
+  835 failure points, each ending with a normal return.
+- **Not covered.** Creating, resetting and configuring a parser still
+  abort on allocation failure. The reference-count block of an internal
+  entity's shared text (`Arc<Vec<u8>>`) is allocated infallibly, since
+  stable Rust has no fallible `Arc` constructor; the test exempts it.
+  A shrinking `realloc` was never failed by the test.

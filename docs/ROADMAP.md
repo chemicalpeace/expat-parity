@@ -13,7 +13,7 @@ Status words: **done** (implemented and compared with libexpat),
 | # | Point | Status |
 |---|-------|--------|
 | 1 | Drop-in C header and shared library, all public functions working | done on Linux |
-| 2 | Graceful handling of out-of-memory situations | partial |
+| 2 | Graceful handling of out-of-memory situations | done while parsing |
 | 3 | Protection against billion laughs, parameter laughs and quadratic runtime, without rejecting benign documents | done, as libexpat |
 | 4 | External entities available, disabled by default | done, as libexpat |
 | 5 | Security beyond memory safety | partial |
@@ -53,11 +53,17 @@ Done: every allocation point of the parser is failed in turn and compared
 with libexpat through `XML_ParserCreate_MM` (D-058, 83,023 failure points,
 equal results).
 
-Remaining: a failure of the system allocator in the port aborts the
-process, as the Rust standard collections do. The plan is fallible
-allocation (`try_reserve` and fallible constructors) on every path that
-libexpat reports as `XML_ERROR_NO_MEMORY`, checked with a failing global
-allocator in tests.
+Done as well: while parsing, the port's collections grow fallibly
+(`try_reserve`), so a failure of the system allocator ends the parse with
+`XML_ERROR_NO_MEMORY` instead of aborting; a test with a failing global
+allocator fails every allocation in turn and checks that the process
+does not abort (D-061).
+
+Remaining: creating, resetting and configuring a parser (`Parser::new`,
+`reset`, `XML_SetEncoding`) still abort on allocation failure, as does the
+reference-count block of an internal entity's shared text (stable Rust
+has no fallible `Arc` constructor), and the input buffer's reference
+count when `XML_GetBuffer` is called inside a handler.
 
 ## 3. Amplification and quadratic runtime
 
@@ -151,8 +157,7 @@ MIT, as libexpat.
 
 ## Order of work
 
-1. Fallible allocation (2).
-2. Release procedure and a comparison with libexpat's development branch
+1. Release procedure and a comparison with libexpat's development branch
    (10).
-3. x86_64 and Fil-C benchmarks (9); DocBook and DITA documents (3).
-4. Fifth edition names, after discussion with upstream (6).
+2. x86_64 and Fil-C benchmarks (9); DocBook and DITA documents (3).
+3. Fifth edition names, after discussion with upstream (6).

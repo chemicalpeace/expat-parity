@@ -140,6 +140,9 @@ internal_modules! {
     // reason: consumed by the parser core (docs/STATE.md modules 10-11).
     #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
     heap,
+    // reason: as above (fallible growth of the parser's collections, D-061).
+    #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
+    fallible,
     // reason: as above.
     #[cfg_attr(not(feature = "internal-api"), allow(dead_code))]
     pool,

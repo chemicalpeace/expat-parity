@@ -40,6 +40,7 @@
 //! # }
 //! ```
 
+use crate::fallible::TryGrow;
 use super::c_layout;
 use crate::heap::{BLOCK_HEADER_SIZE, Heap, NoMemory, POINTER_SIZE};
 
@@ -659,6 +660,11 @@ impl PoolShadow {
     /// `poolGrow`.
     fn grow<H: Heap + ?Sized>(&mut self, heap: &mut H) -> Result<(), NoMemory> {
         let used = self.end() - self.start;
+        // Room for a block in use, and on the free list for every block so
+        // that `clear` never allocates (D-061).
+        self.blocks.try_room(1)?;
+        self.free_blocks
+            .try_room(self.blocks.len() + 1)?;
         if let Some(&free_size) = self.free_blocks.last() {
             if self.blocks.is_empty() {
                 // `pool->start == NULL`
@@ -1097,6 +1103,11 @@ impl Tracker {
     /// later, by [`Tracker::store_raw_names`] (D-034 stage 5; the port
     /// charged it here before).
     pub fn open_tag(&mut self, name_len: usize, raw_len: usize, direct: u64) -> Result<(), NoMemory> {
+        // Room for the tag, and on the free list for every tag so that
+        // `close_tag` never allocates (D-061).
+        self.open_tags.try_room(1)?;
+        self.free_tags
+            .try_room(self.open_tags.len() + 1)?;
         let mut size = match self.free_tags.pop() {
             Some(s) => s,
             None => {
@@ -1173,6 +1184,9 @@ impl Tracker {
     /// included): a binding from the free list (`reused`, whose buffer is
     /// enlarged when too small) or a new `BINDING` with a new buffer.
     pub fn binding(&mut self, id: usize, reused: bool, len: usize, direct: u64) -> Result<(), NoMemory> {
+        if self.binding_alloc.len() <= id {
+            self.binding_alloc.try_resize(id + 1, 0)?;
+        }
         let need = len.saturating_add(EXPAND_SPARE);
         if reused {
             let alloc = self.binding_alloc.get(id).copied().unwrap_or(0);

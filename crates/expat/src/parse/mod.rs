@@ -78,6 +78,7 @@ pub use error::{Stop, XmlError};
 pub use external::{ExternalEntities, ExternalEntityParser};
 pub use unknown::{ConvertFn, EncodingInfo, ReleaseFn};
 
+use crate::fallible::{try_copy, try_filled, try_with_capacity, TryGrow};
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -1069,9 +1070,10 @@ impl Parser {
     pub fn set_base(&mut self, base: Option<&[u8]>) -> Result<(), crate::heap::NoMemory> {
         match base {
             Some(b) => {
+                let copy = try_copy(b)?;
                 let direct = self.direct();
                 self.tracker.copy(tracker::Pool::Dtd, b.len(), direct)?;
-                self.cur_base = Some(b.to_vec());
+                self.cur_base = Some(copy);
             }
             None => self.cur_base = None,
         }
@@ -1290,9 +1292,9 @@ impl Parser {
             let text = self
                 .dtd
                 .entity(open.entity)
-                .and_then(|e| e.text.clone())
-                .unwrap_or_else(|| Arc::from(&[][..]));
-            let (s, e) = slice(&text, open.internal_event_ptr, open.internal_event_end_ptr);
+                .and_then(|e| e.text.clone());
+            let text: &[u8] = text.as_deref().map_or(&[], |t| t);
+            let (s, e) = slice(text, open.internal_event_ptr, open.internal_event_end_ptr);
             h.event_text(&[text.get(s..e).unwrap_or_default()]);
             return;
         }
@@ -1384,7 +1386,26 @@ impl Parser {
     pub fn buffer_space(&mut self, len: i32) -> Option<&mut [u8]> {
         let end = self.buffer_end;
         let len = usize::try_from(len).ok()?;
-        Arc::make_mut(&mut self.buffer).get_mut(end..end.checked_add(len)?)
+        self.buffer_mut()?.get_mut(end..end.checked_add(len)?)
+    }
+
+    /// The input buffer for writing: a copy when a handler still reads the
+    /// shared one, `None` when that copy cannot be allocated (D-061).
+    fn buffer_mut(&mut self) -> Option<&mut Vec<u8>> {
+        if Arc::get_mut(&mut self.buffer).is_none() {
+            let copy = try_copy(&self.buffer).ok()?;
+            self.set_buffer(copy);
+        }
+        Arc::get_mut(&mut self.buffer)
+    }
+
+    /// Replaces the input buffer, in place when nothing else holds it.
+    fn set_buffer(&mut self, new: Vec<u8>) {
+        if let Some(b) = Arc::get_mut(&mut self.buffer) {
+            *b = new;
+        } else {
+            self.buffer = Arc::new(new);
+        }
     }
 
     /// The work of `XML_GetBuffer` without the returned pointer: makes room
@@ -1433,7 +1454,12 @@ impl Parser {
             if self.has_buffer && needed as usize <= lim {
                 if keep < parsed {
                     let offset = parsed - keep;
-                    Arc::make_mut(&mut self.buffer).copy_within(offset..self.buffer_end, 0);
+                    let end = self.buffer_end;
+                    let Some(b) = self.buffer_mut() else {
+                        self.error_code = XmlError::NoMemory.into();
+                        return false;
+                    };
+                    b.copy_within(offset..end, 0);
                     self.buffer_end -= offset;
                     self.buffer_ptr -= offset;
                 }
@@ -1454,6 +1480,11 @@ impl Parser {
                 // input size to the application", `xmlparse.c` 2601-2603),
                 // so the port does not charge it either; it frees the old
                 // buffer after copying.
+                // The Rust memory before the suite's call (D-061).
+                let Ok(mut new_buf) = try_filled(0u8, size as usize) else {
+                    self.error_code = XmlError::NoMemory.into();
+                    return false;
+                };
                 if !self.tracker.t.untracked_malloc(size as usize) {
                     self.error_code = XmlError::NoMemory.into();
                     return false;
@@ -1461,7 +1492,6 @@ impl Parser {
                 if self.has_buffer {
                     self.tracker.t.untracked_free(self.buffer.len());
                 }
-                let mut new_buf = vec![0u8; size as usize];
                 if self.has_buffer {
                     let from = self.buffer_ptr - keep;
                     let n = self.buffer_end - from;
@@ -1476,7 +1506,7 @@ impl Parser {
                     self.buffer_end = 0;
                     self.buffer_ptr = 0;
                 }
-                self.buffer = Arc::new(new_buf);
+                self.set_buffer(new_buf);
                 self.has_buffer = true;
             }
             self.event_ptr = None;
@@ -1731,6 +1761,28 @@ impl Parser {
 /// [`Handler::event_text`] for text that needs converting: the pieces of
 /// UTF-8 that `reportDefault` writes to its 1024-byte data buffer.
 fn event_pieces<E: Encoding, H: Handler>(h: &mut H, enc: &E, raw: &[u8]) {
+    // Without the memory for the pieces, the handler gets no text
+    // (D-061).
+    let Ok(pieces) = event_pieces_utf8(enc, raw) else {
+        return;
+    };
+    let (out, ends) = pieces;
+    let Ok(mut pieces) = try_with_capacity(ends.len()) else {
+        return;
+    };
+    let mut from = 0;
+    for end in ends {
+        pieces.push(out.get(from..end).unwrap_or_default());
+        from = end;
+    }
+    h.event_text(&pieces);
+}
+
+/// The UTF-8 text of [`event_pieces`] and where each piece ends.
+fn event_pieces_utf8<E: Encoding>(
+    enc: &E,
+    raw: &[u8],
+) -> Result<(Vec<u8>, Vec<usize>), crate::heap::NoMemory> {
     let mut out = Vec::new();
     let mut ends = Vec::new();
     let mut s = 0;
@@ -1738,17 +1790,10 @@ fn event_pieces<E: Encoding, H: Handler>(h: &mut H, enc: &E, raw: &[u8]) {
         let mut data = [0u8; INIT_DATA_BUF_SIZE];
         let r = enc.to_utf8(raw.get(s..).unwrap_or_default(), &mut data);
         s += r.read;
-        out.extend_from_slice(data.get(..r.written).unwrap_or_default());
-        ends.push(out.len());
+        out.try_extend(data.get(..r.written).unwrap_or_default())?;
+        ends.try_push(out.len())?;
         if matches!(r.result, ConvertResult::Completed | ConvertResult::InputIncomplete) {
-            break;
+            return Ok((out, ends));
         }
     }
-    let mut pieces = Vec::with_capacity(ends.len());
-    let mut from = 0;
-    for end in ends {
-        pieces.push(out.get(from..end).unwrap_or_default());
-        from = end;
-    }
-    h.event_text(&pieces);
 }

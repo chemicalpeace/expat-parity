@@ -156,9 +156,12 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   not time, so they do not guarantee bounded processing time. When parsing
   untrusted input, limit its size and the time spent parsing it in your
   application.
-- **Real out-of-memory aborts.** When the system allocator itself fails,
-  the crate does not return `ErrorCode::NoMemory` as libexpat does; Rust's
-  allocation-error handler runs, which by default aborts the process.
+- **Out of memory.** While parsing, a failure of the system allocator
+  makes the parse fail with `ErrorCode::NoMemory`, as in libexpat
+  (D-061). Creating, resetting or configuring a parser still aborts on
+  allocation failure, and so does the small reference-count block of
+  each internal entity's shared text, which stable Rust cannot allocate
+  fallibly.
 - **Performance** was measured on one aarch64 Linux VM only: the port
   reached 0.68x-1.24x of libexpat 2.10.0 built with clang `-O2`, slowest
   on UTF-16 input (`docs/REPORT.md`, "Benchmarks"). Other platforms are
