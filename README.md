@@ -142,6 +142,7 @@ These are deferred, with no commitment to implement them.
 | Path | What |
 |---|---|
 | `crates/expat` | the safe port, published as `expat` (`#![forbid(unsafe_code)]`, `no_std` + `alloc`) |
+| `crates/expat-capi` | first part of a libexpat-compatible C interface (`expat.h`) over `expat`, not published (D-047) |
 | `crates/expat-oracle` | vendored libexpat C at a pinned commit + FFI, **test-only**, not published |
 | `tests/` | differential harness, upstream-derived vectors |
 | `fuzz/` | cargo-fuzz targets and committed corpus |

@@ -10,6 +10,7 @@ documented divergences (`docs/DIVERGENCES.md`).
 
 ```
 crates/expat          safe port (#![no_std] + alloc, #![forbid(unsafe_code)])
+crates/expat-capi     C interface (expat.h subset) over expat; unsafe FFI, D-047
 crates/expat-oracle   vendored libexpat C + shims, FFI — test-only
 tests/                expat-difftest: harness, vectors, differential tests
 benches/              expat-bench: criterion benchmarks (port vs C)
@@ -17,7 +18,8 @@ fuzz/                 cargo-fuzz targets (nightly, outside the workspace)
 ```
 
 Dependency direction: `expat-difftest`, `expat-bench` and `fuzz` depend on both
-`expat` and `expat-oracle`; `expat` depends on nothing.
+`expat` and `expat-oracle`; `expat-capi` depends on `expat`; `expat` depends
+on nothing.
 
 ## Module map (C → Rust)
 

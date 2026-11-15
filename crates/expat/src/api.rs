@@ -15,7 +15,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use crate::handler::{Adapter, Handler};
+use crate::handler::{Adapter, Events, Handler};
 use crate::parse::{self, Status, Stop, XmlError};
 
 /// How a [`Parser`] is created: the encoding name and the namespace
@@ -200,9 +200,71 @@ impl Parser {
         data: &[u8],
         is_final: bool,
     ) -> Result<(), Error> {
-        self.inner.set_handlers(H::EVENTS.handler_set());
+        self.parse_with_events(handler, H::EVENTS, data, is_final)
+    }
+
+    /// [`Parser::parse_with`] with the events given for this call instead
+    /// of [`Handler::EVENTS`], for a caller whose set of handlers is only
+    /// known at run time (C sets each handler pointer separately).
+    /// `parse_with(h, data, is_final)` is `parse_with_events(h, H::EVENTS,
+    /// data, is_final)`.
+    ///
+    /// ```
+    /// use expat::{Events, Handler, Parser};
+    ///
+    /// #[derive(Default)]
+    /// struct Count(usize);
+    ///
+    /// impl Handler for Count {
+    ///     fn start_element(&mut self, _name: &[u8], _attributes: &[(&[u8], &[u8])], _specified: usize) {
+    ///         self.0 += 1;
+    ///     }
+    /// }
+    ///
+    /// let mut count = Count::default();
+    /// let mut p = Parser::new([7; 16]);
+    /// p.parse_with_events(&mut count, Events::NONE, b"<a>", false)?;
+    /// p.parse_with_events(&mut count, Events::NONE.start_element(true), b"<b/></a>", true)?;
+    /// assert_eq!(count.0, 1);
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    pub fn parse_with_events<H: Handler>(
+        &mut self,
+        handler: &mut H,
+        events: Events,
+        data: &[u8],
+        is_final: bool,
+    ) -> Result<(), Error> {
+        self.inner.set_handlers(events.handler_set());
         let status = self.inner.parse(&mut Adapter(handler), data, is_final);
         self.result(status)
+    }
+
+    /// The line of the parser's current position, from 1
+    /// (`XML_GetCurrentLineNumber64` between calls). After an error it is
+    /// the line of [`Error::line`].
+    ///
+    /// ```
+    /// let mut p = expat::Parser::new([7; 16]);
+    /// p.parse(b"<a>\n<b/>", false)?;
+    /// assert_eq!(p.current_line(), 2);
+    /// # Ok::<(), expat::Error>(())
+    /// ```
+    pub fn current_line(&mut self) -> u64 {
+        self.inner.current_line_number()
+    }
+
+    /// The column of the parser's current position, from 0
+    /// (`XML_GetCurrentColumnNumber64` between calls).
+    pub fn current_column(&mut self) -> u64 {
+        self.inner.current_column_number()
+    }
+
+    /// The byte offset of the parser's current position in the whole
+    /// input, or -1 before the first call (`XML_GetCurrentByteIndex64`
+    /// between calls).
+    pub fn current_byte_index(&self) -> i64 {
+        self.inner.current_byte_index()
     }
 
     /// The public result of a call that returned `status`.
@@ -302,7 +364,6 @@ macro_rules! error_codes {
             }
 
             /// Every code, in declaration order.
-            #[cfg(test)]
             const ALL: &[ErrorCode] = &[$(ErrorCode::$name,)*];
         }
     };
@@ -403,6 +464,19 @@ impl ErrorCode {
     /// The C value of the code (`enum XML_Error`).
     pub fn to_c(self) -> u32 {
         self.to_internal().to_c()
+    }
+
+    /// The code whose C value is `value`; `None` for `XML_ERROR_NONE` (0)
+    /// and for values libexpat 2.10.0 does not define.
+    ///
+    /// ```
+    /// use expat::ErrorCode;
+    ///
+    /// assert_eq!(ErrorCode::from_c(ErrorCode::TagMismatch.to_c()), Some(ErrorCode::TagMismatch));
+    /// assert_eq!(ErrorCode::from_c(0), None);
+    /// ```
+    pub fn from_c(value: u32) -> Option<Self> {
+        ErrorCode::ALL.iter().copied().find(|c| c.to_c() == value)
     }
 
     /// The libexpat text of the code (`XML_ErrorString`), the same bytes as

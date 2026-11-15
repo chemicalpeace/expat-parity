@@ -754,6 +754,7 @@ impl Parser {
     /// `accountingDiffTolerated` for this parser: an external entity
     /// parser's bytes are never direct (`isDirect` needs the root parser),
     /// they count as indirect.
+    #[inline]
     pub(crate) fn diff_tolerated(&mut self, tok: crate::tok::Scan, bytes: usize, account: Account) -> bool {
         let account = if self.is_child && account == Account::Direct {
             Account::EntityExpansion

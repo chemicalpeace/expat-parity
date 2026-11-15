@@ -84,7 +84,8 @@ are never shipped with weaker verification.
 - `tests/` — the `expat-difftest` crate (harness, vectors, differential tests).
 - `benches/` — the `expat-bench` crate (criterion).
 - `fuzz/` — cargo-fuzz crate, excluded from the workspace (needs nightly).
-- `crates/expat-capi` — deferred until the public API exists (D-004 order).
+- `crates/expat-capi` — deferred until the public API exists (D-004 order);
+  started in D-047.
 
 ## D-006 Internal API for white-box differential tests
 
@@ -1301,3 +1302,80 @@ recorded in DIVERGENCES.md.
   clang -O2, the slower of the two port builds moved from 0.72–1.11x to
   0.76–1.22x of C across 20 cases; the median gain was 6.5 % for the
   release build and 8.4 % with fat LTO, and 11–22 % on `plain-large`.
+
+## D-046 Amplification check without a division when nothing was expanded (2026-11-14)
+
+- **Decision.** `Accounting::amplification_tolerated` returns `true`
+  without computing the factor when no indirect bytes are counted or
+  asked about, the direct count is not zero and the maximum factor is at
+  least 1.0. `diff_tolerated` is marked `#[inline]`.
+- **Why.** Once a document passes the 8 MiB activation threshold, every
+  token computed `(direct + indirect) / direct` in `float`. With no
+  indirect bytes this is `d / d`, which is exactly 1.0 in IEEE arithmetic
+  for any non-zero `d`, so the comparison with a maximum of at least 1.0
+  is always true. The maximum condition keeps the shortcut exact for an
+  `Accounting` built directly with a smaller or NaN maximum (the setter
+  refuses those).
+- **Parity.** The result is the same as the division for every input;
+  `direct_only_amplification_matches_division` checks it for large,
+  boundary and `u64::MAX` counts and for maxima of 1.0, 100.0, 0.5 and
+  NaN.
+- **Measured.** Small: on one aarch64 VM the median gain was 1.3 % for the
+  release build and none with fat LTO (2 rounds of 5 runs, within noise),
+  up to 7 % on `plain-large` without handlers.
+
+## D-047 C interface, slice 1 (module 13) (2026-11-14)
+
+- **Decision.** New crate `crates/expat-capi` (`staticlib`, `cdylib`,
+  `rlib`; not published) exports a first part of `expat.h` under the
+  libexpat names: `XML_ParserCreate`, `XML_ParserCreateNS`,
+  `XML_ParserFree`, `XML_SetUserData`, `XML_UseParserAsHandlerArg`, the
+  setters of the nine handlers of `expat::Events` (and the three pair
+  setters), `XML_Parse`, `XML_GetErrorCode`, `XML_ErrorString`,
+  `XML_GetCurrentLineNumber`, `XML_GetCurrentColumnNumber`,
+  `XML_GetCurrentByteIndex` (and their 64-bit forms),
+  `XML_GetSpecifiedAttributeCount`, `XML_ExpatVersion` and
+  `XML_ExpatVersionInfo`. `XML_Char` is `char` and `XML_Size` /
+  `XML_Index` are `unsigned long` / `long`, the vendored header's
+  defaults. Functions not in this list are absent, so a program that needs
+  one fails to link.
+- **Public API additions in `expat`** needed by the interface:
+  `Parser::parse_with_events` (the events of a call given at run time,
+  since C sets each handler pointer separately; `parse_with` calls it with
+  `H::EVENTS`), `Parser::current_line`, `current_column` and
+  `current_byte_index` (the position between calls), and
+  `ErrorCode::from_c`.
+- **Handle layout.** `XML_ParserStruct` is `#[repr(C)]` with the user data
+  first, because `expat.h` defines `XML_GetUserData(parser)` as
+  `(*(void **)(parser))`. Everything a handler can reach through the
+  handle while `XML_Parse` runs is a `Cell`; the parser and scratch
+  buffers sit in an `UnsafeCell` that only `XML_Parse` and the position
+  functions borrow, guarded by a `busy` flag. `XML_Parse` and
+  `XML_ParserFree` from inside a handler are refused, as in libexpat
+  2.10.0; the position functions return 0, 0 and -1 there (libexpat
+  returns the event's position, which the public API does not expose
+  yet). The handler set is read when `XML_Parse` starts.
+- **Strings.** Names, attribute values, processing instruction parts,
+  comments and namespace prefixes and URIs are copied into a reused buffer
+  with a terminating NUL (XML text cannot contain NUL); character data is
+  passed as pointer and length without a copy.
+- **Salt.** From the standard library's `RandomState` keys, which are
+  seeded from the operating system (libexpat uses its own entropy
+  sources).
+- **Verification.** `scripts/capi-check.sh` builds
+  `crates/expat-capi/tests/c/trace.c` once against the vendored libexpat
+  and once against the static library and requires identical output on
+  the 540 upstream vectors and `handwritten-rich.xml`, each in 12 runs
+  (whole, 1-byte and 7-byte pieces; with and without namespace
+  processing; with all handlers and with none): events with their
+  strings, `XML_GetSpecifiedAttributeCount` in the start handler, status
+  and error code of every `XML_Parse` call, position after every call, and
+  the error text. A deliberate change of the specified count is caught.
+  Unit tests in `src/tests.rs` cover handler wiring, user data and the
+  parser as handler argument, calls from inside a handler and argument
+  checks; CI runs them under Miri. The check and Miri run in CI (Linux).
+- **Not in this slice.** Every other `expat.h` function (buffer API,
+  stop/resume, default and DTD handlers, external entities, encodings
+  handler, memory suite, reset, billion-laughs setters, hash salt
+  setters), positions inside handlers, `XML_UNICODE` builds, a generated
+  symbol map or a shared-library version script.

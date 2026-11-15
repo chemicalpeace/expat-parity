@@ -29,6 +29,8 @@ jobs:
       # Default features, as docs.rs builds the published crate.
       - run: cargo doc -p expat --no-deps
       - run: scripts/package-check.sh
+      - name: C interface against libexpat
+        run: scripts/capi-check.sh
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
@@ -100,12 +102,15 @@ jobs:
           if-no-files-found: error
 
   miri:
-    name: miri (safe crate)
+    name: miri (safe crate, C interface)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install nightly --profile minimal -c miri,rust-src
       - run: cargo +nightly miri test -p expat --all-features
+        env:
+          MIRIFLAGS: -Zmiri-strict-provenance
+      - run: cargo +nightly miri test -p expat-capi
         env:
           MIRIFLAGS: -Zmiri-strict-provenance
 
