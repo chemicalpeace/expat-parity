@@ -173,10 +173,13 @@ impl Parser {
         s: usize,
         next: usize,
         allow_closing_doctype: bool,
-    ) -> Result<(), Stop> {
+    ) -> Result<bool, Stop> {
         let m = E::MINBPC;
         let salt = self.salt;
         let no_mem = |_| Stop::Error(XmlError::NoMemory);
+        // C's `handleDefault`: cleared where a declaration handler takes
+        // the token.
+        let mut hd = true;
         match role {
             Role::DoctypeName => {
                 if self.handlers.start_doctype_decl {
@@ -186,6 +189,7 @@ impl Parser {
                     self.tracker.store_text(Pool::Temp, &name, direct).map_err(no_mem)?;
                     self.doctype_name = Some(name);
                     self.doctype_pubid = None;
+                    hd = false;
                 }
                 // Always initialize to NULL.
                 self.doctype_sysid = None;
@@ -202,6 +206,7 @@ impl Parser {
                     // C clears the temporary pool here; the system id
                     // pointer stays non-NULL and is only tested later.
                     self.tracker.temp_pool.clear();
+                    hd = false;
                 }
             }
             Role::DoctypePublicId | Role::EntityPublicId => {
@@ -220,6 +225,7 @@ impl Parser {
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Temp, &lit, direct).map_err(no_mem)?;
                     self.doctype_pubid = Some(normalize_public_id(&lit));
+                    hd = false;
                 }
                 if self.dtd.keep_processing
                     && let Some(r) = self.decl_entity
@@ -234,6 +240,10 @@ impl Parser {
                     let id = normalize_public_id(&lit);
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.public_id = Some(id);
+                    }
+                    // Not for a document type public id.
+                    if self.handlers.entity_decl && role == Role::EntityPublicId {
+                        hd = false;
                     }
                 }
             }
@@ -251,6 +261,7 @@ impl Parser {
                         false,
                     );
                     self.tracker.temp_pool.clear();
+                    hd = false;
                 }
                 if self.doctype_sysid.is_some() || self.use_foreign_dtd {
                     // The external subset (or the foreign DTD) is read only
@@ -269,10 +280,12 @@ impl Parser {
                 }
                 if self.handlers.end_doctype_decl {
                     h.end_doctype_decl();
+                    hd = false;
                 }
             }
             Role::AttlistElementName => {
                 self.decl_element_type = Some(self.get_element_type(enc, buf, s, next)?);
+                hd = !(self.dtd.keep_processing && self.handlers.attlist_decl);
             }
             Role::AttributeName => {
                 let name = to_utf8(enc, bytes(buf, s, next));
@@ -285,6 +298,7 @@ impl Parser {
                 self.decl_attribute_is_cdata = false;
                 self.decl_attribute_type = None;
                 self.decl_attribute_is_id = false;
+                hd = !(self.dtd.keep_processing && self.handlers.attlist_decl);
             }
             Role::AttributeTypeCdata
             | Role::AttributeTypeId
@@ -300,6 +314,7 @@ impl Parser {
                     _ => {}
                 }
                 self.decl_attribute_type = attribute_type_name(role).map(<[u8]>::to_vec);
+                hd = !(self.dtd.keep_processing && self.handlers.attlist_decl);
             }
             Role::AttributeEnumValue | Role::AttributeNotationValue => {
                 if self.dtd.keep_processing && self.handlers.attlist_decl {
@@ -320,6 +335,7 @@ impl Parser {
                     let t = self.decl_attribute_type.get_or_insert_with(Vec::new);
                     t.extend_from_slice(prefix);
                     t.extend_from_slice(&value);
+                    hd = false;
                 }
             }
             Role::ImpliedAttributeValue | Role::RequiredAttributeValue => {
@@ -341,6 +357,7 @@ impl Parser {
                     if self.handlers.attlist_decl && self.decl_attribute_type.is_some() {
                         self.ev_end(enc, Some(s));
                         self.report_attlist(h, None, role == Role::RequiredAttributeValue)?;
+                        hd = false;
                     }
                 }
             }
@@ -373,6 +390,7 @@ impl Parser {
                     if self.handlers.attlist_decl && self.decl_attribute_type.is_some() {
                         self.ev_end(enc, Some(s));
                         self.report_attlist(h, Some(&value), role == Role::FixedAttributeValue)?;
+                        hd = false;
                     }
                 }
             }
@@ -427,6 +445,7 @@ impl Parser {
                                 None,
                                 None,
                             );
+                            hd = false;
                         }
                     } else {
                         self.finish_current(Pool::EntityValue, false, false)?;
@@ -441,6 +460,7 @@ impl Parser {
                         let lit = Self::literal(enc, buf, s, next);
                         let direct = self.direct();
                         self.tracker.store_text(Pool::Temp, &lit, direct).map_err(no_mem)?;
+                        hd = false;
                         lit
                     } else {
                         // Makes m_doctypeSysid non-NULL when no start
@@ -472,6 +492,10 @@ impl Parser {
                         e.system_id = Some(sysid);
                         e.base = base;
                     }
+                    // Not for a document type system id.
+                    if self.handlers.entity_decl && role == Role::EntitySystemId {
+                        hd = false;
+                    }
                 }
             }
             Role::EntityComplete => {
@@ -492,6 +516,7 @@ impl Parser {
                             None,
                         );
                     }
+                    hd = false;
                 }
             }
             Role::EntityNotationName => {
@@ -507,6 +532,7 @@ impl Parser {
                     let name = self.dtd.entity_name(r).to_vec();
                     if self.handlers.unparsed_entity_decl || self.handlers.entity_decl {
                         self.ev_end(enc, Some(s));
+                        hd = false;
                     }
                     if let Some(e) = self.dtd.entity(r) {
                         if self.handlers.unparsed_entity_decl {
@@ -552,6 +578,7 @@ impl Parser {
                             e.is_internal = is_internal;
                         }
                         self.decl_entity = Some(r);
+                        hd = !self.handlers.entity_decl;
                     } else {
                         self.decl_entity = None;
                     }
@@ -567,6 +594,7 @@ impl Parser {
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Temp, &name, direct).map_err(no_mem)?;
                     self.decl_notation_name = Some(name);
+                    hd = false;
                 }
             }
             Role::NotationPublicId => {
@@ -577,6 +605,7 @@ impl Parser {
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Temp, &lit, direct).map_err(no_mem)?;
                     self.decl_notation_public_id = Some(normalize_public_id(&lit));
+                    hd = false;
                 }
             }
             Role::NotationSystemId => {
@@ -593,6 +622,7 @@ impl Parser {
                         Some(&sysid),
                         self.decl_notation_public_id.as_deref(),
                     );
+                    hd = false;
                 }
                 self.tracker.temp_pool.clear();
             }
@@ -603,6 +633,7 @@ impl Parser {
                     let name = self.decl_notation_name.clone().unwrap_or_default();
                     self.ev_end(enc, Some(s));
                     h.notation_decl(&name, self.cur_base.as_deref(), None, Some(&pubid));
+                    hd = false;
                 }
                 self.tracker.temp_pool.clear();
             }
@@ -633,6 +664,7 @@ impl Parser {
                     if let Some(sc) = self.dtd.scaffold.get_mut(myindex) {
                         sc.kind = ContentType::Seq;
                     }
+                    hd = !self.handlers.element_decl;
                 }
             }
             Role::GroupSequence | Role::GroupChoice => {
@@ -642,6 +674,7 @@ impl Parser {
                     if cur == b'|' {
                         return Err(XmlError::Syntax.into());
                     }
+                    hd = !(self.dtd.in_eldecl && self.handlers.element_decl);
                 } else {
                     if cur == b',' {
                         return Err(XmlError::Syntax.into());
@@ -652,6 +685,7 @@ impl Parser {
                             && sc.kind != ContentType::Mixed
                         {
                             sc.kind = ContentType::Choice;
+                            hd = !self.handlers.element_decl;
                         }
                     }
                 }
@@ -660,7 +694,7 @@ impl Parser {
                 }
             }
             Role::ParamEntityRef | Role::InnerParamEntityRef => {
-                self.param_entity_ref(h, enc, buf, role, s, next)?;
+                hd = self.param_entity_ref(h, enc, buf, role, s, next)?;
             }
             Role::ElementName => {
                 if self.handlers.element_decl {
@@ -668,6 +702,7 @@ impl Parser {
                     self.dtd.scaff_level = 0;
                     self.dtd.scaff_count = 0;
                     self.dtd.in_eldecl = true;
+                    hd = false;
                 }
             }
             Role::ContentAny | Role::ContentEmpty => {
@@ -681,6 +716,7 @@ impl Parser {
                         self.ev_end(enc, Some(s));
                         let name = self.decl_element_name();
                         h.element_decl(&name, &ContentModel::leaf(kind));
+                        hd = false;
                     }
                     self.dtd.in_eldecl = false;
                 }
@@ -691,6 +727,7 @@ impl Parser {
                     if let Some(sc) = self.dtd.scaffold.get_mut(top) {
                         sc.kind = ContentType::Mixed;
                     }
+                    hd = !self.handlers.element_decl;
                 }
             }
             Role::ContentElement
@@ -718,10 +755,12 @@ impl Parser {
                         sc.quant = quant;
                         sc.name = Some(name);
                     }
+                    hd = !self.handlers.element_decl;
                 }
             }
             Role::GroupClose | Role::GroupCloseOpt | Role::GroupCloseRep | Role::GroupClosePlus => {
                 if self.dtd.in_eldecl {
+                    hd = !self.handlers.element_decl;
                     self.dtd.scaff_level = self.dtd.scaff_level.saturating_sub(1);
                     let idx = self
                         .dtd
@@ -744,8 +783,10 @@ impl Parser {
                     }
                 }
             }
-            // Only the default handler (public API) sees these.
-            Role::EntityNone | Role::NotationNone | Role::AttlistNone | Role::ElementNone => {}
+            Role::EntityNone => hd = !(self.dtd.keep_processing && self.handlers.entity_decl),
+            Role::NotationNone => hd = !self.handlers.notation_decl,
+            Role::AttlistNone => hd = !(self.dtd.keep_processing && self.handlers.attlist_decl),
+            Role::ElementNone => hd = !self.handlers.element_decl,
             // Handled by `doProlog` itself (XML and text declarations,
             // instance start, PIs, comments, ignore sections, errors).
             Role::XmlDecl
@@ -761,7 +802,7 @@ impl Parser {
                 return Err(XmlError::UnexpectedState.into());
             }
         }
-        Ok(())
+        Ok(hd)
     }
 
     /// `scaffold[scaffIndex[scaffLevel - 1]]`: the innermost open group.
@@ -800,6 +841,8 @@ impl Parser {
     }
 
     /// `XML_ROLE_PARAM_ENTITY_REF` / `XML_ROLE_INNER_PARAM_ENTITY_REF`.
+    /// Returns C's `handleDefault`: whether the reference still goes to
+    /// the default handler.
     fn param_entity_ref<E: Encoding, H: Handler>(
         &mut self,
         h: &mut H,
@@ -808,11 +851,12 @@ impl Parser {
         role: Role,
         s: usize,
         next: usize,
-    ) -> Result<(), Stop> {
+    ) -> Result<bool, Stop> {
         self.dtd.has_param_entity_refs = true;
         if self.param_entity_parsing == ParamEntityParsing::Never {
             self.dtd.keep_processing = self.dtd.standalone;
-            return self.check_not_standalone(h);
+            self.check_not_standalone(h)?;
+            return Ok(true);
         }
         let name = Self::literal(enc, buf, s, next);
         // The name is stored in `dtd->pool` for the lookup.
@@ -838,8 +882,9 @@ impl Parser {
             // Cannot report skipped entities in declarations.
             if role == Role::ParamEntityRef && self.handlers.skipped_entity {
                 h.skipped_entity(&name, true);
+                return Ok(false);
             }
-            return Ok(());
+            return Ok(true);
         };
         let r = EntityRef::Param(id);
         let (open, has_text, is_internal) = match self.dtd.entity(r) {
@@ -853,15 +898,21 @@ impl Parser {
             return Err(XmlError::RecursiveEntityRef.into());
         }
         if has_text {
-            return self.open_param_entity(r, role == Role::ParamEntityRef);
+            self.open_param_entity(r, role == Role::ParamEntityRef)?;
+            return Ok(false);
         }
         // An external parameter entity: only the external entity
         // reference handler can read it.
-        if !self.handlers.external_entity_ref || !self.external_param_entity(h, r, true)? {
+        if !self.handlers.external_entity_ref {
             self.dtd.keep_processing = self.dtd.standalone;
-            return Ok(());
+            return Ok(true);
         }
-        self.check_not_standalone(h)
+        if !self.external_param_entity(h, r, true)? {
+            self.dtd.keep_processing = self.dtd.standalone;
+            return Ok(false);
+        }
+        self.check_not_standalone(h)?;
+        Ok(false)
     }
 
     /// `storeEntityValue` on `buf[ptr..]` (the slice ends at the end of the

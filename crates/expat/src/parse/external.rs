@@ -993,7 +993,7 @@ impl Parser {
         };
         let have_more = !self.final_buffer;
         let mut start = Some(s);
-        with_known!(k, e => self.do_ignore_section(e, buf, &mut start, next_ptr, have_more))?;
+        with_known!(k, e => self.do_ignore_section(h, e, buf, &mut start, next_ptr, have_more))?;
         if let Some(s) = start {
             self.processor = Processor::Prolog;
             return self.prolog_processor(h, buf, s, next_ptr);
@@ -1003,8 +1003,9 @@ impl Parser {
 
     /// `doIgnoreSection`: `*start` becomes `None` if the section is not yet
     /// closed, else the position after it.
-    pub(crate) fn do_ignore_section<E: Encoding>(
+    pub(crate) fn do_ignore_section<E: Encoding, H: Handler>(
         &mut self,
+        h: &mut H,
         enc: &E,
         buf: &[u8],
         start: &mut Option<usize>,
@@ -1024,6 +1025,7 @@ impl Parser {
         self.ev_end(enc, Some(next));
         match r.scan {
             Scan::Token(Tok::IgnoreSect) => {
+                self.report_default(h, enc, buf, s, next);
                 *start = Some(next);
                 *next_ptr = next;
                 if self.control.get() == Parsing::Finished {

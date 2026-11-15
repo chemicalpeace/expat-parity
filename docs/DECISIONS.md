@@ -1474,3 +1474,42 @@ recorded in DIVERGENCES.md.
   handler, after the final piece, a stop without resume while suspended):
   output equal to libexpat. Unit tests cover the Rust API and the C
   functions.
+
+## D-051 Default handler (module 13, slice 4) (2026-11-14)
+
+- **Decision.** The parser core reports `reportDefault` at every place
+  libexpat does: in content (character data, newlines, references,
+  tags, character references, CDATA section markers, trailing `]` and
+  carriage return), in CDATA sections, in the prolog and the document
+  type declaration (`handleDefault`, cleared by each declaration
+  handler under the same conditions as in `doProlog`), in the XML and
+  text declarations, in ignored sections, in the epilog, and for
+  processing instructions and comments without their handler. The
+  public API gets `Events::default_data`, `Events::expand_internal_entities`
+  and `Handler::default_data`; the C interface exports
+  `XML_SetDefaultHandler` and `XML_SetDefaultHandlerExpand`.
+- **Expansion.** `Events::expand_internal_entities` is libexpat's
+  `m_defaultExpandInternalEntities`, kept separate from the handler
+  because `XML_SetDefaultHandler(parser, NULL)` also turns expansion off.
+  Without expansion, a reference to an internal general entity in
+  content goes to the skipped entity handler, or else the default
+  handler, as written. Both `Events::ALL` and `Events::NONE` leave the
+  default handler off and expansion on, so existing callers see no
+  change.
+- **Text.** The text is converted to UTF-8 through the 1024-byte data
+  buffer as in `reportDefault`, with the event pointers moved after
+  each piece; line ends are not normalised.
+- **Not done.** `XML_DefaultCurrent` needs a handler to call the parser
+  and is left out of this slice.
+- **Verification.** `scripts/capi-check.sh` adds four handler sets with
+  the default handler (alone with positions; beside every handler with
+  expansion; beside the element and comment handlers with positions;
+  set to `NULL` beside every handler) and the default handler alone
+  suspended at every event: 541 documents x 98 runs, output equal to
+  libexpat. The oracle's handler mask gets two bits for the default
+  handler, with and without expansion, and `handler_mask_diff.rs` adds
+  11 masks with them (beside the full set, which covers the
+  declaration handlers, and beside random sets) and two documents with
+  every declaration kind, compared with libexpat on the T2 corpus,
+  whole and in pieces, with parameter entity parsing and external
+  entity parsers. Unit tests cover the Rust API.

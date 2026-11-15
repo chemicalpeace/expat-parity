@@ -8,7 +8,10 @@
  * edge() checks the error cases of the buffer functions. Further runs
  * stop the parser from the handlers with XML_StopParser, resuming it with
  * XML_ResumeParser after each suspension; stop_edge() checks the error
- * cases of the two functions. */
+ * cases of the two functions. Handler sets 3 to 6 add the default
+ * handler: alone, beside every other handler with internal entities
+ * expanded, beside the element and comment handlers, and set to NULL
+ * beside every other handler (which still turns expansion off). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -135,6 +138,14 @@ static void XMLCALL on_ns_end(void *ud, const XML_Char *p) {
   where();
 }
 
+static void XMLCALL on_default(void *ud, const XML_Char *s, int len) {
+  (void)ud;
+  printf("  default ");
+  putn(s, len);
+  putchar('\n');
+  where();
+}
+
 static void position(void) {
   printf(" line=%llu col=%llu byte=%lld\n",
          (unsigned long long)XML_GetCurrentLineNumber(g_parser),
@@ -149,12 +160,12 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
   if (every)
     printf(" stop=%d resumable=%d", every, resumable);
   putchar('\n');
-  g_where = handlers == 2;
+  g_where = handlers == 2 || handlers == 3 || handlers == 5;
   g_every = every;
   g_resumable = resumable;
   g_events = 0;
   g_parser = ns ? XML_ParserCreateNS(NULL, '|') : XML_ParserCreate(NULL);
-  if (handlers) {
+  if (handlers == 1 || handlers == 2 || handlers == 4 || handlers == 6) {
     XML_SetElementHandler(g_parser, on_start, on_end);
     XML_SetCharacterDataHandler(g_parser, on_chars);
     XML_SetProcessingInstructionHandler(g_parser, on_pi);
@@ -162,6 +173,16 @@ static void run(const char *doc, long len, long chunk, int ns, int handlers,
     XML_SetCdataSectionHandler(g_parser, on_cdata_start, on_cdata_end);
     XML_SetNamespaceDeclHandler(g_parser, on_ns_start, on_ns_end);
   }
+  if (handlers == 5) {
+    XML_SetElementHandler(g_parser, on_start, on_end);
+    XML_SetCommentHandler(g_parser, on_comment);
+  }
+  if (handlers == 3 || handlers == 5)
+    XML_SetDefaultHandler(g_parser, on_default);
+  else if (handlers == 4)
+    XML_SetDefaultHandlerExpand(g_parser, on_default);
+  else if (handlers == 6)
+    XML_SetDefaultHandler(g_parser, NULL);
   long off = 0;
   do {
     long n = chunk > 0 && len - off > chunk ? chunk : len - off;
@@ -353,7 +374,7 @@ int main(int argc, char **argv) {
     static const long chunks[] = {0, 1, 7};
     for (int c = 0; c < 3; c++)
       for (int ns = 0; ns < 2; ns++)
-        for (int h = 0; h < 3; h++)
+        for (int h = 0; h < 7; h++)
           for (int b = 0; b < 2; b++)
             run(doc, len, chunks[c], ns, h, b, 0, 0);
     /* Stopped from the handlers: suspended at every event, at every third
@@ -363,6 +384,9 @@ int main(int argc, char **argv) {
       for (int ns = 0; ns < 2; ns++)
         for (int k = 0; k < 3; k++)
           run(doc, len, chunks[c], ns, 2, k == 1, stops[k][0], stops[k][1]);
+    /* The default handler alone, suspended at every event. */
+    for (int ns = 0; ns < 2; ns++)
+      run(doc, len, 0, ns, 3, 0, 1, 1);
     free(doc);
   }
   return 0;

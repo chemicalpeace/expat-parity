@@ -53,7 +53,11 @@ enum {
   ORACLE_H_START_NS = 1 << 14,
   ORACLE_H_END_NS = 1 << 15,
   ORACLE_H_SKIPPED_ENTITY = 1 << 16,
-  ORACLE_H_FULL = (1 << 17) - 1
+  ORACLE_H_FULL = (1 << 17) - 1,
+  /* Not in ORACLE_H_FULL: XML_SetDefaultHandler, or (without it)
+     XML_SetDefaultHandlerExpand, traced as "default <text>". */
+  ORACLE_H_DEFAULT = 1 << 17,
+  ORACLE_H_DEFAULT_EXPAND = 1 << 18
 };
 
 /* Parse options for oracle_parse_trace. */

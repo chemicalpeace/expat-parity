@@ -29,10 +29,12 @@ All notable changes are documented here. The format follows
   (`buffer`, `parse_buffer`, `parse_buffer_with`,
   `parse_buffer_with_events`) and `error_code` (D-049), stop and resume
   (`Stopper`, `Parser::stopper`, `is_suspended`, `resume`,
-  `resume_with`, `resume_with_events`, D-050).
+  `resume_with`, `resume_with_events`, D-050), the default handler
+  (`Events::default_data`, `Events::expand_internal_entities`,
+  `Handler::default_data`, D-051).
 - `crates/expat-capi` (not published): a first part of libexpat's C
   interface over the crate, compared with libexpat by
-  `scripts/capi-check.sh` (D-047 to D-050).
+  `scripts/capi-check.sh` (D-047 to D-051).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.
@@ -53,6 +55,6 @@ All notable changes are documented here. The format follows
   padding is now rejected in about 15 ms instead of about 30 s.
 
 ### Known limitations
-- No default handler, DTD or entity declaration events, or
+- No DTD or entity declaration events, `XML_DefaultCurrent`, or
   unknown-encoding handler; external entities are never loaded; real allocator failure aborts instead of returning
   `NoMemory`. See the README.

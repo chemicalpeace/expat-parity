@@ -127,6 +127,9 @@ impl Handler for Tracer {
     fn skipped_entity(&mut self, name: &[u8], is_param: bool) {
         self.w.skipped(name, is_param);
     }
+    fn default_data(&mut self, data: &[u8]) {
+        self.w.default_data(data);
+    }
     fn external_entity_ref(
         &mut self,
         parsers: &mut ExternalEntities<'_>,
@@ -250,6 +253,9 @@ fn masked_handlers(mask: HandlerMask) -> HandlerSet {
         external_entity_ref: false,
         not_standalone: false,
         event_position: false,
+        default: mask.default_handler || mask.default_expand,
+        // `XML_SetDefaultHandler` turns expansion off, `...Expand` keeps it.
+        no_default_expand: mask.default_handler,
     }
 }
 

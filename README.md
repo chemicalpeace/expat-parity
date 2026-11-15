@@ -97,12 +97,16 @@ documents you do not trust.
 
 What `0.1.0-beta.1` does not do, or does differently from libexpat:
 
-- **Callbacks:** only nine events — start and end element, character data,
+- **Callbacks:** nine events — start and end element, character data,
   processing instruction, comment, CDATA section start and end, namespace
-  declaration start and end. There is no default handler, no handler for
-  DTD declarations, entity declarations, XML declarations or skipped
-  entities, and no unknown-encoding handler (only libexpat's built-in
-  encodings: UTF-8, UTF-16, UTF-16BE, UTF-16LE, ISO-8859-1, US-ASCII).
+  declaration start and end — and the default handler
+  (`Handler::default_data`, `XML_SetDefaultHandler`), which receives the
+  rest of the document as written. There is no handler for DTD
+  declarations, entity declarations, XML declarations or skipped
+  entities (inside the document type declaration everything goes to the
+  default handler), no `XML_DefaultCurrent`, and no unknown-encoding
+  handler (only libexpat's built-in encodings: UTF-8, UTF-16, UTF-16BE,
+  UTF-16LE, ISO-8859-1, US-ASCII).
 - **Positions:** the position of each event is reported to
   `Handler::position` when `Events::position` is set, and the position
   between calls is `Parser::current_line`, `current_column` and

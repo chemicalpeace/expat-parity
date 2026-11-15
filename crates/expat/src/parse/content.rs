@@ -183,6 +183,12 @@ impl Parser {
             match r.scan {
                 // Report partial linebreak - it might be the last token.
                 Scan::PartialToken(Tok::PrologS) => {
+                    if self.handlers.default {
+                        self.report_default(h, enc, buf, s, next);
+                        if self.control.get() == Parsing::Finished {
+                            return Err(XmlError::Aborted.into());
+                        }
+                    }
                     *next_ptr = next;
                     return Ok(());
                 }
@@ -190,7 +196,7 @@ impl Parser {
                     *next_ptr = s;
                     return Ok(());
                 }
-                Scan::Token(Tok::PrologS) => {}
+                Scan::Token(Tok::PrologS) => self.report_default(h, enc, buf, s, next),
                 Scan::Token(Tok::Pi) => self.report_processing_instruction(h, enc, buf, s, next)?,
                 Scan::Token(Tok::Comment) => self.report_comment(h, enc, buf, s, next)?,
                 Scan::Invalid => {
@@ -244,6 +250,7 @@ impl Parser {
         from: DataIn,
     ) {
         if !self.handlers.character_data {
+            self.report_default(h, enc, buf, s, next);
             return;
         }
         if enc.is_utf8() {
@@ -270,6 +277,44 @@ impl Parser {
                 return;
             }
             self.ev(enc, Some(s));
+        }
+    }
+
+    /// `reportDefault`: `buf[s..end]` to the default handler, converted to
+    /// UTF-8 through the 1024-byte data buffer when the encoding is not
+    /// UTF-8. Does nothing without a default handler (the C callers test
+    /// the pointer first).
+    pub(crate) fn report_default<E: Encoding, H: Handler>(
+        &mut self,
+        h: &mut H,
+        enc: &E,
+        buf: &[u8],
+        s: usize,
+        end: usize,
+    ) {
+        if !self.handlers.default {
+            return;
+        }
+        if enc.is_utf8() {
+            self.locate(h);
+            h.default_data(bytes(buf, s, end));
+            return;
+        }
+        let mut s = s;
+        let mut data = [0u8; INIT_DATA_BUF_SIZE];
+        loop {
+            let r = enc.to_utf8(bytes(buf, s, end), &mut data);
+            s += r.read;
+            self.ev_end(enc, Some(s));
+            self.locate(h);
+            h.default_data(data.get(..r.written).unwrap_or_default());
+            self.ev(enc, Some(s));
+            if matches!(
+                r.result,
+                ConvertResult::Completed | ConvertResult::InputIncomplete
+            ) {
+                return;
+            }
         }
     }
 
@@ -320,6 +365,8 @@ impl Parser {
                     if self.handlers.character_data {
                         self.locate(h);
                         h.character_data(b"\n");
+                    } else {
+                        self.report_default(h, enc, buf, s, end);
                     }
                     if start_tag_level == 0 {
                         return Err(XmlError::NoElements.into());
@@ -374,6 +421,8 @@ impl Parser {
                         if self.handlers.character_data {
                             self.locate(h);
                             h.character_data(&[ch]);
+                        } else {
+                            self.report_default(h, enc, buf, s, next);
                         }
                     } else {
                         let name = to_utf8(enc, bytes(buf, s + m, next - m));
@@ -393,6 +442,8 @@ impl Parser {
                             None => {
                                 if self.handlers.skipped_entity {
                                     h.skipped_entity(&name, false);
+                                } else {
+                                    self.report_default(h, enc, buf, s, next);
                                 }
                             }
                             Some(id) => {
@@ -410,17 +461,19 @@ impl Parser {
                                 if notation {
                                     return Err(XmlError::BinaryEntityRef.into());
                                 }
-                                if text {
-                                    // m_defaultExpandInternalEntities is
-                                    // true without a default handler
-                                    // (public API, module 12).
+                                if text && self.handlers.no_default_expand {
+                                    if self.handlers.skipped_entity {
+                                        h.skipped_entity(&name, false);
+                                    } else {
+                                        self.report_default(h, enc, buf, s, next);
+                                    }
+                                } else if text {
                                     self.open_content_entity(r)?;
                                 } else if self.handlers.external_entity_ref {
                                     self.external_general_entity(h, r)?;
+                                } else {
+                                    self.report_default(h, enc, buf, s, next);
                                 }
-                                // An external entity without a handler: C
-                                // only reports it to the default handler
-                                // (public API, module 12).
                             }
                         }
                     }
@@ -454,6 +507,8 @@ impl Parser {
                     if self.handlers.start_element {
                         self.locate(h);
                         self.call_start_element(h, &name);
+                    } else {
+                        self.report_default(h, enc, buf, s, next);
                     }
                     if let Some(tag) = self.tag_stack.last_mut() {
                         tag.name = name;
@@ -491,6 +546,9 @@ impl Parser {
                         self.locate(h);
                         h.end_element(&name);
                     }
+                    if !self.handlers.start_element && !self.handlers.end_element {
+                        self.report_default(h, enc, buf, s, next);
+                    }
                     self.tracker.temp_pool.clear();
                     self.empty_tag_name = name;
                     self.free_bindings(h, bindings);
@@ -518,6 +576,8 @@ impl Parser {
                     if self.handlers.end_element {
                         self.locate(h);
                         h.end_element(&tag.name);
+                    } else {
+                        self.report_default(h, enc, buf, s, next);
                     }
                     let tag_bindings = tag.bindings;
                     self.free_tags.push(tag);
@@ -536,6 +596,8 @@ impl Parser {
                         let k = utf8_encode(c, &mut out);
                         self.locate(h);
                         h.character_data(out.get(..k).unwrap_or_default());
+                    } else {
+                        self.report_default(h, enc, buf, s, next);
                     }
                 }
                 Scan::Token(Tok::XmlDecl) => return Err(XmlError::MisplacedXmlPi.into()),
@@ -543,12 +605,16 @@ impl Parser {
                     if self.handlers.character_data {
                         self.locate(h);
                         h.character_data(b"\n");
+                    } else {
+                        self.report_default(h, enc, buf, s, next);
                     }
                 }
                 Scan::Token(Tok::CdataSectOpen) => {
                     if self.handlers.start_cdata_section {
                         self.locate(h);
                         h.start_cdata_section();
+                    } else {
+                        self.report_default(h, enc, buf, s, next);
                     }
                     let mut after = Some(next);
                     self.do_cdata_section(h, enc, buf, &mut after, next_ptr, have_more, account)?;
@@ -576,6 +642,8 @@ impl Parser {
                             self.locate(h);
                             h.character_data(data.get(..r.written).unwrap_or_default());
                         }
+                    } else {
+                        self.report_default(h, enc, buf, s, end);
                     }
                     if start_tag_level == 0 {
                         self.ev(enc, Some(end));
@@ -594,9 +662,8 @@ impl Parser {
                 Scan::Token(Tok::Pi) => self.report_processing_instruction(h, enc, buf, s, next)?,
                 Scan::Token(Tok::Comment) => self.report_comment(h, enc, buf, s, next)?,
                 // Every token the content scanner produces has its own
-                // case; C keeps a default that only reports to the default
-                // handler (module 12).
-                _ => {}
+                // case; C keeps this one as a safety net.
+                _ => self.report_default(h, enc, buf, s, next),
             }
             match self.control.get() {
                 Parsing::Suspended => {
@@ -696,6 +763,8 @@ impl Parser {
                     if self.handlers.end_cdata_section {
                         self.locate(h);
                         h.end_cdata_section();
+                    } else {
+                        self.report_default(h, enc, buf, s, next);
                     }
                     *start = Some(next);
                     *next_ptr = next;
@@ -708,6 +777,8 @@ impl Parser {
                     if self.handlers.character_data {
                         self.locate(h);
                         h.character_data(b"\n");
+                    } else {
+                        self.report_default(h, enc, buf, s, next);
                     }
                 }
                 Scan::Token(Tok::DataChars) => {
@@ -755,7 +826,7 @@ impl Parser {
         }
     }
 
-    /// `reportProcessingInstruction` (without a default handler).
+    /// `reportProcessingInstruction`.
     pub(crate) fn report_processing_instruction<E: Encoding, H: Handler>(
         &mut self,
         h: &mut H,
@@ -765,6 +836,7 @@ impl Parser {
         end: usize,
     ) -> Result<(), Stop> {
         if !self.handlers.processing_instruction {
+            self.report_default(h, enc, buf, start, end);
             return Ok(());
         }
         let m = E::MINBPC;
@@ -785,7 +857,7 @@ impl Parser {
         Ok(())
     }
 
-    /// `reportComment` (without a default handler).
+    /// `reportComment`.
     pub(crate) fn report_comment<E: Encoding, H: Handler>(
         &mut self,
         h: &mut H,
@@ -795,6 +867,7 @@ impl Parser {
         end: usize,
     ) -> Result<(), Stop> {
         if !self.handlers.comment {
+            self.report_default(h, enc, buf, start, end);
             return Ok(());
         }
         let m = E::MINBPC;

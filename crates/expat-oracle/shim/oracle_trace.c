@@ -325,6 +325,14 @@ on_comment(void *ud, const XML_Char *data) {
 }
 
 static void XMLCALL
+on_default(void *ud, const XML_Char *s, int len) {
+  struct start_ctx *c = ud;
+  struct tracer *t = begin(c->t, "default");
+  buf_field_n(&t->out, s, len > 0 ? (size_t)len : 0);
+  end_line(t);
+}
+
+static void XMLCALL
 on_cdata(void *ud) {
   struct start_ctx *c = ud;
   end_line(begin(c->t, "cdata"));
@@ -737,6 +745,10 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
       XML_SetEndNamespaceDeclHandler(p, on_nsend);
     if (m & ORACLE_H_SKIPPED_ENTITY)
       XML_SetSkippedEntityHandler(p, on_skipped);
+    if (m & ORACLE_H_DEFAULT)
+      XML_SetDefaultHandler(p, on_default);
+    else if (m & ORACLE_H_DEFAULT_EXPAND)
+      XML_SetDefaultHandlerExpand(p, on_default);
   }
   ext_handler_mode = opts->ext_handler;
   not_standalone_mode = opts->not_standalone;

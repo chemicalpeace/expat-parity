@@ -7,7 +7,8 @@
 //! libexpat. This first slice covers parser creation and release, user
 //! data, the nine handlers of [`expat::Events`], `XML_Parse`,
 //! `XML_GetBuffer` and `XML_ParseBuffer` (D-049), `XML_StopParser` and
-//! `XML_ResumeParser` (D-050), the error code and its
+//! `XML_ResumeParser` (D-050), `XML_SetDefaultHandler` and
+//! `XML_SetDefaultHandlerExpand` (D-051), the error code and its
 //! text, the position between calls and inside handlers (D-048) and the
 //! version. Every
 //! other `expat.h` function is missing, so a program that uses one fails
@@ -30,6 +31,8 @@
 //! - `XML_Parse`, `XML_ParseBuffer`, `XML_GetBuffer`, `XML_ResumeParser`
 //!   and `XML_ParserFree` called from inside a handler do nothing (`XML_STATUS_ERROR` or
 //!   `NULL`, without an error code), as in libexpat 2.10.0.
+//! - `XML_DefaultCurrent` is missing: a handler cannot pass its event to
+//!   the default handler.
 //! - The hash salt comes from the standard library's `RandomState` keys,
 //!   which are seeded from the operating system.
 //!
@@ -93,6 +96,8 @@ pub type XML_StartNamespaceDeclHandler =
     Option<unsafe extern "C" fn(*mut c_void, *const XML_Char, *const XML_Char)>;
 /// `XML_EndNamespaceDeclHandler`.
 pub type XML_EndNamespaceDeclHandler = Option<unsafe extern "C" fn(*mut c_void, *const XML_Char)>;
+/// `XML_DefaultHandler`.
+pub type XML_DefaultHandler = Option<unsafe extern "C" fn(*mut c_void, *const XML_Char, c_int)>;
 
 /// `XML_Expat_Version`.
 #[repr(C)]
@@ -133,6 +138,10 @@ pub struct XML_ParserStruct {
     end_cdata_section: Cell<XML_EndCdataSectionHandler>,
     start_namespace_decl: Cell<XML_StartNamespaceDeclHandler>,
     end_namespace_decl: Cell<XML_EndNamespaceDeclHandler>,
+    default: Cell<XML_DefaultHandler>,
+    /// `m_defaultExpandInternalEntities`: cleared by
+    /// `XML_SetDefaultHandler`, set by `XML_SetDefaultHandlerExpand`.
+    default_expand: Cell<bool>,
     /// Stops the parser from inside a handler (`XML_StopParser`).
     stopper: Stopper,
     inner: UnsafeCell<Inner>,
@@ -169,6 +178,8 @@ impl XML_ParserStruct {
             end_cdata_section: Cell::new(None),
             start_namespace_decl: Cell::new(None),
             end_namespace_decl: Cell::new(None),
+            default: Cell::new(None),
+            default_expand: Cell::new(true),
             stopper: parser.stopper(),
             inner: UnsafeCell::new(Inner {
                 parser,
@@ -190,7 +201,9 @@ impl XML_ParserStruct {
             .start_cdata_section(self.start_cdata_section.get().is_some())
             .end_cdata_section(self.end_cdata_section.get().is_some())
             .start_namespace_decl(self.start_namespace_decl.get().is_some())
-            .end_namespace_decl(self.end_namespace_decl.get().is_some());
+            .end_namespace_decl(self.end_namespace_decl.get().is_some())
+            .default_data(self.default.get().is_some())
+            .expand_internal_entities(self.default_expand.get());
         events.position(events != Events::NONE)
     }
 
@@ -316,18 +329,14 @@ impl Handler for Dispatch<'_> {
     }
 
     fn character_data(&mut self, data: &[u8]) {
-        let Some(h) = self.state.character_data.get() else {
-            return;
-        };
-        let arg = self.state.handler_arg.get();
-        // `XML_Parse` takes an `int` length, so a piece never exceeds it.
-        // The split only keeps the conversion total.
-        for piece in data.chunks(usize::try_from(c_int::MAX).unwrap_or(usize::MAX)) {
-            let len = c_int::try_from(piece.len()).unwrap_or(c_int::MAX);
-            // SAFETY: `h` is a handler the program set; `piece` is valid for
-            // `len` bytes for the call (character data is not
-            // NUL-terminated in libexpat either).
-            unsafe { h(arg, piece.as_ptr().cast(), len) };
+        if let Some(h) = self.state.character_data.get() {
+            pieces(h, self.state.handler_arg.get(), data);
+        }
+    }
+
+    fn default_data(&mut self, data: &[u8]) {
+        if let Some(h) = self.state.default.get() {
+            pieces(h, self.state.handler_arg.get(), data);
         }
     }
 
@@ -397,6 +406,23 @@ impl Handler for Dispatch<'_> {
         // SAFETY: `h` is a handler the program set; the prefix is NULL or a
         // NUL-terminated copy valid for the call.
         self.with_str(prefix, |p| unsafe { h(arg, p) });
+    }
+}
+
+/// Calls a handler that takes a length (`XML_CharacterDataHandler`,
+/// `XML_DefaultHandler`) with `data`. `XML_Parse` takes an `int` length,
+/// so a piece never exceeds it; the split only keeps the conversion total.
+fn pieces(
+    h: unsafe extern "C" fn(*mut c_void, *const XML_Char, c_int),
+    arg: *mut c_void,
+    data: &[u8],
+) {
+    for piece in data.chunks(usize::try_from(c_int::MAX).unwrap_or(usize::MAX)) {
+        let len = c_int::try_from(piece.len()).unwrap_or(c_int::MAX);
+        // SAFETY: `h` is a handler the program set; `piece` is valid for
+        // `len` bytes for the call (this text is not NUL-terminated in
+        // libexpat either).
+        unsafe { h(arg, piece.as_ptr().cast(), len) };
     }
 }
 
@@ -571,6 +597,41 @@ setter!(
     /// `XML_SetEndNamespaceDeclHandler`.
     XML_SetEndNamespaceDeclHandler, end_namespace_decl, XML_EndNamespaceDeclHandler
 );
+
+/// `XML_SetDefaultHandler`: the handler for the text no other handler
+/// reports. References to internal general entities in content are then
+/// not expanded (even when `handler` is `NULL`, as in libexpat).
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle; the handler is `NULL` or a
+/// function of the C type `expat.h` declares.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetDefaultHandler(parser: XML_Parser, handler: XML_DefaultHandler) {
+    // SAFETY: forwarded from this function's contract.
+    if let Some(s) = unsafe { state(parser) } {
+        s.default.set(handler);
+        s.default_expand.set(false);
+    }
+}
+
+/// `XML_SetDefaultHandlerExpand`: as `XML_SetDefaultHandler`, but
+/// references to internal general entities stay expanded.
+///
+/// # Safety
+///
+/// As for `XML_SetDefaultHandler`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetDefaultHandlerExpand(
+    parser: XML_Parser,
+    handler: XML_DefaultHandler,
+) {
+    // SAFETY: forwarded from this function's contract.
+    if let Some(s) = unsafe { state(parser) } {
+        s.default.set(handler);
+        s.default_expand.set(true);
+    }
+}
 
 /// `XML_SetElementHandler`: both element handlers.
 ///
