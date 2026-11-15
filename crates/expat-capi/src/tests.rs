@@ -464,3 +464,39 @@ fn external_entities_through_the_c_functions() {
         unsafe { XML_ParserFree(p) };
     }
 }
+
+#[test]
+fn input_context_and_byte_count_between_calls() {
+    // SAFETY: `NULL` is accepted by every function below.
+    unsafe {
+        assert_eq!(XML_GetCurrentByteCount(std::ptr::null_mut()), 0);
+        assert_eq!(XML_GetIdAttributeIndex(std::ptr::null_mut()), -1);
+        let none = XML_GetInputContext(
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        );
+        assert!(none.is_null());
+    }
+    // SAFETY: plain creation; the parser is freed at the end.
+    let p = unsafe { XML_ParserCreate(std::ptr::null()) };
+    let (mut offset, mut size) = (-7, -7);
+    // SAFETY: `p` is live and the two locals are valid for a write.
+    let before = unsafe { XML_GetInputContext(p, &mut offset, &mut size) };
+    assert!(before.is_null());
+    assert_eq!((offset, size), (-7, -7));
+    assert_eq!(parse(p, b"<a><b", false), XML_STATUS_OK);
+    // SAFETY: as above.
+    let buf = unsafe { XML_GetInputContext(p, &mut offset, &mut size) };
+    assert!(!buf.is_null());
+    let len = usize::try_from(size).unwrap();
+    // SAFETY: libexpat's contract: `size` bytes from `buf` are readable
+    // until the parser next reads input.
+    let bytes = unsafe { std::slice::from_raw_parts(buf.cast::<u8>(), len) };
+    assert_eq!(&bytes[usize::try_from(offset).unwrap()..], b"<b");
+    // SAFETY: `p` is live.
+    unsafe {
+        assert_eq!(XML_GetIdAttributeIndex(p), -1);
+        XML_ParserFree(p);
+    }
+}

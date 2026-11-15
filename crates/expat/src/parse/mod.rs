@@ -190,6 +190,14 @@ pub struct HandlerSet {
     /// caller that passes the current event to the default handler from
     /// inside its handlers (`XML_DefaultCurrent`).
     pub event_text: bool,
+    /// Report each event's place in the input buffer first
+    /// ([`Handler::event_input`]), for a caller that asks for
+    /// `XML_GetInputContext` or `XML_GetCurrentByteCount` from inside its
+    /// handlers.
+    pub event_input: bool,
+    /// Report `XML_GetIdAttributeIndex` before each start element event
+    /// ([`Handler::id_attribute_index`]).
+    pub id_attribute: bool,
 }
 
 /// Receives the parser's events. Only the methods whose [`HandlerSet`]
@@ -205,6 +213,14 @@ pub trait Handler {
     /// is set: what `XML_DefaultCurrent` passes to the default handler, in
     /// the pieces `reportDefault` would pass.
     fn event_text(&mut self, _pieces: &[&[u8]]) {}
+    /// The input buffer of the event reported next, when
+    /// [`HandlerSet::event_input`] is set: what `XML_GetInputContext64`
+    /// returns inside its handler (`None` for `NULL`: `buffer` is then
+    /// empty) and what `XML_GetCurrentByteCount64` returns.
+    fn event_input(&mut self, _buffer: &[u8], _offset: Option<usize>, _byte_count: u64) {}
+    /// `XML_GetIdAttributeIndex` for the start element event reported
+    /// next, when [`HandlerSet::id_attribute`] is set.
+    fn id_attribute_index(&mut self, _index: i32) {}
     /// A base set by `XML_SetBase` from inside a handler, asked for before
     /// the base is next used: `Some(base)` replaces the base, `None` keeps
     /// it.
@@ -1053,6 +1069,17 @@ impl Parser {
         }
     }
 
+    /// `XML_GetInputContext64`: the input buffer up to `m_bufferEnd` and
+    /// the offset of the current event in it, or `None` where C returns
+    /// `NULL` (no current event, or no buffer).
+    pub fn input_context(&self) -> Option<(&[u8], usize)> {
+        let ev = self.event_ptr?;
+        if !self.has_buffer {
+            return None;
+        }
+        Some((self.buffer.get(..self.buffer_end).unwrap_or_default(), ev))
+    }
+
     /// Brings `m_position` up to `m_eventPtr` (the first half of
     /// `XML_GetCurrentLineNumber64` and `XML_GetCurrentColumnNumber64`).
     fn update_position_to_event(&mut self) {
@@ -1120,6 +1147,13 @@ impl Parser {
         }
         if self.handlers.event_text {
             self.report_event_text(h);
+        }
+        if self.handlers.event_input {
+            let count = self.current_byte_count();
+            match self.input_context() {
+                Some((buffer, offset)) => h.event_input(buffer, Some(offset), count),
+                None => h.event_input(&[], None, count),
+            }
         }
     }
 

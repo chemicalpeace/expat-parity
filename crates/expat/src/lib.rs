@@ -50,7 +50,8 @@
 //! - The events of [`Events`], the default handler, the declaration
 //!   events and external entity references; no unknown-encoding handler.
 //! - A handler reads the position of its event through
-//!   [`Handler::position`] and stops the parse through a [`Stopper`]; the
+//!   [`Handler::position`], its place in the input through
+//!   [`Handler::input_context`], and stops the parse through a [`Stopper`]; the
 //!   position is also reported with an [`Error`] and between calls
 //!   ([`Parser::current_line`]).
 //! - The crate does no I/O, so external entities and DTD subsets are
