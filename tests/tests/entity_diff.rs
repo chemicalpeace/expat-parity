@@ -84,6 +84,7 @@ const ALWAYS: ParseOptions = ParseOptions {
     text_digest: false,
     trace_accounting: false,
     heap_cap: 0,
+    fail_alloc_after: None,
     ext_handler: expat_oracle::ExtHandler::None,
     not_standalone: None,
     use_foreign_dtd: false,

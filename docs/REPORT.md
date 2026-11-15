@@ -1505,9 +1505,8 @@ suite, same pipeline as main): lines 95.10 % on Linux and macOS
 URI, with and without triplets); `buffer_diff` 7 slices, 672 s, 4,296,352
 executions. No crash, no mismatch. aarch64 Linux only.
 
-**Not done here.** OOM fault injection per allocation point
-(PR #16, DV-1 parity phase 2, has merged, so the port's allocation
-points are final; not started). A libFuzzer merge of the Part 2
+**Not done here.** OOM fault injection per allocation point (done
+later, D-058). A libFuzzer merge of the Part 2
 runs' working corpora into `fuzz/corpus` (only the 40 curated inputs
 were added). Suspend/resume: see "Remaining uncovered
 lines".
@@ -1656,6 +1655,11 @@ compilers and inputs; x86_64 was not measured.
   the port copies it for every entity, so it charges at least C's bytes.
   The child encoding-name charge is untested. The input buffer is not
   tracked, as in C.
+- Allocation failures are compared at every allocation point (D-058),
+  except shrinking `realloc_fcn` calls; through the C interface a
+  failing `XML_ParserCreate_MM` allocator only reaches content models and
+  the `XML_Mem*` functions. A failure of the system allocator aborts the
+  process.
 - D-017: on targets where C `char` is unsigned (aarch64 Linux) C's
   `utf8_toUtf16` zero-extends stray bytes that the port sign-extends; the
   parser never passes such bytes to the converter, and the tokenizer

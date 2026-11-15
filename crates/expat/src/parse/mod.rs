@@ -935,6 +935,13 @@ impl Parser {
         &self.tracker.t
     }
 
+    /// Allocation failure injection (tests only): see
+    /// [`AllocTracker::fail_allocations_after`]. Counts from this call on;
+    /// external entity parsers created later share the count.
+    pub fn fail_allocations_after(&mut self, calls: Option<u64>) {
+        self.tracker.t.fail_allocations_after(calls);
+    }
+
     /// Starts (or stops) recording the tracker's events
     /// ([`AllocTracker::log_events`], D-034).
     pub fn log_tracker_events(&mut self, on: bool) {
@@ -1409,6 +1416,10 @@ impl Parser {
                 // outside the allocation tracker ("to leave limiting the
                 // input size to the application", `xmlparse.c` 2601-2603),
                 // so the port does not charge it either.
+                if !self.tracker.t.allocator_call() {
+                    self.error_code = XmlError::NoMemory.into();
+                    return false;
+                }
                 let mut new_buf = vec![0u8; size as usize];
                 if self.has_buffer {
                     let from = self.buffer_ptr - keep;

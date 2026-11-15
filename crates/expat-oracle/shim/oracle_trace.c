@@ -57,6 +57,19 @@ unsigned long long testingAccountingGetCountBytesIndirect(XML_Parser parser);
 static ORACLE_TLS size_t heap_cap_bytes;
 static ORACLE_TLS size_t heap_live;
 static ORACLE_TLS size_t heap_peak;
+/* Allocation failure injection (fail_allocs): calls still granted. */
+static ORACLE_TLS int fail_on;
+static ORACLE_TLS unsigned long long fail_left;
+
+static int
+fail_this_call(void) {
+  if (! fail_on)
+    return 0;
+  if (fail_left == 0)
+    return 1;
+  fail_left--;
+  return 0;
+}
 
 size_t
 oracle_last_heap_peak(void) {
@@ -81,6 +94,8 @@ oracle_last_tracker(unsigned long long *created, unsigned long long *end) {
 static void *
 capped_malloc(size_t n) {
   if (n > heap_cap_bytes || heap_live > heap_cap_bytes - n)
+    return NULL;
+  if (fail_this_call())
     return NULL;
   unsigned char *b = malloc(n + HEAP_HDR);
   if (b == NULL)
@@ -111,6 +126,8 @@ capped_realloc(void *p, size_t n) {
   size_t old;
   memcpy(&old, b, sizeof old);
   if (n > old && (n - old > heap_cap_bytes || heap_live > heap_cap_bytes - (n - old)))
+    return NULL;
+  if (n > old && fail_this_call())
     return NULL;
   unsigned char *nb = realloc(b, n + HEAP_HDR);
   if (nb == NULL)
@@ -661,15 +678,20 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
 
   t.digest = opts->text_digest;
   t.dhash = FNV_OFFSET;
-  if (opts->heap_cap != 0) {
+  fail_on = 0;
+  if (opts->heap_cap != 0 || opts->fail_allocs) {
     static const XML_Memory_Handling_Suite capped
         = {capped_malloc, capped_realloc, capped_free};
     XML_Char sep = (XML_Char)opts->ns_separator;
-    heap_cap_bytes = opts->heap_cap;
+    heap_cap_bytes = opts->heap_cap != 0 ? opts->heap_cap : (size_t)-1;
     heap_live = 0;
     heap_peak = 0;
     p = XML_ParserCreate_MM(opts->encoding, &capped,
                             opts->ns_separator >= 0 ? &sep : NULL);
+    if (p != NULL && opts->fail_allocs) {
+      fail_left = opts->fail_alloc_after;
+      fail_on = 1;
+    }
   } else if (opts->ns_separator >= 0)
     p = XML_ParserCreateNS(opts->encoding, (XML_Char)opts->ns_separator);
   else
@@ -802,6 +824,7 @@ oracle_parse_trace(const unsigned char *doc, size_t len,
   tracker_end = oracle_tracker_bytes(p);
   oracle_tracker_events_mark_end();
   XML_ParserFree(p);
+  fail_on = 0;
   free(t.text.data);
   if (t.out.failed) {
     free(t.out.data);

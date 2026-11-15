@@ -36,6 +36,8 @@ pub(crate) struct OracleOptions {
     pub(crate) text_digest: c_int,
     pub(crate) trace_accounting: c_int,
     pub(crate) heap_cap: usize,
+    pub(crate) fail_allocs: c_int,
+    pub(crate) fail_alloc_after: u64,
     pub(crate) ext_handler: c_int,
     pub(crate) not_standalone: c_int,
     pub(crate) use_foreign_dtd: c_int,
