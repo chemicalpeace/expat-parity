@@ -43,6 +43,7 @@ mod tests;
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::cell::Cell;
 use core::ffi::c_ulong;
 
 use crate::heap::{Heap, NoMemory, POINTER_SIZE};
@@ -84,6 +85,73 @@ pub struct HashTable<V> {
     power: u8,
     /// The entries, in insertion order; `used` is their number.
     entries: Vec<Entry<V>>,
+    /// Recently looked-up entries (no C counterpart, see [`Memo`]).
+    memo: Memo,
+}
+
+/// Number of entries in a [`Memo`] (a power of two).
+const MEMO_SIZE: usize = 64;
+
+/// A direct-mapped cache of recently found or inserted entries, indexed by
+/// the length and the first and last bytes of the key. A hit is confirmed by
+/// comparing the whole key with the entry's, so it gives the entry that
+/// probing would give: keys are unique and an [`EntryId`] does not change
+/// until the table is cleared, which empties the cache. It saves the SipHash
+/// of names that repeat, such as the attribute and element names of
+/// consecutive start tags. Slots, sizes and heap use are not affected.
+#[derive(Debug, Clone)]
+struct Memo([Cell<usize>; MEMO_SIZE]);
+
+impl Default for Memo {
+    fn default() -> Self {
+        Self(core::array::from_fn(|_| Cell::new(0)))
+    }
+}
+
+impl PartialEq for Memo {
+    /// The cache is not part of the table's state.
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for Memo {}
+
+impl Memo {
+    /// The cache entry for `key`.
+    #[inline(always)]
+    fn cell(&self, key: &[u8]) -> Option<&Cell<usize>> {
+        let first = u64::from(key.first().copied().unwrap_or(0));
+        let last = u64::from(key.last().copied().unwrap_or(0));
+        let x = first | (last << 8) | ((key.len() as u64) << 16);
+        // A 64-bit mixer (the multiply-xorshift steps of MurmurHash3's
+        // finaliser); the top six bits pick the entry.
+        let mut y = x.wrapping_mul(0xff51_afd7_ed55_8ccd);
+        y ^= y >> 29;
+        y = y.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
+        let i = (y >> 58) as usize;
+        self.0.get(i)
+    }
+
+    /// Entry index plus one; 0 is empty.
+    #[inline(always)]
+    fn get(&self, key: &[u8]) -> Option<EntryId> {
+        let v = self.cell(key)?.get();
+        v.checked_sub(1).map(EntryId)
+    }
+
+    #[inline(always)]
+    fn set(&self, key: &[u8], id: EntryId) {
+        if let Some(c) = self.cell(key) {
+            c.set(id.0.wrapping_add(1));
+        }
+    }
+
+    fn reset(&self) {
+        for c in &self.0 {
+            c.set(0);
+        }
+    }
 }
 
 impl<V> Default for HashTable<V> {
@@ -132,6 +200,7 @@ impl<V> HashTable<V> {
             slots: Vec::new(),
             power: 0,
             entries: Vec::new(),
+            memo: Memo::default(),
         }
     }
 
@@ -175,6 +244,16 @@ impl<V> HashTable<V> {
         self.entries.get_mut(id.0).map(|e| &mut e.value)
     }
 
+    /// The entry for `key` if the cache holds it.
+    #[inline(always)]
+    fn memo_hit(&self, key: &[u8]) -> Option<EntryId> {
+        let id = self.memo.get(key)?;
+        self.entries
+            .get(id.0)
+            .is_some_and(|e| *e.key == *key)
+            .then_some(id)
+    }
+
     fn mask(&self) -> c_ulong {
         (self.slots.len() as c_ulong).wrapping_sub(1)
     }
@@ -205,7 +284,15 @@ impl<V> HashTable<V> {
         if self.slots.is_empty() {
             return None;
         }
-        self.probe(hash(salt, key), key).1
+        if let Some(id) = self.memo_hit(key) {
+            debug_assert_eq!(self.probe(hash(salt, key), key).1, Some(id));
+            return Some(id);
+        }
+        let found = self.probe(hash(salt, key), key).1;
+        if let Some(id) = found {
+            self.memo.set(key, id);
+        }
+        found
     }
 
     /// `lookup(parser, table, name, createSize)`: the entry with key `key`,
@@ -225,6 +312,10 @@ impl<V> HashTable<V> {
         make: impl FnOnce() -> V,
     ) -> Result<(EntryId, Lookup), NoMemory> {
         debug_assert!(!key.contains(&0), "C string key without interior NUL");
+        if let Some(id) = self.memo_hit(key) {
+            debug_assert_eq!(self.probe(hash(salt, key), key).1, Some(id));
+            return Ok((id, Lookup::Found));
+        }
         let h = hash(salt, key);
         let i = if self.slots.is_empty() {
             self.power = INIT_POWER;
@@ -237,6 +328,7 @@ impl<V> HashTable<V> {
         } else {
             let (i, found) = self.probe(h, key);
             if let Some(id) = found {
+                self.memo.set(key, id);
                 return Ok((id, Lookup::Found));
             }
             // Half full: double before inserting.
@@ -260,6 +352,7 @@ impl<V> HashTable<V> {
         if let Some(slot) = self.slots.get_mut(i) {
             *slot = Some(id);
         }
+        self.memo.set(key, id);
         Ok((id, Lookup::Inserted))
     }
 
@@ -328,6 +421,7 @@ impl<V> HashTable<V> {
             }
         }
         self.entries.clear();
+        self.memo.reset();
     }
 
     /// `hashTableDestroy`: releases every entry (in slot order), then the

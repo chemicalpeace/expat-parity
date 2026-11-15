@@ -1530,8 +1530,69 @@ D-017 (sign of stray bytes in `utf8_toUtf16`).
 
 ## Benchmarks
 
-Only an oracle baseline exists (`cargo bench -p expat-bench`); port-vs-C
-comparisons start when the parser exists.
+`cargo bench -p expat-bench` holds an oracle baseline. `benches/filc/`
+(README there) measures throughput of the port, of C libexpat built with
+clang and gcc, and of C libexpat built with Fil-C, on the same inputs.
+
+### Port, C libexpat 2.10.0 and C libexpat with Fil-C (branch `bench-filc`, 2026-11-13)
+
+Machine: aarch64 Linux sandbox VM, 2 vCPUs, 7 GiB, Debian 13 (glibc 2.41),
+pinned to CPU 1. Port: rustc 1.99.0, `--release` and `--release` + fat LTO,
+codegen-units 1. C: libexpat 2.10.0 (vendored oracle sources, oracle
+configuration), `-O2 -DNDEBUG`, Debian clang 19.1.7 and gcc 14.2.0. Fil-C:
+release 0.687 `filc-0.687-linux-aarch64` (musl-based, clang 20.1.8), same
+sources and flags. Median of 7 runs after one warm-up, MiB/s of input bytes.
+"port/Fil-C" and "port/C clang" use the slower of the two port builds.
+Repeating the bench-mixed and OSM rows moved every figure by less than 3 %.
+
+| corpus | handlers | chunks | port LTO | port release | C clang | C gcc | Fil-C | port/Fil-C | port/C clang | C clang/Fil-C |
+|---|---|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| bench-mixed (8 MiB) | none | single | 176.2 | 197.4 | 265.6 | 280.0 | 73.6 | 2.39x | 0.66x | 3.61x |
+| bench-mixed | none | 64 KiB | 145.7 | 155.7 | 175.8 | 182.8 | 59.7 | 2.44x | 0.83x | 2.94x |
+| bench-mixed | count | single | 203.2 | 168.1 | 256.5 | 270.9 | 70.0 | 2.40x | 0.66x | 3.66x |
+| bench-mixed | count | 64 KiB | 161.3 | 139.1 | 171.1 | 179.3 | 56.9 | 2.44x | 0.81x | 3.01x |
+| plain-large (50 MiB) | none | single | 64.2 | 66.1 | 125.0 | 118.6 | 32.0 | 2.01x | 0.51x | 3.91x |
+| plain-large | none | 64 KiB | 61.0 | 61.9 | 103.0 | 98.7 | 29.2 | 2.09x | 0.59x | 3.53x |
+| plain-large | count | single | 65.5 | 61.8 | 123.6 | 117.6 | 31.3 | 1.97x | 0.50x | 3.95x |
+| plain-large | count | 64 KiB | 63.3 | 58.0 | 101.8 | 97.5 | 28.7 | 2.02x | 0.57x | 3.55x |
+| ns-heavy (12 MiB, NS on) | none | single | 55.8 | 55.1 | 96.5 | 100.1 | 27.0 | 2.04x | 0.57x | 3.57x |
+| ns-heavy | none | 64 KiB | 52.2 | 51.6 | 79.6 | 82.3 | 24.4 | 2.11x | 0.65x | 3.26x |
+| ns-heavy | count | single | 56.1 | 52.1 | 94.4 | 98.7 | 26.6 | 1.96x | 0.55x | 3.55x |
+| ns-heavy | count | 64 KiB | 55.0 | 49.0 | 77.7 | 81.5 | 24.0 | 2.04x | 0.63x | 3.24x |
+| utf16le (14 MiB) | none | single | 303.7 | 278.1 | 496.4 | 508.3 | 144.8 | 1.92x | 0.56x | 3.43x |
+| utf16le | none | 64 KiB | 233.6 | 217.2 | 328.3 | 342.9 | 113.9 | 1.91x | 0.66x | 2.88x |
+| utf16le | count | single | 247.2 | 215.4 | 337.0 | 341.6 | 110.2 | 1.95x | 0.64x | 3.06x |
+| utf16le | count | 64 KiB | 200.0 | 176.4 | 249.4 | 258.7 | 91.2 | 1.93x | 0.71x | 2.73x |
+| docbook-dtd (10 MiB) | none | single | 76.4 | 85.7 | 128.4 | 141.5 | 32.9 | 2.32x | 0.60x | 3.90x |
+| docbook-dtd | none | 64 KiB | 70.8 | 77.5 | 100.7 | 109.2 | 29.3 | 2.42x | 0.70x | 3.44x |
+| docbook-dtd | count | single | 83.7 | 76.6 | 124.5 | 138.4 | 31.7 | 2.42x | 0.62x | 3.93x |
+| docbook-dtd | count | 64 KiB | 76.3 | 69.8 | 98.4 | 107.1 | 28.8 | 2.42x | 0.71x | 3.42x |
+| OSM extract (5.3 MiB) | none | single | 86.9 | 89.7 | 139.6 | 132.6 | 39.9 | 2.18x | 0.62x | 3.50x |
+| OSM extract | none | 64 KiB | 79.7 | 80.8 | 109.3 | 106.0 | 35.6 | 2.24x | 0.73x | 3.07x |
+| OSM extract | count | single | 92.8 | 81.5 | 136.6 | 131.8 | 39.2 | 2.08x | 0.60x | 3.48x |
+| OSM extract | count | 64 KiB | 81.1 | 74.0 | 107.4 | 103.0 | 34.9 | 2.12x | 0.69x | 3.08x |
+
+Event counts (start, end, character data calls and bytes) are identical
+across the five builds in all 24 cells.
+
+On this machine, throughput of the port (slower of its two builds) was
+1.91x-2.44x that of C libexpat built with Fil-C 0.687, and 0.50x-0.83x that
+of C libexpat built with clang `-O2`. These figures come from one aarch64 VM
+and may differ on other platforms, compilers and inputs.
+
+Under `perf` (plain-large, count, single) the largest differences to plain C
+were per-start-tag heap allocation (`malloc`/`free` about 13 % of samples,
+mostly from `store_atts`: per-attribute name/value `Vec`s from `to_utf8`, the
+cloned `default_atts` and `default_att_for_name` of the element type,
+`app_atts`, and the `Vec` built in `call_start_element`; C reuses
+`m_tempPool` and `m_atts`), the `attribute_id` and `element_type_for_content`
+lookups with SipHash `finish` (about 18 % together, against about 12 % for
+`lookup`, `hash` and `sip24_final` in C), and `do_content` itself (14 %).
+
+Not measured: x86_64, the glibc-based `optfil` Fil-C distribution, large
+entity expansions (see D-042: on large within-limit expansions the port took
+about 1.9x the time of C), external entities, unknown encodings,
+Windows/macOS, peak memory.
 
 ## Limitations
 

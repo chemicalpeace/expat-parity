@@ -63,3 +63,29 @@ fn probe_step_is_odd_and_bounded() {
     assert_eq!(probe_next(0, 3, 64), 61);
     assert_eq!(probe_next(10, 3, 64), 7);
 }
+
+#[test]
+fn cached_lookups_match_probing() -> Result<(), NoMemory> {
+    // Keys that share the length and the first and last bytes compete for
+    // one cache entry; every answer must still be the probed one.
+    let s = salt();
+    let mut t: HashTable<usize> = HashTable::new();
+    let keys: Vec<_> = (0..300usize).map(|n| format!("a{n}z")).collect();
+    for round in 0..3 {
+        for (n, key) in keys.iter().enumerate() {
+            let (id, l) = t.lookup_or_insert(&s, &mut Unlimited, key.as_bytes(), 16, || n)?;
+            let expected = if round == 0 { Lookup::Inserted } else { Lookup::Found };
+            assert_eq!(l, expected);
+            assert_eq!(t.value(id), Some(&n));
+            assert_eq!(t.probe(hash(&s, key.as_bytes()), key.as_bytes()).1, Some(id));
+            assert_eq!(t.find(&s, key.as_bytes()), Some(id));
+        }
+    }
+    assert_eq!(t.find(&s, b"a0y"), None);
+    t.clear(&mut Unlimited);
+    assert_eq!(t.find(&s, b"a0z"), None);
+    let (id, l) = t.lookup_or_insert(&s, &mut Unlimited, b"a1z", 16, || 7)?;
+    assert_eq!((id, l), (EntryId(0), Lookup::Inserted));
+    assert_eq!(t.find(&s, b"a0z"), None);
+    Ok(())
+}

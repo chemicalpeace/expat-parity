@@ -76,6 +76,7 @@ impl SipHasher24 {
 
     /// `sip_round` applied `rounds` times. SipHash is defined over wrapping
     /// 64-bit arithmetic, hence the `wrapping_add`s.
+    #[inline(always)]
     fn rounds(&mut self, rounds: usize) {
         for _ in 0..rounds {
             self.v0 = self.v0.wrapping_add(self.v1);
@@ -91,6 +92,7 @@ impl SipHasher24 {
         }
     }
 
+    #[inline(always)]
     fn compress(&mut self, m: u64) {
         self.v3 ^= m;
         self.rounds(2);
@@ -145,11 +147,30 @@ impl SipHasher24 {
     }
 }
 
-/// One-shot SipHash-2-4 (`siphash24`).
+/// One-shot SipHash-2-4 (`siphash24`). Gives the value of
+/// [`SipHasher24::update`] with all of `data` followed by
+/// [`SipHasher24::finish`], without the pending-block buffer: the whole
+/// blocks are compressed straight from `data` and the tail goes into the
+/// final block.
 pub fn siphash24(data: &[u8], key: &SipKey) -> u64 {
     let mut h = SipHasher24::new(key);
-    h.update(data);
-    h.finish()
+    let (blocks, tail) = data.as_chunks::<8>();
+    for block in blocks {
+        h.compress(u64::from_le_bytes(*block));
+    }
+    let mut last = [0u8; 8];
+    if let Some(dst) = last.get_mut(..tail.len()) {
+        dst.copy_from_slice(tail);
+    }
+    // The length byte: `data.len()` mod 256 (C: `(c + left) << 56` with a
+    // wrapping 64-bit `c`); `tail.len() <= 7` leaves the top byte free.
+    let b = ((data.len() as u64) << 56) | u64::from_le_bytes(last);
+    h.v3 ^= b;
+    h.rounds(2);
+    h.v0 ^= b;
+    h.v2 ^= 0xff;
+    h.rounds(4);
+    h.v0 ^ h.v1 ^ h.v2 ^ h.v3
 }
 
 #[cfg(test)]

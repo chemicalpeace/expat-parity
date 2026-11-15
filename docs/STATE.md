@@ -12,6 +12,11 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   everything else in 2.10.0 has no observable effect in the port (D-042
   lists it). Full suite green in debug and release on aarch64 Linux; not
   yet run on macOS/Windows CI, under Miri or the fuzz smoke tests.
+- **Throughput measurement (local branch `bench-filc`, not pushed):**
+  harness in `benches/filc/`. On one aarch64 Linux VM, port throughput was
+  1.91x-2.44x that of C libexpat 2.10.0 built with Fil-C 0.687 and
+  0.50x-0.83x that of C built with clang `-O2` (REPORT.md "Benchmarks");
+  other platforms not measured.
 - **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-10 done;
   module 11 in progress: 11a (declarations, PR #6), 11b (internal entity
   expansion and recursion, PR #7), 11b2 (billion-laughs limits, PR #8) and

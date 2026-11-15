@@ -34,6 +34,7 @@ impl Utf16 {
     pub const ALL: [Utf16; 4] = [Utf16::Little, Utf16::LittleNs, Utf16::Big, Utf16::BigNs];
 
     /// The table that classifies code units below 0x100.
+    #[inline(always)]
     pub fn table(self) -> Table {
         match self {
             Utf16::Little | Utf16::Big => Table::Little2,
@@ -76,6 +77,7 @@ fn unicode_byte_type(hi: u8, lo: u8) -> ByteType {
 impl Encoding for Utf16 {
     const MINBPC: usize = 2;
 
+    #[inline(always)]
     fn byte_type(&self, buf: &[u8], p: usize) -> ByteType {
         // A unit that is not complete in `buf` only occurs where C would
         // read out of bounds; it classifies as "not XML", which stops every

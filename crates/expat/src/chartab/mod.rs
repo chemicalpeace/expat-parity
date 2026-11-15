@@ -105,6 +105,7 @@ pub enum ByteType {
 
 /// The built-in encodings' byte tables (`struct normal_encoding::type`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub enum Table {
     /// `utf8_encoding` (`xmltok.c`): asciitab + utf8tab, colon is a name-start char.
     Utf8,
@@ -173,6 +174,21 @@ static LATIN1_NS: [ByteType; 256] = build(&data::ASCII_LOWER, Some(&data::LATIN1
 static ASCII: [ByteType; 256] = build(&data::ASCII_LOWER, None, true);
 static ASCII_NS: [ByteType; 256] = build(&data::ASCII_LOWER, None, false);
 
+/// The tables in the order of the `Table` variants (`Table::ALL`).
+/// UTF-16 code units below 0x100 classify exactly like Latin-1.
+static TABLES: [&[ByteType; 256]; 10] = [
+    &UTF8,
+    &UTF8_NS,
+    &INTERNAL_UTF8,
+    &INTERNAL_UTF8_NS,
+    &LATIN1,
+    &LATIN1_NS,
+    &ASCII,
+    &ASCII_NS,
+    &LATIN1,
+    &LATIN1_NS,
+];
+
 impl Table {
     /// All tables.
     pub const ALL: [Table; 10] = [
@@ -189,21 +205,16 @@ impl Table {
     ];
 
     /// The full 256-entry table.
+    #[inline(always)]
     pub fn entries(self) -> &'static [ByteType; 256] {
-        match self {
-            Table::Utf8 => &UTF8,
-            Table::Utf8Ns => &UTF8_NS,
-            Table::InternalUtf8 => &INTERNAL_UTF8,
-            Table::InternalUtf8Ns => &INTERNAL_UTF8_NS,
-            // UTF-16 code units below 0x100 classify exactly like Latin-1.
-            Table::Latin1 | Table::Little2 => &LATIN1,
-            Table::Latin1Ns | Table::Little2Ns => &LATIN1_NS,
-            Table::Ascii => &ASCII,
-            Table::AsciiNs => &ASCII_NS,
-        }
+        // One load from `TABLES` (indexed by the discriminant, in the order
+        // of `Table::ALL`) instead of a branch per variant, like C's
+        // `((const struct normal_encoding *)enc)->type`.
+        TABLES.get(usize::from(self as u8)).copied().unwrap_or(&ASCII)
     }
 
     /// Class of byte `b` (`SB_BYTE_TYPE` in `xmltok.c`).
+    #[inline(always)]
     pub fn byte_type(self, b: u8) -> ByteType {
         // A `[_; 256]` indexed by a `u8` cannot be out of bounds; `get` keeps
         // that fact visible to the panic-freedom lints.

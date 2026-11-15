@@ -10,9 +10,9 @@ use super::accounting::Account;
 use super::dtd::{Binding, BindingId, EntityRef, PrefixId};
 use super::error::{Stop, XmlError};
 use super::entity::EntityType;
-use super::prolog::{to_utf8, with_known};
+use super::prolog::{to_utf8, to_utf8_token_into, with_known};
 use super::tracker::{ATTRIBUTE_SIZE, Pool};
-use super::{Enc, Handler, INIT_ATTS_SIZE, INIT_DATA_BUF_SIZE, Parser, Parsing, Processor, Tag};
+use super::{AppAtt, AppAtts, Enc, Handler, INIT_ATTS_SIZE, INIT_DATA_BUF_SIZE, Parser, Parsing, Processor};
 use crate::encode::utf8_encode;
 use crate::hash::EntryId;
 use crate::siphash::siphash24;
@@ -80,12 +80,9 @@ fn bytes(buf: &[u8], from: usize, to: usize) -> &[u8] {
     buf.get(from..to).unwrap_or_default()
 }
 
-/// One attribute of a start tag while `storeAtts` builds the list.
-struct AppAtt {
-    name: Vec<u8>,
-    value: Vec<u8>,
-    id: EntryId,
-}
+/// The number of attributes [`Parser::call_start_element`] hands to the
+/// start handler without allocating a list.
+const STACK_ATTS: usize = 16;
 
 /// Whether character data comes from content or from a CDATA section
 /// (they differ in where `m_eventEndPtr` points while it is converted).
@@ -427,17 +424,22 @@ impl Parser {
                 Scan::Token(Tok::StartTagNoAtts | Tok::StartTagWithAtts) => {
                     let raw_start = s + m;
                     let raw_len = name_length(enc, buf, raw_start);
-                    let raw_name = bytes(buf, raw_start, raw_start + raw_len).to_vec();
-                    let mut name = to_utf8(enc, &raw_name);
+                    let raw = bytes(buf, raw_start, raw_start + raw_len);
+                    // A tag from `m_freeTagList` keeps its buffers.
+                    let mut tag = self.free_tags.pop().unwrap_or_default();
+                    let mut name = core::mem::take(&mut tag.name);
+                    name.clear();
+                    to_utf8_token_into(enc, raw, &mut name);
                     let direct = self.direct();
-                    self.tracker
-                        .open_tag(name.len(), raw_len, direct)
-                        .map_err(|_| Stop::Error(XmlError::NoMemory))?;
-                    self.tag_stack.push(Tag {
-                        raw_name,
-                        name: Vec::new(),
-                        bindings: None,
-                    });
+                    if self.tracker.open_tag(name.len(), raw_len, direct).is_err() {
+                        tag.name = name;
+                        self.free_tags.push(tag);
+                        return Err(XmlError::NoMemory.into());
+                    }
+                    tag.raw_name.clear();
+                    tag.raw_name.extend_from_slice(raw);
+                    tag.bindings = None;
+                    self.tag_stack.push(tag);
                     self.tag_level += 1;
                     let mut bindings = None;
                     let res = self.store_atts(h, enc, buf, s, &mut name, &mut bindings, account);
@@ -456,7 +458,9 @@ impl Parser {
                 Scan::Token(Tok::EmptyElementNoAtts | Tok::EmptyElementWithAtts) => {
                     let raw_start = s + m;
                     let raw_len = name_length(enc, buf, raw_start);
-                    let mut name = to_utf8(enc, bytes(buf, raw_start, raw_start + raw_len));
+                    let mut name = core::mem::take(&mut self.empty_tag_name);
+                    name.clear();
+                    to_utf8_token_into(enc, bytes(buf, raw_start, raw_start + raw_len), &mut name);
                     let mut bindings = None;
                     // C keeps the name in `m_tempPool`.
                     let direct = self.direct();
@@ -481,6 +485,7 @@ impl Parser {
                         h.end_element(&name);
                     }
                     self.tracker.temp_pool.clear();
+                    self.empty_tag_name = name;
                     self.free_bindings(h, bindings);
                     if let Some(r) = self.after_root_closed(h, buf, next, next_ptr) {
                         return r;
@@ -506,7 +511,9 @@ impl Parser {
                     if self.handlers.end_element {
                         h.end_element(&tag.name);
                     }
-                    self.release_bindings(h, tag.bindings);
+                    let tag_bindings = tag.bindings;
+                    self.free_tags.push(tag);
+                    self.release_bindings(h, tag_bindings);
                     if let Some(r) = self.after_root_closed(h, buf, next, next_ptr) {
                         return r;
                     }
@@ -623,14 +630,26 @@ impl Parser {
     }
 
     /// Calls the start element handler with the attribute list `storeAtts`
-    /// built.
+    /// built. Up to [`STACK_ATTS`] attributes are passed from the stack.
     fn call_start_element<H: Handler>(&self, h: &mut H, name: &[u8]) {
-        let atts: Vec<(&[u8], &[u8])> = self
-            .app_atts
-            .iter()
-            .map(|a| (a.0.as_slice(), a.1.as_slice()))
-            .collect();
-        h.start_element(name, &atts, self.n_specified_atts);
+        let atts = &self.app_atts;
+        let pair = |a: &AppAtt| {
+            (
+                bytes(&atts.text, a.name.0, a.name.1),
+                bytes(&atts.text, a.value.0, a.value.1),
+            )
+        };
+        let n = atts.list.len();
+        if n <= STACK_ATTS {
+            let mut list: [(&[u8], &[u8]); STACK_ATTS] = [(&[], &[]); STACK_ATTS];
+            for (slot, a) in list.iter_mut().zip(&atts.list) {
+                *slot = pair(a);
+            }
+            h.start_element(name, list.get(..n).unwrap_or_default(), self.n_specified_atts);
+        } else {
+            let list: Vec<(&[u8], &[u8])> = atts.list.iter().map(pair).collect();
+            h.start_element(name, &list, self.n_specified_atts);
+        }
     }
 
     /// `doCdataSection`. `start` is the C `*startPtr`: set to the end of
@@ -790,6 +809,29 @@ impl Parser {
         bindings: &mut Option<BindingId>,
         account: Account,
     ) -> Result<(), Stop> {
+        // The list's buffers are taken out of the parser while it is built
+        // and put back afterwards, so their memory is reused.
+        let mut app = core::mem::take(&mut self.app_atts);
+        app.text.clear();
+        app.list.clear();
+        let r = self.store_atts_in(h, enc, buf, att_str, tag_name, bindings, account, &mut app);
+        self.app_atts = app;
+        r
+    }
+
+    /// The body of [`Parser::store_atts`], building the list in `app`.
+    #[allow(clippy::too_many_arguments)] // reason: mirrors the C signature of storeAtts plus the list being built.
+    fn store_atts_in<E: Encoding, H: Handler>(
+        &mut self,
+        h: &mut H,
+        enc: &E,
+        buf: &[u8],
+        att_str: usize,
+        tag_name: &mut Vec<u8>,
+        bindings: &mut Option<BindingId>,
+        account: Account,
+        app: &mut AppAtts,
+    ) -> Result<(), Stop> {
         let salt = self.salt;
         let no_mem = |_| Stop::Error(XmlError::NoMemory);
         // Look up the element type name.
@@ -798,16 +840,12 @@ impl Parser {
             .dtd
             .element_type_for_content(&salt, &mut self.tracker, direct, self.ns, tag_name)
             .map_err(no_mem)?;
-        let (et_prefix, et_id_att, defaults, att_index) = match self.dtd.element_types.value(et_id) {
-            Some(et) => (
-                et.prefix,
-                et.id_att,
-                et.default_atts.clone(),
-                et.default_att_for_name.clone(),
-            ),
-            None => (None, None, Vec::new(), alloc::collections::BTreeMap::new()),
+        // The element type's defaults are read in place: nothing below
+        // changes the element types.
+        let (et_prefix, et_id_att, n_default) = match self.dtd.element_types.value(et_id) {
+            Some(et) => (et.prefix, et.id_att, et.default_atts.len()),
+            None => (None, None, 0),
         };
-        let n_default = defaults.len();
 
         // Get the attributes from the tokenizer.
         if self.atts.len() > i32::MAX as usize {
@@ -830,18 +868,19 @@ impl Parser {
             }
         }
 
-        let mut app: Vec<AppAtt> = Vec::with_capacity(n + n_default);
         let mut n_prefixes = 0usize;
         for i in 0..n {
             let Some(att) = self.atts.get(i).copied() else {
                 break;
             };
             let name_end = att.name + name_length(enc, buf, att.name);
-            let name = to_utf8(enc, bytes(buf, att.name, name_end));
+            let name_start = app.text.len();
+            to_utf8_token_into(enc, bytes(buf, att.name, name_end), &mut app.text);
+            let name = (name_start, app.text.len());
             let direct = self.direct();
             let id = self
                 .dtd
-                .attribute_id(&salt, &mut self.tracker, direct, self.ns, &name)
+                .attribute_id(&salt, &mut self.tracker, direct, self.ns, bytes(&app.text, name.0, name.1))
                 .map_err(no_mem)?;
             // Detect duplicate attributes by their QNames. This does not
             // work when namespace processing is turned on and different
@@ -853,21 +892,29 @@ impl Parser {
             }
             self.dtd.set_att_flag(id, 1);
             let a = self.dtd.attribute_ids.value(id).copied().unwrap_or_default();
-            let value = if att.normalized {
+            let value_start = app.text.len();
+            if att.normalized {
                 // The value did not need normalizing.
-                to_utf8(enc, bytes(buf, att.value_ptr, att.value_end))
+                to_utf8_token_into(enc, bytes(buf, att.value_ptr, att.value_end), &mut app.text);
+                // `poolStoreString(&parser->m_tempPool, ...)`; a value that
+                // needed normalising was charged while it was built.
+                let direct = self.direct();
+                self.tracker
+                    .store_text(Pool::Temp, bytes(&app.text, value_start, app.text.len()), direct)
+                    .map_err(no_mem)?;
             } else {
                 // Figure out whether declared as other than CDATA.
                 let is_cdata = if a.maybe_tokenized {
                     // `defaultAttForName` names the first definition.
-                    att_index
-                        .get(&id)
-                        .and_then(|&i| defaults.get(i))
+                    self.dtd
+                        .element_types
+                        .value(et_id)
+                        .and_then(|et| et.default_att_for_name.get(&id).and_then(|&i| et.default_atts.get(i)))
                         .is_none_or(|d| d.is_cdata)
                 } else {
                     true
                 };
-                self.store_attribute_value(
+                self.store_attribute_value_into(
                     enc,
                     buf,
                     is_cdata,
@@ -875,28 +922,24 @@ impl Parser {
                     att.value_end,
                     account,
                     false,
-                )?
-            };
-            if att.normalized {
-                // `poolStoreString(&parser->m_tempPool, ...)`; a value that
-                // needed normalising was charged while it was built.
-                let direct = self.direct();
-                self.tracker
-                    .store_text(Pool::Temp, &value, direct)
-                    .map_err(no_mem)?;
+                    &mut app.value,
+                )?;
+                app.text.extend_from_slice(&app.value);
             }
+            let value = (value_start, app.text.len());
             match a.prefix {
                 Some(prefix) if a.xmlns => {
                     // Deal with namespace declarations here.
-                    self.add_binding(h, prefix, Some(id), &value, bindings)?;
+                    self.add_binding(h, prefix, Some(id), bytes(&app.text, value.0, value.1), bindings)?;
+                    app.text.truncate(name_start);
                 }
                 Some(_) => {
                     // Deal with other prefixed names later.
                     n_prefixes += 1;
                     self.dtd.set_att_flag(id, 2);
-                    app.push(AppAtt { name, value, id });
+                    app.list.push(AppAtt { name, value, id });
                 }
-                None => app.push(AppAtt { name, value, id }),
+                None => app.list.push(AppAtt { name, value, id }),
             }
         }
 
@@ -910,10 +953,10 @@ impl Parser {
                 .and_then(|v| i32::try_from(v).ok())
                 .ok_or(Stop::Error(XmlError::NoMemory))
         };
-        self.n_specified_atts = as_c_int(app.len())?;
+        self.n_specified_atts = as_c_int(app.list.len())?;
         match et_id_att {
             Some(ida) if self.dtd.att_flag(ida) != 0 => {
-                if let Some(i) = app.iter().position(|a| a.id == ida) {
+                if let Some(i) = app.list.iter().position(|a| a.id == ida) {
                     self.id_att_index = as_c_int(i)?;
                 }
             }
@@ -921,43 +964,46 @@ impl Parser {
         }
 
         // Do attribute defaulting.
-        for da in &defaults {
-            let Some(value) = &da.value else { continue };
-            if self.dtd.att_flag(da.id) != 0 {
+        for k in 0..n_default {
+            let Some(da) = self
+                .dtd
+                .element_types
+                .value(et_id)
+                .and_then(|et| et.default_atts.get(k))
+            else {
+                break;
+            };
+            let da_id = da.id;
+            let Some(da_value) = &da.value else { continue };
+            if self.dtd.att_flag(da_id) != 0 {
                 continue;
             }
+            let value_start = app.text.len();
+            app.text.extend_from_slice(da_value);
+            let value = (value_start, app.text.len());
             let a = self
                 .dtd
                 .attribute_ids
-                .value(da.id)
+                .value(da_id)
                 .copied()
                 .unwrap_or_default();
-            let name = self
-                .dtd
-                .attribute_ids
-                .key(da.id)
-                .unwrap_or_default()
-                .to_vec();
             match a.prefix {
                 Some(prefix) if a.xmlns => {
-                    self.add_binding(h, prefix, Some(da.id), value, bindings)?;
+                    self.add_binding(h, prefix, Some(da_id), bytes(&app.text, value.0, value.1), bindings)?;
+                    app.text.truncate(value_start);
                 }
-                Some(_) => {
-                    self.dtd.set_att_flag(da.id, 2);
-                    n_prefixes += 1;
-                    app.push(AppAtt {
-                        name,
-                        value: value.clone(),
-                        id: da.id,
-                    });
-                }
-                None => {
-                    self.dtd.set_att_flag(da.id, 1);
-                    app.push(AppAtt {
-                        name,
-                        value: value.clone(),
-                        id: da.id,
-                    });
+                Some(_) | None => {
+                    let name_start = app.text.len();
+                    app.text
+                        .extend_from_slice(self.dtd.attribute_ids.key(da_id).unwrap_or_default());
+                    let name = (name_start, app.text.len());
+                    if a.prefix.is_some() {
+                        self.dtd.set_att_flag(da_id, 2);
+                        n_prefixes += 1;
+                    } else {
+                        self.dtd.set_att_flag(da_id, 1);
+                    }
+                    app.list.push(AppAtt { name, value, id: da_id });
                 }
             }
         }
@@ -974,11 +1020,13 @@ impl Parser {
             // equal hashes share a probe sequence, so grouping the names by
             // hash finds the same ones. A map keeps the check O(log n) per
             // attribute like C's O(1) table (a list made a 1 MB start tag
-            // take ~30 times longer than in C: `ns_atts_diff`).
-            let mut seen: alloc::collections::BTreeMap<c_ulong, Vec<Vec<u8>>> =
+            // take ~30 times longer than in C: `ns_atts_diff`). The map's
+            // keys are (hash, insertion number), its values the ranges of
+            // the stored names in `app.text`.
+            let mut seen: alloc::collections::BTreeMap<(c_ulong, usize), (usize, usize)> =
                 alloc::collections::BTreeMap::new();
-            while i < app.len() {
-                let Some(att) = app.get_mut(i) else { break };
+            while i < app.list.len() {
+                let Some(&att) = app.list.get(i) else { break };
                 let id = att.id;
                 if self.dtd.att_flag(id) == 2 {
                     self.dtd.set_att_flag(id, 0);
@@ -992,37 +1040,40 @@ impl Parser {
                     let Some(binding) = self.dtd.binding(b) else {
                         return Err(XmlError::UnboundPrefix.into());
                     };
-                    let local_start = att
-                        .name
-                        .iter()
-                        .position(|&c| c == b':')
-                        .map_or(0, |p| p + 1);
-                    let mut expanded = binding.uri.clone();
-                    expanded.extend_from_slice(att.name.get(local_start..).unwrap_or_default());
-                    let hash = siphash24(&expanded, &salt) as c_ulong;
-                    if seen
-                        .get(&hash)
-                        .is_some_and(|same| same.iter().any(|s2| s2.starts_with(&expanded)))
-                    {
+                    let qname = bytes(&app.text, att.name.0, att.name.1);
+                    let local_start = att.name.0
+                        + qname.iter().position(|&c| c == b':').map_or(0, |p| p + 1);
+                    let start = app.text.len();
+                    app.text.extend_from_slice(&binding.uri);
+                    app.text.extend_from_within(local_start..att.name.1);
+                    let expanded = bytes(&app.text, start, app.text.len());
+                    let hash = siphash24(expanded, &salt) as c_ulong;
+                    if seen.range((hash, 0)..=(hash, usize::MAX)).any(|(_, &(s0, s1))| {
+                        bytes(&app.text, s0, s1).starts_with(expanded)
+                    }) {
                         return Err(XmlError::DuplicateAttribute.into());
                     }
                     if self.ns_triplets {
                         // Append namespace separator and prefix.
-                        expanded.push(self.namespace_separator);
-                        expanded.extend_from_slice(
+                        app.text.push(self.namespace_separator);
+                        app.text.extend_from_slice(
                             self.dtd.prefix_name(binding.prefix).unwrap_or_default(),
                         );
                     }
+                    let end = app.text.len();
                     // The expanded name is built in `m_tempPool` with
                     // `poolAppendChar`: the URI, the local part and its
                     // NUL (with triplets the NUL becomes the separator,
                     // then the prefix and a NUL).
                     let direct = self.direct();
                     self.tracker
-                        .copy(Pool::Temp, expanded.len(), direct)
+                        .copy(Pool::Temp, end - start, direct)
                         .map_err(no_mem)?;
-                    seen.entry(hash).or_default().push(expanded.clone());
-                    att.name = expanded;
+                    let seq = seen.len();
+                    seen.insert((hash, seq), (start, end));
+                    if let Some(slot) = app.list.get_mut(i) {
+                        slot.name = (start, end);
+                    }
                     n_prefixes -= 1;
                     if n_prefixes == 0 {
                         i += 1;
@@ -1035,7 +1086,7 @@ impl Parser {
             }
         }
         // Clear flags for the remaining attributes.
-        for att in app.get(i..).unwrap_or_default() {
+        for att in app.list.get(i..).unwrap_or_default() {
             self.dtd.set_att_flag(att.id, 0);
         }
         let mut b = *bindings;
@@ -1047,7 +1098,6 @@ impl Parser {
             }
             b = next;
         }
-        self.app_atts = app.into_iter().map(|a| (a.name, a.value)).collect();
 
         if !self.ns {
             return Ok(());
@@ -1080,7 +1130,11 @@ impl Parser {
         let Some(binding) = self.dtd.binding(b) else {
             return Ok(());
         };
-        let mut expanded = binding.uri.clone();
+        // Built in the value scratch buffer, then copied back, so that
+        // `tag_name` keeps its allocation.
+        let expanded = &mut app.value;
+        expanded.clear();
+        expanded.extend_from_slice(&binding.uri);
         expanded.extend_from_slice(tag_name.get(local_start..).unwrap_or_default());
         if self.ns_triplets
             && let Some(p) = self.dtd.prefix_name(binding.prefix)
@@ -1090,7 +1144,8 @@ impl Parser {
             expanded.push(self.namespace_separator);
             expanded.extend_from_slice(p);
         }
-        *tag_name = expanded;
+        tag_name.clear();
+        tag_name.extend_from_slice(expanded);
         Ok(())
     }
 

@@ -340,6 +340,30 @@ pub(crate) enum Processor {
     Error,
 }
 
+/// One attribute of [`AppAtts`]: where its name and value are in
+/// [`AppAtts::text`], and its attribute id.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AppAtt {
+    /// `text[name.0..name.1]`
+    pub name: (usize, usize),
+    /// `text[value.0..value.1]`
+    pub value: (usize, usize),
+    /// The attribute id in `dtd.attribute_ids`.
+    pub id: crate::hash::EntryId,
+}
+
+/// The attribute list `storeAtts` builds for the start handler, in buffers
+/// kept across start tags (C: `m_atts` and `m_tempPool`).
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AppAtts {
+    /// Names and values, back to back.
+    pub text: Vec<u8>,
+    /// The attributes in handler order.
+    pub list: Vec<AppAtt>,
+    /// Scratch for one normalised attribute value.
+    pub value: Vec<u8>,
+}
+
 /// An open element (`TAG`).
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Tag {
@@ -428,8 +452,14 @@ pub struct Parser {
     /// `m_atts` (its length is `m_attsSize`).
     pub(crate) atts: Vec<Attribute>,
     /// The attribute list of the last start tag, as the start handler gets
-    /// it (C: the `XML_Char *` pairs at the front of `m_atts`).
-    pub(crate) app_atts: Vec<(Vec<u8>, Vec<u8>)>,
+    /// it (C: the `XML_Char *` pairs at the front of `m_atts`, their text in
+    /// `m_tempPool`). Reused from tag to tag.
+    pub(crate) app_atts: AppAtts,
+    /// `m_freeTagList`: closed tags whose name buffers the next start tags
+    /// reuse.
+    pub(crate) free_tags: Vec<Tag>,
+    /// The name of the current empty-element tag, reused from tag to tag.
+    pub(crate) empty_tag_name: Vec<u8>,
     /// `m_dtd`
     pub(crate) dtd: Dtd,
     /// `m_accounting`
@@ -542,7 +572,9 @@ impl Parser {
             n_specified_atts: 0,
             id_att_index: -1,
             atts: vec![Attribute::default(); INIT_ATTS_SIZE],
-            app_atts: Vec::new(),
+            app_atts: AppAtts::default(),
+            free_tags: Vec::new(),
+            empty_tag_name: Vec::new(),
             dtd: Dtd::new(),
             accounting: Accounting::default(),
             cur_base: None,
