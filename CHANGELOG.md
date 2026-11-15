@@ -69,6 +69,9 @@ All notable changes are documented here. The format follows
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.
+- `scripts/doc-limits.sh` and `benches/docs/measure.c`: large benign
+  DocBook and DITA documents measured against the default limits, C and
+  port compared (D-063).
 - `docs/RELEASING.md`, the procedure for following a libexpat release,
   and `scripts/upstream-check.sh` with a weekly workflow that compares
   the port with libexpat's development branch (D-062).

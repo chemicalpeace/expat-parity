@@ -1936,3 +1936,30 @@ recorded in DIVERGENCES.md.
   `XML_Parse64`, `XML_GetBuffer64` and `XML_ParseBuffer64`, new in the
   coming 2.11.0. Both are ported with the release that contains them,
   as the procedure says; until then the weekly job fails.
+
+## D-063 Large benign DocBook and DITA documents against the default limits (2026-11-15)
+
+- **Decision.** `scripts/doc-limits.sh` parses real documents with their
+  DTDs and external entities through `expat.h` (`benches/docs/measure.c`),
+  once with the vendored libexpat and once with expat-capi, and requires
+  equal output. For each document it reports the outcome under the
+  default limits and the smallest amplification factor and allocation
+  tracker factor under which it parses, with the default activation
+  thresholds and with the factors applied from the first byte.
+- **Documents.** The PostgreSQL 17 manual (tag `REL_17_12`, DocBook XML
+  4.5, one book of about 8 MB assembled from external entities; files the
+  PostgreSQL build generates are left empty) and the DITA Open Toolkit
+  4.3.4 user guide (352 DITA 1.3 and Lightweight DITA topics and maps,
+  identifiers resolved through the toolkit's catalogs).
+- **Results** (2026-11-15, the same for both): all 352 DITA documents
+  parse with the defaults; the largest reads about 0.6 MB of DTD modules
+  and stays below the 8 MiB activation threshold. The PostgreSQL manual
+  is refused with the defaults (`XML_ERROR_AMPLIFICATION_LIMIT_BREACH`
+  inside `ref/create_table.sgml`): its root file is 8,101 bytes, and
+  libexpat counts the bytes of external entities as indirect, so once the
+  activation threshold is passed the factor is about 1,687, above the
+  default of 100. The allocation tracker does not stop it with the
+  default threshold. An application parsing such a book raises the
+  factor with `XML_SetBillionLaughsAttackProtectionMaximumAmplification`.
+- **Not done.** The documents are not part of the throughput benchmarks;
+  the script needs network access and is run by hand.

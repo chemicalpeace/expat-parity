@@ -74,8 +74,14 @@ earlier version of the port and is fixed, with a scaling test against C on
 three platforms (REPORT, "Part 2"). Limits and measured peaks:
 `docs/DTD-SECURITY.md`.
 
-Remaining: measure benign large DocBook and DITA documents against the
-default limits, and add them to the benchmark corpus.
+Done as well: large benign DocBook and DITA documents measured against
+the default limits, with the same results in C and in the port
+(`scripts/doc-limits.sh`, D-063). The 352 DITA documents of the DITA Open
+Toolkit user guide parse with the defaults; the PostgreSQL 17 manual,
+assembled from external entities, is refused by the amplification limit
+in both (factor about 1,687 against the default of 100).
+
+Remaining: these documents are not in the throughput benchmarks.
 
 ## 4. External entities
 
@@ -161,5 +167,5 @@ MIT, as libexpat.
 
 ## Order of work
 
-1. x86_64 and Fil-C benchmarks (9); DocBook and DITA documents (3).
+1. x86_64 and Fil-C benchmarks (9).
 2. Fifth edition names, after discussion with upstream (6).
