@@ -148,7 +148,9 @@ with allocation failures, white-box).
    PR #18, the encoding argument of external entity parsers since PR #19
    (docs/EXTERNAL-ENTITY-ENCODING.md, `ext_encoding_diff`, no difference).
    Allocation failure injection at every allocation point is compared
-   since D-058 (`oom_diff.rs`, 83,023 failure points equal). The
+   since D-058 (`oom_diff.rs`, 83,023 failure points equal). The W3C
+   XML Conformance Test Suite is compared since D-059 (`w3c_diff.rs`,
+   2,586 documents, 12,930 runs equal). The
    unknown-encoding handler branch is compared through the C interface
    since D-057.
 3. Part 2 of the coverage work is done on branch `part2-finish` (on top of

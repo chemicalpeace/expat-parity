@@ -31,6 +31,8 @@ jobs:
       - run: scripts/package-check.sh
       - name: C interface against libexpat
         run: scripts/capi-check.sh
+      - name: W3C XML Conformance Test Suite against libexpat
+        run: scripts/w3c-check.sh
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
