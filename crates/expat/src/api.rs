@@ -51,8 +51,12 @@ impl Options {
     /// `UTF-16`, `UTF-16BE`, `UTF-16LE`, `ISO-8859-1` and `US-ASCII`,
     /// compared ignoring the case of ASCII letters; the input is read in
     /// this encoding (a byte order mark is handled as libexpat handles it)
-    /// and the encoding named in its XML declaration is ignored. Any other name, the empty name included, makes the first
-    /// [`Parser::parse`] call fail with [`ErrorCode::UnknownEncoding`].
+    /// and the encoding named in its XML declaration is ignored. Any other name, the empty name included, goes to
+    /// [`Handler::unknown_encoding`] when the first [`Parser::parse`] call
+    /// starts; without an encoding from it, that call fails with
+    /// [`ErrorCode::UnknownEncoding`].
+    ///
+    /// [`Handler::unknown_encoding`]: crate::Handler::unknown_encoding
     ///
     /// As with the C string, the name ends at its first NUL byte: only
     /// the bytes before it are kept.
@@ -510,7 +514,10 @@ impl Parser {
     /// while the parser is busy (a parse has started and has not finished: [`ParsingStatus::Parsing`] or [`ParsingStatus::Suspended`], which is also the state after an error), or when the copy of the name is refused
     /// by the memory limit, in which case no encoding name remains, as in
     /// libexpat. The name is checked when parsing starts: an unknown name
-    /// fails then with [`ErrorCode::UnknownEncoding`].
+    /// goes then to [`Handler::unknown_encoding`], and fails with
+    /// [`ErrorCode::UnknownEncoding`] if it gives no encoding.
+    ///
+    /// [`Handler::unknown_encoding`]: crate::Handler::unknown_encoding
     ///
     /// ```
     /// let mut p = expat::Parser::new([7; 16]);

@@ -500,3 +500,64 @@ fn input_context_and_byte_count_between_calls() {
         XML_ParserFree(p);
     }
 }
+
+#[test]
+fn unknown_encodings_through_the_c_functions() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static RELEASED: AtomicUsize = AtomicUsize::new(0);
+    unsafe extern "C" fn release(_: *mut c_void) {
+        RELEASED.fetch_add(1, Ordering::SeqCst);
+    }
+    unsafe extern "C" fn convert(_: *mut c_void, s: *const c_char) -> c_int {
+        // SAFETY: the parser passes the two bytes of a sequence.
+        let b = unsafe { *s.add(1).cast::<u8>() };
+        0x100 + c_int::from(b & 0x3f)
+    }
+    unsafe extern "C" fn handler(
+        _: *mut c_void,
+        name: *const XML_Char,
+        info: *mut XML_Encoding,
+    ) -> c_int {
+        // SAFETY: the parser passes a valid name and `XML_Encoding`.
+        let (name, info) = unsafe { (CStr::from_ptr(name), &mut *info) };
+        if info.map.iter().any(|&m| m != -1) {
+            return XML_STATUS_ERROR as c_int;
+        }
+        for (m, b) in info.map.iter_mut().zip(0..) {
+            *m = if b < 0x80 { b } else { -2 };
+        }
+        info.convert = Some(convert);
+        info.release = Some(release);
+        c_int::from(name.to_bytes() == b"x-two")
+    }
+    let mut log = Log::default();
+    // SAFETY: the name is NUL-terminated; the handlers fit their types and
+    // `log` outlives the parser.
+    let p = unsafe {
+        let p = XML_ParserCreate(c"x-two".as_ptr());
+        XML_SetUserData(p, (&raw mut log).cast());
+        XML_SetUnknownEncodingHandler(p, Some(handler), std::ptr::null_mut());
+        XML_SetCharacterDataHandler(p, Some(on_chars));
+        p
+    };
+    assert_eq!(parse(p, b"<a>\xc1\x81</a>", true), XML_STATUS_OK);
+    assert_eq!(RELEASED.load(Ordering::SeqCst), 0);
+    // SAFETY: `p` is live and not parsing.
+    assert_eq!(unsafe { XML_ParserReset(p, c"x-other".as_ptr()) }, 1);
+    assert_eq!(RELEASED.load(Ordering::SeqCst), 1);
+    // SAFETY: as above; the handler is kept by the reset.
+    unsafe { XML_SetUserData(p, (&raw mut log).cast()) };
+    assert_eq!(parse(p, b"<a/>", true), XML_STATUS_ERROR);
+    // SAFETY: `p` is live.
+    let code = unsafe { XML_GetErrorCode(p) };
+    assert_eq!(code, error(ErrorCode::UnknownEncoding));
+    // A refused encoding is released at once.
+    assert_eq!(RELEASED.load(Ordering::SeqCst), 2);
+    // SAFETY: as above.
+    unsafe { XML_ParserReset(p, c"x-two".as_ptr()) };
+    assert_eq!(parse(p, b"<a/>", true), XML_STATUS_OK);
+    // SAFETY: `p` is live and not parsing.
+    unsafe { XML_ParserFree(p) };
+    assert_eq!(RELEASED.load(Ordering::SeqCst), 3);
+    assert_eq!(log.lines, ["chars \u{101}"]);
+}

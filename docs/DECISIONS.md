@@ -1718,3 +1718,50 @@ recorded in DIVERGENCES.md.
   (146118), output equal to libexpat 2.10.0. Doc examples cover
   `Handler::input_context`, `Handler::id_attribute` and
   `Parser::input_context`.
+
+## D-057 Unknown-encoding handler (module 13, slice 10) (2026-11-14)
+
+- **Decision.** `Handler::unknown_encoding(name)` is
+  `XML_UnknownEncodingHandler`: it receives the encoding name in UTF-8
+  (the name given to `Options::encoding` or `Parser::set_encoding`, or
+  the one an XML or text declaration names) and returns an
+  `EncodingInfo` (`XML_Encoding`: `map`, `convert`, `release`) or `None`.
+  It is called whatever `Handler::EVENTS` says, since the default
+  refuses, as libexpat does without a handler. `convert` is a
+  `Box<dyn Fn(&[u8]) -> i32 + Send + Sync>` that receives the bytes of one
+  sequence; `release` is a `Box<dyn FnOnce() + Send + Sync>` that runs when
+  the `EncodingInfo` is dropped unused, or, once the parser uses the
+  encoding, when the parser is reset or dropped (an external entity
+  parser: when it is freed), as libexpat calls `release`.
+- **Core.** `handleUnknownEncoding` is ported in `parse::unknown`: the
+  allocation of `XmlSizeOfUnknownEncoding()` bytes is charged to the
+  tracker (`UNKNOWN_ENCODING`, 2016 bytes on 64-bit targets, compared with
+  the C compiler by `tracker_sizes.rs`) and kept until reset or free even
+  when the map is rejected; the map goes through `tok::Unknown::new`
+  (module 6, D-017). The parser's encoding gains `Enc::Unknown`, with the
+  encoding kept behind an `Arc` so that the scanning functions can borrow
+  the parser mutably; the processors dispatch on it as on the built-in
+  encodings. A declaration naming an unknown encoding continues with the
+  next token in that encoding, and a failure leaves `m_eventPtr` at the
+  name, as in `processXmlDecl`.
+- **C interface.** `XML_SetUnknownEncodingHandler` and `XML_Encoding`.
+  The handler and its data are copied to external entity parsers and kept
+  by `XML_ParserReset`. A handler returning 0 has its `release` called at
+  once.
+- **Differences.** The converter may be called a different number of
+  times: the port converts a name or a text in one pass where libexpat
+  sometimes converts a character again after growing a buffer, and with
+  a default handler set it converts the text of each event for
+  `XML_DefaultCurrent`. A converter that is a function of its input, as
+  `expat.h` describes it, sees no difference. `release` runs while the
+  parser is being freed or reset and must not call functions on that
+  parser.
+- **Verification.** `scripts/capi-check.sh` adds handler set 21 (set 20
+  with an unknown-encoding handler that implements the encodings of
+  libexpat's own tests, so the upstream vectors that name them are
+  parsed, and single-byte, multi-byte and rejected encodings with release
+  functions) and edge cases: the name given at creation and at reset, the
+  name in the XML declaration and in an external entity's text
+  declaration or creation, refused and rejected maps, malformed
+  sequences, byte-by-byte input, without and with namespaces. 541
+  documents x 282 runs plus 48 (152610), output equal to libexpat 2.10.0.

@@ -137,6 +137,19 @@ pub const ELEMENT_TYPE: usize = c_struct(&[PTR, PTR, PTR, SIZE_T, SIZE_T, PTR, H
 /// an `int`, a `bool`, an enum.
 pub const OPEN_INTERNAL_ENTITY: usize = c_struct(&[PTR, PTR, PTR, PTR, INT, BOOL, ENUM]).0;
 
+/// `sizeof(struct unknown_encoding)` (`XmlSizeOfUnknownEncoding`,
+/// `xmltok.c` 1233-1239): `struct normal_encoding` (the `ENCODING` of
+/// `xmltok.h` 172-197 with its 16 function pointers, `int
+/// minBytesPerChar`, `char isUtf8`, `char isUtf16`; then `unsigned char
+/// type[256]` and nine function pointers), `convert`, `userData`,
+/// `unsigned short utf16[256]` and `char utf8[256][4]`.
+pub const UNKNOWN_ENCODING: usize = {
+    let encoding = c_struct(&[(16 * PTR.0, PTR.1), INT, UCHAR, UCHAR]);
+    let normal = c_struct(&[encoding, (256 * UCHAR.0, UCHAR.1), (9 * PTR.0, PTR.1)]);
+    let ushort = (size_of::<u16>(), align_of::<u16>());
+    c_struct(&[normal, PTR, PTR, (256 * ushort.0, ushort.1), (1024 * UCHAR.0, UCHAR.1)]).0
+};
+
 /// `sizeof(ATTRIBUTE)` (`xmltok.h` 152-157): three pointers and a `char`.
 pub const ATTRIBUTE: usize = c_struct(&[PTR, PTR, PTR, UCHAR]).0;
 
@@ -418,6 +431,7 @@ mod tests {
             [96, 56, 24, 88, 96, 24, 12]
         );
         assert_eq!([PARSER, DTD, PARSER_M_POSITION], [1112, 368, 808]);
+        assert_eq!(UNKNOWN_ENCODING, 2016);
     }
 
     #[cfg(target_pointer_width = "64")]

@@ -61,6 +61,7 @@ mod external;
 mod model;
 mod prolog;
 mod tracker;
+mod unknown;
 
 #[cfg(test)]
 mod tests;
@@ -75,6 +76,7 @@ pub use model::{ContentModel, ContentNode, ContentQuant, ContentType, Scaffold};
 pub use control::{Control, Pending};
 pub use error::{Stop, XmlError};
 pub use external::{ExternalEntities, ExternalEntityParser};
+pub use unknown::{ConvertFn, EncodingInfo, ReleaseFn};
 
 use alloc::sync::Arc;
 use alloc::vec;
@@ -227,6 +229,12 @@ pub trait Handler {
     fn take_base(&mut self) -> Option<Option<Vec<u8>>> {
         None
     }
+    /// `XML_UnknownEncodingHandler`: the encoding `name` (UTF-8), which no
+    /// built-in encoding has. `None` refuses it
+    /// (`XML_ERROR_UNKNOWN_ENCODING`).
+    fn unknown_encoding(&mut self, _name: &[u8]) -> Option<EncodingInfo> {
+        None
+    }
     /// `XML_XmlDeclHandler`: `standalone` is -1 (absent), 0 or 1.
     fn xml_decl(&mut self, _version: Option<&[u8]>, _encoding: Option<&[u8]>, _standalone: i32) {}
     /// `XML_StartElementHandler`: the attributes as (name, value) pairs in
@@ -364,6 +372,27 @@ pub(crate) enum Enc {
     Init(InitEncoding),
     /// A built-in encoding.
     Known(Known),
+    /// The encoding an unknown-encoding handler described, kept in
+    /// [`Parser::unknown`] (`m_unknownEncodingMem`).
+    Unknown,
+}
+
+/// A decided encoding, held apart from the parser so that the scanning
+/// functions can borrow the parser mutably.
+#[derive(Debug, Clone)]
+pub(crate) enum AnyEnc {
+    Known(Known),
+    Unknown(Arc<unknown::UnknownEnc>),
+}
+
+impl AnyEnc {
+    /// `XmlTok` in `state` (the built-in encodings' or the application's).
+    pub(crate) fn tok(&self, state: crate::tok::State, buf: &[u8], s: usize) -> crate::tok::Scanned {
+        match self {
+            AnyEnc::Known(k) => k.tok(state, buf, s),
+            AnyEnc::Unknown(u) => crate::tok::tok(&u.enc, state, buf, s),
+        }
+    }
 }
 
 /// `m_processor`.
@@ -477,6 +506,11 @@ pub struct Parser {
     pub(crate) handlers: HandlerSet,
     /// `m_protocolEncodingName`
     pub(crate) protocol_encoding_name: Option<Vec<u8>>,
+    /// The encoding of an unknown-encoding handler, when [`Enc::Unknown`].
+    pub(crate) unknown: Option<Arc<unknown::UnknownEnc>>,
+    /// `m_unknownEncodingMem != NULL`: charged to the tracker until the
+    /// parser is reset or freed.
+    pub(crate) unknown_encoding_mem: bool,
     /// `m_ns`
     pub(crate) ns: bool,
     /// `m_ns_triplets`
@@ -621,6 +655,8 @@ impl Parser {
             located: None,
             handlers: HandlerSet::default(),
             protocol_encoding_name: encoding.map(<[u8]>::to_vec),
+            unknown: None,
+            unknown_encoding_mem: false,
             ns,
             ns_triplets: false,
             // ASCII_EXCL when namespace processing is off.
@@ -770,6 +806,8 @@ impl Parser {
         }
         self.apply_pending();
         let sep = self.ns.then_some(self.namespace_separator);
+        // `callUnknownEncodingRelease` before anything else.
+        self.free_unknown_encoding();
         let mut fresh = Parser::new(encoding, sep, salt);
         fresh.ns_triplets = self.ns_triplets;
         fresh.accounting.maximum_amplification_factor = self.accounting.maximum_amplification_factor;
@@ -1061,6 +1099,16 @@ impl Parser {
         }
     }
 
+    /// The decided encoding (`m_encoding` once it is not the initial
+    /// encoding), or `None` while the encoding is undecided.
+    pub(crate) fn decided_enc(&self) -> Option<AnyEnc> {
+        match self.enc {
+            Enc::Init(_) => None,
+            Enc::Known(k) => Some(AnyEnc::Known(k)),
+            Enc::Unknown => self.unknown.clone().map(AnyEnc::Unknown),
+        }
+    }
+
     /// `XML_GetCurrentByteCount64`.
     pub fn current_byte_count(&self) -> u64 {
         match (self.event_ptr, self.event_end_ptr) {
@@ -1106,6 +1154,11 @@ impl Parser {
             Enc::Init(init) => init.update_position(buf, from, pos),
             Enc::Known(Known::Normal(e)) => update_position(&e, buf, from, pos),
             Enc::Known(Known::Utf16(e)) => update_position(&e, buf, from, pos),
+            Enc::Unknown => {
+                if let Some(u) = &self.unknown {
+                    update_position(&u.enc, buf, from, pos);
+                }
+            }
         }
     }
 
@@ -1168,7 +1221,7 @@ impl Parser {
         }
         let converts = match self.enc {
             Enc::Known(Known::Normal(n)) => !n.is_utf8(),
-            Enc::Known(Known::Utf16(_)) => true,
+            Enc::Known(Known::Utf16(_)) | Enc::Unknown => true,
             Enc::Init(_) => false,
         };
         if converts
@@ -1205,6 +1258,10 @@ impl Parser {
         match self.enc {
             Enc::Known(Known::Normal(n)) if !n.is_utf8() => event_pieces(h, &n, raw),
             Enc::Known(Known::Utf16(u)) => event_pieces(h, &u, raw),
+            Enc::Unknown => match self.unknown.clone() {
+                Some(u) => event_pieces(h, &u.enc, raw),
+                None => h.event_text(&[raw]),
+            },
             _ => h.event_text(&[raw]),
         }
     }

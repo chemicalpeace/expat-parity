@@ -49,10 +49,11 @@ All notable changes are documented here. The format follows
   `ExternalEntities`, `ExternalParser`) and `Handler::not_standalone`
   (D-055), `Events::input_context` with `Handler::input_context`,
   `Events::id_attribute` with `Handler::id_attribute`,
-  `Parser::current_byte_count` and `Parser::input_context` (D-056).
+  `Parser::current_byte_count` and `Parser::input_context` (D-056),
+  `Handler::unknown_encoding` with `EncodingInfo` (D-057).
 - `crates/expat-capi` (not published): a first part of libexpat's C
   interface over the crate, compared with libexpat by
-  `scripts/capi-check.sh` (D-047 to D-056).
+  `scripts/capi-check.sh` (D-047 to D-057).
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.
@@ -75,6 +76,5 @@ All notable changes are documented here. The format follows
   padding is now rejected in about 15 ms instead of about 30 s.
 
 ### Known limitations
-- No unknown-encoding handler; the parser never loads external entities
-  itself; real allocator failure aborts instead of returning
+- The parser never loads external entities itself; real allocator failure aborts instead of returning
   `NoMemory`. See the README.

@@ -59,7 +59,7 @@ use core::ops::{Deref, DerefMut};
 use super::accounting::Account;
 use super::dtd::{BindingId, Dtd, PrefixId};
 use super::error::{Stop, XmlError};
-use super::prolog::{PrologDone, with_known};
+use super::prolog::{PrologDone, with_enc, with_known};
 use super::tracker::Pool;
 use super::{Enc, Handler, Parser, Parsing, Processor};
 use crate::tok::{Encoding, InitEncoding, Normal, Scan, Scanned, State, Tok, ignore_section_tok, init_scan};
@@ -455,6 +455,8 @@ impl Parser {
             ATTRIBUTE_SIZE, CONTENT_SCAFFOLD_SIZE, DEFAULT_ATTRIBUTE_SIZE, NAME_AND_DEFAULT_ATTRIBUTE_SIZE,
             NS_ATT_SIZE, OPEN_ENTITY_SIZE, TAG_SIZE,
         };
+        // `callUnknownEncodingRelease` runs before any state is freed.
+        self.unknown = None;
         let tr = &mut self.tracker;
         let dtd = &mut self.dtd;
         // Tags: the stack (innermost first), then the free list (head
@@ -528,6 +530,9 @@ impl Parser {
         if tr.ns_atts_power > 0 {
             tr.t.free((1usize << tr.ns_atts_power).saturating_mul(NS_ATT_SIZE));
             tr.ns_atts_power = 0;
+        }
+        if core::mem::take(&mut self.unknown_encoding_mem) {
+            tr.t.free(super::c_layout::UNKNOWN_ENCODING);
         }
         tr.t.release_parser_struct();
     }
@@ -613,6 +618,10 @@ impl Parser {
                 r.scanned
             }
             Enc::Known(k) => k.tok(state, buf, s),
+            Enc::Unknown => match self.decided_enc() {
+                Some(a) => a.tok(state, buf, s),
+                None => Scanned { scan: Scan::None, next: None },
+            },
         }
     }
 
@@ -624,7 +633,7 @@ impl Parser {
         start: usize,
         end_ptr: &mut usize,
     ) -> Result<(), Stop> {
-        self.initialize_encoding()?;
+        self.initialize_encoding(h)?;
         self.processor = Processor::ExternalEntityInit2;
         self.external_entity_init_processor2(h, buf, start, end_ptr)
     }
@@ -707,12 +716,12 @@ impl Parser {
         self.event_end_ptr = Some(next);
         match r.scan {
             Scan::Token(Tok::XmlDecl) => {
-                let Enc::Known(k) = self.enc else {
+                let Some(k) = self.decided_enc() else {
                     return Err(XmlError::UnexpectedState.into());
                 };
                 // A change of encoding takes effect for the following
                 // tokens (C: `m_encoding` is replaced).
-                let _ = with_known!(k, e => self.process_xml_decl(h, e, buf, start, next, true))?;
+                let _ = with_enc!(k, e => self.process_xml_decl(h, e, buf, start, next, true))?;
                 match self.control.get() {
                     Parsing::Suspended => {
                         *end_ptr = next;
@@ -798,7 +807,7 @@ impl Parser {
         s: usize,
         next_ptr: &mut usize,
     ) -> Result<(), Stop> {
-        self.initialize_encoding()?;
+        self.initialize_encoding(h)?;
         // We know now that XML_Parse(Buffer) has been called, so we
         // consider the external parameter entity read.
         self.dtd.param_entity_read = true;
@@ -847,10 +856,10 @@ impl Parser {
             }
             match r.scan {
                 Scan::Token(Tok::XmlDecl) => {
-                    let Enc::Known(k) = self.enc else {
+                    let Some(k) = self.decided_enc() else {
                         return Err(XmlError::UnexpectedState.into());
                     };
-                    let _ = with_known!(k, e => self.process_xml_decl(h, e, buf, start, next, false))?;
+                    let _ = with_enc!(k, e => self.process_xml_decl(h, e, buf, start, next, false))?;
                     if self.control.get() == Parsing::Finished {
                         return Err(XmlError::Aborted.into());
                     }
@@ -918,13 +927,13 @@ impl Parser {
     fn store_external_value<H: Handler>(&mut self, h: &mut H, buf: &[u8], s: usize) -> Result<(), Stop> {
         let mut out = core::mem::take(&mut self.pending_value);
         let mut next = s;
-        let r = match self.enc {
-            Enc::Known(k) => {
-                with_known!(k, e => self.store_entity_value(h, e, buf, s, &mut out, Account::Direct, &mut next))
+        let r = match self.decided_enc() {
+            Some(k) => {
+                with_enc!(k, e => self.store_entity_value(h, e, buf, s, &mut out, Account::Direct, &mut next))
             }
             // Nothing was scanned in a known encoding: the text is empty
             // (C tokenizes nothing).
-            Enc::Init(_) => {
+            None => {
                 let e = Normal::Utf8;
                 self.store_entity_value(h, &e, buf, buf.len(), &mut out, Account::Direct, &mut next)
             }
@@ -968,14 +977,14 @@ impl Parser {
         self.processor = Processor::Prolog;
         let next = r.next.unwrap_or(s);
         let have_more = !self.final_buffer;
-        let done = match self.enc {
-            Enc::Known(k) => {
-                with_known!(k, e => self.do_prolog(h, e, buf, s, r.scan, next, next_ptr, have_more, true, Account::Direct))?
+        let done = match self.decided_enc() {
+            Some(k) => {
+                with_enc!(k, e => self.do_prolog(h, e, buf, s, r.scan, next, next_ptr, have_more, true, Account::Direct))?
             }
             // An empty entity: C runs doProlog with XML_TOK_NONE in the
             // initial encoding, whose only use is the role of the end of a
             // parameter entity.
-            Enc::Init(_) => {
+            None => {
                 let e = Normal::Utf8;
                 self.do_prolog(h, &e, buf, s, r.scan, next, next_ptr, have_more, true, Account::Direct)?
             }
@@ -994,12 +1003,12 @@ impl Parser {
         s: usize,
         next_ptr: &mut usize,
     ) -> Result<(), Stop> {
-        let Enc::Known(k) = self.enc else {
+        let Some(k) = self.decided_enc() else {
             return Err(XmlError::UnexpectedState.into());
         };
         let have_more = !self.final_buffer;
         let mut start = Some(s);
-        with_known!(k, e => self.do_ignore_section(h, e, buf, &mut start, next_ptr, have_more))?;
+        with_enc!(k, e => self.do_ignore_section(h, e, buf, &mut start, next_ptr, have_more))?;
         if let Some(s) = start {
             self.processor = Processor::Prolog;
             return self.prolog_processor(h, buf, s, next_ptr);

@@ -106,10 +106,11 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   document type declaration, entity, unparsed entity, notation, element
   type and attribute-list declarations, and skipped entities have their
   own events (`Handler::xml_decl` to `Handler::skipped_entity`), with
-  `Parser::set_base` for the base passed to them. There is no
-  unknown-encoding
-  handler (only libexpat's built-in encodings: UTF-8, UTF-16, UTF-16BE,
-  UTF-16LE, ISO-8859-1, US-ASCII).
+  `Parser::set_base` for the base passed to them. Besides libexpat's
+  built-in encodings (UTF-8, UTF-16, UTF-16BE, UTF-16LE, ISO-8859-1,
+  US-ASCII), `Handler::unknown_encoding` describes any other encoding with
+  an `EncodingInfo` (`XML_SetUnknownEncodingHandler`); its converter may
+  be called a different number of times than in libexpat.
 - **Positions:** the position of each event is reported to
   `Handler::position` when `Events::position` is set, and the position
   between calls is `Parser::current_line`, `current_column` and

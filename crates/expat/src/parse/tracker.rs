@@ -755,6 +755,7 @@ pub const INIT_SCAFFOLD_ELEMENTS: usize = 32;
 /// (`tests/tests/tracker_sizes.rs`, on every CI platform).
 pub const TRACKER_SIZES: &[(&str, usize)] = &[
     ("TAG", TAG_SIZE),
+    ("UNKNOWN_ENCODING", super::c_layout::UNKNOWN_ENCODING),
     ("BINDING", BINDING_SIZE),
     ("PREFIX", super::dtd::PREFIX_SIZE),
     ("ENTITY", super::dtd::ENTITY_SIZE),

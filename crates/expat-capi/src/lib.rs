@@ -18,11 +18,11 @@
 //! `XML_GetParsingStatus`, the memory functions and `XML_GetFeatureList`
 //! (D-054), external entities (`XML_SetExternalEntityRefHandler`,
 //! `XML_SetExternalEntityRefHandlerArg`, `XML_ExternalEntityParserCreate`)
-//! and `XML_SetNotStandaloneHandler` (D-055), the error code and its text, the position between calls and
-//! inside handlers (D-048) and the version.
-//!
-//! Not provided yet, so that a program using them fails to link rather
-//! than run with different behaviour: `XML_SetUnknownEncodingHandler`.
+//! and `XML_SetNotStandaloneHandler` (D-055), `XML_GetCurrentByteCount`,
+//! `XML_GetIdAttributeIndex` and `XML_GetInputContext` (D-056),
+//! `XML_SetUnknownEncodingHandler` (D-057), the error code and its text,
+//! the position between calls and inside handlers (D-048) and the
+//! version.
 //!
 //! Differences from libexpat:
 //!
@@ -57,6 +57,9 @@
 //!   `XML_SetReparseDeferralEnabled` set from inside a handler take
 //!   effect from the next token (libexpat: at once); the allocation
 //!   tracker limits take effect at the next allocation, as in libexpat.
+//! - The `release` function of an `XML_Encoding` runs while the parser is
+//!   being freed or reset; it must not call functions on that parser
+//!   (libexpat 2.10.0 refuses the calls that would change it, D-057).
 //! - `XML_ParserCreate_MM`: only the memory handed to the program
 //!   (content models, `XML_MemMalloc`, `XML_MemRealloc`, `XML_MemFree`)
 //!   comes from the suite; the parser's own memory comes from the Rust
@@ -92,8 +95,8 @@ use std::hash::BuildHasher;
 use std::sync::OnceLock;
 
 use expat::{
-    ContentModel, ErrorCode, Events, ExternalEntities, ExternalParser, Handler, Options,
-    ParamEntityParsing, Parser, ParsingStatus, Stopper,
+    ContentModel, ConvertFn, EncodingInfo, ErrorCode, Events, ExternalEntities, ExternalParser,
+    Handler, Options, ParamEntityParsing, Parser, ParsingStatus, ReleaseFn, Stopper,
 };
 
 /// `XML_Char` without `XML_UNICODE`.
@@ -217,6 +220,40 @@ pub type XML_ExternalEntityRefHandler = Option<
 /// `XML_NotStandaloneHandler`: returns 0 to stop the parse with
 /// `XML_ERROR_NOT_STANDALONE`.
 pub type XML_NotStandaloneHandler = Option<unsafe extern "C" fn(*mut c_void) -> c_int>;
+
+/// `XML_Encoding`: what an unknown-encoding handler fills in. The parser
+/// sets every `map` entry to -1 and the three pointers to `NULL` before
+/// the call.
+#[repr(C)]
+#[derive(Debug)]
+pub struct XML_Encoding {
+    /// For each byte: -1 (malformed), -2 to -4 (first byte of a sequence
+    /// of that many bytes, converted by `convert`) or its code point.
+    pub map: [c_int; 256],
+    /// The first argument of `convert` and `release`.
+    pub data: *mut c_void,
+    /// The code point of one multi-byte sequence, or -1.
+    pub convert: Option<unsafe extern "C" fn(*mut c_void, *const c_char) -> c_int>,
+    /// Called once the parser no longer needs `data`.
+    pub release: Option<unsafe extern "C" fn(*mut c_void)>,
+}
+
+/// `XML_UnknownEncodingHandler`: handler data, encoding name, the
+/// `XML_Encoding` to fill in; returns `XML_STATUS_OK` to use it.
+pub type XML_UnknownEncodingHandler =
+    Option<unsafe extern "C" fn(*mut c_void, *const XML_Char, *mut XML_Encoding) -> c_int>;
+
+/// The `data` of an `XML_Encoding`, moved into the converter and release
+/// closures the parser keeps.
+#[derive(Clone, Copy)]
+struct EncodingData(*mut c_void);
+
+// SAFETY: the parser is used from one thread at a time, as libexpat
+// requires; the pointer is only passed back to the program's own
+// functions, from the thread that is parsing or freeing the parser.
+unsafe impl Send for EncodingData {}
+// SAFETY: as above.
+unsafe impl Sync for EncodingData {}
 
 /// `XML_Content` (`struct XML_cp`): one node of an element declaration's
 /// content model. `type` and `quant` hold the values of
@@ -399,6 +436,8 @@ pub struct XML_ParserStruct {
     /// `m_externalEntityRefHandlerArg`; `NULL` for the parser itself.
     external_entity_ref_arg: Cell<XML_Parser>,
     not_standalone: Cell<XML_NotStandaloneHandler>,
+    /// `m_unknownEncodingHandler` and `m_unknownEncodingHandlerData`.
+    unknown_encoding: Cell<(XML_UnknownEncodingHandler, *mut c_void)>,
     /// While the external entity reference handler runs: what creates the
     /// entity's parser (`XML_ExternalEntityParserCreate`); `NULL` otherwise.
     entities: Cell<*mut ExternalEntities<'static>>,
@@ -514,6 +553,7 @@ impl XML_ParserStruct {
             external_entity_ref: Cell::new(None),
             external_entity_ref_arg: Cell::new(std::ptr::null_mut()),
             not_standalone: Cell::new(None),
+            unknown_encoding: Cell::new((None, std::ptr::null_mut())),
             entities: Cell::new(std::ptr::null_mut()),
             open_child: Cell::new(std::ptr::null_mut()),
             parent: Cell::new(std::ptr::null_mut()),
@@ -814,6 +854,49 @@ impl Handler for Dispatch<'_> {
         }
         self.state.entities.set(previous);
         status != XML_STATUS_ERROR as c_int
+    }
+
+    fn unknown_encoding(&mut self, name: &[u8]) -> Option<EncodingInfo> {
+        let (Some(h), data) = self.state.unknown_encoding.get() else {
+            return None;
+        };
+        let mut c_name = name.to_vec();
+        c_name.push(0);
+        let mut info = XML_Encoding {
+            map: [-1; 256],
+            data: std::ptr::null_mut(),
+            convert: None,
+            release: None,
+        };
+        // SAFETY: a handler of the C type `expat.h` declares, called with
+        // the data the program set, a NUL-terminated name and a valid
+        // `XML_Encoding`.
+        let status = unsafe { h(data, c_name.as_ptr().cast(), &raw mut info) };
+        let user = EncodingData(info.data);
+        let mut out = EncodingInfo::new();
+        out.release = info.release.map(|r| -> ReleaseFn {
+            Box::new(move || {
+                let user = user;
+                // SAFETY: the release function the handler gave, called
+                // once with its data, as libexpat does.
+                unsafe { r(user.0) }
+            })
+        });
+        if status == 0 {
+            // `out` is dropped: libexpat calls `release` at once.
+            return None;
+        }
+        out.map = info.map;
+        out.convert = info.convert.map(|f| -> ConvertFn {
+            Box::new(move |seq: &[u8]| {
+                let user = user;
+                // SAFETY: the converter the handler gave, called with its
+                // data and the bytes of one sequence, as many as the map
+                // gives its first byte (libexpat passes a pointer to them).
+                unsafe { f(user.0, seq.as_ptr().cast()) }
+            })
+        });
+        Some(out)
     }
 
     fn not_standalone(&mut self) -> bool {
@@ -1393,6 +1476,25 @@ setter!(
     XML_SetNotStandaloneHandler, not_standalone, XML_NotStandaloneHandler
 );
 
+/// `XML_SetUnknownEncodingHandler`: the handler asked for an encoding no
+/// built-in encoding has, with `data` as its first argument. Kept by
+/// `XML_ParserReset`, as in libexpat.
+///
+/// # Safety
+///
+/// `parser` is `NULL` or a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn XML_SetUnknownEncodingHandler(
+    parser: XML_Parser,
+    handler: XML_UnknownEncodingHandler,
+    data: *mut c_void,
+) {
+    // SAFETY: forwarded from this function's contract.
+    if let Some(s) = unsafe { state(parser) } {
+        s.unknown_encoding.set((handler, data));
+    }
+}
+
 /// `XML_SetExternalEntityRefHandlerArg`: the first argument of the
 /// external entity reference handler (`NULL` for the parser itself).
 ///
@@ -1487,6 +1589,7 @@ pub unsafe extern "C" fn XML_ExternalEntityParserCreate(
             .set(s.external_entity_ref_arg.get());
     }
     c.not_standalone.set(s.not_standalone.get());
+    c.unknown_encoding.set(s.unknown_encoding.get());
     c.default_expand.set(s.default_expand.get());
     c.mem.set(s.mem.get());
     c.salt_set.set(s.salt_set.get());
