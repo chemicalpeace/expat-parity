@@ -4,6 +4,8 @@
 //! declarations with their values (`storeEntityValue`), notations and
 //! parameter entity references.
 
+use crate::fallible::{try_copy, try_copy_opt};
+use crate::fallible::TryGrow;
 use alloc::vec::Vec;
 
 use super::accounting::Account;
@@ -26,22 +28,22 @@ pub(crate) const EXTERNAL_SUBSET_NAME: &[u8] = b"#";
 
 /// `normalizePublicId`: white space (space, CR, LF) runs become one
 /// space; leading and trailing white space is removed.
-pub(crate) fn normalize_public_id(s: &[u8]) -> Vec<u8> {
-    let mut out: Vec<u8> = Vec::with_capacity(s.len());
+pub(crate) fn normalize_public_id(s: &[u8]) -> Result<Vec<u8>, crate::heap::NoMemory> {
+    let mut out: Vec<u8> = crate::fallible::try_with_capacity(s.len())?;
     for &c in s {
         match c {
             0x20 | 0xD | 0xA => {
                 if !out.is_empty() && out.last() != Some(&0x20) {
-                    out.push(0x20);
+                    out.try_push(0x20)?;
                 }
             }
-            _ => out.push(c),
+            _ => out.try_push(c)?,
         }
     }
     if out.last() == Some(&0x20) {
         out.pop();
     }
-    out
+    Ok(out)
 }
 
 /// The bytes `buf[from..to]` (empty if out of range).
@@ -89,7 +91,7 @@ impl Parser {
         s: usize,
         end: usize,
     ) -> Result<crate::hash::EntryId, Stop> {
-        let name = to_utf8(enc, bytes(buf, s, end));
+        let name = to_utf8(enc, bytes(buf, s, end))?;
         let salt = self.salt;
         let direct = self.direct();
         self.dtd
@@ -98,7 +100,12 @@ impl Parser {
     }
 
     /// The literal `buf[s..next]` without its quotes, converted.
-    fn literal<E: Encoding>(enc: &E, buf: &[u8], s: usize, next: usize) -> Vec<u8> {
+    fn literal<E: Encoding>(
+        enc: &E,
+        buf: &[u8],
+        s: usize,
+        next: usize,
+    ) -> Result<Vec<u8>, crate::heap::NoMemory> {
         let m = E::MINBPC;
         to_utf8(enc, bytes(buf, s + m, next.saturating_sub(m)))
     }
@@ -120,11 +127,12 @@ impl Parser {
     }
 
     /// The name of the element type being declared.
-    fn decl_element_name(&self) -> Vec<u8> {
-        self.decl_element_type
-            .and_then(|id| self.dtd.element_types.key(id))
-            .unwrap_or_default()
-            .to_vec()
+    fn decl_element_name(&self) -> Result<Vec<u8>, crate::heap::NoMemory> {
+        try_copy(
+            self.decl_element_type
+                .and_then(|id| self.dtd.element_types.key(id))
+                .unwrap_or_default(),
+        )
     }
 
     /// Calls the attribute-list declaration handler for the attribute
@@ -139,7 +147,7 @@ impl Parser {
             return Ok(());
         };
         if is_enumerated_type(t) {
-            t.push(b')');
+            t.try_push(b')')?;
             // `)` and the NUL in `m_tempPool`, then `poolFinish`.
             let direct = self.accounting.count_bytes_direct;
             let (p, mut heap) = self.tracker.pool(Pool::Temp, direct);
@@ -147,13 +155,13 @@ impl Parser {
                 .map_err(|_| Stop::Error(XmlError::NoMemory))?;
             p.finish();
         }
-        let elname = self.decl_element_name();
-        let attname = self
-            .decl_attribute_id
-            .and_then(|id| self.dtd.attribute_ids.key(id))
-            .unwrap_or_default()
-            .to_vec();
-        let att_type = self.decl_attribute_type.clone().unwrap_or_default();
+        let elname = self.decl_element_name()?;
+        let attname = try_copy(
+            self.decl_attribute_id
+                .and_then(|id| self.dtd.attribute_ids.key(id))
+                .unwrap_or_default(),
+        )?;
+        let att_type = try_copy_opt(&self.decl_attribute_type)?.unwrap_or_default();
         self.locate(h);
         h.attlist_decl(&elname, &attname, &att_type, dflt, is_required);
         self.tracker.temp_pool.clear();
@@ -185,7 +193,7 @@ impl Parser {
         match role {
             Role::DoctypeName => {
                 if self.handlers.start_doctype_decl {
-                    let name = to_utf8(enc, bytes(buf, s, next));
+                    let name = to_utf8(enc, bytes(buf, s, next))?;
                     // `m_doctypeName` lives in `m_tempPool`.
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Temp, &name, direct).map_err(no_mem)?;
@@ -224,10 +232,10 @@ impl Parser {
                 }
                 self.check_public_id(enc, buf, s, next)?;
                 if role == Role::DoctypePublicId && self.handlers.start_doctype_decl {
-                    let lit = Self::literal(enc, buf, s, next);
+                    let lit = Self::literal(enc, buf, s, next)?;
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Temp, &lit, direct).map_err(no_mem)?;
-                    self.doctype_pubid = Some(normalize_public_id(&lit));
+                    self.doctype_pubid = Some(normalize_public_id(&lit)?);
                     hd = false;
                 }
                 if self.dtd.keep_processing
@@ -237,10 +245,10 @@ impl Parser {
                     // normalised in place, then `poolFinish`: the pool
                     // keeps the literal's length (D-034 stage 2; the port
                     // charged the normalised length before, an under-count).
-                    let lit = Self::literal(enc, buf, s, next);
+                    let lit = Self::literal(enc, buf, s, next)?;
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Dtd, &lit, direct).map_err(no_mem)?;
-                    let id = normalize_public_id(&lit);
+                    let id = normalize_public_id(&lit)?;
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.public_id = Some(id);
                     }
@@ -293,7 +301,7 @@ impl Parser {
                 hd = !(self.dtd.keep_processing && self.handlers.attlist_decl);
             }
             Role::AttributeName => {
-                let name = to_utf8(enc, bytes(buf, s, next));
+                let name = to_utf8(enc, bytes(buf, s, next))?;
                 let direct = self.direct();
                 self.decl_attribute_id = Some(
                     self.dtd
@@ -318,7 +326,7 @@ impl Parser {
                     Role::AttributeTypeId => self.decl_attribute_is_id = true,
                     _ => {}
                 }
-                self.decl_attribute_type = attribute_type_name(role).map(<[u8]>::to_vec);
+                self.decl_attribute_type = attribute_type_name(role).map(crate::fallible::try_copy).transpose()?;
                 hd = !(self.dtd.keep_processing && self.handlers.attlist_decl);
             }
             Role::AttributeEnumValue | Role::AttributeNotationValue => {
@@ -330,7 +338,7 @@ impl Parser {
                     } else {
                         b"("
                     };
-                    let value = to_utf8(enc, bytes(buf, s, next));
+                    let value = to_utf8(enc, bytes(buf, s, next))?;
                     // The type string grows in `m_tempPool`: the prefix
                     // (`poolAppendString`), then the value (`poolAppend`).
                     let direct = self.direct();
@@ -338,8 +346,8 @@ impl Parser {
                     p.append_chars(&mut heap, prefix.len()).map_err(no_mem)?;
                     p.append_text(&mut heap, &value).map_err(no_mem)?;
                     let t = self.decl_attribute_type.get_or_insert_with(Vec::new);
-                    t.extend_from_slice(prefix);
-                    t.extend_from_slice(&value);
+                    t.try_extend(prefix)?;
+                    t.try_extend(&value)?;
                     hd = false;
                 }
             }
@@ -388,7 +396,7 @@ impl Parser {
                                 att,
                                 self.decl_attribute_is_cdata,
                                 false,
-                                Some(value.clone()),
+                                Some(crate::fallible::try_copy(&value)?),
                             )
                             .map_err(no_mem)?;
                     }
@@ -428,7 +436,9 @@ impl Parser {
                             return Err(XmlError::NoMemory.into());
                         }
                         self.finish_current(Pool::EntityValue, false, true)?;
-                        let text: Option<alloc::sync::Arc<[u8]>> = has_block.then(|| text.into());
+                        // Only the reference count of the shared text is allocated
+                        // infallibly (D-061).
+                        let text = has_block.then(|| alloc::sync::Arc::new(text));
                         let mut info = None;
                         if let Some(e) = self.dtd.entity_mut(r) {
                             e.text = text.clone();
@@ -440,12 +450,12 @@ impl Parser {
                             && let Some(is_param) = info
                         {
                             self.ev_end(enc, Some(s));
-                            let name = self.dtd.entity_name(r).to_vec();
+                            let name = try_copy(self.dtd.entity_name(r))?;
                             self.locate(h);
                             h.entity_decl(
                                 &name,
                                 is_param,
-                                text.as_deref(),
+                                text.as_deref().map(|t| &t[..]),
                                 self.cur_base.as_deref(),
                                 None,
                                 None,
@@ -463,7 +473,7 @@ impl Parser {
                     self.use_foreign_dtd = false;
                     self.dtd.has_param_entity_refs = true;
                     self.doctype_sysid = Some(if self.handlers.start_doctype_decl {
-                        let lit = Self::literal(enc, buf, s, next);
+                        let lit = Self::literal(enc, buf, s, next)?;
                         let direct = self.direct();
                         self.tracker.store_text(Pool::Temp, &lit, direct).map_err(no_mem)?;
                         hd = false;
@@ -471,7 +481,7 @@ impl Parser {
                     } else {
                         // Makes m_doctypeSysid non-NULL when no start
                         // handler is set.
-                        EXTERNAL_SUBSET_NAME.to_vec()
+                        try_copy(EXTERNAL_SUBSET_NAME)?
                     });
                     if self.param_entity_parsing == ParamEntityParsing::Never {
                         self.check_not_standalone(h)?;
@@ -490,10 +500,10 @@ impl Parser {
                 if self.dtd.keep_processing
                     && let Some(r) = self.decl_entity
                 {
-                    let sysid = Self::literal(enc, buf, s, next);
+                    let sysid = Self::literal(enc, buf, s, next)?;
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Dtd, &sysid, direct).map_err(no_mem)?;
-                    let base = self.cur_base.clone();
+                    let base = try_copy_opt(&self.cur_base)?;
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.system_id = Some(sysid);
                         e.base = base;
@@ -510,7 +520,7 @@ impl Parser {
                     && self.handlers.entity_decl
                 {
                     self.ev_end(enc, Some(s));
-                    let name = self.dtd.entity_name(r).to_vec();
+                    let name = try_copy(self.dtd.entity_name(r))?;
                     self.locate(h);
                     if let Some(e) = self.dtd.entity(r) {
                         h.entity_decl(
@@ -530,13 +540,13 @@ impl Parser {
                 if self.dtd.keep_processing
                     && let Some(r) = self.decl_entity
                 {
-                    let notation = to_utf8(enc, bytes(buf, s, next));
+                    let notation = to_utf8(enc, bytes(buf, s, next))?;
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Dtd, &notation, direct).map_err(no_mem)?;
                     if let Some(e) = self.dtd.entity_mut(r) {
                         e.notation = Some(notation);
                     }
-                    let name = self.dtd.entity_name(r).to_vec();
+                    let name = try_copy(self.dtd.entity_name(r))?;
                     if self.handlers.unparsed_entity_decl || self.handlers.entity_decl {
                         self.ev_end(enc, Some(s));
                         hd = false;
@@ -570,7 +580,7 @@ impl Parser {
                 if !is_param && predefined_entity_name(enc, bytes(buf, 0, next), s).is_some() {
                     self.decl_entity = None;
                 } else if self.dtd.keep_processing {
-                    let name = to_utf8(enc, bytes(buf, s, next));
+                    let name = to_utf8(enc, bytes(buf, s, next))?;
                     let (r, created) = self
                         .dtd
                         .declare_entity(&salt, &mut self.tracker, self.accounting.count_bytes_direct, is_param, &name)
@@ -598,7 +608,7 @@ impl Parser {
                 self.decl_notation_public_id = None;
                 self.decl_notation_name = None;
                 if self.handlers.notation_decl {
-                    let name = to_utf8(enc, bytes(buf, s, next));
+                    let name = to_utf8(enc, bytes(buf, s, next))?;
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Temp, &name, direct).map_err(no_mem)?;
                     self.decl_notation_name = Some(name);
@@ -609,18 +619,18 @@ impl Parser {
                 self.check_public_id(enc, buf, s, next)?;
                 // A name is only stored when the handler is set.
                 if self.decl_notation_name.is_some() {
-                    let lit = Self::literal(enc, buf, s, next);
+                    let lit = Self::literal(enc, buf, s, next)?;
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Temp, &lit, direct).map_err(no_mem)?;
-                    self.decl_notation_public_id = Some(normalize_public_id(&lit));
+                    self.decl_notation_public_id = Some(normalize_public_id(&lit)?);
                     hd = false;
                 }
             }
             Role::NotationSystemId => {
-                if let Some(name) = self.decl_notation_name.clone()
+                if let Some(name) = try_copy_opt(&self.decl_notation_name)?
                     && self.handlers.notation_decl
                 {
-                    let sysid = Self::literal(enc, buf, s, next);
+                    let sysid = Self::literal(enc, buf, s, next)?;
                     let direct = self.direct();
                     self.tracker.store_text(Pool::Temp, &sysid, direct).map_err(no_mem)?;
                     self.ev_end(enc, Some(s));
@@ -636,10 +646,10 @@ impl Parser {
                 self.tracker.temp_pool.clear();
             }
             Role::NotationNoSystemId => {
-                if let Some(pubid) = self.decl_notation_public_id.clone()
+                if let Some(pubid) = try_copy_opt(&self.decl_notation_public_id)?
                     && self.handlers.notation_decl
                 {
-                    let name = self.decl_notation_name.clone().unwrap_or_default();
+                    let name = try_copy_opt(&self.decl_notation_name)?.unwrap_or_default();
                     self.ev_end(enc, Some(s));
                     self.locate(h);
                     h.notation_decl(&name, self.cur_base.as_deref(), None, Some(&pubid));
@@ -652,7 +662,7 @@ impl Parser {
                 let direct = self.direct();
                 self.tracker.group(level, direct).map_err(no_mem)?;
                 if self.group_connector.len() <= level {
-                    self.group_connector.resize(level + 1, 0);
+                    self.group_connector.try_resize(level + 1, 0)?;
                 }
                 if let Some(c) = self.group_connector.get_mut(level) {
                     *c = 0;
@@ -661,11 +671,11 @@ impl Parser {
                     self.tracker
                         .scaffold_part(self.dtd.scaff_count, direct)
                         .map_err(no_mem)?;
-                    let myindex = self.dtd.next_scaffold_part();
+                    let myindex = self.dtd.next_scaffold_part()?;
                     let lvl = self.dtd.scaff_level;
                     self.tracker.scaffold_level(lvl, direct).map_err(no_mem)?;
                     if self.dtd.scaff_index.len() <= lvl {
-                        self.dtd.scaff_index.resize(lvl + 1, 0);
+                        self.dtd.scaff_index.try_resize(lvl + 1, 0)?;
                     }
                     if let Some(i) = self.dtd.scaff_index.get_mut(lvl) {
                         *i = myindex;
@@ -729,9 +739,10 @@ impl Parser {
                             ContentType::Empty
                         };
                         self.ev_end(enc, Some(s));
-                        let name = self.decl_element_name();
+                        let name = self.decl_element_name()?;
                         self.locate(h);
-                        h.element_decl(&name, &ContentModel::leaf(kind));
+                        let model = ContentModel::leaf(kind)?;
+                        h.element_decl(&name, &model);
                         hd = false;
                     }
                     self.dtd.in_eldecl = false;
@@ -757,9 +768,9 @@ impl Parser {
                     self.tracker
                         .scaffold_part(self.dtd.scaff_count, direct)
                         .map_err(no_mem)?;
-                    let myindex = self.dtd.next_scaffold_part();
+                    let myindex = self.dtd.next_scaffold_part()?;
                     let el = self.get_element_type(enc, buf, s, nxt)?;
-                    let name = self.dtd.element_types.key(el).unwrap_or_default().to_vec();
+                    let name = try_copy(self.dtd.element_types.key(el).unwrap_or_default())?;
                     // Detect and prevent integer overflow.
                     let name_len = u32::try_from(name.len() + 1).unwrap_or(u32::MAX);
                     if name_len > u32::MAX - self.dtd.content_string_len {
@@ -800,9 +811,9 @@ impl Parser {
                             if !self.tracker.t.content_model_malloc(size) {
                                 return Err(XmlError::NoMemory.into());
                             }
-                            let model = self.dtd.build_model();
+                            let model = self.dtd.build_model()?;
                             self.ev_end(enc, Some(s));
-                            let name = self.decl_element_name();
+                            let name = self.decl_element_name()?;
                             self.locate(h);
                             h.element_decl(&name, &model);
                         }
@@ -858,7 +869,7 @@ impl Parser {
             .external_subset_entity(&salt, &mut self.tracker, direct)
             .map_err(|_| Stop::Error(XmlError::NoMemory))?;
         if self.use_foreign_dtd {
-            let base = self.cur_base.clone();
+            let base = try_copy_opt(&self.cur_base)?;
             if let Some(e) = self.dtd.entity_mut(r) {
                 e.base = base;
             }
@@ -887,7 +898,7 @@ impl Parser {
             self.check_not_standalone(h)?;
             return Ok(true);
         }
-        let name = Self::literal(enc, buf, s, next);
+        let name = Self::literal(enc, buf, s, next)?;
         // The name is stored in `dtd->pool` for the lookup.
         let direct = self.direct();
         self.tracker
@@ -1015,7 +1026,7 @@ impl Parser {
             match r.scan {
                 Scan::Token(Tok::ParamEntityRef) => {
                     if self.is_param_entity || enc.is_internal() {
-                        let name = to_utf8(enc, bytes(buf, ptr + m, next - m));
+                        let name = to_utf8(enc, bytes(buf, ptr + m, next - m))?;
                         // The name is stored in `m_tempPool` for the lookup.
                         let direct = self.direct();
                         self.tracker
@@ -1066,14 +1077,14 @@ impl Parser {
                 }
                 Scan::None => return Ok(()),
                 Scan::Token(Tok::EntityRef | Tok::DataChars) => {
-                    out.extend_from_slice(&to_utf8(enc, bytes(buf, ptr, next)));
+                    out.try_extend(&to_utf8(enc, bytes(buf, ptr, next))?)?;
                     converted = true;
                 }
                 Scan::TrailingCr | Scan::Token(Tok::DataNewline) => {
                     if r.scan == Scan::TrailingCr {
                         next = ptr + m;
                     }
-                    out.push(0xA);
+                    out.try_push(0xA)?;
                 }
                 Scan::Token(Tok::CharRef) => {
                     let n = char_ref_number(enc, buf, ptr);
@@ -1083,7 +1094,7 @@ impl Parser {
                     };
                     let mut tmp = [0u8; 4];
                     let k = utf8_encode(c, &mut tmp);
-                    out.extend_from_slice(tmp.get(..k).unwrap_or_default());
+                    out.try_extend(tmp.get(..k).unwrap_or_default())?;
                 }
                 Scan::Partial => {
                     self.ev_doc(enc, Some(ptr));

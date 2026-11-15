@@ -41,11 +41,11 @@
 mod tests;
 
 use alloc::boxed::Box;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::Cell;
 use core::ffi::c_ulong;
 
+use crate::fallible::{try_copy, try_filled, TryGrow};
 use crate::heap::{Heap, NoMemory, POINTER_SIZE};
 use crate::siphash::{SipKey, siphash24};
 
@@ -320,10 +320,12 @@ impl<V> HashTable<V> {
         let i = if self.slots.is_empty() {
             self.power = INIT_POWER;
             let size = 1usize << INIT_POWER;
+            // The Rust memory before the heap's record (D-061).
+            let slots = try_filled(None, size)?;
             if !heap.alloc(size.wrapping_mul(POINTER_SIZE)) {
                 return Err(NoMemory);
             }
-            self.slots = vec![None; size];
+            self.slots = slots;
             slot_index(h, self.mask())
         } else {
             let (i, found) = self.probe(h, key);
@@ -340,12 +342,14 @@ impl<V> HashTable<V> {
                 i
             }
         };
+        let stored = try_copy(key)?.into_boxed_slice();
+        self.entries.try_room(1)?;
         if !heap.alloc(alloc_size) {
             return Err(NoMemory);
         }
         let id = EntryId(self.entries.len());
         self.entries.push(Entry {
-            key: key.into(),
+            key: stored,
             alloc_size,
             value: make(),
         });
@@ -365,11 +369,11 @@ impl<V> HashTable<V> {
         }
         let new_size = 1usize.checked_shl(u32::from(new_power)).ok_or(NoMemory)?;
         let bytes = new_size.checked_mul(POINTER_SIZE).ok_or(NoMemory)?;
+        let mut new_slots = try_filled(None, new_size)?;
         if !heap.alloc(bytes) {
             return Err(NoMemory);
         }
         let new_mask = (new_size as c_ulong).wrapping_sub(1);
-        let mut new_slots = vec![None; new_size];
         for id in self.slots.iter().flatten() {
             let Some(e) = self.entries.get(id.0) else {
                 continue;
@@ -408,6 +412,17 @@ impl<V> HashTable<V> {
     /// `hashTableIterInit` + `hashTableIterNext`: the entries in slot order.
     pub fn iter(&self) -> impl Iterator<Item = EntryId> + '_ {
         self.slots.iter().flatten().copied()
+    }
+
+    /// The entry in slot `i` of [`HashTable::iter`]'s order (for a walk
+    /// that changes the values on the way, without collecting the ids).
+    pub fn slot(&self, i: usize) -> Option<EntryId> {
+        self.slots.get(i).copied().flatten()
+    }
+
+    /// The number of slots ([`HashTable::slot`] answers below it).
+    pub fn slot_count(&self) -> usize {
+        self.slots.len()
     }
 
     /// `hashTableClear`: releases every entry (in slot order) but keeps the

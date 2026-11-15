@@ -3,6 +3,7 @@
 //! `appendAttributeValue`), CDATA sections, the epilog, and the reports of
 //! processing instructions and comments.
 
+use crate::fallible::{try_copy, try_filled, try_with_capacity, TryGrow};
 use alloc::vec::Vec;
 use core::ffi::c_ulong;
 
@@ -55,24 +56,26 @@ fn is_rfc3986_uri_char(c: u8) -> bool {
         )
 }
 
-/// `normalizeLines`: CR LF and lone CR become LF.
+/// `normalizeLines`: CR LF and lone CR become LF, in place.
 fn normalize_lines(s: &mut Vec<u8>) {
-    if !s.contains(&0xD) {
-        return;
-    }
-    let mut out = Vec::with_capacity(s.len());
-    let mut it = s.iter().copied().peekable();
-    while let Some(c) = it.next() {
-        if c == 0xD {
-            out.push(0xA);
-            if it.peek() == Some(&0xA) {
-                it.next();
+    let mut w = 0;
+    let mut r = 0;
+    while let Some(&c) = s.get(r) {
+        r += 1;
+        let out = if c == 0xD {
+            if s.get(r) == Some(&0xA) {
+                r += 1;
             }
+            0xA
         } else {
-            out.push(c);
+            c
+        };
+        if let Some(slot) = s.get_mut(w) {
+            *slot = out;
         }
+        w += 1;
     }
-    *s = out;
+    s.truncate(w);
 }
 
 /// The bytes `buf[from..to]` (empty if out of range).
@@ -430,7 +433,7 @@ impl Parser {
                             self.report_default(h, enc, buf, s, next);
                         }
                     } else {
-                        let name = to_utf8(enc, bytes(buf, s + m, next - m));
+                        let name = to_utf8(enc, bytes(buf, s + m, next - m))?;
                         // The name is stored in `dtd->pool` for the lookup.
                         let direct = self.direct();
                         self.tracker
@@ -489,19 +492,29 @@ impl Parser {
                     let raw_start = s + m;
                     let raw_len = name_length(enc, buf, raw_start);
                     let raw = bytes(buf, raw_start, raw_start + raw_len);
+                    // Room for the tag on the stack, and on the free list
+                    // for every tag, so that the end tag never allocates
+                    // (D-061).
+                    self.tag_stack.try_room(1)?;
+                    self.free_tags.try_room(self.tag_stack.len() + 1)?;
                     // A tag from `m_freeTagList` keeps its buffers.
                     let mut tag = self.free_tags.pop().unwrap_or_default();
                     let mut name = core::mem::take(&mut tag.name);
                     name.clear();
-                    to_utf8_token_into(enc, raw, &mut name);
+                    tag.raw_name.clear();
+                    if to_utf8_token_into(enc, raw, &mut name).is_err()
+                        || tag.raw_name.try_extend(raw).is_err()
+                    {
+                        tag.name = name;
+                        self.free_tags.push(tag);
+                        return Err(XmlError::NoMemory.into());
+                    }
                     let direct = self.direct();
                     if self.tracker.open_tag(name.len(), raw_len, direct).is_err() {
                         tag.name = name;
                         self.free_tags.push(tag);
                         return Err(XmlError::NoMemory.into());
                     }
-                    tag.raw_name.clear();
-                    tag.raw_name.extend_from_slice(raw);
                     tag.bindings = None;
                     self.tag_stack.push(tag);
                     self.tag_level += 1;
@@ -513,7 +526,7 @@ impl Parser {
                     res?;
                     if self.handlers.start_element {
                         self.locate(h);
-                        self.call_start_element(h, &name);
+                        self.call_start_element(h, &name)?;
                     } else {
                         self.report_default(h, enc, buf, s, next);
                     }
@@ -527,7 +540,7 @@ impl Parser {
                     let raw_len = name_length(enc, buf, raw_start);
                     let mut name = core::mem::take(&mut self.empty_tag_name);
                     name.clear();
-                    to_utf8_token_into(enc, bytes(buf, raw_start, raw_start + raw_len), &mut name);
+                    to_utf8_token_into(enc, bytes(buf, raw_start, raw_start + raw_len), &mut name)?;
                     let mut bindings = None;
                     // C keeps the name in `m_tempPool`.
                     let direct = self.direct();
@@ -544,7 +557,7 @@ impl Parser {
                     }
                     if self.handlers.start_element {
                         self.locate(h);
-                        self.call_start_element(h, &name);
+                        self.call_start_element(h, &name)?;
                     }
                     if self.handlers.end_element {
                         if self.handlers.start_element {
@@ -718,7 +731,7 @@ impl Parser {
 
     /// Calls the start element handler with the attribute list `storeAtts`
     /// built. Up to [`STACK_ATTS`] attributes are passed from the stack.
-    fn call_start_element<H: Handler>(&self, h: &mut H, name: &[u8]) {
+    fn call_start_element<H: Handler>(&self, h: &mut H, name: &[u8]) -> Result<(), Stop> {
         let atts = &self.app_atts;
         let pair = |a: &AppAtt| {
             (
@@ -737,9 +750,12 @@ impl Parser {
             }
             h.start_element(name, list.get(..n).unwrap_or_default(), self.n_specified_atts);
         } else {
-            let list: Vec<(&[u8], &[u8])> = atts.list.iter().map(pair).collect();
+            // Without the memory for the list the start tag fails (D-061).
+            let mut list: Vec<(&[u8], &[u8])> = try_with_capacity(n)?;
+            list.extend(atts.list.iter().map(pair));
             h.start_element(name, &list, self.n_specified_atts);
         }
+        Ok(())
     }
 
     /// `doCdataSection`. `start` is the C `*startPtr`: set to the end of
@@ -852,9 +868,9 @@ impl Parser {
         let m = E::MINBPC;
         let start = start + 2 * m;
         let tem = start + name_length(enc, buf, start);
-        let target = to_utf8(enc, bytes(buf, start, tem));
+        let target = to_utf8(enc, bytes(buf, start, tem))?;
         let data_start = skip_s(enc, bytes(buf, 0, end), tem);
-        let mut data = to_utf8(enc, bytes(buf, data_start, end - 2 * m));
+        let mut data = to_utf8(enc, bytes(buf, data_start, end - 2 * m))?;
         // Target and data in `m_tempPool`, cleared after the handler.
         let direct = self.direct();
         let no_mem = |_| Stop::Error(XmlError::NoMemory);
@@ -881,7 +897,7 @@ impl Parser {
             return Ok(());
         }
         let m = E::MINBPC;
-        let mut data = to_utf8(enc, bytes(buf, start + 4 * m, end - 3 * m));
+        let mut data = to_utf8(enc, bytes(buf, start + 4 * m, end - 3 * m))?;
         // The text in `m_tempPool`, cleared after the handler.
         let direct = self.direct();
         self.tracker
@@ -954,6 +970,9 @@ impl Parser {
         let mut n = get_atts(enc, buf, att_str, &mut self.atts);
         if n + n_default > self.atts.len() {
             let old = self.atts.len();
+            // The Rust memory before the tracker's record (D-061).
+            self.atts
+                .try_room((n + n_default + INIT_ATTS_SIZE).saturating_sub(old))?;
             if !self.tracker.t.realloc(
                 old * ATTRIBUTE_SIZE,
                 (n + n_default + INIT_ATTS_SIZE) * ATTRIBUTE_SIZE,
@@ -975,7 +994,7 @@ impl Parser {
             };
             let name_end = att.name + name_length(enc, buf, att.name);
             let name_start = app.text.len();
-            to_utf8_token_into(enc, bytes(buf, att.name, name_end), &mut app.text);
+            to_utf8_token_into(enc, bytes(buf, att.name, name_end), &mut app.text)?;
             let name = (name_start, app.text.len());
             let direct = self.direct();
             let id = self
@@ -995,7 +1014,7 @@ impl Parser {
             let value_start = app.text.len();
             if att.normalized {
                 // The value did not need normalizing.
-                to_utf8_token_into(enc, bytes(buf, att.value_ptr, att.value_end), &mut app.text);
+                to_utf8_token_into(enc, bytes(buf, att.value_ptr, att.value_end), &mut app.text)?;
                 // `poolStoreString(&parser->m_tempPool, ...)`; a value that
                 // needed normalising was charged while it was built.
                 let direct = self.direct();
@@ -1024,7 +1043,7 @@ impl Parser {
                     false,
                     &mut app.value,
                 )?;
-                app.text.extend_from_slice(&app.value);
+                app.text.try_extend(&app.value)?;
             }
             let value = (value_start, app.text.len());
             match a.prefix {
@@ -1037,9 +1056,9 @@ impl Parser {
                     // Deal with other prefixed names later.
                     n_prefixes += 1;
                     self.dtd.set_att_flag(id, 2);
-                    app.list.push(AppAtt { name, value, id });
+                    app.list.try_push(AppAtt { name, value, id })?;
                 }
-                None => app.list.push(AppAtt { name, value, id }),
+                None => app.list.try_push(AppAtt { name, value, id })?,
             }
         }
 
@@ -1079,7 +1098,7 @@ impl Parser {
                 continue;
             }
             let value_start = app.text.len();
-            app.text.extend_from_slice(da_value);
+            app.text.try_extend(da_value)?;
             let value = (value_start, app.text.len());
             let a = self
                 .dtd
@@ -1095,7 +1114,7 @@ impl Parser {
                 Some(_) | None => {
                     let name_start = app.text.len();
                     app.text
-                        .extend_from_slice(self.dtd.attribute_ids.key(da_id).unwrap_or_default());
+                        .try_extend(self.dtd.attribute_ids.key(da_id).unwrap_or_default())?;
                     let name = (name_start, app.text.len());
                     if a.prefix.is_some() {
                         self.dtd.set_att_flag(da_id, 2);
@@ -1103,7 +1122,7 @@ impl Parser {
                     } else {
                         self.dtd.set_att_flag(da_id, 1);
                     }
-                    app.list.push(AppAtt { name, value, id: da_id });
+                    app.list.try_push(AppAtt { name, value, id: da_id })?;
                 }
             }
         }
@@ -1123,8 +1142,7 @@ impl Parser {
             // take ~30 times longer than in C: `ns_atts_diff`). The map's
             // keys are (hash, insertion number), its values the ranges of
             // the stored names in `app.text`.
-            let mut seen: alloc::collections::BTreeMap<(c_ulong, usize), (usize, usize)> =
-                alloc::collections::BTreeMap::new();
+            let mut seen = SeenNames::with_room(n_prefixes)?;
             while i < app.list.len() {
                 let Some(&att) = app.list.get(i) else { break };
                 let id = att.id;
@@ -1144,21 +1162,19 @@ impl Parser {
                     let local_start = att.name.0
                         + qname.iter().position(|&c| c == b':').map_or(0, |p| p + 1);
                     let start = app.text.len();
-                    app.text.extend_from_slice(&binding.uri);
+                    app.text.try_extend(&binding.uri)?;
+                    app.text.try_room(att.name.1.saturating_sub(local_start))?;
                     app.text.extend_from_within(local_start..att.name.1);
                     let expanded = bytes(&app.text, start, app.text.len());
                     let hash = siphash24(expanded, &salt) as c_ulong;
-                    if seen.range((hash, 0)..=(hash, usize::MAX)).any(|(_, &(s0, s1))| {
-                        bytes(&app.text, s0, s1).starts_with(expanded)
-                    }) {
+                    if seen.any_with_hash(hash, |s0, s1| bytes(&app.text, s0, s1).starts_with(expanded)) {
                         return Err(XmlError::DuplicateAttribute.into());
                     }
                     if self.ns_triplets {
                         // Append namespace separator and prefix.
-                        app.text.push(self.namespace_separator);
-                        app.text.extend_from_slice(
-                            self.dtd.prefix_name(binding.prefix).unwrap_or_default(),
-                        );
+                        app.text.try_push(self.namespace_separator)?;
+                        app.text
+                            .try_extend(self.dtd.prefix_name(binding.prefix).unwrap_or_default())?;
                     }
                     let end = app.text.len();
                     // The expanded name is built in `m_tempPool` with
@@ -1169,8 +1185,7 @@ impl Parser {
                     self.tracker
                         .copy(Pool::Temp, end - start, direct)
                         .map_err(no_mem)?;
-                    let seq = seen.len();
-                    seen.insert((hash, seq), (start, end));
+                    seen.insert(hash, start, end);
                     if let Some(slot) = app.list.get_mut(i) {
                         slot.name = (start, end);
                     }
@@ -1234,18 +1249,18 @@ impl Parser {
         // `tag_name` keeps its allocation.
         let expanded = &mut app.value;
         expanded.clear();
-        expanded.extend_from_slice(&binding.uri);
-        expanded.extend_from_slice(tag_name.get(local_start..).unwrap_or_default());
+        expanded.try_extend(&binding.uri)?;
+        expanded.try_extend(tag_name.get(local_start..).unwrap_or_default())?;
         if self.ns_triplets
             && let Some(p) = self.dtd.prefix_name(binding.prefix)
         {
             // We always have a namespace separator between localPart and
             // prefix.
-            expanded.push(self.namespace_separator);
-            expanded.extend_from_slice(p);
+            expanded.try_push(self.namespace_separator)?;
+            expanded.try_extend(p)?;
         }
         tag_name.clear();
-        tag_name.extend_from_slice(expanded);
+        tag_name.try_extend(expanded)?;
         Ok(())
     }
 
@@ -1260,14 +1275,14 @@ impl Parser {
         uri: &[u8],
         bindings: &mut Option<BindingId>,
     ) -> Result<(), Stop> {
-        let pname = self.dtd.prefix_name(prefix).map(<[u8]>::to_vec);
+        let pname = self.dtd.prefix_name(prefix);
         // Empty URI is only valid for default namespace per XML NS 1.0 (not
         // 1.1).
         if uri.is_empty() && pname.is_some() {
             return Err(XmlError::UndeclaringPrefix.into());
         }
         let mut must_be_xml = false;
-        if let Some(n) = &pname {
+        if let Some(n) = pname {
             if n == b"xmlns" {
                 // Not allowed to bind xmlns.
                 return Err(XmlError::ReservedPrefixXmlns.into());
@@ -1299,9 +1314,15 @@ impl Parser {
         if is_xmlns {
             return Err(XmlError::ReservedNamespaceUri.into());
         }
-        let mut stored = uri.to_vec();
+        let mut stored = try_copy(uri)?;
+        // Room on the free list for every binding, so that ending a scope
+        // never allocates (D-061).
+        self.dtd
+            .free_bindings
+            .try_room(self.dtd.bindings.len() + 1)?;
+        self.dtd.bindings.try_room(1)?;
         if self.namespace_separator != 0 {
-            stored.push(self.namespace_separator);
+            stored.try_push(self.namespace_separator)?;
         }
         let prev = self.dtd.prefix_binding(prefix);
         let (next_id, reused) = self.dtd.next_binding();
@@ -1322,7 +1343,7 @@ impl Parser {
         *bindings = Some(b);
         if att_id.is_some() && self.handlers.start_namespace_decl {
             self.locate(h);
-            h.start_namespace_decl(pname.as_deref(), bound.then_some(uri));
+            h.start_namespace_decl(self.dtd.prefix_name(prefix), bound.then_some(uri));
         }
         Ok(())
     }
@@ -1340,9 +1361,8 @@ impl Parser {
             let Some(b) = self.dtd.binding(id) else { break };
             let (prefix, next, prev) = (b.prefix, b.next_tag_binding, b.prev_prefix_binding);
             if self.handlers.end_namespace_decl {
-                let name = self.dtd.prefix_name(prefix).map(<[u8]>::to_vec);
                 self.locate(h);
-                h.end_namespace_decl(name.as_deref());
+                h.end_namespace_decl(self.dtd.prefix_name(prefix));
             }
             self.dtd.free_bindings.push(id);
             self.dtd.set_prefix_binding(prefix, prev);
@@ -1407,11 +1427,11 @@ impl Parser {
                     if !(!is_cdata && c == 0x20 && (out.is_empty() || out.last() == Some(&0x20))) {
                         let mut tmp = [0u8; 4];
                         let k = utf8_encode(c, &mut tmp);
-                        out.extend_from_slice(tmp.get(..k).unwrap_or_default());
+                        out.try_extend(tmp.get(..k).unwrap_or_default())?;
                     }
                 }
                 Scan::Token(Tok::DataChars) => {
-                    out.extend_from_slice(&to_utf8(enc, bytes(buf, ptr, next)));
+                    out.try_extend(&to_utf8(enc, bytes(buf, ptr, next))?)?;
                     converted = true;
                 }
                 Scan::TrailingCr | Scan::Token(Tok::AttributeValueS | Tok::DataNewline) => {
@@ -1419,7 +1439,7 @@ impl Parser {
                         next = ptr + m;
                     }
                     if is_cdata || !(out.is_empty() || out.last() == Some(&0x20)) {
-                        out.push(0x20);
+                        out.try_push(0x20)?;
                     }
                 }
                 Scan::Token(Tok::EntityRef) => {
@@ -1431,9 +1451,9 @@ impl Parser {
                             1,
                             Account::EntityExpansion,
                         );
-                        out.push(ch);
+                        out.try_push(ch)?;
                     } else {
-                        let name = to_utf8(enc, bytes(buf, ptr + m, next - m));
+                        let name = to_utf8(enc, bytes(buf, ptr + m, next - m))?;
                         // The name is stored in `m_temp2Pool` for the lookup.
                         let direct = self.direct();
                         self.tracker
@@ -1493,6 +1513,53 @@ impl Parser {
                 }
             }
             ptr = next;
+        }
+    }
+}
+
+/// The expanded attribute names of one start tag, by SipHash value, for
+/// the duplicate check of `storeAtts` (an open-addressing table sized for
+/// the tag's prefixed attributes, allocated fallibly, D-061).
+struct SeenNames {
+    slots: Vec<Option<(c_ulong, usize, usize)>>,
+}
+
+impl SeenNames {
+    fn with_room(n: usize) -> Result<Self, crate::heap::NoMemory> {
+        let size = n
+            .checked_mul(2)
+            .and_then(usize::checked_next_power_of_two)
+            .ok_or(crate::heap::NoMemory)?
+            .max(8);
+        Ok(Self {
+            slots: try_filled(None, size)?,
+        })
+    }
+
+    fn mask(&self) -> usize {
+        self.slots.len().wrapping_sub(1)
+    }
+
+    /// Whether a name with hash `hash` satisfies `f` (given its range).
+    fn any_with_hash(&self, hash: c_ulong, mut f: impl FnMut(usize, usize) -> bool) -> bool {
+        let mut i = (hash as usize) & self.mask();
+        while let Some(Some((h, s0, s1))) = self.slots.get(i) {
+            if *h == hash && f(*s0, *s1) {
+                return true;
+            }
+            i = (i + 1) & self.mask();
+        }
+        false
+    }
+
+    fn insert(&mut self, hash: c_ulong, start: usize, end: usize) {
+        let mask = self.mask();
+        let mut i = (hash as usize) & mask;
+        while let Some(Some(_)) = self.slots.get(i) {
+            i = (i + 1) & mask;
+        }
+        if let Some(slot) = self.slots.get_mut(i) {
+            *slot = Some((hash, start, end));
         }
     }
 }

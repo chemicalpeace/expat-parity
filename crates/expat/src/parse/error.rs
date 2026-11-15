@@ -113,6 +113,18 @@ pub enum Stop {
     Error(XmlError),
 }
 
+impl From<crate::heap::NoMemory> for XmlError {
+    fn from(_: crate::heap::NoMemory) -> Self {
+        XmlError::NoMemory
+    }
+}
+
+impl From<crate::heap::NoMemory> for Stop {
+    fn from(_: crate::heap::NoMemory) -> Self {
+        Stop::Error(XmlError::NoMemory)
+    }
+}
+
 impl From<XmlError> for Stop {
     fn from(e: XmlError) -> Self {
         Stop::Error(e)

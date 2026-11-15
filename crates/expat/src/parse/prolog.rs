@@ -3,6 +3,8 @@
 //! `processXmlDecl`, and the implicit namespace context (`setContext` with
 //! `implicitContext`).
 
+use crate::fallible::{try_with_capacity, TryGrow};
+use crate::heap::NoMemory;
 use alloc::vec::Vec;
 
 use super::accounting::Account;
@@ -63,17 +65,17 @@ pub(crate) enum PrologDone {
 /// Converts `from` to UTF-8 completely (`poolStoreString` without the
 /// terminating NUL). Stops early only where C does: at an incomplete
 /// character, which the tokenizer never lets through.
-pub(crate) fn to_utf8<E: Encoding>(enc: &E, from: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(from.len());
+pub(crate) fn to_utf8<E: Encoding>(enc: &E, from: &[u8]) -> Result<Vec<u8>, NoMemory> {
+    let mut out = try_with_capacity(from.len())?;
     let mut chunk = [0u8; 64];
     let mut rest = from;
     loop {
         let r = enc.to_utf8(rest, &mut chunk);
-        out.extend_from_slice(chunk.get(..r.written).unwrap_or_default());
+        out.try_extend(chunk.get(..r.written).unwrap_or_default())?;
         rest = rest.get(r.read..).unwrap_or_default();
         if r.result != crate::tok::ConvertResult::OutputExhausted || (r.read == 0 && r.written == 0)
         {
-            return out;
+            return Ok(out);
         }
     }
 }
@@ -82,25 +84,33 @@ pub(crate) fn to_utf8<E: Encoding>(enc: &E, from: &[u8]) -> Vec<u8> {
 /// accepted (a name, an attribute value without references). Such bytes are
 /// whole characters, so where the input is already UTF-8 (`isUtf8`) the
 /// conversion is a copy, as `utf8_toUtf8` makes it.
-pub(crate) fn to_utf8_token_into<E: Encoding>(enc: &E, from: &[u8], out: &mut Vec<u8>) {
+pub(crate) fn to_utf8_token_into<E: Encoding>(
+    enc: &E,
+    from: &[u8],
+    out: &mut Vec<u8>,
+) -> Result<(), NoMemory> {
     if enc.is_utf8() {
-        out.extend_from_slice(from);
+        out.try_extend(from)?;
         #[cfg(debug_assertions)]
         {
             let start = out.len() - from.len();
-            debug_assert_eq!(out.get(start..), Some(to_utf8(enc, from).as_slice()));
+            // The check needs memory of its own; without it there is
+            // nothing to compare (D-061).
+            if let Ok(copy) = to_utf8(enc, from) {
+                debug_assert_eq!(out.get(start..), Some(copy.as_slice()));
+            }
         }
-        return;
+        return Ok(());
     }
     let mut chunk = [0u8; 64];
     let mut rest = from;
     loop {
         let r = enc.to_utf8(rest, &mut chunk);
-        out.extend_from_slice(chunk.get(..r.written).unwrap_or_default());
+        out.try_extend(chunk.get(..r.written).unwrap_or_default())?;
         rest = rest.get(r.read..).unwrap_or_default();
         if r.result != crate::tok::ConvertResult::OutputExhausted || (r.read == 0 && r.written == 0)
         {
-            return;
+            return Ok(());
         }
     }
 }
@@ -115,7 +125,7 @@ impl Parser {
                 Ok(())
             }
             None => {
-                let name = self.protocol_encoding_name.clone().unwrap_or_default();
+                let name = crate::fallible::try_copy_opt(&self.protocol_encoding_name)?.unwrap_or_default();
                 self.handle_unknown_encoding(h, &name)
             }
         }
@@ -423,15 +433,18 @@ impl Parser {
             }
         }
         if self.handlers.xml_decl {
-            let enc_name = d.encoding_name.map(|p| {
-                let n = name_length(enc, buf, p);
-                to_utf8(enc, buf.get(p..p + n).unwrap_or_default())
-            });
+            let enc_name = d
+                .encoding_name
+                .map(|p| {
+                    let n = name_length(enc, buf, p);
+                    to_utf8(enc, buf.get(p..p + n).unwrap_or_default())
+                })
+                .transpose()?;
             let version = match (d.version, d.version_end) {
                 (Some(v), Some(ve)) => Some(to_utf8(
                     enc,
                     buf.get(v..ve.saturating_sub(E::MINBPC)).unwrap_or_default(),
-                )),
+                )?),
                 _ => None,
             };
             // Both strings are stored in `m_temp2Pool` (cleared at the end
@@ -486,7 +499,7 @@ impl Parser {
             Some(FoundEncoding::Unrecognized) | None => {
                 if let Some(p) = d.encoding_name {
                     let n = name_length(enc, buf, p);
-                    let name = to_utf8(enc, buf.get(p..p + n).unwrap_or_default());
+                    let name = to_utf8(enc, buf.get(p..p + n).unwrap_or_default())?;
                     if !(stored && self.handlers.xml_decl) {
                         // `poolStoreString(&parser->m_temp2Pool, ...)` of
                         // the name for `handleUnknownEncoding`.
@@ -513,9 +526,10 @@ impl Parser {
     /// through the same `m_tempPool` and `dtd->pool` steps as any context
     /// (D-034 stage 4: C's first `m_tempPool` block comes from here).
     pub(crate) fn set_implicit_context(&mut self) -> bool {
-        let mut context = alloc::vec::Vec::with_capacity(4 + XML_NAMESPACE.len());
-        context.extend_from_slice(b"xml=");
-        context.extend_from_slice(XML_NAMESPACE);
+        let mut context = alloc::vec::Vec::new();
+        if context.try_extend(b"xml=").is_err() || context.try_extend(XML_NAMESPACE).is_err() {
+            return false;
+        }
         self.set_context(&context)
     }
 }

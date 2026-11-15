@@ -9,6 +9,7 @@
 //! dropping it recurses, so a deeply nested model cannot exhaust the
 //! stack (C made `build_model` iterative for the same reason).
 
+use crate::fallible::TryGrow;
 use alloc::vec::Vec;
 use core::ops::Range;
 
@@ -66,15 +67,15 @@ pub struct ContentModel {
 
 impl ContentModel {
     /// The model of `EMPTY` or `ANY`: a single node.
-    pub(crate) fn leaf(kind: ContentType) -> Self {
-        ContentModel {
-            nodes: alloc::vec![ContentNode {
-                kind,
-                quant: ContentQuant::None,
-                name: None,
-                children: 0..0,
-            }],
-        }
+    pub(crate) fn leaf(kind: ContentType) -> Result<Self, crate::heap::NoMemory> {
+        let mut nodes = crate::fallible::try_with_capacity(1)?;
+        nodes.push(ContentNode {
+            kind,
+            quant: ContentQuant::None,
+            name: None,
+            children: 0..0,
+        });
+        Ok(ContentModel { nodes })
     }
 
     /// The root node.
@@ -112,12 +113,12 @@ impl super::Dtd {
     /// the innermost open group. Like C, the array is reused between
     /// declarations; a reused node keeps its old type, quantifier and name
     /// until the caller sets them.
-    pub(crate) fn next_scaffold_part(&mut self) -> usize {
+    pub(crate) fn next_scaffold_part(&mut self) -> Result<usize, crate::heap::NoMemory> {
         let next = self.scaff_count;
-        self.scaff_count += 1;
-        if self.scaffold.len() < self.scaff_count {
-            self.scaffold.push(Scaffold::default());
+        if self.scaffold.len() <= next {
+            self.scaffold.try_push(Scaffold::default())?;
         }
+        self.scaff_count += 1;
         if self.scaff_level > 0 {
             let parent = self
                 .scaff_index
@@ -144,17 +145,17 @@ impl super::Dtd {
             me.childcnt = 0;
             me.nextsib = 0;
         }
-        next
+        Ok(next)
     }
 
     /// `build_model`: the model of `scaffold[0..scaffCount]`, in C's node
     /// order.
-    pub(crate) fn build_model(&self) -> ContentModel {
+    pub(crate) fn build_model(&self) -> Result<ContentModel, crate::heap::NoMemory> {
         let count = self.scaff_count;
-        let mut nodes = Vec::with_capacity(count);
+        let mut nodes = crate::fallible::try_with_capacity(count)?;
         // Source index of each destination node ("jobs" in C).
-        let mut jobs: Vec<usize> = Vec::with_capacity(count);
-        jobs.push(0);
+        let mut jobs: Vec<usize> = crate::fallible::try_with_capacity(count.max(1))?;
+        jobs.try_push(0)?;
         let mut dest = 0;
         while dest < count {
             let src = jobs.get(dest).copied().unwrap_or(0);
@@ -165,14 +166,17 @@ impl super::Dtd {
                 nodes.push(ContentNode {
                     kind: sc.kind,
                     quant: sc.quant,
-                    name: Some(sc.name.clone().unwrap_or_default()),
+                    name: Some(match &sc.name {
+                        Some(n) => crate::fallible::try_copy(n)?,
+                        None => Vec::new(),
+                    }),
                     children: 0..0,
                 });
             } else {
                 let first = jobs.len();
                 let mut cn = sc.firstchild;
                 for _ in 0..sc.childcnt {
-                    jobs.push(cn);
+                    jobs.try_push(cn)?;
                     cn = self.scaffold.get(cn).map_or(0, |c| c.nextsib);
                 }
                 nodes.push(ContentNode {
@@ -184,6 +188,6 @@ impl super::Dtd {
             }
             dest += 1;
         }
-        ContentModel { nodes }
+        Ok(ContentModel { nodes })
     }
 }

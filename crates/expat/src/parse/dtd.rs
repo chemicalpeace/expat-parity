@@ -10,7 +10,7 @@
 //! [`EntryId`] for table entries and [`BindingId`] for bindings, which live
 //! in an arena with C's free list.
 
-use alloc::collections::BTreeMap;
+use crate::fallible::TryGrow;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -82,7 +82,7 @@ pub struct ElementType {
     /// `defaultAttForName`: for each attribute id, the index in
     /// `default_atts` of its first definition. C keeps a hash table whose
     /// slot order is never observable; a map gives the same lookups.
-    pub default_att_for_name: BTreeMap<EntryId, usize>,
+    pub default_att_for_name: crate::fallible::SortedMap<EntryId, usize>,
     /// `allocDefaultAtts` (allocation tracker, D-030).
     pub alloc_default_atts: usize,
     /// The allocations of `defaultAttForName` (allocation tracker).
@@ -95,7 +95,7 @@ pub struct Entity {
     /// `textPtr[0..textLen]`: the replacement text of an internal entity
     /// (UTF-8); `None` for an external entity. Shared so that the text can
     /// be scanned while the parser state changes.
-    pub text: Option<Arc<[u8]>>,
+    pub text: Option<Arc<Vec<u8>>>,
     /// `processed`: bytes of `text` already processed.
     pub processed: usize,
     /// `systemId`
@@ -469,6 +469,9 @@ impl Dtd {
                 t.id_att = Some(att);
             }
         }
+        // The Rust memory before the tracker's record (D-061).
+        t.default_atts.try_room(1)?;
+        t.default_att_for_name.reserve_one()?;
         if t.default_atts.len() == t.alloc_default_atts {
             let count = if t.alloc_default_atts == 0 {
                 8
@@ -494,13 +497,13 @@ impl Dtd {
                 .insert(&mut tr.heap(direct), NAME_AND_DEFAULT_ATTRIBUTE_SIZE)?;
         }
         let index = t.default_atts.len();
+        // The first declaration is binding (XML 1.0 3.3).
+        t.default_att_for_name.insert_if_absent(att, index)?;
         t.default_atts.push(DefaultAttribute {
             id: att,
             is_cdata,
             value,
         });
-        // The first declaration is binding (XML 1.0 3.3).
-        t.default_att_for_name.entry(att).or_insert(index);
         if !is_cdata && let Some(a) = self.attribute_ids.value_mut(att) {
             a.maybe_tokenized = true;
         }

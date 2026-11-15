@@ -53,6 +53,7 @@
 //! # }
 //! ```
 
+use crate::fallible::{try_copy_opt, TryGrow};
 use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
 
@@ -227,29 +228,50 @@ impl Dtd {
             }
             let id_att = old.id_att.and_then(|a| map_att(n, a));
             let prefix = map_prefix(n, old.prefix);
-            let mut default_atts = Vec::with_capacity(count);
+            let mut default_atts = Vec::new();
             let mut table = super::tracker::TableShadow::default();
-            let mut for_name = alloc::collections::BTreeMap::new();
-            let mut failed = false;
+            let mut for_name = crate::fallible::SortedMap::default();
+            // Without the Rust memory the copy fails as C's does (D-061).
+            let mut failed = default_atts.try_room(count).is_err();
             for (i, d) in old.default_atts.iter().enumerate() {
+                if failed {
+                    break;
+                }
                 let Some(att) = map_att(n, d.id) else { continue };
-                if let Some(v) = &d.value
-                    && tr.copy(Pool::Dtd, v.len(), direct).is_err()
-                {
+                let value = match &d.value {
+                    Some(v) => match crate::fallible::try_copy(v) {
+                        Ok(c) => Some(c),
+                        Err(_) => {
+                            failed = true;
+                            break;
+                        }
+                    },
+                    None => None,
+                };
+                if value.is_some() && tr.copy(Pool::Dtd, value.as_ref().map_or(0, Vec::len), direct).is_err() {
                     failed = true;
                     break;
                 }
-                if let alloc::collections::btree_map::Entry::Vacant(e) = for_name.entry(att) {
-                    if table.insert(&mut tr.heap(direct), NAME_AND_DEFAULT_ATTRIBUTE_SIZE).is_err() {
+                if !for_name.contains_key(&att) {
+                    if for_name.reserve_one().is_err()
+                        || table.insert(&mut tr.heap(direct), NAME_AND_DEFAULT_ATTRIBUTE_SIZE).is_err()
+                    {
                         failed = true;
                         break;
                     }
-                    e.insert(i);
+                    if for_name.insert_if_absent(att, i).is_err() {
+                        failed = true;
+                        break;
+                    }
+                }
+                if default_atts.try_room(1).is_err() {
+                    failed = true;
+                    break;
                 }
                 default_atts.push(super::dtd::DefaultAttribute {
                     id: att,
                     is_cdata: d.is_cdata,
-                    value: d.value.clone(),
+                    value,
                 });
             }
             // The partial copy stays in the new DTD (C fills `newE` in
@@ -303,14 +325,22 @@ impl Dtd {
                 if let Some(nt) = &e.notation {
                     tr.copy(Pool::Dtd, nt.len(), direct)?;
                 }
+                let system_id = try_copy_opt(&e.system_id)?;
+                let base = if e.system_id.is_some() { try_copy_opt(&e.base)? } else { None };
+                let public_id = if e.system_id.is_some() {
+                    try_copy_opt(&e.public_id)?
+                } else {
+                    None
+                };
+                let notation = try_copy_opt(&e.notation)?;
                 if let Some(ne) = new_table.value_mut(nid) {
                     *ne = Entity {
                         text: if e.system_id.is_some() { None } else { e.text.clone() },
                         processed: 0,
-                        system_id: e.system_id.clone(),
-                        base: if e.system_id.is_some() { e.base.clone() } else { None },
-                        public_id: if e.system_id.is_some() { e.public_id.clone() } else { None },
-                        notation: e.notation.clone(),
+                        system_id,
+                        base,
+                        public_id,
+                        notation,
                         open: false,
                         has_more: false,
                         is_param: e.is_param,
@@ -330,11 +360,17 @@ impl Dtd {
         n.standalone = self.standalone;
         // Don't want deep copying for scaffolding (C shares the pointer).
         n.in_eldecl = self.in_eldecl;
-        n.scaffold = self.scaffold.clone();
+        n.scaffold = crate::fallible::try_with_capacity(self.scaffold.len())?;
+        for sc in &self.scaffold {
+            n.scaffold.push(super::model::Scaffold {
+                name: try_copy_opt(&sc.name)?,
+                ..*sc
+            });
+        }
         n.content_string_len = self.content_string_len;
         n.scaff_count = self.scaff_count;
         n.scaff_level = self.scaff_level;
-        n.scaff_index = self.scaff_index.clone();
+        n.scaff_index = crate::fallible::try_copy(&self.scaff_index)?;
         Ok(())
     }
 }
@@ -492,8 +528,8 @@ impl Parser {
         }
         if !self.is_param_entity {
             // `dtdDestroy`.
-            let ids: Vec<crate::hash::EntryId> = dtd.element_types.iter().collect();
-            for id in ids {
+            for i in 0..dtd.element_types.slot_count() {
+                let Some(id) = dtd.element_types.slot(i) else { continue };
                 if let Some(e) = dtd.element_types.value_mut(id) {
                     e.default_att_table.destroy(&mut tr.t, NAME_AND_DEFAULT_ATTRIBUTE_SIZE);
                     if e.alloc_default_atts > 0 {
@@ -598,7 +634,9 @@ impl Parser {
                 ctx = j;
                 s = j;
             } else {
-                temp.push(c.unwrap_or(0));
+                if temp.try_push(c.unwrap_or(0)).is_err() {
+                    return false;
+                }
                 s += 1;
             }
         }

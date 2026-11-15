@@ -1665,7 +1665,9 @@ compilers and inputs; x86_64 was not measured.
 - Allocation failures are compared at every allocation point (D-058),
   except shrinking `realloc_fcn` calls; through the C interface
   `XML_ParserCreate_MM` receives every allocator call libexpat makes
-  (D-060). A failure of the system allocator aborts the process.
+  (D-060). A failure of the system allocator while parsing ends the
+  parse with `NoMemory` (D-061); creating, resetting or configuring a
+  parser still aborts on it.
 - D-017: on targets where C `char` is unsigned (aarch64 Linux) C's
   `utf8_toUtf16` zero-extends stray bytes that the port sign-extends; the
   parser never passes such bytes to the converter, and the tokenizer

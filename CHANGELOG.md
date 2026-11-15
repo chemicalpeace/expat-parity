@@ -69,8 +69,12 @@ All notable changes are documented here. The format follows
 - Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
   crate now carries `LICENSE` and `NOTICE`, and the README documents usage
   and limitations. Not yet published.
+- `crates/expat-capi/tests/system_oom.rs`: fails each system
+  allocation in turn while parsing and checks that none aborts (D-061).
 
 ### Fixed
+- A failure of the system allocator while parsing ends the parse with
+  `ErrorCode::NoMemory` instead of aborting the process (D-061).
 - C interface: `XML_ParserFree` from an unknown encoding's `release`
   function freed the parser twice; external entity parsers can be created
   outside a handler; the amplification setters refuse external entity
@@ -95,5 +99,6 @@ All notable changes are documented here. The format follows
   padding is now rejected in about 15 ms instead of about 30 s.
 
 ### Known limitations
-- The parser never loads external entities itself; real allocator failure aborts instead of returning
-  `NoMemory`. See the README.
+- The parser never loads external entities itself. Allocation failure
+  while creating, resetting or configuring a parser aborts (D-061). See
+  the README.
