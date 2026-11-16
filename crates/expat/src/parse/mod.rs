@@ -78,7 +78,7 @@ pub use error::{Stop, XmlError};
 pub use external::{ExternalEntities, ExternalEntityParser};
 pub use unknown::{ConvertFn, EncodingInfo, ReleaseFn};
 
-use crate::fallible::{try_copy, try_filled, try_with_capacity, TryGrow};
+use crate::fallible::{try_arc, try_copy, try_filled, try_with_capacity, TryGrow};
 use crate::heap::NoMemory;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -639,8 +639,9 @@ pub struct Parser {
 }
 
 /// The layout of the reference-count block of the shared control
-/// (`Arc<Control>`), which [`Parser::try_new`] still allocates
-/// infallibly; the system allocator test exempts it (D-065).
+/// (`Arc<Control>`). [`Parser::try_new`] probes for it and then allocates
+/// it with `Arc::new`, which the system allocator test exempts (D-065,
+/// D-067).
 #[cfg(feature = "internal-api")]
 pub fn control_block_layout() -> core::alloc::Layout {
     core::alloc::Layout::new::<(
@@ -667,8 +668,8 @@ impl Parser {
 
     /// [`Parser::new`] that reports a failure of the system allocator
     /// instead of aborting (D-065). The two reference-count blocks (the
-    /// shared control and the input buffer) are still allocated
-    /// infallibly: stable Rust has no fallible `Arc` constructor.
+    /// shared control and the input buffer) are probed for first, since
+    /// stable Rust has no fallible `Arc` constructor (D-067).
     pub fn try_new(
         encoding: Option<&[u8]>,
         ns_separator: Option<u8>,
@@ -677,9 +678,10 @@ impl Parser {
         let ns = ns_separator.is_some();
         let protocol_encoding_name = encoding.map(try_copy).transpose()?;
         let atts = try_filled(Attribute::default(), INIT_ATTS_SIZE)?;
-        let control = Arc::new(Control::default());
+        let control = try_arc(Control::default())?;
+        let buffer = try_arc(Vec::new())?;
         Ok(Parser {
-            buffer: Arc::new(Vec::new()),
+            buffer,
             has_buffer: false,
             buffer_ptr: 0,
             buffer_end: 0,
@@ -1465,12 +1467,15 @@ impl Parser {
     fn buffer_mut(&mut self) -> Option<&mut Vec<u8>> {
         if Arc::get_mut(&mut self.buffer).is_none() {
             let copy = try_copy(&self.buffer).ok()?;
+            crate::fallible::probe_arc::<Vec<u8>>().ok()?;
             self.set_buffer(copy);
         }
         Arc::get_mut(&mut self.buffer)
     }
 
     /// Replaces the input buffer, in place when nothing else holds it.
+    /// When a handler still holds it, the caller has probed for the new
+    /// `Arc` with [`crate::fallible::probe_arc`] (D-067).
     fn set_buffer(&mut self, new: Vec<u8>) {
         if let Some(b) = Arc::get_mut(&mut self.buffer) {
             *b = new;
@@ -1556,6 +1561,14 @@ impl Parser {
                     self.error_code = XmlError::NoMemory.into();
                     return false;
                 };
+                // A handler still reading the shared buffer: `set_buffer`
+                // below creates a new `Arc` (D-067).
+                if Arc::get_mut(&mut self.buffer).is_none()
+                    && crate::fallible::probe_arc::<Vec<u8>>().is_err()
+                {
+                    self.error_code = XmlError::NoMemory.into();
+                    return false;
+                }
                 if !self.tracker.t.untracked_malloc(size as usize) {
                     self.error_code = XmlError::NoMemory.into();
                     return false;

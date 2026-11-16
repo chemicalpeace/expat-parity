@@ -64,10 +64,17 @@ failure of the system allocator (`Parser::try_with_options`; `NULL`,
 `XML_STATUS_ERROR` or `XML_FALSE` through the C interface), checked at
 each allocation point by the same test (D-065).
 
-Remaining: the reference-count blocks of the parser's shared control, the
-input buffer and an internal entity's shared text are still allocated
-infallibly (stable Rust has no fallible `Arc` constructor), including the
-input buffer's when `XML_GetBuffer` is called inside a handler.
+Done as well: the reference-count blocks (`Arc`) of the shared control,
+the input buffer, an internal entity's text, an unknown encoding and an
+application memory suite, and the closures of an unknown encoding, are
+preceded by a reservation of the same size that reports the failure;
+the memory suite of `XML_ParserCreate_MM` keeps its blocks in fallibly
+grown tables (D-067). The same test covers `XML_ParserCreate_MM` and an
+unknown encoding.
+
+Remaining: stable Rust has no fallible `Arc` or `Box` constructor, so
+memory taken by another thread between the reservation and the
+allocation still aborts the process (D-067).
 
 ## 3. Amplification and quadratic runtime
 

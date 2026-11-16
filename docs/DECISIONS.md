@@ -2045,4 +2045,42 @@ recorded in DIVERGENCES.md.
   shared entity text of D-061; the test exempts their layouts
   (`internal::parse::control_block_layout` under `internal-api`, a
   dev-dependency feature of `expat-capi`). `XML_ParserCreate_MM` with a
-  suite also allocates the suite's `Arc` infallibly.
+  suite also allocates the suite's `Arc` infallibly. D-067 reserves
+  before each of these.
+
+## D-067 Reservations before `Arc` and `Box`, and a fallible memory suite (2026-11-16)
+
+- **Context.** After D-065 the remaining allocations that abort on a
+  failure of the system allocator were the reference-count blocks of
+  `Arc` (shared control, input buffer, internal entity text, unknown
+  encoding, application memory suite) and the boxed closures of an
+  unknown encoding. Stable Rust has no fallible `Arc` or `Box`
+  constructor (`Arc::try_new` is unstable), and the `expat` crate
+  forbids `unsafe`. Extending the test to `XML_ParserCreate_MM` and an
+  unknown encoding also showed allocations of the C interface that
+  aborted: the tables of the memory suite (`CSuite`), the encoding name
+  passed to the handler, and the size list of `attach_suite`.
+- **Decision.** `fallible::try_arc` and `probe_arc` reserve a block of
+  the `Arc` block's size (two counts and the value, `repr(C)` layout)
+  with `try_reserve_exact`, free it, and return `NoMemory` when the
+  reservation fails; `Arc::new` follows. The C interface does the same
+  for its `Arc` and for the closures of an unknown encoding (`try_box`).
+  `CSuite` reserves room in its tables before calling `malloc_fcn` or
+  `realloc_fcn` and keeps a size's entry once made, so that putting a
+  block back never allocates. The encoding name for the handler is
+  copied on the stack below 128 bytes and fallibly above. A failure is
+  reported as the call's own failure: `NULL`, `XML_ERROR_NO_MEMORY`, or
+  for the unknown-encoding closures `XML_ERROR_UNKNOWN_ENCODING`, with
+  the release function called.
+- **Check.** `system_oom.rs` creation test now also runs
+  `XML_ParserCreate_MM` with a suite and parses a document in an
+  unknown encoding with a converter and a release function: 155 failure
+  points, each returns. Before the C interface changes 17 of them
+  aborted. The test exempts an allocation that directly follows the
+  release of a reservation of the same size, and the two layouts of
+  D-065, so that it refuses the reservations and not `Arc::new`.
+- **Limits.** A reservation is not the allocation: memory taken by
+  another thread between the two still makes `Arc::new` or `Box::new`
+  abort. With one thread, the allocator is asked for a block of the size
+  just freed.
+

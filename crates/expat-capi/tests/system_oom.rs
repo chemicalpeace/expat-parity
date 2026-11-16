@@ -19,11 +19,16 @@
 //! does (`NULL`, `XML_STATUS_ERROR`, `XML_FALSE`); the process must not
 //! abort.
 //!
-//! Two layouts are exempt, since stable Rust has no fallible `Arc`
-//! constructor: the reference-count block of an `Arc<Vec<u8>>` (shared
-//! entity text and the input buffer: the counts and the vector header)
-//! and that of the parser's shared control. Allocations of exactly these
-//! layouts are neither counted nor refused.
+//! Stable Rust has no fallible `Arc` constructor. The port reserves a
+//! block of the `Arc`'s size before each `Arc::new` and fails when that
+//! reservation fails (D-067); the reservation is counted and refused like
+//! any allocation, the `Arc::new` itself is exempt. Exempt are the
+//! allocation that directly follows the release of such a reservation of
+//! the same size, and two layouts whose `Arc::new` does not always follow
+//! its reservation directly: the reference-count block of an
+//! `Arc<Vec<u8>>` (shared entity text and the input buffer) and that of
+//! the parser's shared control. Exempt allocations are neither counted
+//! nor refused.
 
 // Miri cannot spawn the child processes.
 #![cfg(not(miri))]
@@ -32,7 +37,7 @@
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use expat::{ErrorCode, Events, Handler, Options, Parser};
 
@@ -56,9 +61,17 @@ fn shared_text_block() -> Layout {
     Layout::new::<(AtomicU64, AtomicU64, Vec<u8>)>()
 }
 
+/// The size of the last byte block freed, until the next allocation: an
+/// `Arc` reservation (D-067) when the next allocation is an `Arc` block of
+/// that size.
+static RESERVED: AtomicUsize = AtomicUsize::new(0);
+
 impl Failing {
     fn refuse(layout: Layout) -> bool {
-        if layout == shared_text_block() || layout == expat::internal::parse::control_block_layout()
+        let reserved = RESERVED.swap(0, Ordering::Relaxed);
+        if layout == shared_text_block()
+            || layout == expat::internal::parse::control_block_layout()
+            || (reserved == layout.size() && layout.align() >= std::mem::align_of::<AtomicUsize>())
         {
             return false;
         }
@@ -93,6 +106,14 @@ unsafe impl GlobalAlloc for Failing {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        RESERVED.store(
+            if layout.align() == 1 {
+                layout.size()
+            } else {
+                0
+            },
+            Ordering::Relaxed,
+        );
         // SAFETY: the caller's contract for `dealloc`.
         unsafe { System.dealloc(ptr, layout) }
     }
@@ -233,9 +254,77 @@ fn run_creation(fail_at: u64) -> u64 {
         if !q.is_null() {
             c::XML_ParserFree(q);
         }
+        // An application memory suite and an unknown encoding (D-067).
+        let suite = c::XML_Memory_Handling_Suite {
+            malloc_fcn: Some(c_malloc),
+            realloc_fcn: Some(c_realloc),
+            free_fcn: Some(c_free),
+        };
+        let m = c::XML_ParserCreate_MM(std::ptr::null(), &raw const suite, std::ptr::null());
+        if !m.is_null() {
+            c::XML_SetUnknownEncodingHandler(m, Some(latin_like), std::ptr::null_mut());
+            let d = b"<?xml version='1.0' encoding='x-test'?><a b='\xC3\xA9'>\xE9\xC3\xA9</a>";
+            let n = std::ffi::c_int::try_from(d.len()).expect("length");
+            let _ = c::XML_Parse(m, d.as_ptr().cast(), n, 1);
+            c::XML_ParserFree(m);
+        }
     }
     ARMED.store(false, Ordering::Relaxed);
     COUNT.load(Ordering::Relaxed)
+}
+
+unsafe extern "C" {
+    fn malloc(size: usize) -> *mut std::ffi::c_void;
+    fn realloc(ptr: *mut std::ffi::c_void, size: usize) -> *mut std::ffi::c_void;
+    fn free(ptr: *mut std::ffi::c_void);
+}
+
+/// `malloc_fcn` of the test's memory suite.
+unsafe extern "C" fn c_malloc(size: usize) -> *mut std::ffi::c_void {
+    // SAFETY: the C library's `malloc`.
+    unsafe { malloc(size) }
+}
+
+/// `realloc_fcn` of the test's memory suite.
+unsafe extern "C" fn c_realloc(ptr: *mut std::ffi::c_void, size: usize) -> *mut std::ffi::c_void {
+    // SAFETY: `ptr` came from `c_malloc` or `c_realloc`.
+    unsafe { realloc(ptr, size) }
+}
+
+/// `free_fcn` of the test's memory suite.
+unsafe extern "C" fn c_free(ptr: *mut std::ffi::c_void) {
+    // SAFETY: `ptr` came from `c_malloc` or `c_realloc`.
+    unsafe { free(ptr) }
+}
+
+/// The converter of `latin_like`: every two-byte sequence is U+00E9.
+unsafe extern "C" fn two_bytes(
+    _data: *mut std::ffi::c_void,
+    _s: *const std::ffi::c_char,
+) -> std::ffi::c_int {
+    0xE9
+}
+
+/// The release function of `latin_like`.
+unsafe extern "C" fn release(_data: *mut std::ffi::c_void) {}
+
+/// An unknown-encoding handler that maps every byte to its own code
+/// point, except 0xC3, the first byte of a two-byte sequence.
+unsafe extern "C" fn latin_like(
+    _data: *mut std::ffi::c_void,
+    _name: *const expat_capi::XML_Char,
+    info: *mut expat_capi::XML_Encoding,
+) -> std::ffi::c_int {
+    // SAFETY: the parser passes a valid `XML_Encoding` to fill in.
+    let info = unsafe { &mut *info };
+    for (i, m) in info.map.iter_mut().enumerate() {
+        *m = std::ffi::c_int::try_from(i).expect("byte");
+    }
+    info.map[0xC3] = -2;
+    info.data = std::ptr::null_mut();
+    info.convert = Some(two_bytes);
+    info.release = Some(release);
+    expat_capi::XML_STATUS_OK as std::ffi::c_int
 }
 
 /// The child side of the creation test.

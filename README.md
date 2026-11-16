@@ -160,10 +160,12 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   makes the parse fail with `ErrorCode::NoMemory`, as in libexpat
   (D-061). Creating, resetting and configuring a parser report it too
   (`Parser::try_with_options`; through the C interface `NULL`,
-  `XML_STATUS_ERROR` or `XML_FALSE`, D-065). A few small fixed-size
-  reference-count blocks (the parser's shared control, the input buffer,
-  each internal entity's shared text) are still allocated infallibly,
-  since stable Rust has no fallible `Arc` constructor.
+  `XML_STATUS_ERROR` or `XML_FALSE`, D-065). Stable Rust has no fallible
+  `Arc` or `Box` constructor: for the few small reference-count blocks and
+  closures the port reserves a block of the same size first and reports
+  the failure when that reservation fails (D-067). Another thread taking
+  the memory between the reservation and the allocation can still make
+  the process abort.
 - **Performance** was measured on one aarch64 Linux VM only: the port
   reached 0.68x-1.24x of libexpat 2.10.0 built with clang `-O2`, slowest
   on UTF-16 input (`docs/REPORT.md`, "Benchmarks"). Other platforms are

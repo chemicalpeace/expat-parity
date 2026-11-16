@@ -43,19 +43,38 @@ impl CSuite {
         }
     }
 
+    /// The last block of `size` bytes kept. The size's entry stays, with
+    /// its capacity, so that putting the block back cannot allocate.
     fn take(&self, size: usize) -> Option<Block> {
-        let mut blocks = self.blocks.lock().ok()?;
-        let v = blocks.get_mut(&size)?;
-        let b = v.pop();
-        if v.is_empty() {
-            blocks.remove(&size);
-        }
-        b
+        self.blocks.lock().ok()?.get_mut(&size)?.pop()
     }
 
+    /// Room to keep one more block of `size` bytes, reserved before the
+    /// program's allocator is called; `false` when the system allocator
+    /// cannot provide it, which the suite reports as a failed call
+    /// (D-067).
+    fn room(&self, size: usize) -> bool {
+        let Ok(mut blocks) = self.blocks.lock() else {
+            return false;
+        };
+        if !blocks.contains_key(&size) {
+            if blocks.try_reserve(1).is_err() {
+                return false;
+            }
+            blocks.insert(size, Vec::new());
+        }
+        blocks
+            .get_mut(&size)
+            .is_some_and(|v| v.try_reserve(1).is_ok())
+    }
+
+    /// Keeps a block, in room [`CSuite::room`] reserved or [`CSuite::take`]
+    /// left.
     fn keep(&self, size: usize, b: Block) {
-        if let Ok(mut blocks) = self.blocks.lock() {
-            blocks.entry(size).or_default().push(b);
+        if let Ok(mut blocks) = self.blocks.lock()
+            && let Some(v) = blocks.get_mut(&size)
+        {
+            v.push(b);
         }
     }
 
@@ -74,6 +93,9 @@ impl CSuite {
 
 impl MemorySuite for CSuite {
     fn malloc(&self, size: usize) -> bool {
+        if !self.room(size) {
+            return false;
+        }
         // SAFETY: the program's `malloc_fcn`, which takes any size.
         let p = unsafe { (self.mem.malloc)(size) };
         if p.is_null() {
@@ -88,6 +110,10 @@ impl MemorySuite for CSuite {
             // No block of that size (a reset parser's creation): a new one.
             return self.malloc(size);
         };
+        if !self.room(size) {
+            self.keep(old, b);
+            return false;
+        }
         // SAFETY: a block the program's allocator returned and this suite
         // kept; on failure it stays valid and is kept again.
         let p = unsafe { (self.mem.realloc)(b.0, size) };
