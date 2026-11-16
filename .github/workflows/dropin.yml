@@ -1,0 +1,71 @@
+name: drop-in library (release asset)
+
+# Builds the drop-in shared library of crates/expat-capi
+# (scripts/build-dropin.sh) from a release tag on Linux x86_64 and
+# aarch64, checks it with libexpat 2.10.0's own test suite
+# (scripts/runtests-check.sh) and attaches an archive and its SHA-256 to
+# the GitHub release of that tag (D-068). Run by hand after a release.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release tag, for example v0.1.0-beta.2
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  dropin:
+    name: libexpat.so.1 (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: x86_64
+          - runner: ubuntu-22.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - run: rustup show active-toolchain
+      - name: libexpat 2.10.0 test suite against the drop-in library
+        run: scripts/runtests-check.sh
+      - name: Build
+        run: scripts/build-dropin.sh
+      - name: Archive
+        env:
+          TAG: ${{ inputs.tag }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          name="expat-capi-dropin-${TAG}-linux-${ARCH}"
+          mkdir -p "dist/$name"
+          cp -a target/dropin/lib target/dropin/include "dist/$name/"
+          cp LICENSE* "dist/$name/" 2>/dev/null || true
+          cp crates/expat-oracle/vendor/expat/COPYING "dist/$name/COPYING.libexpat" 2>/dev/null || true
+          {
+            echo "Drop-in replacement for libexpat 2.10.0 (soname libexpat.so.1),"
+            echo "built from ${TAG} of chemicalpeace/expat-parity (crates/expat-capi)."
+            echo "Linux ${ARCH}, glibc $(ldd --version | head -1 | awk '{print $NF}') or later."
+            echo
+            echo "Run a program built against libexpat with:"
+            echo "  LD_LIBRARY_PATH=/path/to/lib program"
+            echo
+            echo "Unofficial; not a libexpat release. Tests that call libexpat"
+            echo "internals are not supported; see docs/DECISIONS.md D-060."
+          } > "dist/$name/README.txt"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+          cat "dist/$name.tar.gz.sha256"
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" dist/*.tar.gz dist/*.tar.gz.sha256 --clobber --repo "$GITHUB_REPOSITORY"

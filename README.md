@@ -93,6 +93,19 @@ parser's hash tables and make parsing much slower (hash flooding). Use bytes
 from a cryptographic random source, for example the `getrandom` crate, for
 documents you do not trust.
 
+## C interface (drop-in libexpat)
+
+The `expat` crate on crates.io is the Rust API only. The repository also
+has `crates/expat-capi`, libexpat's C interface (`expat.h`) over the
+port, which builds as a drop-in replacement for libexpat 2.10.0 on Linux:
+`scripts/build-dropin.sh` produces `libexpat.so.1` and the headers, and a
+program built against libexpat runs against it with `LD_LIBRARY_PATH`.
+libexpat 2.10.0's own test suite (`tests/runtests`) passes against it
+except 12 tests that call libexpat internals rather than `expat.h`
+(`scripts/runtests-check.sh`, D-060). From 0.1.0-beta.2, prebuilt
+archives for Linux x86_64 and aarch64 are attached to the GitHub
+releases (D-068). The C interface is not published as a crate.
+
 ## Limitations
 
 What `0.1.0-beta.2` does not do, or does differently from libexpat:
@@ -186,7 +199,7 @@ These are deferred, with no commitment to implement them.
 | Path | What |
 |---|---|
 | `crates/expat` | the safe port, published as `expat` (`#![forbid(unsafe_code)]`, `no_std` + `alloc`) |
-| `crates/expat-capi` | first part of a libexpat-compatible C interface (`expat.h`) over `expat`, not published (D-047) |
+| `crates/expat-capi` | libexpat's C interface (`expat.h`) over `expat`, drop-in `libexpat.so.1` on Linux; not on crates.io (D-047, D-060) |
 | `crates/expat-oracle` | vendored libexpat C at a pinned commit + FFI, **test-only**, not published |
 | `tests/` | differential harness, upstream-derived vectors |
 | `fuzz/` | cargo-fuzz targets and committed corpus |

@@ -5,6 +5,15 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `.github/workflows/dropin.yml`: builds the drop-in `libexpat.so.1`
+  from a release tag on Linux x86_64 and aarch64, runs libexpat 2.10.0's
+  test suite against it and attaches the archives to the GitHub release
+  (D-068).
+
+### Changed
+- README: a section on the C interface and the drop-in library.
+
 ## [0.1.0-beta.2] - 2026-11-16
 
 ### Added

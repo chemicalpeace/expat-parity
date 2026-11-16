@@ -2105,3 +2105,21 @@ recorded in DIVERGENCES.md.
   abort. With one thread, the allocator is asked for a block of the size
   just freed.
 
+## D-068 Prebuilt drop-in library on GitHub releases (2026-11-16)
+
+- **Context.** The published crate is the Rust API; the C interface
+  (`crates/expat-capi`, D-047 to D-060) was only available by building
+  the repository, and the README still described it as a first part.
+- **Decision.** A manual workflow (`dropin.yml`, input: a release tag)
+  checks out the tag, runs `scripts/runtests-check.sh`, builds
+  `scripts/build-dropin.sh` on `ubuntu-22.04` (x86_64) and
+  `ubuntu-22.04-arm` (aarch64), and uploads
+  `expat-capi-dropin-<tag>-linux-<arch>.tar.gz` (lib, include, licences,
+  a README) with its SHA-256 to that tag's release. The older Ubuntu
+  image keeps the glibc requirement low. The C interface stays off
+  crates.io.
+- **Consequences.** Users can try the port under existing C programs
+  without a Rust toolchain. Only Linux is built; macOS and Windows
+  shared libraries are not provided. Tests that call libexpat internals
+  remain unsupported (D-060).
+
