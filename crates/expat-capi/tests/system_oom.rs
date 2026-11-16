@@ -389,7 +389,19 @@ fn every_allocation_failure_in_creation_and_reset_returns() {
         let stdout = String::from_utf8_lossy(&out.stdout);
         if !(out.status.success() && stdout.contains("OUTCOME done")) {
             if aborted.is_empty() {
-                first = String::from_utf8_lossy(&out.stderr).into_owned();
+                // The same point again, with the backtrace of each refusal.
+                let traced = Command::new(&exe)
+                    .args([
+                        "--exact",
+                        "child_creation_case",
+                        "--nocapture",
+                        "--test-threads=1",
+                    ])
+                    .env("EXPAT_SYSTEM_OOM_CREATION", at.to_string())
+                    .env("OOM_TRACE", "1")
+                    .output()
+                    .expect("child process");
+                first = String::from_utf8_lossy(&traced.stderr).into_owned();
             }
             aborted.push(at);
         }
