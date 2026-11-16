@@ -525,23 +525,23 @@ struct Inner {
 }
 
 impl XML_ParserStruct {
-    fn new(options: Options) -> Self {
-        Self::own(Parser::with_options(salt(), options))
-    }
-
     /// The state of a root parser.
     // reason: `parser` is changed only with the `testing` feature.
     #[cfg_attr(not(feature = "testing"), allow(unused_mut))]
-    fn own(mut parser: Parser) -> Self {
+    fn own(mut parser: Parser) -> Option<Self> {
         #[cfg(feature = "testing")]
         parser.set_reparse_deferral_enabled(testing::reparse_deferral_default());
         Self::with_core(Core::Own(parser))
     }
 
-    fn with_core(mut core: Core) -> Self {
+    /// `None` when the system allocator cannot copy the base (D-065).
+    fn with_core(mut core: Core) -> Option<Self> {
         let parser = core.get();
-        let base = parser.base().and_then(|b| CString::new(b).ok());
-        XML_ParserStruct {
+        let base = match parser.base() {
+            Some(b) => Some(try_c_string(b)?),
+            None => None,
+        };
+        Some(XML_ParserStruct {
             user_data: Cell::new(std::ptr::null_mut()),
             handler_arg: Cell::new(std::ptr::null_mut()),
             busy: Cell::new(false),
@@ -595,7 +595,7 @@ impl XML_ParserStruct {
                 text: Vec::new(),
                 atts: Vec::new(),
             }),
-        }
+        })
     }
 
     /// The events whose handler is set (non-`NULL`), and the position of
@@ -1348,7 +1348,45 @@ unsafe fn c_bytes<'a>(s: *const XML_Char) -> Option<&'a [u8]> {
 }
 
 fn create(options: Options) -> XML_Parser {
-    Box::into_raw(Box::new(XML_ParserStruct::new(options)))
+    match Parser::try_with_options(salt(), options) {
+        Some(p) => XML_ParserStruct::own(p).map_or(std::ptr::null_mut(), into_handle),
+        None => std::ptr::null_mut(),
+    }
+}
+
+/// `b.to_vec()`, or `None` instead of aborting when the system allocator
+/// fails (D-065).
+fn try_bytes(b: &[u8]) -> Option<Vec<u8>> {
+    let mut v = Vec::new();
+    v.try_reserve_exact(b.len().checked_add(1)?).ok()?;
+    v.extend_from_slice(b);
+    Some(v)
+}
+
+/// `CString::new(b)` for a string without NUL bytes, or `None` instead of
+/// aborting when the system allocator fails (D-065). The vector has room
+/// for the terminator, so `CString::new` does not allocate again.
+fn try_c_string(b: &[u8]) -> Option<CString> {
+    CString::new(try_bytes(b)?).ok()
+}
+
+/// `Box::into_raw(Box::new(state))`, or `NULL` instead of aborting when
+/// the system allocator cannot provide the block (D-065), as libexpat's
+/// `XML_ParserCreate` returns `NULL` after a failed `malloc`. The block
+/// has the layout `Box` uses, so `XML_ParserFree` releases it with
+/// `Box::from_raw`.
+fn into_handle(state: XML_ParserStruct) -> XML_Parser {
+    let layout = std::alloc::Layout::new::<XML_ParserStruct>();
+    // SAFETY: `XML_ParserStruct` is not zero-sized, so `layout` is valid
+    // for `alloc`.
+    let block = unsafe { std::alloc::alloc(layout) }.cast::<XML_ParserStruct>();
+    if block.is_null() {
+        return std::ptr::null_mut();
+    }
+    // SAFETY: `block` is a fresh, aligned allocation for one
+    // `XML_ParserStruct`, which this write initialises.
+    unsafe { block.write(state) };
+    block
 }
 
 /// `XML_ParserCreate`: a parser for the encoding named by `encoding`
@@ -1362,7 +1400,10 @@ pub unsafe extern "C" fn XML_ParserCreate(encoding: *const XML_Char) -> XML_Pars
     let mut options = Options::new();
     // SAFETY: forwarded from this function's contract.
     if let Some(name) = unsafe { c_bytes(encoding) } {
-        options = options.encoding(name);
+        let Some(o) = options.try_encoding(name) else {
+            return std::ptr::null_mut();
+        };
+        options = o;
     }
     create(options)
 }
@@ -1382,7 +1423,10 @@ pub unsafe extern "C" fn XML_ParserCreateNS(
     let mut options = Options::new().namespace_separator(namespace_separator.to_ne_bytes()[0]);
     // SAFETY: forwarded from this function's contract.
     if let Some(name) = unsafe { c_bytes(encoding) } {
-        options = options.encoding(name);
+        let Some(o) = options.try_encoding(name) else {
+            return std::ptr::null_mut();
+        };
+        options = o;
     }
     create(options)
 }
@@ -1666,7 +1710,12 @@ pub unsafe extern "C" fn XML_ExternalEntityParserCreate(
     if lent {
         s.busy.set(true);
     }
-    let c = XML_ParserStruct::with_core(Core::Child(child));
+    let Some(c) = XML_ParserStruct::with_core(Core::Child(child)) else {
+        if lent {
+            s.busy.set(false);
+        }
+        return std::ptr::null_mut();
+    };
     c.lent.set(lent);
     // `XML_ExternalEntityParserCreate` copies the handlers, the user data
     // and the handler argument.
@@ -1710,7 +1759,13 @@ pub unsafe extern "C" fn XML_ExternalEntityParserCreate(
     c.at_threshold.set(s.at_threshold.get());
     c.reparse_deferral.set(s.reparse_deferral.get());
     c.parent.set(parser);
-    let child = Box::into_raw(Box::new(c));
+    let child = into_handle(c);
+    if child.is_null() {
+        if lent {
+            s.busy.set(false);
+        }
+        return std::ptr::null_mut();
+    }
     if s.handler_arg.get() != s.user_data.get() {
         // SAFETY: `child` was just made by `Box::into_raw`.
         if let Some(c) = unsafe { state(child) } {
@@ -1827,12 +1882,30 @@ pub unsafe extern "C" fn XML_SetBase(parser: XML_Parser, base: *const XML_Char) 
     };
     // SAFETY: forwarded from this function's contract.
     let bytes = unsafe { c_bytes(base) };
+    // The copy is made first, so that a failure of the system allocator
+    // leaves the base as it was (D-065).
+    let copy = match bytes {
+        Some(b) => match try_c_string(b) {
+            Some(c) => Some(c),
+            None => return XML_STATUS_ERROR,
+        },
+        None => None,
+    };
     match s.with_parser(|p| p.set_base(bytes)) {
         Some(Err(_)) => return XML_STATUS_ERROR,
         Some(Ok(())) => {}
-        None => *s.pending_base.borrow_mut() = Some(bytes.map(<[u8]>::to_vec)),
+        None => {
+            let pending = match bytes {
+                Some(b) => match try_bytes(b) {
+                    Some(v) => Some(v),
+                    None => return XML_STATUS_ERROR,
+                },
+                None => None,
+            };
+            *s.pending_base.borrow_mut() = Some(pending);
+        }
     }
-    *s.base.borrow_mut() = bytes.and_then(|b| CString::new(b).ok());
+    *s.base.borrow_mut() = copy;
     XML_STATUS_OK
 }
 
@@ -3036,7 +3109,10 @@ pub unsafe extern "C" fn XML_ParserCreate_MM(
     }
     // SAFETY: forwarded from this function's contract.
     if let Some(name) = unsafe { c_bytes(encoding) } {
-        options = options.encoding(name);
+        let Some(o) = options.try_encoding(name) else {
+            return std::ptr::null_mut();
+        };
+        options = o;
     }
     if memsuite.is_null() {
         return create(options);
@@ -3045,10 +3121,12 @@ pub unsafe extern "C" fn XML_ParserCreate_MM(
     let Some(parser) = Parser::with_memory_suite(salt(), options, suite.clone()) else {
         return std::ptr::null_mut();
     };
-    let state = XML_ParserStruct::own(parser);
+    let Some(state) = XML_ParserStruct::own(parser) else {
+        return std::ptr::null_mut();
+    };
     state.mem.set(mem);
     state.suite.replace(Some(suite));
-    Box::into_raw(Box::new(state))
+    into_handle(state)
 }
 
 /// `XML_FeatureEnum`.

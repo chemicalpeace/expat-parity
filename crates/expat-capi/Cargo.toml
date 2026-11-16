@@ -30,3 +30,7 @@ testing = []
 
 [dependencies]
 expat = { path = "../expat" }
+
+[dev-dependencies]
+# `internal-api` only for the layout the system allocator test exempts.
+expat = { path = "../expat", features = ["internal-api"] }

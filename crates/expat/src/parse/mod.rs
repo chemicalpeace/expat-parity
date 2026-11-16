@@ -79,8 +79,8 @@ pub use external::{ExternalEntities, ExternalEntityParser};
 pub use unknown::{ConvertFn, EncodingInfo, ReleaseFn};
 
 use crate::fallible::{try_copy, try_filled, try_with_capacity, TryGrow};
+use crate::heap::NoMemory;
 use alloc::sync::Arc;
-use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::siphash::SipKey;
@@ -638,6 +638,18 @@ pub struct Parser {
     pub(crate) charged_len: usize,
 }
 
+/// The layout of the reference-count block of the shared control
+/// (`Arc<Control>`), which [`Parser::try_new`] still allocates
+/// infallibly; the system allocator test exempts it (D-065).
+#[cfg(feature = "internal-api")]
+pub fn control_block_layout() -> core::alloc::Layout {
+    core::alloc::Layout::new::<(
+        core::sync::atomic::AtomicUsize,
+        core::sync::atomic::AtomicUsize,
+        Control,
+    )>()
+}
+
 impl Parser {
     /// `XML_ParserCreate(encoding)` (`ns_separator == None`) or
     /// `XML_ParserCreateNS(encoding, sep)`, followed by
@@ -647,9 +659,26 @@ impl Parser {
     /// its own (it is `no_std`); the public API decides where it comes from
     /// (D-023).
     pub fn new(encoding: Option<&[u8]>, ns_separator: Option<u8>, salt: [u8; 16]) -> Self {
+        match Self::try_new(encoding, ns_separator, salt) {
+            Ok(p) => p,
+            Err(NoMemory) => alloc::alloc::handle_alloc_error(core::alloc::Layout::new::<Attribute>()),
+        }
+    }
+
+    /// [`Parser::new`] that reports a failure of the system allocator
+    /// instead of aborting (D-065). The two reference-count blocks (the
+    /// shared control and the input buffer) are still allocated
+    /// infallibly: stable Rust has no fallible `Arc` constructor.
+    pub fn try_new(
+        encoding: Option<&[u8]>,
+        ns_separator: Option<u8>,
+        salt: [u8; 16],
+    ) -> Result<Self, NoMemory> {
         let ns = ns_separator.is_some();
+        let protocol_encoding_name = encoding.map(try_copy).transpose()?;
+        let atts = try_filled(Attribute::default(), INIT_ATTS_SIZE)?;
         let control = Arc::new(Control::default());
-        Parser {
+        Ok(Parser {
             buffer: Arc::new(Vec::new()),
             has_buffer: false,
             buffer_ptr: 0,
@@ -667,7 +696,7 @@ impl Parser {
             position: Position::default(),
             located: None,
             handlers: HandlerSet::default(),
-            protocol_encoding_name: encoding.map(<[u8]>::to_vec),
+            protocol_encoding_name,
             unknown: None,
             unknown_encoding_mem: false,
             ns,
@@ -691,7 +720,7 @@ impl Parser {
             inherited_bindings: None,
             n_specified_atts: 0,
             id_att_index: -1,
-            atts: vec![Attribute::default(); INIT_ATTS_SIZE],
+            atts,
             app_atts: AppAtts::default(),
             free_tags: Vec::new(),
             empty_tag_name: Vec::new(),
@@ -725,7 +754,7 @@ impl Parser {
                 t
             },
             charged_len: 0,
-        }
+        })
     }
 
     /// Sets which handlers are called (the `XML_Set*Handler` functions).
@@ -780,7 +809,11 @@ impl Parser {
             if !self.tracker.t.alloc(n.len().saturating_add(1), direct) {
                 return false;
             }
-            self.protocol_encoding_name = Some(n.to_vec());
+            let Ok(copy) = try_copy(n) else {
+                self.tracker.t.free(n.len().saturating_add(1));
+                return false;
+            };
+            self.protocol_encoding_name = Some(copy);
         }
         true
     }
@@ -828,7 +861,12 @@ impl Parser {
         {
             return false;
         }
-        let mut fresh = Parser::new(encoding, sep, salt);
+        let Ok(mut fresh) = Parser::try_new(encoding, sep, salt) else {
+            return false;
+        };
+        let Ok(mut is_free) = try_filled(false, self.dtd.bindings.len()) else {
+            return false;
+        };
         fresh.ns_triplets = self.ns_triplets;
         fresh.accounting.maximum_amplification_factor = self.accounting.maximum_amplification_factor;
         fresh.accounting.activation_threshold_bytes = self.accounting.activation_threshold_bytes;
@@ -837,7 +875,6 @@ impl Parser {
         // `moveToFreeBindingList`: C keeps every binding, with its URI
         // buffer, on the free binding list for the next parse.
         let mut free = core::mem::take(&mut self.dtd.free_bindings);
-        let mut is_free = alloc::vec![false; self.dtd.bindings.len()];
         for id in &free {
             if let Some(f) = is_free.get_mut(id.0) {
                 *f = true;

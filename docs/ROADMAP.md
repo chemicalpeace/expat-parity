@@ -59,11 +59,15 @@ Done as well: while parsing, the port's collections grow fallibly
 allocator fails every allocation in turn and checks that the process
 does not abort (D-061).
 
-Remaining: creating, resetting and configuring a parser (`Parser::new`,
-`reset`, `XML_SetEncoding`) still abort on allocation failure, as does the
-reference-count block of an internal entity's shared text (stable Rust
-has no fallible `Arc` constructor), and the input buffer's reference
-count when `XML_GetBuffer` is called inside a handler.
+Done as well: creating, configuring and resetting a parser report a
+failure of the system allocator (`Parser::try_with_options`; `NULL`,
+`XML_STATUS_ERROR` or `XML_FALSE` through the C interface), checked at
+each allocation point by the same test (D-065).
+
+Remaining: the reference-count blocks of the parser's shared control, the
+input buffer and an internal entity's shared text are still allocated
+infallibly (stable Rust has no fallible `Arc` constructor), including the
+input buffer's when `XML_GetBuffer` is called inside a handler.
 
 ## 3. Amplification and quadratic runtime
 
