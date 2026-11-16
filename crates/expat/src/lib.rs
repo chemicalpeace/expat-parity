@@ -2,7 +2,7 @@
 //! a stream-oriented XML 1.0 parser, verified against the vendored C
 //! reference by differential testing and fuzzing.
 //!
-//! **`0.1.0-beta.1` is experimental**: an early-use MVP whose public API
+//! **`0.1.0-beta.2` is experimental**: an early-use MVP whose public API
 //! covers only part of libexpat's (see [Limitations](#limitations)) and
 //! may change before 0.1.0.
 //!

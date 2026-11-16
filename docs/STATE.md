@@ -234,4 +234,9 @@ with allocation failures, white-box).
    stop/resume, external entity parsers (`getContext` with the oracle's
    salt, D-021), unknown-encoding handler, input context, salt from an
    entropy source behind `std`.
+   `0.1.0-beta.1` was published on crates.io on 2026-10-18 (libexpat
+   2.9.0 parity). `0.1.0-beta.2` (2026-11-16) carries everything since:
+   libexpat 2.10.0 parity, the extended API, `expat-capi` (not
+   published), fallible allocation (D-061, D-065, D-067) and the metadata
+   change (description marked unofficial, `homepage`, `documentation`).
 7. Phase 4: long fuzzing runs, coverage, benchmarks against C.

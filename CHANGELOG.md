@@ -5,24 +5,10 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0-beta.2] - 2026-11-16
+
 ### Added
 - Throughput on x86_64 Linux: manual workflow `bench.yml` and first figures (D-066).
-- Phase 0: target selection (libexpat 2.9.0), frozen in `docs/DECISIONS.md`.
-- Phase 1: workspace, vendored C oracle, CI, debt check, documentation skeleton.
-- Phase 2: oracle FFI, canonical trace format, differential harness, test
-  vectors extracted from the upstream test suite, fuzz targets, harness
-  self-test.
-- Phase 3: the parser core ported bottom-up (modules 1-11: byte tables,
-  name predicates, encoders, SipHash, tokenizer in every built-in
-  encoding, prolog state machine, string pool and hash tables, parser
-  state and buffer, content, attributes, namespaces, DTD, internal and
-  external entity parsing, amplification limits, allocation tracker with
-  exact parity to libexpat), each compared with the C oracle; see
-  `docs/STATE.md` and `docs/REPORT.md`.
-- Public API (module 12, the MVP): `Parser` (`new`, `with_options`,
-  `parse`, `parse_with`), `Options` (encoding name, namespace separator),
-  `Error` and `ErrorCode` with libexpat's texts, `Handler` with nine
-  events and `Events` (D-038 to D-041).
 - Public API, continued: `Parser::parse_with_events` (handlers chosen at
   run time), the position between calls (`current_line`,
   `current_column`, `current_byte_index`), event positions for handlers
@@ -67,9 +53,6 @@ All notable changes are documented here. The format follows
   libexpat internals (D-060).
 - `docs/ROADMAP.md`: status and planned work against the points in
   "What a rewrite of libexpat needs" (libexpat maintainer, 2026-11-10).
-- Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
-  crate now carries `LICENSE` and `NOTICE`, and the README documents usage
-  and limitations. Not yet published.
 - `scripts/doc-limits.sh` and `benches/docs/measure.c`: large benign
   DocBook and DITA documents measured against the default limits, C and
   port compared (D-063).
@@ -85,7 +68,8 @@ All notable changes are documented here. The format follows
 - The reference-count blocks and closures the port allocates with `Arc` or
   `Box` are preceded by a reservation of the same size, and a failure is
   reported instead of aborting; the memory suite of `XML_ParserCreate_MM`
-  keeps its blocks in fallibly grown tables (D-067).
+  keeps its blocks in fallibly grown tables, behind a lock that does
+  not allocate (D-067).
 - `Parser::set_fifth_edition_names`: an option, off by default and not
   part of libexpat, that classifies name characters by XML 1.0 Fifth
   Edition instead of the Fourth Edition classes libexpat uses (D-064).
@@ -102,6 +86,7 @@ All notable changes are documented here. The format follows
   through the program's memory functions (D-060).
 
 ### Changed
+- Crate metadata: the description now says the port is unofficial, and `homepage` and `documentation` (docs.rs) are set.
 - `Parser::reset` returns whether the parser was reset (`false` for an
   external entity parser, D-055).
 - Target and C oracle moved from libexpat 2.9.0 to 2.10.0 (D-042). The
@@ -119,6 +104,36 @@ All notable changes are documented here. The format follows
   padding is now rejected in about 15 ms instead of about 30 s.
 
 ### Known limitations
-- The parser never loads external entities itself. Allocation failure
-  while creating, resetting or configuring a parser aborts (D-061). See
-  the README.
+- The parser never loads external entities itself. Stable Rust has no
+  fallible `Arc` or `Box` constructor; the port reserves a block of the
+  same size first, so memory taken by another thread in between can still
+  make the process abort (D-067). See the README.
+
+## [0.1.0-beta.1] - 2026-10-18
+
+### Added
+- Phase 0: target selection (libexpat 2.9.0), frozen in `docs/DECISIONS.md`.
+- Phase 1: workspace, vendored C oracle, CI, debt check, documentation skeleton.
+- Phase 2: oracle FFI, canonical trace format, differential harness, test
+  vectors extracted from the upstream test suite, fuzz targets, harness
+  self-test.
+- Phase 3: the parser core ported bottom-up (modules 1-11: byte tables,
+  name predicates, encoders, SipHash, tokenizer in every built-in
+  encoding, prolog state machine, string pool and hash tables, parser
+  state and buffer, content, attributes, namespaces, DTD, internal and
+  external entity parsing, amplification limits, allocation tracker with
+  exact parity to libexpat), each compared with the C oracle; see
+  `docs/STATE.md` and `docs/REPORT.md`.
+- Public API (module 12, the MVP): `Parser` (`new`, `with_options`,
+  `parse`, `parse_with`), `Options` (encoding name, namespace separator),
+  `Error` and `ErrorCode` with libexpat's texts, `Handler` with nine
+  events and `Events` (D-038 to D-041).
+- Prepared for publication as `expat` `0.1.0-beta.1` (experimental): the
+  crate now carries `LICENSE` and `NOTICE`, and the README documents usage
+  and limitations.
+
+### Known limitations
+- No default handler, DTD or entity declaration events, unknown-encoding
+  handler, position in callbacks, or stop/resume; external entities are
+  never loaded; real allocator failure aborts instead of returning
+  `NoMemory`. See the README.

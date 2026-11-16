@@ -4,7 +4,7 @@ A memory-safe Rust port of [libexpat](https://github.com/libexpat/libexpat)
 2.10.0, the stream-oriented XML parser, verified by differential testing and
 fuzzing against the vendored C reference. The crate is published as `expat`.
 
-> **Status: `0.1.0-beta.1`, experimental.** This is an early-use MVP: the
+> **Status: `0.1.0-beta.2`, experimental.** This is an early-use MVP: the
 > parser core (tokenizer, prolog, content, namespaces, DTD, internal
 > entities, allocation limits) is ported and compared with libexpat, but the public
 > API covers only part of libexpat's (see [Limitations](#limitations)), may
@@ -25,7 +25,7 @@ in [`docs/ARCHITECTURE.md`](https://github.com/chemicalpeace/expat-parity/blob/m
 
 ```toml
 [dependencies]
-expat = "=0.1.0-beta.1"
+expat = "=0.1.0-beta.2"
 ```
 
 The parser is fed the document in one or more pieces; the last piece is
@@ -95,7 +95,7 @@ documents you do not trust.
 
 ## Limitations
 
-What `0.1.0-beta.1` does not do, or does differently from libexpat:
+What `0.1.0-beta.2` does not do, or does differently from libexpat:
 
 - **Callbacks:** nine events — start and end element, character data,
   processing instruction, comment, CDATA section start and end, namespace
