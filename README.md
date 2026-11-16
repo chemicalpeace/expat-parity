@@ -199,6 +199,20 @@ cargo test --workspace            # unit, differential and vector tests
 scripts/ci-local.sh               # the full CI gate locally (needs nightly for Miri/fuzz)
 ```
 
+## Acknowledgements
+
+This project is a port of libexpat, written by James Clark and maintained
+over the years by Clark Cooper, Fred L. Drake, Jr., Karl Waclawek,
+Sebastian Pipping and many other contributors. Every detail of its
+behaviour follows libexpat's source and test suite.
+
+The roadmap (`docs/ROADMAP.md`) follows the points in Sebastian Pipping's
+post "What a rewrite of libexpat needs" (2026-11-10,
+<https://blog.hartwork.org/posts/what-a-libexpat-rewrite-needs/>). Thank
+you for that post and for libexpat's open development.
+
+This project is not affiliated with or endorsed by the libexpat project.
+
 ## License
 
 MIT, same as libexpat, of which this is a derivative work. See
