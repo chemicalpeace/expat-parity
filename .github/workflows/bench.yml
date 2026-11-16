@@ -1,0 +1,67 @@
+name: throughput (x86_64 Linux)
+
+# Runs benches/filc on a GitHub-hosted x86_64 runner. Hosted runners are
+# shared machines, so the figures are indicative; the job reports the
+# median of several runs per cell. It does not run on pull requests.
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: timed runs per cell
+        default: "9"
+  push:
+    branches:
+      - "bench/**"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  FILC_VERSION: "0.687"
+
+jobs:
+  bench:
+    name: port, C libexpat, Fil-C
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain
+      - name: Machine
+        run: |
+          uname -a
+          lscpu
+          clang --version | head -1
+          gcc --version | head -1
+          rustc -V
+      - name: Fil-C
+        run: |
+          sudo apt-get install -y patchelf
+          curl -fsSL -o /tmp/filc.tar.xz \
+            "https://github.com/pizlonator/fil-c/releases/download/v${FILC_VERSION}/filc-${FILC_VERSION}-linux-x86_64.tar.xz"
+          mkdir -p /tmp/filc && tar -xJf /tmp/filc.tar.xz -C /tmp/filc --strip-components=1
+          ls /tmp/filc
+          if [ -x /tmp/filc/setup.sh ]; then (cd /tmp/filc && ./setup.sh); fi
+      - name: Build
+        env:
+          FILC: /tmp/filc
+        run: benches/filc/run.sh build
+      - name: Corpus
+        run: |
+          benches/filc/run.sh corpus
+          ls -l /tmp/expat-bench/corpus
+      - name: Run
+        env:
+          RUNS: ${{ inputs.runs || '9' }}
+        run: benches/filc/run.sh run
+      - name: Table
+        run: |
+          python3 benches/filc/table.py /tmp/expat-bench/results.txt | tee /tmp/expat-bench/table.md
+          cat /tmp/expat-bench/table.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-x86_64-linux
+          path: |
+            /tmp/expat-bench/results.txt
+            /tmp/expat-bench/table.md
