@@ -2097,6 +2097,9 @@ recorded in DIVERGENCES.md.
   D-065, so that it refuses the reservations and not `Arc::new`.
   Only the thread that runs the parser is counted and refused; the test
   harness's other threads allocate at times that vary between runs.
+  On macOS `std::sync::Mutex` allocates its system mutex on first lock,
+  infallibly; `CSuite` guards its tables with a spin lock that needs no
+  allocation (a parser is used from one thread at a time).
 - **Limits.** A reservation is not the allocation: memory taken by
   another thread between the two still makes `Arc::new` or `Box::new`
   abort. With one thread, the allocator is asked for a block of the size
