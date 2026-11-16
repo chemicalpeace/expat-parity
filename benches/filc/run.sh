@@ -6,7 +6,7 @@
 #   benches/filc/run.sh corpus              generate the corpus into $CORPUS
 #   benches/filc/run.sh run [FILE...]       run the matrix, append to $OUT
 #
-# Environment: FILC (Fil-C distribution dir, required for `build`), BIN
+# Environment: FILC (Fil-C distribution dir; without it `build` skips Fil-C), BIN
 # (default /tmp/expat-bench/bin), CORPUS (default /tmp/expat-bench/corpus),
 # OUT (default /tmp/expat-bench/results.txt), RUNS (default 7), CPU (core to
 # pin to with taskset, default 1), IMPLS, MODES, CHUNKS (subsets of the
@@ -33,8 +33,11 @@ build() {
   local flags=(-O2 -DNDEBUG -DXML_STATIC -Icrates/expat-oracle/shim "-I$lib" -w -g)
   clang "${flags[@]}" "${src[@]}" -o "$BIN/c-clang"
   gcc "${flags[@]}" "${src[@]}" -o "$BIN/c-gcc"
-  "${FILC:?set FILC to the Fil-C distribution directory}/build/bin/clang" \
-    "${flags[@]}" "${src[@]}" -o "$BIN/c-filc"
+  if [ -n "${FILC:-}" ]; then
+    "$FILC/build/bin/clang" "${flags[@]}" "${src[@]}" -o "$BIN/c-filc"
+  else
+    echo "FILC not set: the Fil-C build is skipped" >&2
+  fi
   local t=${CARGO_TARGET_DIR:-target}
   cargo build --release -p expat-bench --bin xmlbench
   cp "$t/release/xmlbench" "$BIN/rust-release"

@@ -2048,6 +2048,22 @@ recorded in DIVERGENCES.md.
   suite also allocates the suite's `Arc` infallibly. D-067 reserves
   before each of these.
 
+## D-066 Throughput on x86_64 Linux in a manual workflow (2026-11-16)
+
+- **Context:** the throughput figures (REPORT.md "Benchmarks") came from one
+  aarch64 VM; no x86_64 machine was available outside CI.
+- **Decision:** `.github/workflows/bench.yml` runs `benches/filc/` on a
+  GitHub-hosted x86_64 Linux runner, on demand and on pushes to `bench/**`
+  branches, never on pull requests. It downloads the Fil-C release named in
+  the workflow, builds the port (release and LTO), C libexpat 2.10.0 with
+  clang and gcc and with Fil-C, and publishes the table in the job summary
+  and as an artifact. `run.sh build` now skips Fil-C when `FILC` is unset.
+- **Result:** one run (43908573224, code of D-065): the port 1.61x-3.29x of
+  Fil-C (median 2.88x) and 0.54x-0.99x of C clang `-O2` (median 0.80x),
+  event counts equal in all 20 cells.
+- **Consequences:** hosted runners are shared machines, so the figures are
+  indicative and are reported as one run; they are not a CI gate.
+
 ## D-067 Reservations before `Arc` and `Box`, and a fallible memory suite (2026-11-16)
 
 - **Context.** After D-065 the remaining allocations that abort on a

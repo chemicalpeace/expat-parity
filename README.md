@@ -166,10 +166,11 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   the failure when that reservation fails (D-067). Another thread taking
   the memory between the reservation and the allocation can still make
   the process abort.
-- **Performance** was measured on one aarch64 Linux VM only: the port
-  reached 0.68x-1.24x of libexpat 2.10.0 built with clang `-O2`, slowest
-  on UTF-16 input (`docs/REPORT.md`, "Benchmarks"). Other platforms are
-  not measured.
+- **Performance** was measured on one aarch64 Linux VM and once on a
+  GitHub-hosted x86_64 Linux runner: the port reached 0.68x-1.24x and
+  0.54x-0.99x of libexpat 2.10.0 built with clang `-O2`, slowest on UTF-16
+  input (`docs/REPORT.md`, "Benchmarks"). macOS and Windows are not
+  measured.
 - **Names** follow libexpat: the XML 1.0 Fourth Edition character
   classes, within the Basic Multilingual Plane. `Parser::set_fifth_edition_names`
   switches to the Fifth Edition rules, which also accept letters added to
@@ -200,6 +201,20 @@ Requires a C compiler (for the oracle) and rustup.
 cargo test --workspace            # unit, differential and vector tests
 scripts/ci-local.sh               # the full CI gate locally (needs nightly for Miri/fuzz)
 ```
+
+## Acknowledgements
+
+This project is a port of libexpat, written by James Clark and maintained
+over the years by Clark Cooper, Fred L. Drake, Jr., Karl Waclawek,
+Sebastian Pipping and many other contributors. Every detail of its
+behaviour follows libexpat's source and test suite.
+
+The roadmap (`docs/ROADMAP.md`) follows the points in Sebastian Pipping's
+post "What a rewrite of libexpat needs" (2026-11-10,
+<https://blog.hartwork.org/posts/what-a-libexpat-rewrite-needs/>). Thank
+you for that post and for libexpat's open development.
+
+This project is not affiliated with or endorsed by the libexpat project.
 
 ## License
 

@@ -20,7 +20,7 @@ Status words: **done** (implemented and compared with libexpat),
 | 6 | XML 1.0 fifth edition rather than fourth edition or 1.1 | option for names |
 | 7 | Full support for DTD, parameter entities, general entities | done, as libexpat |
 | 8 | Testing against the XML specification and libexpat's test suite | done |
-| 9 | Parsing speed above libexpat compiled with Fil-C | done on one machine |
+| 9 | Parsing speed above libexpat compiled with Fil-C | done (aarch64 and x86_64 Linux) |
 | 10 | Continuous bug and feature parity with libexpat | partial |
 | 11 | Sharing bugs found in libexpat with upstream | open |
 | 12 | Maintaining the rewrite | ongoing |
@@ -141,7 +141,13 @@ Done on one aarch64 Linux VM: 1.91x-2.44x the throughput of libexpat
 built with Fil-C 0.687 (2026-11-13), and after D-043 to D-046 0.68x-1.24x
 of libexpat built with clang `-O2` (median 1.00x). REPORT, "Benchmarks".
 
-Remaining: x86_64 figures; Fil-C figures after D-043 to D-046; UTF-16
+Done on x86_64 Linux (GitHub-hosted runner, one run, D-066): 1.61x-3.29x
+the throughput of libexpat built with Fil-C 0.687 (median 2.88x) and
+0.54x-0.99x of libexpat built with clang `-O2` (median 0.80x), with the
+code after D-043 to D-046. The workflow `.github/workflows/bench.yml`
+repeats the measurement on demand.
+
+Remaining: the gap to plain C, larger on x86_64 than on aarch64; UTF-16
 input, the slowest case.
 
 ## 10. Parity over time
@@ -178,5 +184,5 @@ MIT, as libexpat.
 
 ## Order of work
 
-1. x86_64 and Fil-C benchmarks (9).
+1. The gap to plain C, UTF-16 input first (9).
 2. Fifth edition names: option done (D-064); the default follows libexpat (6).

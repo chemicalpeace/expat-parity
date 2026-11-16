@@ -1637,7 +1637,50 @@ with clang `-O2` (median 1.00x). UTF-16 input is the slowest case
 cells moved by up to about 9 % (median about 1.4 %), so differences of a
 few percent between cells or between D-044 to D-046 are within noise.
 These figures come from one aarch64 VM and may differ on other platforms,
-compilers and inputs; x86_64 was not measured.
+compilers and inputs; x86_64 is measured below.
+
+### x86_64 Linux, GitHub-hosted runner (D-066, 2026-11-16)
+
+Machine: GitHub-hosted `ubuntu-24.04` runner, Intel Xeon 6975P-C, 4 vCPUs
+(KVM), Ubuntu 24.04. Port: rustc 1.99.0, the same two builds as above, with
+the code of D-065 (main `c29467fe`). C: libexpat 2.10.0 (vendored oracle
+sources and configuration), `-O2 -DNDEBUG`, Ubuntu clang 18.1.3 and gcc
+13.3.0. Fil-C: release 0.687 `filc-0.687-linux-x86_64`, same sources and
+flags. Workflow `.github/workflows/bench.yml` (run 43908573224), harness
+`benches/filc/`, median of 9 runs after one warm-up, pinned to CPU 1,
+MiB/s of input bytes; "port/Fil-C" and "port/C clang" use the slower of the
+two port builds. The OSM extract was not part of this run.
+
+| corpus | handlers | chunks | port LTO | port release | C clang | C gcc | Fil-C | port/Fil-C | port/C clang | C clang/Fil-C |
+| bench-mixed | none | single | 288.3 | 283.7 | 365.7 | 341.5 | 103.3 | 2.75x | 0.78x | 3.54x |
+| bench-mixed | none | 64 KiB | 250.3 | 248.8 | 250.3 | 235.5 | 87.0 | 2.86x | 0.99x | 2.88x |
+| bench-mixed | count | single | 279.1 | 268.7 | 350.1 | 323.7 | 97.0 | 2.77x | 0.77x | 3.61x |
+| bench-mixed | count | 64 KiB | 246.1 | 237.8 | 244.6 | 230.0 | 82.7 | 2.88x | 0.97x | 2.96x |
+| docbook-dtd | none | single | 135.5 | 129.5 | 184.7 | 170.9 | 45.4 | 2.85x | 0.70x | 4.07x |
+| docbook-dtd | none | 64 KiB | 129.0 | 124.0 | 161.2 | 148.4 | 42.3 | 2.93x | 0.77x | 3.81x |
+| docbook-dtd | count | single | 130.1 | 123.7 | 182.8 | 167.7 | 44.0 | 2.81x | 0.68x | 4.15x |
+| docbook-dtd | count | 64 KiB | 125.0 | 118.7 | 159.3 | 146.7 | 41.3 | 2.87x | 0.75x | 3.86x |
+| ns-heavy | none | single | 117.1 | 112.5 | 127.6 | 129.9 | 34.8 | 3.23x | 0.88x | 3.67x |
+| ns-heavy | none | 64 KiB | 112.3 | 108.3 | 118.1 | 119.7 | 33.1 | 3.27x | 0.92x | 3.57x |
+| ns-heavy | count | single | 113.7 | 109.2 | 127.0 | 127.8 | 33.2 | 3.29x | 0.86x | 3.83x |
+| ns-heavy | count | 64 KiB | 109.5 | 105.2 | 116.5 | 119.2 | 32.2 | 3.27x | 0.90x | 3.62x |
+| plain-large | none | single | 127.2 | 125.3 | 151.2 | 141.6 | 41.8 | 3.00x | 0.83x | 3.62x |
+| plain-large | none | 64 KiB | 125.9 | 124.6 | 142.0 | 137.6 | 39.0 | 3.19x | 0.88x | 3.64x |
+| plain-large | count | single | 128.8 | 123.4 | 148.5 | 139.9 | 40.7 | 3.03x | 0.83x | 3.65x |
+| plain-large | count | 64 KiB | 128.7 | 124.1 | 140.3 | 136.2 | 37.9 | 3.27x | 0.88x | 3.70x |
+| utf16le | none | single | 442.4 | 412.0 | 634.7 | 724.6 | 191.0 | 2.16x | 0.65x | 3.32x |
+| utf16le | none | 64 KiB | 320.6 | 304.0 | 426.2 | 477.6 | 160.2 | 1.90x | 0.71x | 2.66x |
+| utf16le | count | single | 350.4 | 242.6 | 445.8 | 504.3 | 144.8 | 1.68x | 0.54x | 3.08x |
+| utf16le | count | 64 KiB | 272.3 | 202.9 | 336.8 | 372.4 | 126.4 | 1.61x | 0.60x | 2.66x |
+
+Event counts are identical across builds in all 20 cells.
+
+In this run the slower port build reached 1.61x-3.29x the throughput of C
+libexpat built with Fil-C (median 2.88x) and 0.54x-0.99x that of C built
+with clang `-O2` (median 0.80x). UTF-16 input is the slowest case for the
+port relative to C (0.54x-0.71x). A hosted runner is a shared machine and
+the run was made once, so these figures are indicative; they also come
+from different compilers than the aarch64 tables above.
 
 ## Limitations
 
