@@ -17,7 +17,9 @@ state change. Read with `docs/DECISIONS.md` and `git log`.
   libexpat 2.10.0 built with Fil-C 0.687 and 0.50x-0.83x that of C built
   with clang `-O2`. After D-043 to D-046 the last run measured 0.68x-1.24x
   of C clang `-O2` (median 1.00x; UTF-16 input slowest); Fil-C was not
-  measured again (REPORT.md "Benchmarks"). Other platforms not measured.
+  measured again. On a GitHub-hosted x86_64 Linux runner (D-066, one
+  run) the port reached 1.61x-3.29x of C built with Fil-C and 0.54x-0.99x
+  of C clang `-O2` (REPORT.md "Benchmarks").
 - **Phase:** 3 (bottom-up port). Phases 0, 1, 2 complete; Phase 3 modules 1-10 done;
   module 11 in progress: 11a (declarations, PR #6), 11b (internal entity
   expansion and recursion, PR #7), 11b2 (billion-laughs limits, PR #8) and

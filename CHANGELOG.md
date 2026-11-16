@@ -6,6 +6,7 @@ All notable changes are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Throughput on x86_64 Linux: manual workflow `bench.yml` and first figures (D-066).
 - Phase 0: target selection (libexpat 2.9.0), frozen in `docs/DECISIONS.md`.
 - Phase 1: workspace, vendored C oracle, CI, debt check, documentation skeleton.
 - Phase 2: oracle FFI, canonical trace format, differential harness, test

@@ -164,10 +164,11 @@ What `0.1.0-beta.1` does not do, or does differently from libexpat:
   reference-count blocks (the parser's shared control, the input buffer,
   each internal entity's shared text) are still allocated infallibly,
   since stable Rust has no fallible `Arc` constructor.
-- **Performance** was measured on one aarch64 Linux VM only: the port
-  reached 0.68x-1.24x of libexpat 2.10.0 built with clang `-O2`, slowest
-  on UTF-16 input (`docs/REPORT.md`, "Benchmarks"). Other platforms are
-  not measured.
+- **Performance** was measured on one aarch64 Linux VM and once on a
+  GitHub-hosted x86_64 Linux runner: the port reached 0.68x-1.24x and
+  0.54x-0.99x of libexpat 2.10.0 built with clang `-O2`, slowest on UTF-16
+  input (`docs/REPORT.md`, "Benchmarks"). macOS and Windows are not
+  measured.
 - **Names** follow libexpat: the XML 1.0 Fourth Edition character
   classes, within the Basic Multilingual Plane. `Parser::set_fifth_edition_names`
   switches to the Fifth Edition rules, which also accept letters added to
