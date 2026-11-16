@@ -365,7 +365,6 @@ fn every_allocation_failure_in_creation_and_reset_returns() {
                 "--test-threads=1",
             ])
             .env("EXPAT_SYSTEM_OOM_CREATION", at.to_string())
-            .env("OOM_TRACE", "1")
             .output()
             .expect("child process");
         let stdout = String::from_utf8_lossy(&out.stdout);
