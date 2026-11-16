@@ -36,6 +36,7 @@
 #![allow(clippy::expect_used)]
 
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::cell::Cell;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
@@ -49,7 +50,6 @@ impl Handler for Quiet {}
 /// Counts allocations while armed and fails from `FAIL_AT` on.
 struct Failing;
 
-static ARMED: AtomicBool = AtomicBool::new(false);
 static COUNT: AtomicU64 = AtomicU64::new(0);
 static FAIL_AT: AtomicU64 = AtomicU64::new(u64::MAX);
 /// With `OOM_TRACE` set, a child prints the backtrace of each refusal
@@ -61,26 +61,45 @@ fn shared_text_block() -> Layout {
     Layout::new::<(AtomicU64, AtomicU64, Vec<u8>)>()
 }
 
-/// The size of the last byte block freed, until the next allocation: an
-/// `Arc` reservation (D-067) when the next allocation is an `Arc` block of
-/// that size.
-static RESERVED: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    /// Whether this thread's allocations are counted and refused. Only
+    /// the thread that runs the parser is armed; the harness's other
+    /// threads allocate at times that differ from run to run.
+    static ARMED: Cell<bool> = const { Cell::new(false) };
+    /// The size of the last byte block this thread freed, until its next
+    /// allocation: an `Arc` reservation (D-067) when the next allocation
+    /// is an `Arc` block of that size.
+    static RESERVED: Cell<usize> = const { Cell::new(0) };
+}
+
+/// Whether the current thread is armed (false while its thread-local
+/// storage is torn down).
+fn armed() -> bool {
+    ARMED.try_with(Cell::get).unwrap_or(false)
+}
+
+/// Arms or disarms the current thread.
+fn arm(on: bool) {
+    ARMED.with(|a| a.set(on));
+}
 
 impl Failing {
     fn refuse(layout: Layout) -> bool {
-        let reserved = RESERVED.swap(0, Ordering::Relaxed);
+        if !armed() {
+            return false;
+        }
+        let reserved = RESERVED.try_with(|r| r.replace(0)).unwrap_or(0);
         if layout == shared_text_block()
             || layout == expat::internal::parse::control_block_layout()
             || (reserved == layout.size() && layout.align() >= std::mem::align_of::<AtomicUsize>())
         {
             return false;
         }
-        let r = ARMED.load(Ordering::Relaxed)
-            && COUNT.fetch_add(1, Ordering::Relaxed) >= FAIL_AT.load(Ordering::Relaxed);
+        let r = COUNT.fetch_add(1, Ordering::Relaxed) >= FAIL_AT.load(Ordering::Relaxed);
         if r && TRACE.load(Ordering::Relaxed) {
-            ARMED.store(false, Ordering::Relaxed);
+            arm(false);
             eprintln!("TRACE {}", std::backtrace::Backtrace::force_capture());
-            ARMED.store(true, Ordering::Relaxed);
+            arm(true);
         }
         r
     }
@@ -106,14 +125,14 @@ unsafe impl GlobalAlloc for Failing {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        RESERVED.store(
-            if layout.align() == 1 {
+        if armed() {
+            let size = if layout.align() == 1 {
                 layout.size()
             } else {
                 0
-            },
-            Ordering::Relaxed,
-        );
+            };
+            let _ = RESERVED.try_with(|r| r.set(size));
+        }
         // SAFETY: the caller's contract for `dealloc`.
         unsafe { System.dealloc(ptr, layout) }
     }
@@ -187,7 +206,7 @@ fn run(doc: usize, events: bool, fail_at: u64) -> (Option<ErrorCode>, u64) {
     TRACE.store(std::env::var_os("OOM_TRACE").is_some(), Ordering::Relaxed);
     COUNT.store(0, Ordering::Relaxed);
     FAIL_AT.store(fail_at, Ordering::Relaxed);
-    ARMED.store(true, Ordering::Relaxed);
+    arm(true);
     let mut result = Ok(());
     for (i, piece) in bytes.chunks(7).enumerate() {
         let last = (i + 1) * 7 >= bytes.len();
@@ -200,7 +219,7 @@ fn run(doc: usize, events: bool, fail_at: u64) -> (Option<ErrorCode>, u64) {
             break;
         }
     }
-    ARMED.store(false, Ordering::Relaxed);
+    arm(false);
     let code = result.err().map(|e| e.code());
     drop(p);
     (code, COUNT.load(Ordering::Relaxed))
@@ -234,7 +253,7 @@ fn run_creation(fail_at: u64) -> u64 {
     COUNT.store(0, Ordering::Relaxed);
     FAIL_AT.store(fail_at, Ordering::Relaxed);
     TRACE.store(std::env::var_os("OOM_TRACE").is_some(), Ordering::Relaxed);
-    ARMED.store(true, Ordering::Relaxed);
+    arm(true);
     let len = std::ffi::c_int::try_from(doc.len()).expect("length");
     // SAFETY: the strings are NUL-terminated literals, the document is a
     // live slice of `len` bytes, and each handle is used only while live.
@@ -274,7 +293,7 @@ fn run_creation(fail_at: u64) -> u64 {
             c::XML_ParserFree(m);
         }
     }
-    ARMED.store(false, Ordering::Relaxed);
+    arm(false);
     COUNT.load(Ordering::Relaxed)
 }
 
