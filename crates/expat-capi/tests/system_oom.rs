@@ -130,6 +130,11 @@ unsafe impl GlobalAlloc for Failing {
 #[global_allocator]
 static GLOBAL: Failing = Failing;
 
+/// Held by each test that counts allocations in this process: the
+/// counter and its switches are shared, so two tests counting at once
+/// would disarm or count for each other.
+static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 const SALT: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
 /// Documents that reach the parser's tables, pools, stacks and buffers.
@@ -344,9 +349,13 @@ fn every_allocation_failure_in_creation_and_reset_returns() {
     {
         return;
     }
+    let _serial = SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let exe = std::env::current_exe().expect("test binary");
     let total = run_creation(u64::MAX);
     let mut aborted = Vec::new();
+    let mut first = String::new();
     for at in 0..total {
         let out = Command::new(&exe)
             .args([
@@ -356,17 +365,21 @@ fn every_allocation_failure_in_creation_and_reset_returns() {
                 "--test-threads=1",
             ])
             .env("EXPAT_SYSTEM_OOM_CREATION", at.to_string())
+            .env("OOM_TRACE", "1")
             .output()
             .expect("child process");
         let stdout = String::from_utf8_lossy(&out.stdout);
         if !(out.status.success() && stdout.contains("OUTCOME done")) {
+            if aborted.is_empty() {
+                first = String::from_utf8_lossy(&out.stderr).into_owned();
+            }
             aborted.push(at);
         }
     }
     println!("system_oom creation: {total} failure points");
     assert!(
         aborted.is_empty(),
-        "{} of {total} failure points did not return: {aborted:?}",
+        "{} of {total} failure points did not return: {aborted:?}\nfirst: {first}",
         aborted.len()
     );
 }
@@ -378,6 +391,9 @@ fn every_allocation_failure_ends_the_parse_normally() {
     {
         return;
     }
+    let _serial = SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let exe = std::env::current_exe().expect("test binary");
     let mut aborted = Vec::new();
     let mut points = 0;
