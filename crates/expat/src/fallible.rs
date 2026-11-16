@@ -124,3 +124,32 @@ impl<K: Ord + Copy, V> SortedMap<K, V> {
 pub fn try_copy_opt(value: &Option<Vec<u8>>) -> Result<Option<Vec<u8>>, NoMemory> {
     value.as_deref().map(try_copy).transpose()
 }
+
+/// `Arc::new(value)` that reports a failure of the system allocator
+/// instead of aborting, as far as stable Rust allows (D-067).
+///
+/// Stable Rust has no fallible `Arc` constructor. This function first
+/// reserves a block of the same size as the `Arc`'s and returns
+/// [`NoMemory`] when that fails; otherwise it frees the block and calls
+/// `Arc::new`, which then asks for a block of the size just freed. That
+/// call can still abort when another thread takes the memory in between.
+pub fn try_arc<T>(value: T) -> Result<alloc::sync::Arc<T>, NoMemory> {
+    probe_arc::<T>()?;
+    Ok(alloc::sync::Arc::new(value))
+}
+
+/// The reservation [`try_arc`] makes before `Arc::new`, for a caller that
+/// creates the `Arc<T>` itself right after it.
+pub fn probe_arc<T>() -> Result<(), NoMemory> {
+    let mut probe: Vec<u8> = Vec::new();
+    probe.try_reserve_exact(arc_block_size::<T>()).map_err(|_| NoMemory)
+}
+
+/// The size of the block behind an `Arc<T>`: two reference counts and
+/// the value.
+pub fn arc_block_size<T>() -> usize {
+    let counts = core::alloc::Layout::new::<[core::sync::atomic::AtomicUsize; 2]>();
+    counts
+        .extend(core::alloc::Layout::new::<T>())
+        .map_or(usize::MAX, |(l, _)| l.pad_to_align().size())
+}

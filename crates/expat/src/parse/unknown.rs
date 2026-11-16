@@ -111,7 +111,10 @@ impl Parser {
         match Unknown::new(&info.map, info.convert.take(), self.ns) {
             Ok(enc) => {
                 let enc = if self.fifth_edition_names { enc.with_fifth_edition_names() } else { enc };
-                self.unknown = Some(Arc::new(UnknownEnc { enc, _release: release }));
+                let Ok(unknown) = crate::fallible::try_arc(UnknownEnc { enc, _release: release }) else {
+                    return Err(XmlError::NoMemory.into());
+                };
+                self.unknown = Some(unknown);
                 self.enc = Enc::Unknown;
                 Ok(())
             }

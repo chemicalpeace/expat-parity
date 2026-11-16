@@ -539,13 +539,9 @@ impl AllocTracker {
     /// before it are freed in reverse order and the suite is detached, as
     /// libexpat frees them and returns `NULL`.
     pub fn attach_suite(&mut self, suite: alloc::sync::Arc<dyn MemorySuite>) -> bool {
-        let sizes: alloc::vec::Vec<usize> = self
-            .creation
-            .iter()
-            .take_while(|&&c| c > 0)
-            .map(|&c| usize::try_from(c).unwrap_or(usize::MAX))
-            .collect();
-        for (i, &size) in sizes.iter().enumerate() {
+        let sizes = self.creation.map(|c| usize::try_from(c).unwrap_or(usize::MAX));
+        let n = self.creation.iter().take_while(|&&c| c > 0).count();
+        for (i, &size) in sizes.iter().take(n).enumerate() {
             if !suite.malloc(size) {
                 for &prev in sizes.iter().take(i).rev() {
                     suite.free(prev);

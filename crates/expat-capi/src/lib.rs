@@ -920,8 +920,23 @@ impl Handler for Dispatch<'_> {
         let (Some(h), data) = self.state.unknown_encoding.get() else {
             return None;
         };
-        let mut c_name = name.to_vec();
-        c_name.push(0);
+        // The NUL-terminated name, on the stack when it is short; a
+        // longer one is copied fallibly, and when that fails the encoding
+        // is treated as unknown (D-067).
+        let mut short = [0u8; 128];
+        let mut long = Vec::new();
+        let c_name: &[u8] =
+            if let Some(dst) = short.get_mut(..name.len()).filter(|_| name.len() < 128) {
+                dst.copy_from_slice(name);
+                &short
+            } else {
+                if long.try_reserve_exact(name.len() + 1).is_err() {
+                    return None;
+                }
+                long.extend_from_slice(name);
+                long.push(0);
+                &long
+            };
         let mut info = XML_Encoding {
             map: [-1; 256],
             data: std::ptr::null_mut(),
@@ -934,28 +949,41 @@ impl Handler for Dispatch<'_> {
         let status = unsafe { h(data, c_name.as_ptr().cast(), &raw mut info) };
         let user = EncodingData(info.data);
         let mut out = EncodingInfo::new();
-        out.release = info.release.map(|r| -> ReleaseFn {
-            Box::new(move || {
+        if let Some(r) = info.release {
+            let release = move || {
                 let user = user;
                 // SAFETY: the release function the handler gave, called
                 // once with its data, as libexpat does.
                 unsafe { r(user.0) }
-            })
-        });
+            };
+            match try_box(release) {
+                Some(b) => out.release = Some(b as ReleaseFn),
+                None => {
+                    // The closure is not boxed; it is called here, and
+                    // the encoding is refused (D-067).
+                    // SAFETY: as above.
+                    unsafe { r(user.0) };
+                    return None;
+                }
+            }
+        }
         if status == 0 {
             // `out` is dropped: libexpat calls `release` at once.
             return None;
         }
         out.map = info.map;
-        out.convert = info.convert.map(|f| -> ConvertFn {
-            Box::new(move |seq: &[u8]| {
+        if let Some(f) = info.convert {
+            let convert = move |seq: &[u8]| {
                 let user = user;
                 // SAFETY: the converter the handler gave, called with its
                 // data and the bytes of one sequence, as many as the map
                 // gives its first byte (libexpat passes a pointer to them).
                 unsafe { f(user.0, seq.as_ptr().cast()) }
-            })
-        });
+            };
+            // When the closure cannot be boxed, `out` is dropped and its
+            // release function runs (D-067).
+            out.convert = Some(try_box(convert)? as ConvertFn);
+        }
         Some(out)
     }
 
@@ -3117,7 +3145,9 @@ pub unsafe extern "C" fn XML_ParserCreate_MM(
     if memsuite.is_null() {
         return create(options);
     }
-    let suite = std::sync::Arc::new(mem::CSuite::new(mem));
+    let Some(suite) = try_arc(mem::CSuite::new(mem)) else {
+        return std::ptr::null_mut();
+    };
     let Some(parser) = Parser::with_memory_suite(salt(), options, suite.clone()) else {
         return std::ptr::null_mut();
     };
@@ -3216,4 +3246,32 @@ static FEATURES: Features = Features([
 #[unsafe(no_mangle)]
 pub extern "C" fn XML_GetFeatureList() -> *const XML_Feature {
     FEATURES.0.as_ptr()
+}
+
+/// `Arc::new(value)`, or `None` when a block of the `Arc`'s size cannot
+/// be reserved first (D-067; stable Rust has no fallible `Arc`
+/// constructor).
+fn try_arc<T>(value: T) -> Option<std::sync::Arc<T>> {
+    let counts = std::alloc::Layout::new::<[std::sync::atomic::AtomicUsize; 2]>();
+    let size = counts
+        .extend(std::alloc::Layout::new::<T>())
+        .ok()?
+        .0
+        .pad_to_align()
+        .size();
+    let mut probe: Vec<u8> = Vec::new();
+    probe.try_reserve_exact(size).ok()?;
+    drop(probe);
+    Some(std::sync::Arc::new(value))
+}
+
+/// `Box::new(value)`, or `None` when a block of its size cannot be
+/// reserved first (D-067; stable Rust has no fallible `Box`
+/// constructor).
+fn try_box<T>(value: T) -> Option<Box<T>> {
+    if std::mem::size_of::<T>() > 0 {
+        let mut probe: Vec<u8> = Vec::new();
+        probe.try_reserve_exact(std::mem::size_of::<T>()).ok()?;
+    }
+    Some(Box::new(value))
 }

@@ -431,13 +431,15 @@ impl Parser {
                         p.has_block()
                     };
                     if let Some(r) = self.decl_entity {
-                        if i32::try_from(text.len()).is_err() {
+                        // The shared text's `Arc` is probed for before the
+                        // pool keeps the string (D-067).
+                        if i32::try_from(text.len()).is_err()
+                            || (has_block && crate::fallible::probe_arc::<alloc::vec::Vec<u8>>().is_err())
+                        {
                             self.finish_current(Pool::EntityValue, false, false)?;
                             return Err(XmlError::NoMemory.into());
                         }
                         self.finish_current(Pool::EntityValue, false, true)?;
-                        // Only the reference count of the shared text is allocated
-                        // infallibly (D-061).
                         let text = has_block.then(|| alloc::sync::Arc::new(text));
                         let mut info = None;
                         if let Some(e) = self.dtd.entity_mut(r) {

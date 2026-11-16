@@ -82,6 +82,10 @@ All notable changes are documented here. The format follows
   `XML_ParserCreate_MM` and `XML_ExternalEntityParserCreate` return
   `NULL`, `XML_SetEncoding` and `XML_SetBase` return `XML_STATUS_ERROR`
   and `XML_ParserReset` returns `XML_FALSE` in that case (D-065).
+- The reference-count blocks and closures the port allocates with `Arc` or
+  `Box` are preceded by a reservation of the same size, and a failure is
+  reported instead of aborting; the memory suite of `XML_ParserCreate_MM`
+  keeps its blocks in fallibly grown tables (D-067).
 - `Parser::set_fifth_edition_names`: an option, off by default and not
   part of libexpat, that classifies name characters by XML 1.0 Fifth
   Edition instead of the Fourth Edition classes libexpat uses (D-064).

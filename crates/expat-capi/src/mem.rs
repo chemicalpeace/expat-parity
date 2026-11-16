@@ -6,9 +6,11 @@
 //! allocator that fails, counts or checks for leaks behaves as with
 //! libexpat.
 
+use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::ffi::c_void;
-use std::sync::Mutex;
+use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use expat::MemorySuite;
 
@@ -24,45 +26,123 @@ struct Block(*mut c_void);
 // the parser (libexpat parsers are used from one thread at a time).
 unsafe impl Send for Block {}
 
+/// A lock that needs no allocation. `std::sync::Mutex` allocates its
+/// system mutex on first use on some platforms (macOS), infallibly; the
+/// suite's tables are used while the system allocator may be failing
+/// (D-067). A parser is used from one thread at a time, so the lock is
+/// uncontended and spinning is brief.
+#[derive(Debug)]
+struct Lock<T> {
+    busy: AtomicBool,
+    value: UnsafeCell<T>,
+}
+
+// SAFETY: the value is reached only through a guard, and `busy` admits one
+// guard at a time.
+unsafe impl<T: Send> Sync for Lock<T> {}
+
+impl<T> Lock<T> {
+    const fn new(value: T) -> Self {
+        Lock {
+            busy: AtomicBool::new(false),
+            value: UnsafeCell::new(value),
+        }
+    }
+
+    fn lock(&self) -> Guard<'_, T> {
+        while self
+            .busy
+            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            std::hint::spin_loop();
+        }
+        Guard(self)
+    }
+
+    fn get_mut(&mut self) -> &mut T {
+        self.value.get_mut()
+    }
+}
+
+/// Exclusive access to a [`Lock`]'s value until dropped.
+struct Guard<'a, T>(&'a Lock<T>);
+
+impl<T> Deref for Guard<'_, T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        // SAFETY: this guard holds `busy`.
+        unsafe { &*self.0.value.get() }
+    }
+}
+
+impl<T> DerefMut for Guard<'_, T> {
+    fn deref_mut(&mut self) -> &mut T {
+        // SAFETY: this guard holds `busy`.
+        unsafe { &mut *self.0.value.get() }
+    }
+}
+
+impl<T> Drop for Guard<'_, T> {
+    fn drop(&mut self) {
+        self.0.busy.store(false, Ordering::Release);
+    }
+}
+
 /// The program's memory functions with the blocks allocated through them,
 /// by size, and the content model allocated for the next element
 /// declaration.
 #[derive(Debug)]
 pub(crate) struct CSuite {
     mem: Mem,
-    blocks: Mutex<HashMap<usize, Vec<Block>>>,
-    model: Mutex<Option<(Block, usize)>>,
+    blocks: Lock<HashMap<usize, Vec<Block>>>,
+    model: Lock<Option<(Block, usize)>>,
 }
 
 impl CSuite {
     pub(crate) fn new(mem: Mem) -> Self {
         CSuite {
             mem,
-            blocks: Mutex::new(HashMap::new()),
-            model: Mutex::new(None),
+            blocks: Lock::new(HashMap::new()),
+            model: Lock::new(None),
         }
     }
 
+    /// The last block of `size` bytes kept. The size's entry stays, with
+    /// its capacity, so that putting the block back cannot allocate.
     fn take(&self, size: usize) -> Option<Block> {
-        let mut blocks = self.blocks.lock().ok()?;
-        let v = blocks.get_mut(&size)?;
-        let b = v.pop();
-        if v.is_empty() {
-            blocks.remove(&size);
-        }
-        b
+        self.blocks.lock().get_mut(&size)?.pop()
     }
 
+    /// Room to keep one more block of `size` bytes, reserved before the
+    /// program's allocator is called; `false` when the system allocator
+    /// cannot provide it, which the suite reports as a failed call
+    /// (D-067).
+    fn room(&self, size: usize) -> bool {
+        let mut blocks = self.blocks.lock();
+        if !blocks.contains_key(&size) {
+            if blocks.try_reserve(1).is_err() {
+                return false;
+            }
+            blocks.insert(size, Vec::new());
+        }
+        blocks
+            .get_mut(&size)
+            .is_some_and(|v| v.try_reserve(1).is_ok())
+    }
+
+    /// Keeps a block, in room [`CSuite::room`] reserved or [`CSuite::take`]
+    /// left.
     fn keep(&self, size: usize, b: Block) {
-        if let Ok(mut blocks) = self.blocks.lock() {
-            blocks.entry(size).or_default().push(b);
+        if let Some(v) = self.blocks.lock().get_mut(&size) {
+            v.push(b);
         }
     }
 
     /// The content model block of `size` bytes allocated for the element
     /// declaration being reported, if any; the program owns it now.
     pub(crate) fn take_model(&self, size: usize) -> Option<*mut c_void> {
-        let (b, n) = self.model.lock().ok()?.take()?;
+        let (b, n) = self.model.lock().take()?;
         if n == size {
             return Some(b.0);
         }
@@ -74,6 +154,9 @@ impl CSuite {
 
 impl MemorySuite for CSuite {
     fn malloc(&self, size: usize) -> bool {
+        if !self.room(size) {
+            return false;
+        }
         // SAFETY: the program's `malloc_fcn`, which takes any size.
         let p = unsafe { (self.mem.malloc)(size) };
         if p.is_null() {
@@ -88,6 +171,10 @@ impl MemorySuite for CSuite {
             // No block of that size (a reset parser's creation): a new one.
             return self.malloc(size);
         };
+        if !self.room(size) {
+            self.keep(old, b);
+            return false;
+        }
         // SAFETY: a block the program's allocator returned and this suite
         // kept; on failure it stays valid and is kept again.
         let p = unsafe { (self.mem.realloc)(b.0, size) };
@@ -112,9 +199,8 @@ impl MemorySuite for CSuite {
         if p.is_null() {
             return false;
         }
-        if let Ok(mut m) = self.model.lock()
-            && let Some((old, _)) = m.replace((Block(p), size))
-        {
+        let old = self.model.lock().replace((Block(p), size));
+        if let Some((old, _)) = old {
             // SAFETY: an earlier model block no handler took.
             unsafe { (self.mem.free)(old.0) };
         }
@@ -125,12 +211,12 @@ impl MemorySuite for CSuite {
 impl Drop for CSuite {
     /// `XML_ParserFree`: the blocks still allocated are freed.
     fn drop(&mut self) {
-        let blocks = std::mem::take(self.blocks.get_mut().unwrap_or_else(|e| e.into_inner()));
+        let blocks = std::mem::take(self.blocks.get_mut());
         for b in blocks.into_values().flatten() {
             // SAFETY: blocks the program's allocator returned, freed once.
             unsafe { (self.mem.free)(b.0) };
         }
-        if let Some((b, _)) = self.model.get_mut().ok().and_then(Option::take) {
+        if let Some((b, _)) = self.model.get_mut().take() {
             // SAFETY: as above.
             unsafe { (self.mem.free)(b.0) };
         }

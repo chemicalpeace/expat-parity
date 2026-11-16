@@ -19,11 +19,16 @@
 //! does (`NULL`, `XML_STATUS_ERROR`, `XML_FALSE`); the process must not
 //! abort.
 //!
-//! Two layouts are exempt, since stable Rust has no fallible `Arc`
-//! constructor: the reference-count block of an `Arc<Vec<u8>>` (shared
-//! entity text and the input buffer: the counts and the vector header)
-//! and that of the parser's shared control. Allocations of exactly these
-//! layouts are neither counted nor refused.
+//! Stable Rust has no fallible `Arc` constructor. The port reserves a
+//! block of the `Arc`'s size before each `Arc::new` and fails when that
+//! reservation fails (D-067); the reservation is counted and refused like
+//! any allocation, the `Arc::new` itself is exempt. Exempt are the
+//! allocation that directly follows the release of such a reservation of
+//! the same size, and two layouts whose `Arc::new` does not always follow
+//! its reservation directly: the reference-count block of an
+//! `Arc<Vec<u8>>` (shared entity text and the input buffer) and that of
+//! the parser's shared control. Exempt allocations are neither counted
+//! nor refused.
 
 // Miri cannot spawn the child processes.
 #![cfg(not(miri))]
@@ -31,8 +36,9 @@
 #![allow(clippy::expect_used)]
 
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::cell::Cell;
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use expat::{ErrorCode, Events, Handler, Options, Parser};
 
@@ -44,7 +50,6 @@ impl Handler for Quiet {}
 /// Counts allocations while armed and fails from `FAIL_AT` on.
 struct Failing;
 
-static ARMED: AtomicBool = AtomicBool::new(false);
 static COUNT: AtomicU64 = AtomicU64::new(0);
 static FAIL_AT: AtomicU64 = AtomicU64::new(u64::MAX);
 /// With `OOM_TRACE` set, a child prints the backtrace of each refusal
@@ -56,18 +61,45 @@ fn shared_text_block() -> Layout {
     Layout::new::<(AtomicU64, AtomicU64, Vec<u8>)>()
 }
 
+thread_local! {
+    /// Whether this thread's allocations are counted and refused. Only
+    /// the thread that runs the parser is armed; the harness's other
+    /// threads allocate at times that differ from run to run.
+    static ARMED: Cell<bool> = const { Cell::new(false) };
+    /// The size of the last byte block this thread freed, until its next
+    /// allocation: an `Arc` reservation (D-067) when the next allocation
+    /// is an `Arc` block of that size.
+    static RESERVED: Cell<usize> = const { Cell::new(0) };
+}
+
+/// Whether the current thread is armed (false while its thread-local
+/// storage is torn down).
+fn armed() -> bool {
+    ARMED.try_with(Cell::get).unwrap_or(false)
+}
+
+/// Arms or disarms the current thread.
+fn arm(on: bool) {
+    ARMED.with(|a| a.set(on));
+}
+
 impl Failing {
     fn refuse(layout: Layout) -> bool {
-        if layout == shared_text_block() || layout == expat::internal::parse::control_block_layout()
+        if !armed() {
+            return false;
+        }
+        let reserved = RESERVED.try_with(|r| r.replace(0)).unwrap_or(0);
+        if layout == shared_text_block()
+            || layout == expat::internal::parse::control_block_layout()
+            || (reserved == layout.size() && layout.align() >= std::mem::align_of::<AtomicUsize>())
         {
             return false;
         }
-        let r = ARMED.load(Ordering::Relaxed)
-            && COUNT.fetch_add(1, Ordering::Relaxed) >= FAIL_AT.load(Ordering::Relaxed);
+        let r = COUNT.fetch_add(1, Ordering::Relaxed) >= FAIL_AT.load(Ordering::Relaxed);
         if r && TRACE.load(Ordering::Relaxed) {
-            ARMED.store(false, Ordering::Relaxed);
+            arm(false);
             eprintln!("TRACE {}", std::backtrace::Backtrace::force_capture());
-            ARMED.store(true, Ordering::Relaxed);
+            arm(true);
         }
         r
     }
@@ -93,6 +125,14 @@ unsafe impl GlobalAlloc for Failing {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        if armed() {
+            let size = if layout.align() == 1 {
+                layout.size()
+            } else {
+                0
+            };
+            let _ = RESERVED.try_with(|r| r.set(size));
+        }
         // SAFETY: the caller's contract for `dealloc`.
         unsafe { System.dealloc(ptr, layout) }
     }
@@ -108,6 +148,11 @@ unsafe impl GlobalAlloc for Failing {
 
 #[global_allocator]
 static GLOBAL: Failing = Failing;
+
+/// Held by each test that counts allocations in this process: the
+/// counter and its switches are shared, so two tests counting at once
+/// would disarm or count for each other.
+static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 const SALT: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
@@ -161,7 +206,7 @@ fn run(doc: usize, events: bool, fail_at: u64) -> (Option<ErrorCode>, u64) {
     TRACE.store(std::env::var_os("OOM_TRACE").is_some(), Ordering::Relaxed);
     COUNT.store(0, Ordering::Relaxed);
     FAIL_AT.store(fail_at, Ordering::Relaxed);
-    ARMED.store(true, Ordering::Relaxed);
+    arm(true);
     let mut result = Ok(());
     for (i, piece) in bytes.chunks(7).enumerate() {
         let last = (i + 1) * 7 >= bytes.len();
@@ -174,7 +219,7 @@ fn run(doc: usize, events: bool, fail_at: u64) -> (Option<ErrorCode>, u64) {
             break;
         }
     }
-    ARMED.store(false, Ordering::Relaxed);
+    arm(false);
     let code = result.err().map(|e| e.code());
     drop(p);
     (code, COUNT.load(Ordering::Relaxed))
@@ -208,7 +253,7 @@ fn run_creation(fail_at: u64) -> u64 {
     COUNT.store(0, Ordering::Relaxed);
     FAIL_AT.store(fail_at, Ordering::Relaxed);
     TRACE.store(std::env::var_os("OOM_TRACE").is_some(), Ordering::Relaxed);
-    ARMED.store(true, Ordering::Relaxed);
+    arm(true);
     let len = std::ffi::c_int::try_from(doc.len()).expect("length");
     // SAFETY: the strings are NUL-terminated literals, the document is a
     // live slice of `len` bytes, and each handle is used only while live.
@@ -233,9 +278,77 @@ fn run_creation(fail_at: u64) -> u64 {
         if !q.is_null() {
             c::XML_ParserFree(q);
         }
+        // An application memory suite and an unknown encoding (D-067).
+        let suite = c::XML_Memory_Handling_Suite {
+            malloc_fcn: Some(c_malloc),
+            realloc_fcn: Some(c_realloc),
+            free_fcn: Some(c_free),
+        };
+        let m = c::XML_ParserCreate_MM(std::ptr::null(), &raw const suite, std::ptr::null());
+        if !m.is_null() {
+            c::XML_SetUnknownEncodingHandler(m, Some(latin_like), std::ptr::null_mut());
+            let d = b"<?xml version='1.0' encoding='x-test'?><a b='\xC3\xA9'>\xE9\xC3\xA9</a>";
+            let n = std::ffi::c_int::try_from(d.len()).expect("length");
+            let _ = c::XML_Parse(m, d.as_ptr().cast(), n, 1);
+            c::XML_ParserFree(m);
+        }
     }
-    ARMED.store(false, Ordering::Relaxed);
+    arm(false);
     COUNT.load(Ordering::Relaxed)
+}
+
+unsafe extern "C" {
+    fn malloc(size: usize) -> *mut std::ffi::c_void;
+    fn realloc(ptr: *mut std::ffi::c_void, size: usize) -> *mut std::ffi::c_void;
+    fn free(ptr: *mut std::ffi::c_void);
+}
+
+/// `malloc_fcn` of the test's memory suite.
+unsafe extern "C" fn c_malloc(size: usize) -> *mut std::ffi::c_void {
+    // SAFETY: the C library's `malloc`.
+    unsafe { malloc(size) }
+}
+
+/// `realloc_fcn` of the test's memory suite.
+unsafe extern "C" fn c_realloc(ptr: *mut std::ffi::c_void, size: usize) -> *mut std::ffi::c_void {
+    // SAFETY: `ptr` came from `c_malloc` or `c_realloc`.
+    unsafe { realloc(ptr, size) }
+}
+
+/// `free_fcn` of the test's memory suite.
+unsafe extern "C" fn c_free(ptr: *mut std::ffi::c_void) {
+    // SAFETY: `ptr` came from `c_malloc` or `c_realloc`.
+    unsafe { free(ptr) }
+}
+
+/// The converter of `latin_like`: every two-byte sequence is U+00E9.
+unsafe extern "C" fn two_bytes(
+    _data: *mut std::ffi::c_void,
+    _s: *const std::ffi::c_char,
+) -> std::ffi::c_int {
+    0xE9
+}
+
+/// The release function of `latin_like`.
+unsafe extern "C" fn release(_data: *mut std::ffi::c_void) {}
+
+/// An unknown-encoding handler that maps every byte to its own code
+/// point, except 0xC3, the first byte of a two-byte sequence.
+unsafe extern "C" fn latin_like(
+    _data: *mut std::ffi::c_void,
+    _name: *const expat_capi::XML_Char,
+    info: *mut expat_capi::XML_Encoding,
+) -> std::ffi::c_int {
+    // SAFETY: the parser passes a valid `XML_Encoding` to fill in.
+    let info = unsafe { &mut *info };
+    for (i, m) in info.map.iter_mut().enumerate() {
+        *m = std::ffi::c_int::try_from(i).expect("byte");
+    }
+    info.map[0xC3] = -2;
+    info.data = std::ptr::null_mut();
+    info.convert = Some(two_bytes);
+    info.release = Some(release);
+    expat_capi::XML_STATUS_OK as std::ffi::c_int
 }
 
 /// The child side of the creation test.
@@ -255,9 +368,13 @@ fn every_allocation_failure_in_creation_and_reset_returns() {
     {
         return;
     }
+    let _serial = SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let exe = std::env::current_exe().expect("test binary");
     let total = run_creation(u64::MAX);
     let mut aborted = Vec::new();
+    let mut first = String::new();
     for at in 0..total {
         let out = Command::new(&exe)
             .args([
@@ -271,13 +388,28 @@ fn every_allocation_failure_in_creation_and_reset_returns() {
             .expect("child process");
         let stdout = String::from_utf8_lossy(&out.stdout);
         if !(out.status.success() && stdout.contains("OUTCOME done")) {
+            if aborted.is_empty() {
+                // The same point again, with the backtrace of each refusal.
+                let traced = Command::new(&exe)
+                    .args([
+                        "--exact",
+                        "child_creation_case",
+                        "--nocapture",
+                        "--test-threads=1",
+                    ])
+                    .env("EXPAT_SYSTEM_OOM_CREATION", at.to_string())
+                    .env("OOM_TRACE", "1")
+                    .output()
+                    .expect("child process");
+                first = String::from_utf8_lossy(&traced.stderr).into_owned();
+            }
             aborted.push(at);
         }
     }
     println!("system_oom creation: {total} failure points");
     assert!(
         aborted.is_empty(),
-        "{} of {total} failure points did not return: {aborted:?}",
+        "{} of {total} failure points did not return: {aborted:?}\nfirst: {first}",
         aborted.len()
     );
 }
@@ -289,6 +421,9 @@ fn every_allocation_failure_ends_the_parse_normally() {
     {
         return;
     }
+    let _serial = SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let exe = std::env::current_exe().expect("test binary");
     let mut aborted = Vec::new();
     let mut points = 0;
